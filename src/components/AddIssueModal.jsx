@@ -80,7 +80,6 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       }
       
       // 전송 직전에 데이터 확인
-      console.log('ISSUE 전송할 데이터:', payload)
       
       await addIssue(payload)
       alert('ISSUE가 추가되었습니다.')

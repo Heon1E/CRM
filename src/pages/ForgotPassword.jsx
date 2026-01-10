@@ -44,7 +44,6 @@ const ForgotPassword = () => {
       setVerificationCode(code)
 
       // 콘솔에 출력
-      console.log('인증번호:', code)
 
       // 알림창으로 표시
       alert(`인증번호가 발송되었습니다.\n인증번호: ${code}\n(실제 서비스에서는 SMS로 발송됩니다)`)

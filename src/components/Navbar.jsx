@@ -78,7 +78,6 @@ const Navbar = () => {
     try {
       // 현재 전체 URL을 redirectTo로 사용 (경로 포함)
       const redirectTo = window.location.href
-      console.log('Navbar: Starting Google login, redirectTo:', redirectTo)
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -97,7 +96,6 @@ const Navbar = () => {
         alert('로그인 에러: ' + error.message)
         setIsLoggingIn(false)
       } else {
-        console.log('Navbar: OAuth redirect initiated')
         // 성공 시 OAuth 리다이렉트가 발생하므로 여기서는 아무것도 하지 않음
       }
     } catch (error) {

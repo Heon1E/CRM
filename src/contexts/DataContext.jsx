@@ -150,15 +150,11 @@ export const DataProvider = ({ children }) => {
           try {
             const { data, error } = await supabase.from('clients').select('*').order('company')
             
-            // 디버깅 로그 추가
-            console.log('🔍 [fetchClients] 데이터 로딩 결과:', { data, error })
-            
             if (error) {
               console.error('❌ [fetchClients] 에러 발생:', error)
               throw error
             }
             
-            console.log('✅ [fetchClients] 성공, 데이터 개수:', data?.length || 0)
             return { success: true, data: data || [] }
           } catch (error) {
             console.error('❌ [fetchClients] Clients 로드 실패:', error)
@@ -175,15 +171,11 @@ export const DataProvider = ({ children }) => {
               .order('activity_date', { ascending: false })
               .order('created_at', { ascending: false })
             
-            // 디버깅 로그 추가
-            console.log('🔍 [fetchActivities] 데이터 로딩 결과:', { data, error })
-            
             if (error) {
               console.error('❌ [fetchActivities] 에러 발생:', error)
               throw error
             }
             
-            console.log('✅ [fetchActivities] 성공, 데이터 개수:', data?.length || 0)
             return { success: true, data: data || [] }
           } catch (error) {
             console.error('❌ [fetchActivities] Activities 로드 실패:', error)
@@ -260,7 +252,6 @@ export const DataProvider = ({ children }) => {
             }
           })
           
-          console.log('📋 [초기 로드] 변환된 clients:', mappedClients.length, '개')
           setClients(mappedClients)
         } else {
           console.warn('⚠️ [초기 로드] clientsResult 실패:', clientsResult)
@@ -274,9 +265,6 @@ export const DataProvider = ({ children }) => {
             user: activity.user_name || activity.user,  // user_name -> user 변환
             date: activity.activity_date,
           }))
-          
-          console.log('📋 [초기 로드] 변환된 activities:', mappedActivities.length, '개')
-          console.log('📋 [초기 로드] 첫 번째 activity 샘플:', mappedActivities[0])
           
           setActivities(mappedActivities)
         } else {
@@ -496,13 +484,7 @@ export const DataProvider = ({ children }) => {
         }
       })
       
-      // 디버깅 로그: 저장할 데이터 확인
-      console.log('💾 [addClient] 저장할 데이터:', filteredData)
-      
       const { data, error } = await supabase.from('clients').insert([filteredData]).select().single()
-      
-      // 디버깅 로그: 저장 결과 확인
-      console.log('🔍 [addClient] 저장 결과:', { data, error })
       
       if (error) {
         console.error('❌ [addClient] 저장 실패:', error)
@@ -517,7 +499,6 @@ export const DataProvider = ({ children }) => {
         contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
       }
       
-      console.log('✅ [addClient] 변환된 데이터:', clientWithCamelCase)
       setClients((prev) => [...prev, clientWithCamelCase])
       return clientWithCamelCase
     } catch (error) {
@@ -548,13 +529,7 @@ export const DataProvider = ({ children }) => {
           }
         })
         
-        // 디버깅 로그: 저장할 데이터 확인
-        console.log('💾 [updateClient] 저장할 데이터:', filteredData)
-        
         const { data, error } = await supabase.from('clients').update(filteredData).eq('id', id).select().single()
-        
-        // 디버깅 로그: 저장 결과 확인
-        console.log('🔍 [updateClient] 저장 결과:', { data, error })
         
         if (error) {
           console.error('❌ [updateClient] 저장 실패:', error)
@@ -569,7 +544,6 @@ export const DataProvider = ({ children }) => {
           contract_prices: typeof data.contract_prices === 'string' ? JSON.parse(data.contract_prices) : data.contract_prices || [] 
         }
         
-        console.log('✅ [updateClient] 변환된 데이터:', updatedClient)
         setClients((prev) => prev.map((client) => (client.id === id ? updatedClient : client)))
         return updatedClient
     } catch (error) {
@@ -638,17 +612,11 @@ export const DataProvider = ({ children }) => {
         }
       })
       
-      // 디버깅 로그: 저장할 데이터 확인
-      console.log('💾 [addActivity] 저장할 데이터:', filteredData)
-      
       const { data, error } = await supabase
         .from('activities')
         .insert([filteredData])
         .select()
         .single()
-
-      // 디버깅 로그: 저장 결과 확인
-      console.log('🔍 [addActivity] 저장 결과:', { data, error })
 
       if (error) {
         console.error('❌ [addActivity] 저장 실패:', error)
@@ -661,19 +629,11 @@ export const DataProvider = ({ children }) => {
         ...data,
         clientId: data.client_id || data.clientId,
         clientName: data.client_name || data.clientName,
-        user: data.user_name || data.user,  // user_name -> user 변환 (누락 수정)
+        user: data.user_name || data.user,  // user_name -> user 변환
         date: data.activity_date,
       }
 
-      console.log('✅ [addActivity] 변환된 데이터:', activityWithDate)
-      console.log('📊 [addActivity] State 업데이트 전 activities 개수:', activities.length)
-      
-      setActivities((prev) => {
-        const newActivities = [activityWithDate, ...prev]
-        console.log('📊 [addActivity] State 업데이트 후 activities 개수:', newActivities.length)
-        return newActivities
-      })
-      
+      setActivities((prev) => [activityWithDate, ...prev])
       return activityWithDate
     } catch (error) {
       console.error('활동 추가 중 오류 발생:', error)

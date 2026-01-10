@@ -40,8 +40,6 @@ const Settings = () => {
           .eq('user_id', user.id)
           .maybeSingle()  // .single() 대신 .maybeSingle() 사용 (데이터 없으면 null 반환, 에러 없음)
 
-        console.log('🔍 [loadSettings] 조회 결과:', { data, error })
-
         if (error) {
           console.error('❌ [loadSettings] 설정 불러오기 오류:', error)
           // 에러가 있어도 기본값 사용
@@ -51,7 +49,6 @@ const Settings = () => {
 
         if (data) {
           // 데이터가 있으면 설정에 반영
-          console.log('✅ [loadSettings] 기존 설정 불러오기 성공')
           setSettings({
             company_name: data.company_name || '',
             email: data.email || '',
@@ -61,8 +58,6 @@ const Settings = () => {
           })
         } else {
           // 데이터가 없으면 기본값을 DB에 insert하고 다시 불러오기
-          console.log('⚠️ [loadSettings] 설정 데이터 없음, 기본값 생성 중...')
-          
           const defaultSettings = {
             user_id: user.id,
             company_name: 'Xavian CRM',
@@ -89,7 +84,6 @@ const Settings = () => {
               sales_goal_notification: false,
             })
           } else {
-            console.log('✅ [loadSettings] 기본 설정 생성 성공:', insertData)
             // 생성된 데이터를 설정에 반영
             setSettings({
               company_name: insertData.company_name || 'Xavian CRM',

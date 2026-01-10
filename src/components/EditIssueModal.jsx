@@ -147,7 +147,6 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
       }
       
       // 전송 직전에 데이터 확인
-      console.log('ISSUE 수정 전송할 데이터:', payload)
       
       await updateIssue(issueId, payload)
       alert('ISSUE가 수정되었습니다.')
