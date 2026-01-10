@@ -7,7 +7,7 @@ import { Sparkles, Loader2, X, Plus } from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
 
 const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
-  const { clients, addActivity } = useData()
+  const { clients, addActivity, addIssue } = useData()
   const formRef = useRef(null)
 
   const [formData, setFormData] = useState({
@@ -20,6 +20,7 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
     next_action_date: initialDate || '',
     next_action_detail: '',
   })
+  const [registerAsIssue, setRegisterAsIssue] = useState(false)
 
   // initialDate가 변경되면 next_action_date 업데이트
   useEffect(() => {
@@ -30,6 +31,16 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
       }))
     }
   }, [initialDate])
+
+  // 모달이 닫힐 때 상태 초기화
+  useEffect(() => {
+    if (!isOpen) {
+      setRegisterAsIssue(false)
+      setAttendees([])
+      setAttendeeInput('')
+      setCharCount(0)
+    }
+  }, [isOpen])
 
   const [attendees, setAttendees] = useState([]) // 참석자 배열
   const [attendeeInput, setAttendeeInput] = useState('') // 참석자 입력 필드
@@ -158,7 +169,7 @@ ${currentText}`
     }
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.clientId) {
       alert('고객을 선택해주세요.')
@@ -173,26 +184,53 @@ ${currentText}`
       return
     }
 
-    // 참석자 배열을 콤마로 구분된 문자열로 변환하여 user 필드에 저장
-    const userString = attendees.length > 0 ? attendees.join(', ') : ''
-    
-    addActivity({
-      ...formData,
-      user: userString,
-    })
-    alert('활동 내역이 추가되었습니다.')
-    setFormData({
-      clientId: '',
-      type: '미팅',
-      activity_date: new Date().toISOString().split('T')[0],
-      user: '',
-      description: '',
-      status: '완료',
-    })
-    setAttendees([])
-    setAttendeeInput('')
-    setCharCount(0)
-    onClose()
+    try {
+      // 참석자 배열을 콤마로 구분된 문자열로 변환하여 user 필드에 저장
+      const userString = attendees.length > 0 ? attendees.join(', ') : ''
+      
+      // 영업 활동 등록
+      const activity = await addActivity({
+        ...formData,
+        user: userString,
+      })
+
+      // 이슈로 등록 체크박스가 체크되어 있으면 이슈도 함께 등록
+      if (registerAsIssue) {
+        const selectedClient = clients.find(c => c.id === formData.clientId)
+        const issueTitle = `${selectedClient?.company || '고객'} - ${formData.type}`
+        
+        await addIssue({
+          title: issueTitle,
+          content: formData.description,
+          status: '등록',
+          target_date: formData.activity_date,
+          date: formData.activity_date
+        })
+        alert('활동 내역이 추가되었고, 이슈로도 등록되었습니다.')
+      } else {
+        alert('활동 내역이 추가되었습니다.')
+      }
+
+      // 폼 초기화
+      setFormData({
+        clientId: '',
+        type: '미팅',
+        activity_date: new Date().toISOString().split('T')[0],
+        user: '',
+        description: '',
+        status: '완료',
+        next_action_date: initialDate || '',
+        next_action_detail: '',
+      })
+      setAttendees([])
+      setAttendeeInput('')
+      setCharCount(0)
+      setRegisterAsIssue(false)
+      onClose()
+    } catch (error) {
+      console.error('활동 등록 오류:', error)
+      alert('활동 내역 등록 중 오류가 발생했습니다.')
+    }
   }
 
   return (
@@ -369,10 +407,33 @@ ${currentText}`
             required
             disabled={isAILoading}
           />
-          <div className="mt-1 text-right text-sm text-gray-500">
-            {charCount}/3000
-          </div>
+          <p className="text-xs text-gray-500 mt-1">{charCount}/3000자</p>
         </div>
+
+        {/* 이슈 등록 체크박스 */}
+        <div className="flex items-center space-x-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <input
+            type="checkbox"
+            id="registerAsIssue"
+            checked={registerAsIssue}
+            onChange={(e) => setRegisterAsIssue(e.target.checked)}
+            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+          />
+          <label htmlFor="registerAsIssue" className="text-sm font-medium text-gray-700 cursor-pointer">
+            이슈로 등록
+          </label>
+          <span className="text-xs text-gray-500 ml-1">
+            (체크 시 이 활동이 이슈 리스트에도 자동으로 추가됩니다)
+          </span>
+        </div>
+
+        {registerAsIssue && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              💡 이 활동이 이슈로 등록되며, 제목과 내용이 이슈 항목에 복사됩니다.
+            </p>
+          </div>
+        )}
 
         <div className="flex justify-end space-x-3 pt-4">
           <button

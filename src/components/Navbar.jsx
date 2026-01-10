@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Users, Activity, Settings, DollarSign, Package, LogOut, User, AlertCircle, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, Users, Activity, Settings, DollarSign, LogOut, User, TrendingUp } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -9,15 +9,51 @@ const Navbar = () => {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [companyName, setCompanyName] = useState('')
 
+  // localStorage에서 회사명 불러오기
+  useEffect(() => {
+    const loadCompanyName = () => {
+      try {
+        const savedSettings = localStorage.getItem('crm_settings')
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings)
+          if (parsed.companyName) {
+            setCompanyName(parsed.companyName)
+          }
+        }
+      } catch (error) {
+        console.error('회사명 불러오기 오류:', error)
+      }
+    }
+
+    loadCompanyName()
+    
+    // settingsUpdated 이벤트 리스너 등록 (설정 변경 시 즉시 반영)
+    window.addEventListener('settingsUpdated', loadCompanyName)
+    
+    return () => {
+      window.removeEventListener('settingsUpdated', loadCompanyName)
+    }
+  }, [])
+
+  // 동적 앱 타이틀: localStorage의 companyName이 있으면 '회사이름 CRM', 없으면 기본값 'Xavian CRM'
+  const appTitle = useMemo(() => {
+    if (companyName && companyName.trim()) {
+      return `${companyName.trim()} CRM`
+    }
+    // user.user_metadata.company_name 또는 user.app_metadata.company_name 확인 (백업)
+    const userCompanyName = user?.user_metadata?.company_name || user?.app_metadata?.company_name || null
+    return userCompanyName ? `${userCompanyName} CRM` : 'Xavian CRM'
+  }, [user, companyName])
+
+  // 메뉴에서 '제품 관리'와 'ISSUE' 제거
   const menuItems = [
     { path: '/', label: '대시보드', icon: LayoutDashboard },
     { path: '/clients', label: '고객 관리', icon: Users },
     { path: '/activities', label: '영업 활동', icon: Activity },
     { path: '/pipeline', label: '영업 파이프라인', icon: TrendingUp },
     { path: '/sales', label: '매출 관리', icon: DollarSign },
-    { path: '/products', label: '제품 관리', icon: Package },
-    { path: '/issues', label: 'ISSUE', icon: AlertCircle },
     { path: '/settings', label: '설정', icon: Settings },
   ]
 
@@ -67,7 +103,7 @@ const Navbar = () => {
       <div className="flex items-center justify-between h-16 px-2 md:px-6">
         {/* Logo */}
         <div className="flex items-center space-x-4 flex-shrink-0">
-          <h1 className="text-xl font-bold text-brand-blue">IND CRM</h1>
+          <h1 className="text-xl font-bold text-brand-blue">{appTitle}</h1>
         </div>
 
         {/* Menu Items - 가로 스크롤 가능 (모바일 대응) */}

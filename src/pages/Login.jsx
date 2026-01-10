@@ -1,12 +1,19 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { signInWithGoogle } = useAuth()
+  const { signInWithGoogle, user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // 동적 앱 타이틀: 회사명이 있으면 '회사이름 CRM', 없으면 기본값 'Xavian CRM'
+  const appTitle = useMemo(() => {
+    // user.user_metadata.company_name 또는 user.app_metadata.company_name 확인
+    const companyName = user?.user_metadata?.company_name || user?.app_metadata?.company_name || null
+    return companyName ? `${companyName} CRM` : 'Xavian CRM'
+  }, [user])
 
   const handleGoogleSignIn = async () => {
     setError('')
@@ -32,7 +39,7 @@ const Login = () => {
     <div className="min-h-screen bg-background-default flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-text-primary">
-          IND CRM
+          {appTitle}
         </h2>
         <p className="mt-2 text-center text-sm text-text-secondary">
           Google 계정으로 시작하세요

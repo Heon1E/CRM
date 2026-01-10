@@ -9,25 +9,25 @@ const MetricCard = ({ title, value, icon, trend, trendValue, onClick, clickable 
   return (
     <div
       onClick={clickable && onClick ? onClick : undefined}
-      className={`card card-hover p-5 md:p-6 w-full ${
+      className={`card card-hover p-3 md:p-5 lg:p-6 w-full ${
         clickable && onClick ? 'cursor-pointer hover:border-brand-blue' : ''
       }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs md:text-sm font-medium text-text-secondary mb-2">{title}</p>
-          <p className="text-2xl md:text-3xl font-bold text-text-primary break-words mb-2">{value}</p>
+          <p className="text-xs font-medium text-text-secondary mb-1 md:mb-2">{title}</p>
+          <p className="text-xl md:text-2xl lg:text-3xl font-bold text-text-primary break-words mb-1 md:mb-2">{value}</p>
           {trend && trendValue && (
-            <div className="flex items-center mt-3 flex-wrap">
-              <span className={`text-xs md:text-sm font-semibold ${trend === 'up' ? 'text-brand-green' : 'text-red-500'}`}>
+            <div className="flex items-center mt-2 md:mt-3 flex-wrap">
+              <span className={`text-xs font-semibold ${trend === 'up' ? 'text-brand-green' : 'text-red-500'}`}>
                 {trend === 'up' ? '↑' : '↓'} {trendValue}
               </span>
-              <span className="text-xs md:text-sm text-text-secondary ml-2">전월 대비</span>
+              <span className="text-xs text-text-secondary ml-2">전월 대비</span>
             </div>
           )}
         </div>
-        <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-50 rounded-card flex items-center justify-center flex-shrink-0 ml-4">
-          <span className="text-2xl md:text-3xl">{icon || '📊'}</span>
+        <div className="w-10 h-10 md:w-12 md:h-12 lg:w-16 lg:h-16 bg-blue-50 rounded-card flex items-center justify-center flex-shrink-0 ml-2 md:ml-4">
+          <span className="text-xl md:text-2xl lg:text-3xl">{icon || '📊'}</span>
         </div>
       </div>
     </div>
