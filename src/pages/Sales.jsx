@@ -3,10 +3,11 @@ import { Edit, Download, Plus } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import AddSaleModal from '../components/AddSaleModal'
 import EditSaleModal from '../components/EditSaleModal'
+import SwipeableListItem from '../components/SwipeableListItem'
 import { exportSalesToExcel } from '../utils/excelExport'
 
 const Sales = () => {
-  const { sales, clients, products, loading } = useData()
+  const { sales, clients, products, loading, deleteSale } = useData()
   const [editingSaleGroup, setEditingSaleGroup] = useState(null) // 그룹 전체 데이터 저장
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
@@ -37,14 +38,16 @@ const Sales = () => {
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <button
             onClick={handleExport}
-            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2"
+            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Download className="w-4 h-4" />
             <span>엑셀 다운로드</span>
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2"
+            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Plus className="w-4 h-4" />
             <span>매출 추가</span>
@@ -52,8 +55,10 @@ const Sales = () => {
         </div>
       </div>
 
+      {/* Sales - PC: Table, 모바일: Card with Swipe */}
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* PC: Table View (768px 이상) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-border-light">
             <thead className="bg-transparent">
               <tr>
@@ -90,7 +95,6 @@ const Sales = () => {
                     <td className="px-6 py-5 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
                         {(() => {
-                          // clientName이 있으면 사용, 없으면 clients 배열에서 찾기
                           if (sale.clientName && sale.clientName !== '알 수 없음') {
                             return sale.clientName
                           }
@@ -111,18 +115,16 @@ const Sales = () => {
                       {sale.itemCount || sale.items?.length || 1}건
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {(sale.totalAmount / 10000).toLocaleString()}만원
+                      {((sale.totalAmount || 0) / 10000).toLocaleString()}만원
                     </td>
                     <td className="px-6 py-5 text-sm text-gray-500">
                       <div className="max-w-xs truncate">{sale.notes || '-'}</div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => {
-                          // 그룹 내 모든 원본 데이터를 모달에 전달
-                          setEditingSaleGroup(sale)
-                        }}
-                        className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors"
+                        onClick={() => setEditingSaleGroup(sale)}
+                        className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         <Edit className="w-4 h-4" />
                         <span>수정</span>
@@ -139,6 +141,70 @@ const Sales = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* 모바일: Card View with Swipe (768px 미만) */}
+        <div className="md:hidden divide-y divide-border-light">
+          {sortedSales.length > 0 ? (
+            sortedSales.map((sale) => {
+              const clientName = sale.clientName && sale.clientName !== '알 수 없음'
+                ? sale.clientName
+                : (sale.clientId && clients && Array.isArray(clients))
+                  ? clients.find((c) => c.id === sale.clientId)?.company || '-'
+                  : '-'
+              
+              return (
+                <SwipeableListItem
+                  key={sale.id}
+                  onEdit={() => setEditingSaleGroup(sale)}
+                  onDelete={() => {
+                    if (window.confirm('이 매출 기록을 삭제하시겠습니까?')) {
+                      deleteSale(sale.id).catch((error) => {
+                        console.error('매출 삭제 오류:', error)
+                        alert('삭제 중 오류가 발생했습니다.')
+                      })
+                    }
+                  }}
+                  enabled={true}
+                >
+                  <div className="p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation min-h-[44px]">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-base font-bold text-gray-900 flex-1 break-words">
+                        {sale.date || sale.sale_date || '-'}
+                      </h3>
+                      <span className="ml-2 text-base font-bold text-gray-900 whitespace-nowrap">
+                        {((sale.totalAmount || 0) / 10000).toLocaleString()}만원
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 text-sm text-gray-600">
+                      <div className="flex items-start space-x-2">
+                        <span className="font-medium whitespace-nowrap">거래처:</span>
+                        <span className="break-words flex-1">{clientName}</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="font-medium whitespace-nowrap">품목:</span>
+                        <span className="break-words flex-1">
+                          {sale.displayItemName || sale.items?.[0]?.item_name || sale.items?.[0]?.productName || '-'}
+                        </span>
+                        <span className="text-xs text-gray-500 whitespace-nowrap">
+                          ({sale.itemCount || sale.items?.length || 1}건)
+                        </span>
+                      </div>
+                      {sale.notes && (
+                        <div className="mt-2 pt-2 border-t border-gray-100 text-sm text-gray-500 break-words">
+                          {sale.notes}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </SwipeableListItem>
+              )
+            })
+          ) : (
+            <div className="px-6 py-8 text-center text-text-secondary">
+              매출 기록이 없습니다.
+            </div>
+          )}
         </div>
       </div>
 

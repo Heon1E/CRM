@@ -1,7 +1,9 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { DataProvider } from './contexts/DataContext'
+import { BackgroundTaskProvider } from './contexts/BackgroundTaskContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Clients from './pages/Clients'
@@ -57,12 +59,50 @@ function App() {
   return (
     <AuthProvider>
       <DataProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
-        </Router>
+        <BackgroundTaskProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/*" element={<ProtectedRoutes />} />
+            </Routes>
+          </Router>
+          {/* Toast 알림 컴포넌트 */}
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#fff',
+                color: '#363636',
+                borderRadius: '12px',
+                padding: '16px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                fontSize: '14px',
+                fontWeight: 500,
+                minWidth: '300px',
+                maxWidth: '500px'
+              },
+              success: {
+                iconTheme: {
+                  primary: '#10b981',
+                  secondary: '#fff'
+                },
+                style: {
+                  border: '1px solid #10b981'
+                }
+              },
+              error: {
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fff'
+                },
+                style: {
+                  border: '1px solid #ef4444'
+                }
+              }
+            }}
+          />
+        </BackgroundTaskProvider>
       </DataProvider>
     </AuthProvider>
   )

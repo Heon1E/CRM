@@ -1,17 +1,20 @@
 import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Edit, Download, Users } from 'lucide-react'
+import { Search, Edit, Download, Users, Camera } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import EditClientModal from '../components/EditClientModal'
 import AddClientModal from '../components/AddClientModal'
+import BusinessCardScannerModal from '../components/BusinessCardScannerModal'
+import SwipeableListItem from '../components/SwipeableListItem'
 import { exportClientsToExcel } from '../utils/excelExport'
 
 const Clients = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
-  const { clients, sales, loading } = useData()
+  const { clients, sales, loading, deleteClient } = useData()
   const [searchTerm, setSearchTerm] = useState('')
   const [editingClientId, setEditingClientId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false)
 
   // 회사명 기준으로 그룹핑 (Hook 선언 후에 수행)
   const groupedClients = useMemo(() => {
@@ -150,20 +153,33 @@ const Clients = () => {
             총 {Object.keys(groupedClients).length}개 거래처
           </p>
         </div>
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-2">
           <button
             onClick={handleExport}
-            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2"
+            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Download className="w-4 h-4" />
-            <span>엑셀 다운로드</span>
+            <span className="hidden sm:inline">엑셀 다운로드</span>
+            <span className="sm:hidden">다운로드</span>
+          </button>
+          <button
+            onClick={() => setIsScannerModalOpen(true)}
+            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            <Camera className="w-4 h-4" />
+            <span className="hidden sm:inline">명함 스캔</span>
+            <span className="sm:hidden">스캔</span>
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2"
+            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span>+</span>
-            <span>거래처 추가</span>
+            <span className="hidden sm:inline">거래처 추가</span>
+            <span className="sm:hidden">추가</span>
           </button>
         </div>
       </div>
@@ -171,20 +187,22 @@ const Clients = () => {
       {/* Search Bar */}
       <div className="card p-4 md:p-5">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
           <input
             type="text"
             placeholder="회사명 또는 담당자명으로 검색..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field w-full pl-10 pr-4 text-sm md:text-base"
+            className="input-field w-full pl-10 pr-4 py-3 text-base md:text-base touch-manipulation min-h-[44px]"
+            style={{ fontSize: '16px', WebkitTapHighlightColor: 'transparent' }}
           />
         </div>
       </div>
 
-      {/* Clients Table - 회사명 기준 그룹핑 */}
+      {/* Clients - PC: Table, 모바일: Card with Swipe */}
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* PC: Table View (768px 이상) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-border-light">
             <thead className="bg-transparent">
               <tr>
@@ -279,7 +297,8 @@ const Clients = () => {
                       <td className="px-6 py-5 whitespace-nowrap text-sm">
                         <button
                           onClick={() => setEditingClientId(primaryContact?.id)}
-                          className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors"
+                          className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                          style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
                           <Edit className="w-4 h-4" />
                           <span>수정</span>
@@ -298,6 +317,93 @@ const Clients = () => {
             </tbody>
           </table>
         </div>
+
+        {/* 모바일: Card View with Swipe (768px 미만) */}
+        <div className="md:hidden divide-y divide-border-light">
+          {Object.keys(filteredGroupedClients).length > 0 ? (
+            Object.keys(filteredGroupedClients).map((company) => {
+              const companyClients = filteredGroupedClients[company]
+              const primaryContact = companyClients[0]
+              const hasMultipleContacts = companyClients.length > 1
+              const stats = getCompanyStats(companyClients)
+
+              return (
+                <SwipeableListItem
+                  key={company}
+                  onEdit={() => setEditingClientId(primaryContact?.id)}
+                  onDelete={() => {
+                    if (window.confirm(`"${company}" 고객을 삭제하시겠습니까?`)) {
+                      deleteClient(primaryContact?.id).catch((error) => {
+                        console.error('고객 삭제 오류:', error)
+                        alert('삭제 중 오류가 발생했습니다.')
+                      })
+                    }
+                  }}
+                  enabled={true}
+                >
+                  <Link
+                    to={`/clients/${primaryContact?.id}`}
+                    className="block p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-base font-bold text-text-primary flex-1 break-words">
+                        {company}
+                      </h3>
+                      <span
+                        className={`ml-2 px-2 py-1 text-xs font-semibold rounded-lg whitespace-nowrap ${getStatusColor(
+                          primaryContact?.status
+                        )}`}
+                      >
+                        {primaryContact?.status || '-'}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 text-sm text-text-secondary">
+                      {primaryContact?.contact_person && (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">담당자:</span>
+                          <span>{primaryContact.contact_person}</span>
+                          {hasMultipleContacts && (
+                            <span className="text-xs text-brand-blue">
+                              외 {companyClients.length - 1}명
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {primaryContact?.phone && (
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">연락처:</span>
+                          <span>{primaryContact.phone}</span>
+                        </div>
+                      )}
+                      {primaryContact?.email && (
+                        <div className="flex items-center space-x-2 break-all">
+                          <span className="font-medium">이메일:</span>
+                          <span>{primaryContact.email}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-2 mt-2 pt-2 border-t border-gray-100">
+                        <span className="text-xs text-text-secondary">
+                          최근 주문: {stats.lastOrder ? stats.lastOrder.split('T')[0] : '-'}
+                        </span>
+                        <span className="text-xs text-text-secondary">•</span>
+                        <span className="text-xs font-semibold text-text-primary">
+                          {stats.totalAmount === 0
+                            ? '0원'
+                            : `${(stats.totalAmount / 10000).toLocaleString()}만원`}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </SwipeableListItem>
+              )
+            })
+          ) : (
+            <div className="px-6 py-8 text-center text-text-secondary">
+              검색 결과가 없습니다.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modals */}
@@ -309,6 +415,16 @@ const Clients = () => {
         isOpen={editingClientId !== null}
         onClose={() => setEditingClientId(null)}
         clientId={editingClientId}
+      />
+      <BusinessCardScannerModal
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
+        onSuccess={(result) => {
+          // 성공 후 모달 자동 닫기 (1.5초 후)
+          setTimeout(() => {
+            setIsScannerModalOpen(false)
+          }, 1500)
+        }}
       />
     </div>
   )

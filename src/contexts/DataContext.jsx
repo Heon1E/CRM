@@ -1,6 +1,24 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { 
+  getAllData as getOfflineData, 
+  saveToStore, 
+  deleteFromStore,
+  getStoreName,
+  clearStore,
+  STORES
+} from '../utils/offlineDB'
+import { 
+  addToQueue, 
+  getPendingOperations, 
+  updateQueueStatus, 
+  removeFromQueue,
+  QUEUE_STATUS,
+  QUEUE_OPERATION,
+  getQueueCount
+} from '../utils/syncQueue'
 
 const DataContext = createContext()
 
@@ -14,12 +32,14 @@ export const useData = () => {
 
 export const DataProvider = ({ children }) => {
   const { user, loading: authLoading } = useAuth() // AuthContext의 user와 loading 상태 참조
+  const { isOnline } = useOnlineStatus() // 온라인/오프라인 상태
   const [products, setProducts] = useState([])
   const [clients, setClients] = useState([])
   const [activities, setActivities] = useState([])
   const [sales, setSales] = useState([])
   const [issues, setIssues] = useState([])
   const [loading, setLoading] = useState(true)
+  const [pendingSyncCount, setPendingSyncCount] = useState(0) // 동기화 대기 중인 작업 수
 
   // 데이터 정제 헬퍼 함수 (Sanitize)
   const sanitizeData = useCallback((data, type) => {
@@ -112,6 +132,104 @@ export const DataProvider = ({ children }) => {
     return sanitized
   }, [])
 
+  // 동기화 큐 상태 업데이트
+  useEffect(() => {
+    const updateSyncCount = async () => {
+      try {
+        const count = await getQueueCount()
+        setPendingSyncCount(count)
+      } catch (error) {
+        console.error('[DataContext] 동기화 큐 개수 가져오기 실패:', error)
+      }
+    }
+
+    // 초기 로드 및 큐 업데이트 이벤트 리스너
+    updateSyncCount()
+    window.addEventListener('syncQueueUpdated', updateSyncCount)
+
+    return () => {
+      window.removeEventListener('syncQueueUpdated', updateSyncCount)
+    }
+  }, [])
+
+  // 온라인 복귀 시 자동 동기화
+  useEffect(() => {
+    if (!isOnline || !user) return
+
+    const syncOfflineOperations = async () => {
+      try {
+        const pendingOps = await getPendingOperations()
+        if (pendingOps.length === 0) return
+
+        for (const op of pendingOps) {
+          try {
+            await updateQueueStatus(op.id, QUEUE_STATUS.SYNCING)
+            
+            let result
+            const storeName = getStoreName(op.table)
+            
+            if (op.operation === QUEUE_OPERATION.INSERT) {
+              // Insert: Supabase에 저장
+              result = await supabase.from(op.table).insert(op.data).select().single()
+              if (result.error) throw result.error
+              
+              // IndexedDB의 임시 ID를 실제 ID로 업데이트
+              if (storeName && op.tempId) {
+                await deleteFromStore(storeName, op.tempId)
+                if (result.data) {
+                  await saveToStore(storeName, result.data)
+                }
+              }
+            } else if (op.operation === QUEUE_OPERATION.UPDATE) {
+              // Update: Supabase에 업데이트
+              result = await supabase.from(op.table).update(op.data).eq('id', op.data.id).select().single()
+              if (result.error) throw result.error
+              
+              // IndexedDB도 업데이트
+              if (storeName && result.data) {
+                await saveToStore(storeName, result.data)
+              }
+            } else if (op.operation === QUEUE_OPERATION.DELETE) {
+              // Delete: Supabase에서 삭제
+              result = await supabase.from(op.table).delete().eq('id', op.data.id)
+              if (result.error) throw result.error
+              
+              // IndexedDB에서도 삭제
+              if (storeName) {
+                await deleteFromStore(storeName, op.data.id)
+              }
+            }
+            
+            await updateQueueStatus(op.id, QUEUE_STATUS.COMPLETED)
+            await removeFromQueue(op.id)
+            
+            // 데이터 새로고침
+            window.location.reload() // 간단한 방법: 전체 새로고침 (필요시 선택적 업데이트로 개선 가능)
+            
+          } catch (error) {
+            console.error(`[DataContext] 동기화 실패 (${op.table}/${op.operation}):`, error)
+            await updateQueueStatus(op.id, QUEUE_STATUS.FAILED, error)
+          }
+        }
+      } catch (error) {
+        console.error('[DataContext] 오프라인 작업 동기화 중 오류:', error)
+      }
+    }
+
+    // 온라인 복귀 이벤트 리스너
+    const handleOnlineStatusChanged = (event) => {
+      if (event.detail.isOnline && event.detail.wasOffline) {
+        syncOfflineOperations()
+      }
+    }
+
+    window.addEventListener('onlineStatusChanged', handleOnlineStatusChanged)
+
+    return () => {
+      window.removeEventListener('onlineStatusChanged', handleOnlineStatusChanged)
+    }
+  }, [isOnline, user])
+
   // 초기 데이터 로드
   useEffect(() => {
     if (authLoading) {
@@ -134,6 +252,45 @@ export const DataProvider = ({ children }) => {
       }, 5000)
 
       try {
+        // 온라인 상태면 Supabase에서 가져오고 IndexedDB에 저장
+        // 오프라인 상태면 IndexedDB에서 가져오기
+        if (!isOnline) {
+          // 오프라인: IndexedDB에서 로드
+          const offlineData = await getOfflineData()
+          
+          if (offlineData.products && offlineData.products.length > 0) {
+            setProducts(offlineData.products)
+          }
+          if (offlineData.clients && offlineData.clients.length > 0) {
+            setClients(offlineData.clients.map(c => ({
+              ...c,
+              lastOrder: c.last_order || c.lastOrder,
+              orderAmount: c.order_amount || c.orderAmount,
+              contract_prices: typeof c.contract_prices === 'string' ? (c.contract_prices ? JSON.parse(c.contract_prices) : []) : (c.contract_prices || [])
+            })))
+          }
+          if (offlineData.activities && offlineData.activities.length > 0) {
+            setActivities(offlineData.activities.map(a => ({
+              ...a,
+              clientId: a.client_id || a.clientId,
+              clientName: a.client_name || a.clientName,
+              user: a.user_name || a.user,
+              date: a.activity_date
+            })))
+          }
+          if (offlineData.sales && offlineData.sales.length > 0) {
+            setSales(offlineData.sales)
+          }
+          if (offlineData.issues && offlineData.issues.length > 0) {
+            setIssues(offlineData.issues)
+          }
+          
+          clearTimeout(timeoutId)
+          setLoading(false)
+          return
+        }
+
+        // 온라인: Supabase에서 로드하고 IndexedDB에 저장
         const fetchProducts = async () => {
           try {
             const { data, error } = await supabase.from('products').select('*').order('name')
@@ -228,7 +385,16 @@ export const DataProvider = ({ children }) => {
         const issuesResult = results[4].status === 'fulfilled' ? results[4].value : { success: false, data: null }
 
         if (productsResult.success && productsResult.data !== null) {
-          setProducts(productsResult.data || [])
+          const productsData = productsResult.data || []
+          setProducts(productsData)
+          // IndexedDB에 저장
+          if (productsData.length > 0) {
+            try {
+              await saveToStore(STORES.PRODUCTS, productsData)
+            } catch (error) {
+              console.error('[DataContext] Products IndexedDB 저장 실패:', error)
+            }
+          }
         }
         
         if (clientsResult.success && clientsResult.data !== null) {
@@ -253,6 +419,14 @@ export const DataProvider = ({ children }) => {
           })
           
           setClients(mappedClients)
+          // IndexedDB에 저장 (원본 데이터 형태로)
+          if (clientsResult.data && clientsResult.data.length > 0) {
+            try {
+              await saveToStore(STORES.CLIENTS, clientsResult.data)
+            } catch (error) {
+              console.error('[DataContext] Clients IndexedDB 저장 실패:', error)
+            }
+          }
         } else {
           console.warn('⚠️ [초기 로드] clientsResult 실패:', clientsResult)
         }
@@ -267,6 +441,14 @@ export const DataProvider = ({ children }) => {
           }))
           
           setActivities(mappedActivities)
+          // IndexedDB에 저장 (원본 데이터 형태로)
+          if (activitiesResult.data && activitiesResult.data.length > 0) {
+            try {
+              await saveToStore(STORES.ACTIVITIES, activitiesResult.data)
+            } catch (error) {
+              console.error('[DataContext] Activities IndexedDB 저장 실패:', error)
+            }
+          }
         } else {
           console.warn('⚠️ [초기 로드] activitiesResult 실패:', activitiesResult)
         }
@@ -309,7 +491,7 @@ export const DataProvider = ({ children }) => {
           }
 
           const groupedSalesData = processGroupedSales(salesResult.data || [], productsResult.data || [])
-          setSales(groupedSalesData.map((group) => {
+          const mappedSales = groupedSalesData.map((group) => {
             // DB에서 가져온 데이터를 camelCase로 변환
             let clientName = group.client_name || group.clientName
             if (!clientName && group.clients) {
@@ -323,11 +505,29 @@ export const DataProvider = ({ children }) => {
               totalAmount: group.total_amount || group.totalAmount,
               date: group.sale_date
             }
-          }))
+          })
+          setSales(mappedSales)
+          // IndexedDB에 저장 (원본 데이터 형태로)
+          if (salesResult.data && salesResult.data.length > 0) {
+            try {
+              await saveToStore(STORES.SALES, salesResult.data)
+            } catch (error) {
+              console.error('[DataContext] Sales IndexedDB 저장 실패:', error)
+            }
+          }
         }
 
         if (issuesResult.success && issuesResult.data !== null) {
-          setIssues(issuesResult.data || [])
+          const issuesData = issuesResult.data || []
+          setIssues(issuesData)
+          // IndexedDB에 저장
+          if (issuesData.length > 0) {
+            try {
+              await saveToStore(STORES.ISSUES, issuesData)
+            } catch (error) {
+              console.error('[DataContext] Issues IndexedDB 저장 실패:', error)
+            }
+          }
         }
 
         if (errors.length > 0) {
@@ -484,19 +684,62 @@ export const DataProvider = ({ children }) => {
         }
       })
       
-      const { data, error } = await supabase.from('clients').insert([filteredData]).select().single()
+      let clientWithCamelCase
       
-      if (error) {
-        console.error('❌ [addClient] 저장 실패:', error)
-        throw error
-      }
-      
-      // DB에서 가져온 데이터를 camelCase로 변환
-      const clientWithCamelCase = {
-        ...data,
-        lastOrder: data.last_order || data.lastOrder,
-        orderAmount: data.order_amount || data.orderAmount,
-        contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
+      if (isOnline) {
+        // 온라인: Supabase에 바로 저장
+        const { data, error } = await supabase.from('clients').insert([filteredData]).select().single()
+        
+        if (error) {
+          console.error('❌ [addClient] 저장 실패:', error)
+          throw error
+        }
+        
+        // DB에서 가져온 데이터를 camelCase로 변환
+        clientWithCamelCase = {
+          ...data,
+          lastOrder: data.last_order || data.lastOrder,
+          orderAmount: data.order_amount || data.orderAmount,
+          contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
+        }
+        
+        // IndexedDB에도 저장
+        try {
+          await saveToStore(STORES.CLIENTS, data)
+        } catch (error) {
+          console.error('[DataContext] addClient IndexedDB 저장 실패:', error)
+        }
+      } else {
+        // 오프라인: 임시 ID 생성 및 IndexedDB에 저장, Sync Queue에 추가
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        const offlineData = {
+          ...filteredData,
+          id: tempId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        clientWithCamelCase = {
+          ...offlineData,
+          lastOrder: offlineData.last_order || offlineData.lastOrder,
+          orderAmount: offlineData.order_amount || offlineData.orderAmount,
+          contract_prices: typeof offlineData.contract_prices === 'string' ? (offlineData.contract_prices ? JSON.parse(offlineData.contract_prices) : []) : (offlineData.contract_prices || [])
+        }
+        
+        // IndexedDB에 임시 저장
+        try {
+          await saveToStore(STORES.CLIENTS, offlineData)
+        } catch (error) {
+          console.error('[DataContext] addClient IndexedDB 저장 실패:', error)
+          throw error
+        }
+        
+        // Sync Queue에 추가
+        try {
+          await addToQueue('clients', QUEUE_OPERATION.INSERT, filteredData, tempId)
+        } catch (error) {
+          console.error('[DataContext] addClient Sync Queue 추가 실패:', error)
+        }
       }
       
       setClients((prev) => [...prev, clientWithCamelCase])
@@ -505,7 +748,7 @@ export const DataProvider = ({ children }) => {
       console.error('❌ [addClient] 고객 추가 중 오류 발생:', error)
       throw error
     }
-  }, [sanitizeData])
+  }, [sanitizeData, isOnline])
 
   const updateClient = useCallback(async (id, clientData) => {
     try {
@@ -946,7 +1189,9 @@ export const DataProvider = ({ children }) => {
   }, [])
 
   const value = {
-    products, clients, activities, sales, issues, loading, fetchDashboardData,
+    products, clients, activities, sales, issues, loading, 
+    isOnline, pendingSyncCount, // 오프라인 상태 및 동기화 대기 작업 수
+    fetchDashboardData,
     addProduct, addProductsBulk, updateProduct, deleteProduct,
     addClient, updateClient, deleteClient,
     addActivity, updateActivity, deleteActivity,

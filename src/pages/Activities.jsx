@@ -4,11 +4,12 @@ import { Edit, Download } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import EditActivityModal from '../components/EditActivityModal'
 import AddActivityModal from '../components/AddActivityModal'
+import SwipeableListItem from '../components/SwipeableListItem'
 import { exportActivitiesToExcel } from '../utils/excelExport'
 import { formatActivityTitle, formatActivityText } from '../utils/koreanJosa'
 
 const Activities = () => {
-  const { activities, loading, updateActivity } = useData()
+  const { activities, loading, updateActivity, deleteActivity } = useData()
   const [searchParams] = useSearchParams()
   const [editingActivityId, setEditingActivityId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -101,14 +102,16 @@ const Activities = () => {
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <button
             onClick={handleExport}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm"
+            className="flex-1 sm:flex-none px-4 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm touch-manipulation min-h-[44px]"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Download className="w-4 h-4" />
             <span>엑셀 다운로드</span>
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2"
+            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span>+</span>
             <span>활동 추가</span>
@@ -151,57 +154,78 @@ const Activities = () => {
                           )}
                         </div>
 
-                        {/* Activity Content */}
-                        <div className="flex-1 bg-gray-50 rounded-xl p-5 hover:bg-gray-100 hover:shadow-sm transition-all duration-200">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <span
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${getTypeColor(
-                                    activity.type
-                                  )}`}
-                                >
-                                  {activity.type}
-                                </span>
-                                <button
-                                  onClick={() => handleStatusToggle(activity)}
-                                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:shadow-sm ${getStatusColor(
-                                    activity.status
-                                  )}`}
-                                  title="클릭하여 상태 변경"
-                                >
-                                  {activity.status}
-                                </button>
+                        {/* Activity Content with Swipe */}
+                        <div className="flex-1">
+                          <SwipeableListItem
+                            onEdit={() => setEditingActivityId(activity.id)}
+                            onDelete={() => {
+                              if (window.confirm('이 활동을 삭제하시겠습니까?')) {
+                                deleteActivity(activity.id).catch((error) => {
+                                  console.error('활동 삭제 중 오류:', error)
+                                  alert('삭제 중 오류가 발생했습니다.')
+                                })
+                              }
+                            }}
+                            enabled={true}
+                          >
+                            <div className="bg-gray-50 rounded-xl p-4 md:p-5 hover:bg-gray-100 hover:shadow-sm transition-all duration-200">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center space-x-2 mb-3 flex-wrap gap-2">
+                                    <span
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${getTypeColor(
+                                        activity.type
+                                      )}`}
+                                    >
+                                      {activity.type}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleStatusToggle(activity)
+                                      }}
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:shadow-sm touch-manipulation min-h-[44px] ${getStatusColor(
+                                        activity.status
+                                      )}`}
+                                      title="클릭하여 상태 변경"
+                                      style={{ minWidth: '44px', WebkitTapHighlightColor: 'transparent' }}
+                                    >
+                                      {activity.status}
+                                    </button>
+                                  </div>
+                                  {/* 거래처 중심 제목: [거래처] - [핵심요약] */}
+                                  <h3 className="font-bold text-base md:text-lg text-gray-900 mb-2 break-words">
+                                    {formatActivityTitle(activity.clientName, activity.description)}
+                                  </h3>
+                                  {/* 상세 문구: [거래처명]의 [정제된_외부참석자]와 [활동종류] */}
+                                  <p className="text-sm text-gray-600 mb-3 leading-relaxed break-words">
+                                    {formatActivityText(
+                                      activity.clientName,
+                                      activity.user, // 참석자 (정제 로직 적용)
+                                      activity.type
+                                    )}
+                                  </p>
+                                  {/* 활동 내용 */}
+                                  {activity.description && (
+                                    <p className="text-sm text-gray-700 mb-3 leading-relaxed bg-white p-3 rounded-lg border border-gray-200 break-words">
+                                      {activity.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {/* PC에서만 표시하는 수정 버튼 (모바일에서는 스와이프 사용) */}
+                                <div className="ml-4 hidden md:flex flex-col space-y-2">
+                                  <button
+                                    onClick={() => setEditingActivityId(activity.id)}
+                                    className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                    <span className="text-sm">수정</span>
+                                  </button>
+                                </div>
                               </div>
-                              {/* 거래처 중심 제목: [거래처] - [핵심요약] */}
-                              <h3 className="font-bold text-lg text-gray-900 mb-2">
-                                {formatActivityTitle(activity.clientName, activity.description)}
-                              </h3>
-                              {/* 상세 문구: [거래처명]의 [정제된_외부참석자]와 [활동종류] */}
-                              <p className="text-sm text-gray-600 mb-3 leading-relaxed">
-                                {formatActivityText(
-                                  activity.clientName,
-                                  activity.user, // 참석자 (정제 로직 적용)
-                                  activity.type
-                                )}
-                              </p>
-                              {/* 활동 내용 */}
-                              {activity.description && (
-                                <p className="text-sm text-gray-700 mb-3 leading-relaxed bg-white p-3 rounded-lg border border-gray-200">
-                                  {activity.description}
-                                </p>
-                              )}
                             </div>
-                            <div className="ml-4 flex flex-col space-y-2">
-                              <button
-                                onClick={() => setEditingActivityId(activity.id)}
-                                className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors"
-                              >
-                                <Edit className="w-4 h-4" />
-                                <span className="text-sm">수정</span>
-                              </button>
-                            </div>
-                          </div>
+                          </SwipeableListItem>
                         </div>
                       </div>
                     ))}
