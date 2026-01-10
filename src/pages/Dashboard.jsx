@@ -92,13 +92,13 @@ const Dashboard = () => {
   return (
     <div className="space-y-4 md:space-y-6 pb-20 md:pb-0"> {/* 하단 여백 추가 (모바일에서 짤림 방지) */}
       
-      {/* 상단 헤더 영역 수정됨: hidden 클래스 제거하여 모바일에서도 표시 */}
+      {/* 상단 헤더 영역: PC에서는 버튼 숨김, 모바일에서만 표시 */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex-1">
           <h1 className="text-2xl md:text-3xl font-bold text-text-primary">대시보드</h1>
         </div>
-        {/* 모바일에서도 보이도록 flex 설정 유지, 우측 정렬 */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+        {/* 모바일 전용: PC에서는 숨김 (md:hidden) */}
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end md:hidden">
           <VoiceControl />
           <AppInstallGuide />
         </div>

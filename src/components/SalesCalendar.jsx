@@ -256,18 +256,68 @@ const SalesCalendar = () => {
           .fc-col-header-cell { padding: 0.25rem 0.125rem !important; font-size: 0.7rem !important; font-weight: 600 !important; line-height: 1 !important; }
           .fc-col-header-cell-cushion { padding: 0 !important; }
           
-          /* 4. 날짜 셀 높이 최소화 (h-10 = 40px, h-12 = 48px) - 컴팩트하게 */
-          .fc-daygrid-day-frame { min-height: 40px !important; max-height: 48px !important; padding: 2px !important; }
-          .fc-daygrid-day { height: 40px !important; min-height: 40px !important; max-height: 48px !important; }
-          .fc-daygrid-day-number { padding: 2px 4px !important; font-size: 0.7rem !important; line-height: 1.2 !important; }
+          /* 4. 날짜 셀 높이 고정 (h-14 = 56px) 및 Flexbox 레이아웃 적용 */
+          .fc-daygrid-day { height: 56px !important; min-height: 56px !important; max-height: 56px !important; }
+          .fc-daygrid-day-frame { 
+            min-height: 56px !important; 
+            max-height: 56px !important; 
+            height: 56px !important;
+            padding: 2px 4px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+          }
+          .fc-daygrid-day-top { 
+            padding-top: 4px !important;  /* pt-1과 유사한 여백 */
+            padding-bottom: 0 !important;
+            width: 100% !important;
+            display: flex !important;
+            justify-content: flex-start !important;
+            align-items: center !important;
+          }
+          .fc-daygrid-day-number { 
+            padding: 0 4px !important; 
+            font-size: 0.7rem !important; 
+            line-height: 1.2 !important;
+            align-self: flex-start !important;
+            font-weight: 500 !important;
+          }
           
-          /* 5. 모바일 이벤트 점만 표시 (컴팩트하게) */
-          .fc-daygrid-event-harness { margin: 0 !important; }
-          .fc-daygrid-event { margin: 1px 0 !important; padding: 0 !important; height: auto !important; }
-          .fc-daygrid-event-dot { width: 5px !important; height: 5px !important; }
+          /* 5. 이벤트 영역: 날짜 아래에 점들을 가로 중앙 정렬 (mt-1과 유사한 여백) */
+          .fc-daygrid-day-events { 
+            margin-top: 4px !important;  /* mt-1과 유사한 여백 */
+            margin-bottom: 0 !important;
+            display: flex !important;
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 2px !important;  /* gap-0.5와 유사한 간격 */
+            width: 100% !important;
+            min-height: 6px !important;
+            max-height: 12px !important;
+          }
+          .fc-daygrid-event-harness { 
+            margin: 0 !important;
+            flex-shrink: 0 !important;
+          }
+          .fc-daygrid-event { 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            height: auto !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+          }
+          .fc-daygrid-event-dot { 
+            width: 6px !important; 
+            height: 6px !important; 
+            border-radius: 50% !important;
+            margin: 0 auto !important;
+          }
           
-          /* 6. 주(week) 행 여백 최소화 */
-          .fc-daygrid-week { min-height: 40px !important; max-height: 48px !important; }
+          /* 6. 주(week) 행 여백 고정 */
+          .fc-daygrid-week { min-height: 56px !important; max-height: 56px !important; }
           .fc-daygrid-week-numbers { display: none !important; }
           
           /* 7. 달력 전체 컨테이너 자연스러운 높이 */
@@ -305,31 +355,35 @@ const SalesCalendar = () => {
             const title = arg.event.title;
             const props = arg.event.extendedProps;
 
-            // 모바일: 점만 표시
+            // 모바일: 점만 표시 (크기 및 정렬 개선)
             if (isMobile) {
               // A. 공휴일
               if (sourceId === 'holiday-source' || sourceId === HOLIDAY_CALENDAR_ID) {
-                if (isRedDay(title)) return <div className="w-2 h-2 rounded-full bg-rose-500 mx-auto"></div>
-                if (isObservance(title)) return <div className="w-2 h-2 rounded-full bg-gray-300 mx-auto"></div>
-                return <div className="w-2 h-2 rounded-full bg-gray-400 mx-auto"></div>
+                if (isRedDay(title)) {
+                  return <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mx-auto flex-shrink-0"></div>
+                }
+                if (isObservance(title)) {
+                  return <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mx-auto flex-shrink-0"></div>
+                }
+                return <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mx-auto flex-shrink-0"></div>
               }
 
               // B. CRM 데이터
               if (sourceId === 'crm-source') {
                 // 1. [다음 일정] - 빨간색 점
                 if (props.isNextSchedule) {
-                  return <div className="w-2 h-2 rounded-full bg-rose-500 mx-auto"></div>
+                  return <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mx-auto flex-shrink-0"></div>
                 }
                 // 2. [완료된 활동] - 회색 점
                 if (props.status === '완료') {
-                  return <div className="w-2 h-2 rounded-full bg-gray-400 mx-auto opacity-60"></div>
+                  return <div className="w-1.5 h-1.5 rounded-full bg-gray-400 mx-auto opacity-60 flex-shrink-0"></div>
                 }
                 // 3. [진행중] - 초록색 점
-                return <div className="w-2 h-2 rounded-full bg-emerald-500 mx-auto"></div>
+                return <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mx-auto flex-shrink-0"></div>
               }
 
               // C. 구글 내 일정 (파란색 점)
-              return <div className="w-2 h-2 rounded-full bg-blue-500 mx-auto"></div>
+              return <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mx-auto flex-shrink-0"></div>
             }
 
             // PC: 기존 텍스트 + 점 형태

@@ -107,7 +107,7 @@ const AppInstallGuide = () => {
   return (
     <button
       onClick={handleInstallClick}
-      className="hidden md:flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors touch-manipulation min-h-[44px]"
+      className="flex md:hidden items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors touch-manipulation min-h-[44px]"
       style={{ WebkitTapHighlightColor: 'transparent' }}
       title="앱으로 설치하기"
     >
