@@ -31,9 +31,9 @@ class VoiceService {
     this.isSupported = true
     try {
       this.recognition = new SpeechRecognition()
-      this.recognition.continuous = false // 단발성 인식: false
+      this.recognition.continuous = true // ⚠️ 핵심: 연속 듣기 모드 (멈춤 버튼 누르기 전까지 계속 듣기)
       this.recognition.interimResults = true // 중간 결과 표시
-      this.recognition.lang = 'ko-KR'
+      this.recognition.lang = 'ko-KR' // 한국어 고정
       this.recognition.maxAlternatives = 1
 
       // 이벤트 핸들러 연결
@@ -83,9 +83,13 @@ class VoiceService {
     }
   }
 
-  // 종료 처리 핸들러 (단발성: 재시작 없음)
+  // 종료 처리 핸들러
   handleEnd() {
     console.log('[VoiceService] 인식 세션 종료')
+    
+    // continuous 모드에서는 자동 재시작 로직이 필요하지만,
+    // useSpeechToText 훅에서 처리하므로 여기서는 상태만 업데이트
+    // 실제 재시작은 훅의 onEnd 핸들러에서 처리됨
     this.isListening = false
     
     if (this.onEndCallback) {
