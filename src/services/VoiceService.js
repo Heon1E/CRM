@@ -87,13 +87,30 @@ class VoiceService {
   handleEnd() {
     console.log('[VoiceService] 인식 세션 종료')
     
-    // continuous 모드에서는 자동 재시작 로직이 필요하지만,
-    // useSpeechToText 훅에서 처리하므로 여기서는 상태만 업데이트
-    // 실제 재시작은 훅의 onEnd 핸들러에서 처리됨
-    this.isListening = false
-    
-    if (this.onEndCallback) {
-      this.onEndCallback()
+    // continuous 모드에서는 자동 재시작
+    if (this.recognition && this.recognition.continuous && this.isListening) {
+      // 약간의 지연 후 자동 재시작 (continuous 모드)
+      setTimeout(() => {
+        if (this.isListening && this.recognition) {
+          try {
+            this.recognition.start()
+            console.log('[VoiceService] 자동 재시작됨 (continuous 모드)')
+          } catch (e) {
+            // 이미 실행 중이거나 다른 오류인 경우 무시
+            console.warn('[VoiceService] 자동 재시작 실패:', e.message)
+            this.isListening = false
+            if (this.onEndCallback) {
+              this.onEndCallback()
+            }
+          }
+        }
+      }, 100)
+    } else {
+      // continuous 모드가 아니거나 사용자가 중지한 경우
+      this.isListening = false
+      if (this.onEndCallback) {
+        this.onEndCallback()
+      }
     }
   }
 
@@ -138,6 +155,7 @@ class VoiceService {
 
   // 음성 인식 중지
   stopListening() {
+    // 사용자가 직접 중지한 것으로 표시 (자동 재시작 방지)
     this.isListening = false
     
     if (this.recognition) {

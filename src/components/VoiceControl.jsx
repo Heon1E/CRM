@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useSpeechToText } from '../hooks/useSpeechToText'
+import React, { useState, useEffect } from 'react'
+import voiceService from '../services/VoiceService'
 import { processVoiceCommand } from '../utils/voiceAssistant'
 import { useData } from '../contexts/DataContext'
 import { Mic } from 'lucide-react'
@@ -11,12 +11,26 @@ import toast from 'react-hot-toast'
  * Gemini AI로 명령을 처리
  */
 const VoiceControl = () => {
+  const [isListening, setIsListening] = useState(false)
+  const [isSupported, setIsSupported] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const { addActivity } = useData()
-  const resetTranscriptRef = useRef(null)
 
-  // 음성 명령 처리 함수 (useCallback으로 메모이제이션)
-  const handleVoiceCommand = useCallback(async (transcript, resetTranscript) => {
+  // 음성 인식 지원 여부 확인
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (SpeechRecognition) {
+      if (!voiceService.recognition && voiceService.initRecognition) {
+        voiceService.initRecognition()
+      }
+      setIsSupported(true)
+    } else {
+      setIsSupported(false)
+    }
+  }, [])
+
+  // 음성 명령 처리 함수
+  const handleVoiceCommand = async (transcript) => {
     if (!transcript || transcript.trim().length < 3) {
       toast.warning('음성이 인식되지 않았습니다. 다시 시도해주세요.', {
         duration: 2000,
@@ -56,11 +70,6 @@ const VoiceControl = () => {
         icon: '✅'
       })
 
-      // 텍스트 초기화 (다음 음성 명령을 위해)
-      if (resetTranscript) {
-        resetTranscript()
-      }
-
     } catch (error) {
       console.error('[VoiceControl] 음성 명령 처리 오류:', error)
       toast.error('음성 명령 처리 중 오류가 발생했습니다.', {
@@ -70,93 +79,83 @@ const VoiceControl = () => {
     } finally {
       setIsProcessing(false)
     }
-  }, [addActivity])
-
-  // 음성 인식 훅 사용 (연속 듣기 모드)
-  const {
-    isListening,
-    transcript,
-    interimTranscript,
-    isSupported,
-    error,
-    startListening,
-    stopListening,
-    resetTranscript
-  } = useSpeechToText({
-    continuous: true, // ⚠️ 핵심: 멈춤 버튼 누르기 전까지 계속 듣기
-    interimResults: true, // 말하는 도중에도 텍스트 표시
-    lang: 'ko-KR', // 한국어 고정
-    onResult: (final, interim, full) => {
-      // 실시간 결과 업데이트 (선택사항: 필요시 UI에 표시 가능)
-      if (final) {
-        console.log('[VoiceControl] 누적 인식:', final)
-      }
-      if (interim) {
-        console.log('[VoiceControl] 중간 인식:', interim)
-      }
-    },
-    onError: (errorType, errorMessage) => {
-      // 에러 처리
-      console.error('[VoiceControl] 음성 인식 에러:', errorType, errorMessage)
-      
-      if (errorType === 'not-allowed') {
-        toast.error('마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.', {
-          duration: 5000,
-          icon: '⚠️'
-        })
-      } else if (errorType === 'not-supported') {
-        toast.error('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Edge 브라우저를 사용해주세요.', {
-          duration: 5000,
-          icon: '⚠️'
-        })
-      } else if (errorType !== 'no-speech') {
-        // 침묵(no-speech)은 continuous 모드에서는 에러가 아니므로 무시
-        toast.error(errorMessage || '음성 인식 중 오류가 발생했습니다.', {
-          duration: 4000,
-          icon: '❌'
-        })
-      }
-    },
-    onEnd: async (finalTranscript) => {
-      // 사용자가 직접 중지한 경우에만 처리
-      if (finalTranscript && finalTranscript.trim().length > 0) {
-        await handleVoiceCommand(finalTranscript, resetTranscript)
-      }
-    }
-  })
-
-  // resetTranscript 참조 저장 (onEnd 콜백에서 사용하기 위해)
-  resetTranscriptRef.current = resetTranscript
-
-  // 에러 상태 감지
-  useEffect(() => {
-    if (error && error !== 'no-speech') {
-      // 에러는 onError 콜백에서 이미 처리되므로 여기서는 추가 처리 없음
-    }
-  }, [error])
+  }
 
   // 음성 인식 시작/중지 토글
-  const toggleListening = useCallback(async () => {
+  const toggleListening = async () => {
     if (isListening) {
       // 중지: 현재까지 인식된 텍스트 처리
-      stopListening()
+      voiceService.stopListening()
+      const finalText = voiceService.getFinalTranscript()
+      setIsListening(false)
       
-      // stopListening 내부에서 onEnd 콜백이 호출되어 handleVoiceCommand가 실행됨
-      // 여기서는 추가 처리 불필요
+      if (finalText && finalText.trim().length > 0) {
+        await handleVoiceCommand(finalText)
+        // 텍스트 초기화
+        voiceService.finalTranscript = ''
+      } else {
+        toast.warning('인식된 내용이 없습니다.', {
+          duration: 2000,
+          icon: '⚠️'
+        })
+      }
     } else {
       // 시작
-      const success = await startListening()
-      
-      if (success) {
+      try {
+        await voiceService.startListening(
+          (final, interim, accumulated) => {
+            // 결과 콜백 (실시간 표시는 선택사항)
+            if (final) {
+              console.log('[VoiceControl] 최종 인식:', final)
+            }
+          },
+          (error) => {
+            // 에러 콜백
+            console.error('[VoiceControl] 음성 인식 에러:', error)
+            setIsListening(false)
+            
+            if (error === 'not-allowed') {
+              toast.error('마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.', {
+                duration: 5000,
+                icon: '⚠️'
+              })
+            } else if (error === 'not-supported') {
+              toast.error('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 Edge 브라우저를 사용해주세요.', {
+                duration: 5000,
+                icon: '⚠️'
+              })
+            } else if (error !== 'no-speech') {
+              // 침묵(no-speech)은 continuous 모드에서는 에러가 아니므로 무시
+              toast.error('음성 인식 중 오류가 발생했습니다.', {
+                duration: 4000,
+                icon: '❌'
+              })
+            }
+          },
+          async () => {
+            // 종료 콜백: continuous 모드에서는 자동 재시작되므로 여기서는 처리하지 않음
+            // 사용자가 직접 중지한 경우에만 toggleListening에서 처리됨
+            if (!voiceService.isListening) {
+              // 자동 종료된 경우 (침묵 등) 처리하지 않음
+              setIsListening(false)
+            }
+          }
+        )
+        setIsListening(true)
         toast.success('음성 명령을 듣고 있습니다... (멈추려면 버튼을 다시 누르세요)', {
           duration: 3000,
           icon: '🎤'
         })
-      } else {
-        // startListening 내부에서 이미 에러 처리됨
+      } catch (error) {
+        console.error('[VoiceControl] 마이크 실행 실패:', error)
+        setIsListening(false)
+        toast.error('마이크 실행 실패: ' + (error.message || '알 수 없는 오류'), {
+          duration: 3000,
+          icon: '❌'
+        })
       }
     }
-  }, [isListening, startListening, stopListening])
+  }
 
   // 지원하지 않는 브라우저에서는 아무것도 렌더링하지 않음
   if (!isSupported) {
