@@ -242,19 +242,21 @@ const SalesCalendar = () => {
           .fc-button { padding: 0.2rem 0.4rem !important; font-size: 0.7rem !important; min-height: 32px !important; }
           .fc-toolbar-chunk { margin: 0 0.15rem !important; }
           .fc-toolbar-title { font-size: 0.875rem !important; }
-          /* 모바일에서 날짜 셀 높이 더 줄이기 (컴팩트 모드) */
-          .fc-daygrid-day-frame { min-height: 40px !important; padding: 2px !important; }
-          .fc-daygrid-day { height: auto !important; min-height: 40px !important; max-height: 50px !important; }
-          .fc-daygrid-day-number { padding: 1px 3px !important; font-size: 0.7rem !important; line-height: 1.2 !important; }
-          .fc-col-header-cell { padding: 2px 1px !important; font-size: 0.7rem !important; font-weight: 600 !important; }
-          .fc-col-header-cell-cushion { padding: 1px !important; }
-          /* 모바일 이벤트 점만 표시 (더 작게) */
+          /* 모바일에서 날짜 셀 높이 절반 이하로 축소 (급격한 축소) */
+          .fc-daygrid-day-frame { min-height: 20px !important; padding: 1px !important; }
+          .fc-daygrid-day { height: auto !important; min-height: 20px !important; max-height: 25px !important; }
+          .fc-daygrid-day-number { padding: 0 2px !important; font-size: 0.65rem !important; line-height: 1 !important; }
+          .fc-col-header-cell { padding: 1px 0.5px !important; font-size: 0.65rem !important; font-weight: 600 !important; }
+          .fc-col-header-cell-cushion { padding: 0.5px !important; }
+          /* 모바일 이벤트 점만 표시 (매우 작게) */
           .fc-daygrid-event-harness { margin: 0 !important; }
-          .fc-daygrid-event { margin: 1px 0 !important; padding: 0 !important; height: auto !important; }
-          /* 달력 전체 높이 제한 (컴팩트 모드) */
-          .fc-dayGridMonth-view { height: auto !important; max-height: 380px !important; }
-          .fc-scroller { overflow-y: auto !important; max-height: 380px !important; }
-          .fc-daygrid-body { max-height: 340px !important; }
+          .fc-daygrid-event { margin: 0.5px 0 !important; padding: 0 !important; height: auto !important; }
+          .fc-daygrid-event-dot { width: 4px !important; height: 4px !important; }
+          /* 달력 전체 높이 제한 (더욱 컴팩트) */
+          .fc-dayGridMonth-view { height: auto !important; max-height: 200px !important; }
+          .fc-scroller { overflow-y: auto !important; max-height: 200px !important; }
+          .fc-daygrid-body { max-height: 180px !important; }
+          .fc-daygrid-week { min-height: 20px !important; }
         }
       `}</style>
 

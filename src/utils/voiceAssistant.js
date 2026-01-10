@@ -187,16 +187,80 @@ export const summarizeMeeting = async (transcript) => {
       throw new Error('Gemini API 응답이 비어있습니다.')
     }
 
-    // JSON 추출
+    // JSON 추출 및 안전한 파싱
     let jsonText = responseText.trim()
     if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '')
     }
-    
-    const parsed = JSON.parse(jsonText)
-    return parsed
+
+    // JSON 객체 추출 시도 (여러 방법 시도)
+    let parsed = null
+    try {
+      // 방법 1: 직접 파싱
+      parsed = JSON.parse(jsonText)
+    } catch (parseError1) {
+      console.warn('[voiceAssistant] 직접 파싱 실패, JSON 객체 추출 시도:', parseError1.message)
+      
+      try {
+        // 방법 2: JSON 객체 찾기 (중괄호 내부 추출)
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+        if (jsonMatch && jsonMatch[0]) {
+          parsed = JSON.parse(jsonMatch[0])
+          console.log('[voiceAssistant] JSON 객체 추출 성공')
+        } else {
+          throw new Error('JSON 객체를 찾을 수 없습니다.')
+        }
+      } catch (parseError2) {
+        console.error('[voiceAssistant] JSON 파싱 완전 실패:', {
+          originalError: parseError1.message,
+          extractionError: parseError2.message,
+          responseText: jsonText.substring(0, 200) + '...',
+          timestamp: new Date().toISOString()
+        })
+        
+        // 파싱 실패 시 기본 구조 반환 (안전장치)
+        parsed = {
+          summary: transcript.substring(0, 200) + '...',
+          agenda: [],
+          decisions: [],
+          nextMeeting: null
+        }
+        console.warn('[voiceAssistant] 기본 구조 반환 (파싱 실패)')
+      }
+    }
+
+    // 파싱된 결과 검증 및 안전한 반환
+    if (!parsed || typeof parsed !== 'object') {
+      console.warn('[voiceAssistant] 파싱된 결과가 유효하지 않음, 기본 구조 반환')
+      return {
+        summary: transcript.substring(0, 200) + '...',
+        agenda: [],
+        decisions: [],
+        nextMeeting: null
+      }
+    }
+
+    // 안전한 구조로 정규화
+    return {
+      summary: (typeof parsed.summary === 'string') ? parsed.summary : (transcript.substring(0, 200) + '...'),
+      agenda: (Array.isArray(parsed.agenda)) ? parsed.agenda.filter(a => typeof a === 'string') : [],
+      decisions: (Array.isArray(parsed.decisions)) ? parsed.decisions.filter(d => typeof d === 'string') : [],
+      nextMeeting: (parsed.nextMeeting && typeof parsed.nextMeeting === 'object' && parsed.nextMeeting.date) 
+        ? {
+            date: (typeof parsed.nextMeeting.date === 'string') ? parsed.nextMeeting.date : null,
+            time: (typeof parsed.nextMeeting.time === 'string') ? parsed.nextMeeting.time : null,
+            topic: (typeof parsed.nextMeeting.topic === 'string') ? parsed.nextMeeting.topic : null
+          }
+        : null
+    }
   } catch (error) {
-    console.error('회의록 요약 오류:', error)
+    console.error('[voiceAssistant] 회의록 요약 오류:', {
+      error: error.message,
+      name: error.name,
+      stack: error.stack,
+      transcriptLength: transcript.length,
+      timestamp: new Date().toISOString()
+    })
     throw error
   }
 }

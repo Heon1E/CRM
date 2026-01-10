@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Smartphone, Mic, MicOff, Square, Loader2, X } from 'lucide-react'
+import { Smartphone, Mic, Square, Loader2, X } from 'lucide-react'
 import voiceService from '../services/VoiceService'
 import { classifyVoiceIntent, summarizeMeeting } from '../utils/voiceAssistant'
+import { requestWakeLock, releaseWakeLock } from '../utils/wakeLock'
 import { useData } from '../contexts/DataContext'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'
 import { useNavigate } from 'react-router-dom'
@@ -125,42 +126,83 @@ const MobileFAB = () => {
   }
 
   // 음성 명령 시작
-  const handleStartListening = () => {
+  const handleStartListening = async () => {
     if (!voiceService.getSupported()) {
       toast.error('이 브라우저는 음성 인식을 지원하지 않습니다.', { duration: 6000 })
       return
     }
 
     try {
+      // Wake Lock 요청
+      await requestWakeLock()
+
       setTranscript('')
+      voiceService.clearAccumulatedTranscript()
       setIsListening(true)
       setIsRecording(false)
       isListeningRef.current = true
       isRecordingRef.current = false
 
-      voiceService.startListening(
-        (finalTranscript, interimTranscript) => {
+      await voiceService.startListening(
+        (finalTranscript, interimTranscript, accumulatedTranscript) => {
           if (isListeningRef.current) {
-            setTranscript((prev) => {
-              const currentFinal = prev.split('|')[0]?.trim() || ''
-              const combinedFinal = currentFinal && finalTranscript 
-                ? `${currentFinal} ${finalTranscript}`.trim() 
-                : (finalTranscript || currentFinal)
-              return interimTranscript ? `${combinedFinal}|${interimTranscript}` : combinedFinal
-            })
+            const currentFinal = accumulatedTranscript || transcript.split('|')[0]?.trim() || ''
+            const combinedFinal = currentFinal && finalTranscript 
+              ? `${currentFinal} ${finalTranscript}`.trim() 
+              : (finalTranscript || currentFinal)
+            setTranscript(interimTranscript ? `${combinedFinal}|${interimTranscript}` : combinedFinal)
           }
         },
         (error) => {
           setIsListening(false)
           isListeningRef.current = false
-          toast.error('음성 인식 중 오류가 발생했습니다.', { duration: 3000 })
+          releaseWakeLock()
+          
+          console.error('[MobileFAB] 음성 인식 에러:', {
+            error: error,
+            type: typeof error,
+            timestamp: new Date().toISOString()
+          })
+          
+          let errorMessage = null
+          if (error === 'not-allowed') {
+            errorMessage = '마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.'
+          } else if (error === 'service-not-allowed') {
+            errorMessage = '음성 인식 서비스를 사용할 수 없습니다.'
+          } else if (error === 'aborted') {
+            errorMessage = '음성 인식이 중단되었습니다.'
+          }
+          
+          if (errorMessage) {
+            toast.error(errorMessage, { duration: 5000, icon: '⚠️' })
+          }
         },
-        () => {}
-      )
+        () => {
+          releaseWakeLock()
+        },
+        true // autoRestart
+      ).catch((error) => {
+        console.error('[MobileFAB] startListening 에러:', {
+          error: error.message,
+          name: error.name,
+          stack: error.stack,
+          timestamp: new Date().toISOString()
+        })
+        setIsListening(false)
+        isListeningRef.current = false
+        releaseWakeLock()
+        throw error
+      })
 
       toast.success('음성 명령을 듣고 있습니다...', { duration: 2000 })
     } catch (error) {
+      console.error('[MobileFAB] 음성 인식 시작 오류:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      })
       setIsListening(false)
+      releaseWakeLock()
       toast.error('음성 인식을 시작할 수 없습니다.', { duration: 3000 })
     }
   }
@@ -173,11 +215,13 @@ const MobileFAB = () => {
       voiceService.stopListening()
       setIsListening(false)
       isListeningRef.current = false
+      releaseWakeLock()
 
-      const finalTranscript = transcript.split('|')[0].trim() || transcript.trim()
+      const accumulatedText = voiceService.getAccumulatedTranscript()
+      const finalTranscript = accumulatedText || transcript.split('|')[0].trim() || transcript.trim()
 
-      if (!finalTranscript) {
-        toast.warning('음성이 인식되지 않았습니다.', { duration: 2000 })
+      if (!finalTranscript || finalTranscript.length < 3) {
+        toast.warning('음성이 인식되지 않았습니다. 다시 시도해주세요.', { duration: 2000 })
         return
       }
 
@@ -232,7 +276,12 @@ const MobileFAB = () => {
         }
       } catch (error) {
         removeTask(taskId)
-        console.error('음성 명령 처리 오류:', error)
+        console.error('[MobileFAB] 음성 명령 처리 오류:', {
+          error: error.message,
+          stack: error.stack,
+          transcriptLength: finalTranscript.length,
+          timestamp: new Date().toISOString()
+        })
         toast.error('음성 명령 처리 중 오류가 발생했습니다.', {
           duration: 4000,
           icon: '❌'
@@ -240,52 +289,101 @@ const MobileFAB = () => {
       } finally {
         setIsProcessing(false)
         setTranscript('')
+        voiceService.clearAccumulatedTranscript()
       }
     } catch (error) {
+      console.error('[MobileFAB] 음성 인식 종료 오류:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      })
       setIsListening(false)
       setIsProcessing(false)
+      releaseWakeLock()
     }
   }
 
   // 회의록 녹음 시작
-  const handleStartRecording = () => {
+  const handleStartRecording = async () => {
     if (!voiceService.getSupported()) {
       toast.error('이 브라우저는 음성 인식을 지원하지 않습니다.', { duration: 6000 })
       return
     }
 
     try {
+      // Wake Lock 요청
+      await requestWakeLock()
+
       setRecordingTranscript('')
       setRecordingTime(0)
+      voiceService.clearAccumulatedTranscript()
       setIsRecording(true)
       setIsListening(false)
       isRecordingRef.current = true
       isListeningRef.current = false
 
-      voiceService.startListening(
-        (finalTranscript, interimTranscript) => {
+      await voiceService.startListening(
+        (finalTranscript, interimTranscript, accumulatedTranscript) => {
           if (isRecordingRef.current) {
-            setRecordingTranscript(prev => {
-              const current = prev.trim()
-              const newText = finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')
-              return current && newText ? `${current} ${newText}`.trim() : (newText || current)
-            })
+            const current = accumulatedTranscript || recordingTranscript.trim()
+            const newText = finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')
+            setRecordingTranscript(current && newText ? `${current} ${newText}`.trim() : (newText || current))
           }
         },
         (error) => {
           setIsRecording(false)
           isRecordingRef.current = false
-          toast.error('녹음 중 오류가 발생했습니다.', { duration: 3000 })
+          releaseWakeLock()
+          
+          console.error('[MobileFAB] 녹음 에러:', {
+            error: error,
+            type: typeof error,
+            timestamp: new Date().toISOString()
+          })
+          
+          let errorMessage = null
+          if (error === 'not-allowed') {
+            errorMessage = '마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.'
+          } else if (error === 'service-not-allowed') {
+            errorMessage = '음성 인식 서비스를 사용할 수 없습니다.'
+          } else if (error === 'aborted') {
+            errorMessage = '녹음이 중단되었습니다.'
+          }
+          
+          if (errorMessage) {
+            toast.error(errorMessage, { duration: 5000, icon: '⚠️' })
+          }
         },
-        () => {}
-      )
+        () => {
+          releaseWakeLock()
+        },
+        true // autoRestart
+      ).catch((error) => {
+        console.error('[MobileFAB] 녹음 시작 에러:', {
+          error: error.message,
+          name: error.name,
+          stack: error.stack,
+          timestamp: new Date().toISOString()
+        })
+        setIsRecording(false)
+        isRecordingRef.current = false
+        releaseWakeLock()
+        throw error
+      })
 
       toast.success('회의록 녹음을 시작했습니다. 종료 시 자동으로 요약됩니다.', {
         duration: 3000,
         icon: '🎙️'
       })
     } catch (error) {
+      console.error('[MobileFAB] 녹음 시작 오류:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      })
       setIsRecording(false)
+      isRecordingRef.current = false
+      releaseWakeLock()
       toast.error('녹음을 시작할 수 없습니다.', { duration: 3000 })
     }
   }
@@ -298,9 +396,30 @@ const MobileFAB = () => {
       voiceService.stopListening()
       setIsRecording(false)
       isRecordingRef.current = false
+      releaseWakeLock()
 
-      if (!recordingTranscript.trim()) {
-        toast.warning('녹음된 내용이 없습니다.', { duration: 2000 })
+      const accumulatedText = voiceService.getAccumulatedTranscript()
+      const finalTranscript = accumulatedText || recordingTranscript.trim()
+
+      // transcript 로깅 (디버깅용)
+      console.log('[MobileFAB] 녹음 종료 - Transcript 확인:', {
+        accumulatedText: accumulatedText,
+        recordingTranscript: recordingTranscript,
+        finalTranscript: finalTranscript,
+        length: finalTranscript ? finalTranscript.length : 0,
+        isEmpty: !finalTranscript || finalTranscript.trim().length === 0,
+        timestamp: new Date().toISOString()
+      })
+
+      if (!finalTranscript || finalTranscript.trim().length < 10) {
+        console.warn('[MobileFAB] 녹음된 내용이 너무 짧음:', {
+          length: finalTranscript ? finalTranscript.length : 0,
+          content: finalTranscript ? finalTranscript.substring(0, 50) : '(empty)'
+        })
+        toast.warning('녹음된 내용이 너무 짧습니다. 최소 10자 이상의 내용이 필요합니다.', { 
+          duration: 3000, 
+          icon: '⚠️' 
+        })
         return
       }
 
@@ -309,12 +428,34 @@ const MobileFAB = () => {
       addTask(taskId, '회의록 요약 중')
 
       try {
-        const result = await summarizeMeeting(recordingTranscript)
+        console.log('[MobileFAB] Gemini API 호출 시작:', {
+          transcriptLength: finalTranscript.length,
+          transcriptPreview: finalTranscript.substring(0, 100) + '...',
+          timestamp: new Date().toISOString()
+        })
+
+        const result = await summarizeMeeting(finalTranscript)
         removeTask(taskId)
 
-        const meetingDescription = `[회의록]\n\n${result.summary || '회의록 요약'}\n\n[주요 안건]\n${(result.agenda || []).length > 0 ? result.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n') : '없음'}\n\n[결정 사항]\n${(result.decisions || []).length > 0 ? result.decisions.map((d, i) => `${i + 1}. ${d}`).join('\n') : '없음'}${result.nextMeeting?.date ? `\n\n[다음 회의]\n날짜: ${result.nextMeeting.date}${result.nextMeeting.time ? ` ${result.nextMeeting.time}` : ''}${result.nextMeeting.topic ? `\n주제: ${result.nextMeeting.topic}` : ''}` : ''}`
+        console.log('[MobileFAB] Gemini API 응답 성공:', {
+          hasSummary: !!result.summary,
+          agendaCount: result.agenda ? result.agenda.length : 0,
+          decisionsCount: result.decisions ? result.decisions.length : 0,
+          hasNextMeeting: !!result.nextMeeting,
+          timestamp: new Date().toISOString()
+        })
 
-        let parsedMeetingDate = result.nextMeeting?.date || new Date().toISOString().split('T')[0]
+        // result 검증 및 안전한 파싱
+        const safeResult = {
+          summary: (result && typeof result.summary === 'string') ? result.summary : '회의록 요약',
+          agenda: (Array.isArray(result?.agenda)) ? result.agenda : [],
+          decisions: (Array.isArray(result?.decisions)) ? result.decisions : [],
+          nextMeeting: (result?.nextMeeting && typeof result.nextMeeting === 'object') ? result.nextMeeting : null
+        }
+
+        const meetingDescription = `[회의록]\n\n${safeResult.summary}\n\n[주요 안건]\n${safeResult.agenda.length > 0 ? safeResult.agenda.map((a, i) => `${i + 1}. ${a}`).join('\n') : '없음'}\n\n[결정 사항]\n${safeResult.decisions.length > 0 ? safeResult.decisions.map((d, i) => `${i + 1}. ${d}`).join('\n') : '없음'}${safeResult.nextMeeting?.date ? `\n\n[다음 회의]\n날짜: ${safeResult.nextMeeting.date}${safeResult.nextMeeting.time ? ` ${safeResult.nextMeeting.time}` : ''}${safeResult.nextMeeting.topic ? `\n주제: ${safeResult.nextMeeting.topic}` : ''}` : ''}`
+
+        let parsedMeetingDate = safeResult.nextMeeting?.date || new Date().toISOString().split('T')[0]
         if (!parsedMeetingDate || !/^\d{4}-\d{2}-\d{2}$/.test(parsedMeetingDate)) {
           parsedMeetingDate = new Date().toISOString().split('T')[0]
         }
@@ -326,19 +467,33 @@ const MobileFAB = () => {
           status: '완료',
         }
 
-        await addActivity(activityData)
+        console.log('[MobileFAB] 활동 내역 저장 시작:', {
+          activityDate: parsedMeetingDate,
+          descriptionLength: meetingDescription.length,
+          hasNextMeeting: !!safeResult.nextMeeting,
+          timestamp: new Date().toISOString()
+        })
 
-        if (result.nextMeeting?.date && /^\d{4}-\d{2}-\d{2}$/.test(result.nextMeeting.date)) {
+        await addActivity(activityData)
+        
+        console.log('[MobileFAB] 활동 내역 저장 성공')
+
+        if (safeResult.nextMeeting?.date && /^\d{4}-\d{2}-\d{2}$/.test(safeResult.nextMeeting.date)) {
           const nextActivityData = {
             type: '미팅',
-            activity_date: result.nextMeeting.date,
-            description: `[다음 회의] ${result.nextMeeting.topic || '일정 등록'}${result.nextMeeting.time ? ` (${result.nextMeeting.time})` : ''}`,
+            activity_date: safeResult.nextMeeting.date,
+            description: `[다음 회의] ${safeResult.nextMeeting.topic || '일정 등록'}${safeResult.nextMeeting.time ? ` (${safeResult.nextMeeting.time})` : ''}`,
             status: '진행중',
           }
 
           await addActivity(nextActivityData)
           
-          toast.success(`${result.nextMeeting.date}${result.nextMeeting.topic ? ` ${result.nextMeeting.topic}` : ''} 미팅 일정이 달력에 등록되었습니다.`, {
+          console.log('[MobileFAB] 다음 회의 일정 저장 성공:', {
+            date: safeResult.nextMeeting.date,
+            topic: safeResult.nextMeeting.topic
+          })
+          
+          toast.success(`${safeResult.nextMeeting.date}${safeResult.nextMeeting.topic ? ` ${safeResult.nextMeeting.topic}` : ''} 미팅 일정이 달력에 등록되었습니다.`, {
             duration: 4000,
             icon: '📅'
           })
@@ -350,19 +505,44 @@ const MobileFAB = () => {
         })
       } catch (error) {
         removeTask(taskId)
-        console.error('회의록 요약 오류:', error)
-        toast.error('회의록 요약 중 오류가 발생했습니다.', {
+        console.error('[MobileFAB] 회의록 요약 오류:', {
+          error: error.message,
+          stack: error.stack,
+          transcriptLength: finalTranscript.length,
+          timestamp: new Date().toISOString()
+        })
+        toast.error('회의록 요약 중 오류가 발생했습니다. 원본 텍스트로 저장합니다.', {
           duration: 4000,
           icon: '❌'
+        })
+        
+        // 요약 실패 시 원본 텍스트로 저장
+        const activityData = {
+          type: '미팅',
+          activity_date: new Date().toISOString().split('T')[0],
+          description: `[회의록]\n\n${finalTranscript}`,
+          status: '완료',
+        }
+        await addActivity(activityData)
+        toast.success('회의록이 원본 텍스트로 저장되었습니다.', {
+          duration: 3000,
+          icon: '📝'
         })
       } finally {
         setIsProcessing(false)
         setRecordingTranscript('')
         setRecordingTime(0)
+        voiceService.clearAccumulatedTranscript()
       }
     } catch (error) {
+      console.error('[MobileFAB] 녹음 종료 오류:', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      })
       setIsRecording(false)
       setIsProcessing(false)
+      releaseWakeLock()
     }
   }
 
@@ -423,13 +603,13 @@ const MobileFAB = () => {
               className={`
                 flex items-center justify-center w-16 h-16 rounded-full shadow-xl hover:shadow-2xl transition-all transform hover:scale-110 active:scale-95 touch-manipulation font-semibold text-sm
                 ${isRecording 
-                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
                   : 'bg-purple-600 hover:bg-purple-700 text-white'
                 }
                 ${(isProcessing || isListening) ? 'opacity-50 cursor-not-allowed' : ''}
               `}
               style={{ WebkitTapHighlightColor: 'transparent' }}
-              title={isRecording ? `녹음 중 (${formatTime(recordingTime)})` : '회의록 녹음'}
+              title={isRecording ? `녹음 중... ${formatTime(recordingTime)}` : '회의록 녹음'}
             >
               {isProcessing ? (
                 <Loader2 className="w-8 h-8 animate-spin" />
@@ -439,7 +619,7 @@ const MobileFAB = () => {
                   <span className="text-xs font-bold">{formatTime(recordingTime)}</span>
                 </div>
               ) : (
-                <MicOff className="w-8 h-8" />
+                <Mic className="w-8 h-8" />
               )}
             </button>
           )}
