@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Smartphone, Mic, Square, Loader2, X } from 'lucide-react'
+import { Smartphone, Mic, Square, Loader2, X, Circle } from 'lucide-react'
 import voiceService from '../services/VoiceService'
 import { classifyVoiceIntent, summarizeMeeting } from '../utils/voiceAssistant'
 import { requestWakeLock, releaseWakeLock } from '../utils/wakeLock'
@@ -595,7 +595,7 @@ const MobileFAB = () => {
             </div>
           )}
 
-          {/* 회의록 녹음 버튼 (큰 버튼) */}
+          {/* 회의록 녹음 버튼 - 빨간색 원형 레코딩 버튼 (큰 버튼) */}
           {isSupported && (
             <button
               onClick={isRecording ? handleStopRecording : handleStartRecording}
@@ -603,8 +603,8 @@ const MobileFAB = () => {
               className={`
                 flex items-center justify-center w-16 h-16 rounded-full shadow-xl hover:shadow-2xl transition-all transform hover:scale-110 active:scale-95 touch-manipulation font-semibold text-sm
                 ${isRecording 
-                  ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  : 'bg-red-500 hover:bg-red-600 text-white'
                 }
                 ${(isProcessing || isListening) ? 'opacity-50 cursor-not-allowed' : ''}
               `}
@@ -612,14 +612,16 @@ const MobileFAB = () => {
               title={isRecording ? `녹음 중... ${formatTime(recordingTime)}` : '회의록 녹음'}
             >
               {isProcessing ? (
-                <Loader2 className="w-8 h-8 animate-spin" />
+                <Loader2 className="w-8 h-8 animate-spin text-white" />
               ) : isRecording ? (
                 <div className="flex flex-col items-center">
-                  <Square className="w-6 h-6 mb-1" />
-                  <span className="text-xs font-bold">{formatTime(recordingTime)}</span>
+                  {/* Pulse 애니메이션이 적용된 빨간색 원형 아이콘 */}
+                  <Circle className="w-8 h-8 fill-white text-white animate-pulse" strokeWidth={0} />
+                  <span className="text-xs font-bold mt-1">{formatTime(recordingTime)}</span>
                 </div>
               ) : (
-                <Mic className="w-8 h-8" />
+                /* 빨간색 꽉 찬 원형 아이콘 */
+                <Circle className="w-8 h-8 fill-white text-white" strokeWidth={0} />
               )}
             </button>
           )}

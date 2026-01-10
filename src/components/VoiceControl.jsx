@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Mic, Square, Loader2 } from 'lucide-react'
+import { Mic, Square, Loader2, Circle } from 'lucide-react'
 import voiceService from '../services/VoiceService'
 import { classifyVoiceIntent, summarizeMeeting } from '../utils/voiceAssistant'
 import { requestWakeLock, releaseWakeLock } from '../utils/wakeLock'
@@ -581,11 +581,11 @@ const VoiceControl = () => {
         </button>
       )}
 
-      {/* 회의록 녹음 버튼 */}
+      {/* 회의록 녹음 버튼 - 빨간색 원형 레코딩 버튼 */}
       {isRecording ? (
         <button
           onClick={handleStopRecording}
-          className="flex items-center space-x-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all text-sm font-medium touch-manipulation min-h-[44px] animate-pulse"
+          className="flex items-center space-x-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all text-sm font-medium touch-manipulation min-h-[44px]"
           style={{ WebkitTapHighlightColor: 'transparent' }}
           disabled={isProcessing}
         >
@@ -596,7 +596,11 @@ const VoiceControl = () => {
             </>
           ) : (
             <>
-              <Square className="w-4 h-4" />
+              {/* Pulse 애니메이션이 적용된 빨간색 원형 버튼 */}
+              <div className="relative flex items-center justify-center">
+                <Circle className="w-4 h-4 fill-red-500 text-red-500 animate-pulse" strokeWidth={0} />
+                <span className="absolute text-white text-xs font-bold">{formatTime(recordingTime)}</span>
+              </div>
               <span className="hidden sm:inline font-bold">녹음 중... {formatTime(recordingTime)}</span>
             </>
           )}
@@ -604,11 +608,12 @@ const VoiceControl = () => {
       ) : (
         <button
           onClick={handleStartRecording}
-          className="flex items-center space-x-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm font-medium touch-manipulation min-h-[44px]"
+          className="flex items-center space-x-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium touch-manipulation min-h-[44px]"
           style={{ WebkitTapHighlightColor: 'transparent' }}
           title="회의록 녹음 시작"
         >
-          <Mic className="w-4 h-4" />
+          {/* 빨간색 꽉 찬 원형 아이콘 */}
+          <Circle className="w-4 h-4 fill-red-500 text-red-500" strokeWidth={0} />
           <span className="hidden sm:inline">녹음</span>
         </button>
       )}

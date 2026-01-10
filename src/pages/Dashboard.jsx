@@ -11,7 +11,7 @@ import AppInstallGuide from '../components/AppInstallGuide'
 import VoiceControl from '../components/VoiceControl'
 import MobileFAB from '../components/MobileFAB'
 import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
-import { formatActivityText, formatActivityTitle, getParticle } from '../utils/koreanJosa'
+import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
 
 const Dashboard = () => {
   const { activities, clients, getStats, getWeeklySalesData, issues, updateIssue, loading } = useData()
@@ -90,19 +90,21 @@ const Dashboard = () => {
     .slice(0, 5)
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* 상단 헤더 영역: 제목 + 음성 제어 + 앱 설치 버튼 (PC에서만 표시) */}
-      <div className="hidden md:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
+    <div className="space-y-4 md:space-y-6 pb-20 md:pb-0"> {/* 하단 여백 추가 (모바일에서 짤림 방지) */}
+      
+      {/* 상단 헤더 영역 수정됨: hidden 클래스 제거하여 모바일에서도 표시 */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex-1">
           <h1 className="text-2xl md:text-3xl font-bold text-text-primary">대시보드</h1>
         </div>
-        <div className="flex items-center space-x-3 flex-shrink-0">
+        {/* 모바일에서도 보이도록 flex 설정 유지, 우측 정렬 */}
+        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
           <VoiceControl />
           <AppInstallGuide />
         </div>
       </div>
 
-      {/* KPI Cards - 반응형 그리드: 모바일 2개, 태블릿 2개, PC 4개 */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
         <MetricCard
           title="총 고객"
@@ -136,7 +138,7 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* 영업 캘린더 + 주간 매출 추이 (3등분 레이아웃) */}
+      {/* 영업 캘린더 + 주간 매출 추이 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6">
         {/* 좌측 2/3: 영업 캘린더 */}
         <div className="lg:col-span-2">
@@ -144,7 +146,7 @@ const Dashboard = () => {
         </div>
 
         {/* 우측 1/3: 주간 매출 추이 */}
-        <div className="card p-5 md:p-6 overflow-hidden">
+        <div className="card p-5 md:p-6 overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-base md:text-lg font-bold text-text-primary mb-4 md:mb-6">
             이번 달 주간 매출 추이
           </h3>
@@ -196,7 +198,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 최근 이슈 목록 - 아코디언 UI */}
+      {/* 최근 이슈 목록 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6 w-full">
         <div className="flex items-center justify-between mb-5 md:mb-6">
           <h3 className="text-base md:text-lg font-bold text-gray-900 flex items-center space-x-2">
@@ -222,7 +224,6 @@ const Dashboard = () => {
                 const isExpanded = expandedIssueId === issue.id
                 const isEditing = editingIssueId === issue.id
                 
-                // 색상 코딩
                 const baseDate = issue.date || issue.created_at
                 const daysDiff = baseDate 
                   ? Math.floor((new Date() - new Date(baseDate)) / (1000 * 60 * 60 * 24))
@@ -367,7 +368,6 @@ const Dashboard = () => {
                                 등록일: {new Date(issue.created_at || issue.date).toLocaleDateString('ko-KR')}
                               </p>
 
-                              {/* 상태 변경 및 편집 버튼 */}
                               <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
                                 <select
                                   value={issue.status}
@@ -418,7 +418,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Recent Activities - 모바일 최적화 */}
+      {/* 최근 영업 활동 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6 w-full">
         <h3 className="text-base md:text-lg font-bold text-gray-900 mb-5 md:mb-6">
           최근 영업 활동
@@ -438,7 +438,6 @@ const Dashboard = () => {
                     </span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    {/* 활동 종류 뱃지 */}
                     <div className="flex items-center space-x-2 mb-1.5">
                       {activity.type && (
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
@@ -452,15 +451,13 @@ const Dashboard = () => {
                         </span>
                       )}
                     </div>
-                    {/* 제목: [거래처] - [핵심요약] */}
                     <h3 className="font-bold text-gray-900 text-sm md:text-base mb-1">
                       {formatActivityTitle(activity.clientName, activity.description)}
                     </h3>
-                    {/* 상세 문구: [거래처명]의 [정제된_외부참석자]와 [활동종류] */}
                     <p className="text-sm text-gray-600 mb-1.5 leading-relaxed">
                       {formatActivityText(
                         activity.clientName,
-                        activity.user, // 참석자
+                        activity.user,
                         activity.type
                       )}
                     </p>
@@ -504,7 +501,6 @@ const Dashboard = () => {
         issueId={editingIssueId}
       />
 
-      {/* 모바일 전용 FAB 버튼 (우측 하단 고정) */}
       <MobileFAB />
     </div>
   )
