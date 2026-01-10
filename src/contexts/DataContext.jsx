@@ -149,10 +149,19 @@ export const DataProvider = ({ children }) => {
         const fetchClients = async () => {
           try {
             const { data, error } = await supabase.from('clients').select('*').order('company')
-            if (error) throw error
+            
+            // 디버깅 로그 추가
+            console.log('🔍 [fetchClients] 데이터 로딩 결과:', { data, error })
+            
+            if (error) {
+              console.error('❌ [fetchClients] 에러 발생:', error)
+              throw error
+            }
+            
+            console.log('✅ [fetchClients] 성공, 데이터 개수:', data?.length || 0)
             return { success: true, data: data || [] }
           } catch (error) {
-            console.error('Clients 로드 실패:', error)
+            console.error('❌ [fetchClients] Clients 로드 실패:', error)
             errors.push('고객 데이터')
             return { success: false, data: [] }
           }
@@ -165,10 +174,19 @@ export const DataProvider = ({ children }) => {
               .select('*')
               .order('activity_date', { ascending: false })
               .order('created_at', { ascending: false })
-            if (error) throw error
+            
+            // 디버깅 로그 추가
+            console.log('🔍 [fetchActivities] 데이터 로딩 결과:', { data, error })
+            
+            if (error) {
+              console.error('❌ [fetchActivities] 에러 발생:', error)
+              throw error
+            }
+            
+            console.log('✅ [fetchActivities] 성공, 데이터 개수:', data?.length || 0)
             return { success: true, data: data || [] }
           } catch (error) {
-            console.error('Activities 로드 실패:', error)
+            console.error('❌ [fetchActivities] Activities 로드 실패:', error)
             errors.push('활동 데이터')
             return { success: false, data: [] }
           }
@@ -176,19 +194,13 @@ export const DataProvider = ({ children }) => {
 
         const fetchSales = async () => {
           try {
+            // 기본 조회로 수행 (foreign key 조인은 나중에 필요시 추가)
             const result = await supabase
               .from('sales')
-              .select(`*, clients!clientId (id, company, contact_person)`)
+              .select('*')
               .order('sale_date', { ascending: false })
             
-            if (result.error) {
-              const fallbackResult = await supabase
-                .from('sales')
-                .select('*')
-                .order('sale_date', { ascending: false })
-              if (fallbackResult.error) throw fallbackResult.error
-              return { success: true, data: fallbackResult.data || [] }
-            }
+            if (result.error) throw result.error
             return { success: true, data: result.data || [] }
           } catch (error) {
             console.error('Sales 로드 실패:', error)
@@ -228,24 +240,47 @@ export const DataProvider = ({ children }) => {
         }
         
         if (clientsResult.success && clientsResult.data !== null) {
-          setClients((clientsResult.data || []).map((client) => {
+          const mappedClients = (clientsResult.data || []).map((client) => {
             try {
               return {
                 ...client,
+                lastOrder: client.last_order || client.lastOrder,
+                orderAmount: client.order_amount || client.orderAmount,
                 contact_person: client.contact_person || client.contact || '',
                 contract_prices: typeof client.contract_prices === 'string' ? (client.contract_prices ? JSON.parse(client.contract_prices) : []) : (client.contract_prices || []),
               }
             } catch (e) {
-              return { ...client, contact_person: client.contact_person || client.contact || '', contract_prices: [] }
+              return { 
+                ...client, 
+                lastOrder: client.last_order || client.lastOrder,
+                orderAmount: client.order_amount || client.orderAmount,
+                contact_person: client.contact_person || client.contact || '', 
+                contract_prices: [] 
+              }
             }
-          }))
+          })
+          
+          console.log('📋 [초기 로드] 변환된 clients:', mappedClients.length, '개')
+          setClients(mappedClients)
+        } else {
+          console.warn('⚠️ [초기 로드] clientsResult 실패:', clientsResult)
         }
 
         if (activitiesResult.success && activitiesResult.data !== null) {
-          setActivities((activitiesResult.data || []).map((activity) => ({
+          const mappedActivities = (activitiesResult.data || []).map((activity) => ({
             ...activity,
+            clientId: activity.client_id || activity.clientId,
+            clientName: activity.client_name || activity.clientName,
+            user: activity.user_name || activity.user,  // user_name -> user 변환
             date: activity.activity_date,
-          })))
+          }))
+          
+          console.log('📋 [초기 로드] 변환된 activities:', mappedActivities.length, '개')
+          console.log('📋 [초기 로드] 첫 번째 activity 샘플:', mappedActivities[0])
+          
+          setActivities(mappedActivities)
+        } else {
+          console.warn('⚠️ [초기 로드] activitiesResult 실패:', activitiesResult)
         }
 
         if (salesResult.success && salesResult.data !== null) {
@@ -287,12 +322,19 @@ export const DataProvider = ({ children }) => {
 
           const groupedSalesData = processGroupedSales(salesResult.data || [], productsResult.data || [])
           setSales(groupedSalesData.map((group) => {
-            let clientName = group.clientName
+            // DB에서 가져온 데이터를 camelCase로 변환
+            let clientName = group.client_name || group.clientName
             if (!clientName && group.clients) {
               if (Array.isArray(group.clients) && group.clients.length > 0) clientName = group.clients[0].company
               else if (group.clients && typeof group.clients === 'object' && group.clients.company) clientName = group.clients.company
             }
-            return { ...group, date: group.sale_date, clientName: clientName || group.clientName || '알 수 없음' }
+            return { 
+              ...group, 
+              clientId: group.client_id || group.clientId,
+              clientName: clientName || group.clientName || '알 수 없음',
+              totalAmount: group.total_amount || group.totalAmount,
+              date: group.sale_date
+            }
           }))
         }
 
@@ -315,19 +357,30 @@ export const DataProvider = ({ children }) => {
   }, [user, authLoading])
 
   const processGroupedSales = useCallback((rawData, productsData) => {
-    // (이전과 동일한 로직, 생략 시 문제될 수 있어 유지)
+    // DB에서 가져온 데이터의 컬럼명을 camelCase로 변환
     const groups = {}
     rawData.forEach((row) => {
+        // DB 컬럼명을 camelCase로 변환
+        const clientId = row.client_id || row.clientId
+        const totalAmount = Number(row.total_amount || row.totalAmount || 0)
+        const clientName = row.client_name || row.clientName
+        
         const timeKey = row.created_at ? row.created_at.substring(0, 16) : ''
-        const key = `${row.sale_date}_${row.clientId}_${timeKey}`
+        const key = `${row.sale_date}_${clientId}_${timeKey}`
         if (!groups[key]) {
             groups[key] = {
-                ...row, id: row.id, originalRows: [row], totalAmount: Number(row.totalAmount || 0), itemCount: 1, displayItemName: row.item_name || '',
+                ...row, 
+                id: row.id, 
+                clientId: clientId,
+                clientName: clientName,
+                totalAmount: totalAmount,
+                itemCount: 1, 
+                displayItemName: row.item_name || '',
                 items: [{ id: row.id, productId: '', item_name: row.item_name || '', quantity: row.quantity || 1, unitPrice: row.unit_price || 0, unit_price: row.unit_price || 0 }]
             }
         } else {
             groups[key].originalRows.push(row)
-            groups[key].totalAmount += Number(row.totalAmount || 0)
+            groups[key].totalAmount += totalAmount
             groups[key].itemCount += 1
             groups[key].items.push({ id: row.id, productId: '', item_name: row.item_name || '', quantity: row.quantity || 1, unitPrice: row.unit_price || 0, unit_price: row.unit_price || 0 })
         }
@@ -425,16 +478,50 @@ export const DataProvider = ({ children }) => {
     try {
       const sanitized = sanitizeData(clientData, 'client')
       if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
+      
+      // DB 컬럼명은 snake_case이므로 매핑 필요
+      // ⚠️ 중요: 'lastOrder' -> 'last_order', 'orderAmount' -> 'order_amount'
+      const fieldMapping = {
+        'lastOrder': 'last_order',
+        'orderAmount': 'order_amount'
+      }
+      
       const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
       const filteredData = {}
-      allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+      allowedFields.forEach((field) => { 
+        if (sanitized[field] !== undefined) {
+          // camelCase를 snake_case로 매핑
+          const dbFieldName = fieldMapping[field] || field
+          filteredData[dbFieldName] = sanitized[field]
+        }
+      })
+      
+      // 디버깅 로그: 저장할 데이터 확인
+      console.log('💾 [addClient] 저장할 데이터:', filteredData)
       
       const { data, error } = await supabase.from('clients').insert([filteredData]).select().single()
-      if (error) throw error
-      setClients((prev) => [...prev, data])
-      return data
+      
+      // 디버깅 로그: 저장 결과 확인
+      console.log('🔍 [addClient] 저장 결과:', { data, error })
+      
+      if (error) {
+        console.error('❌ [addClient] 저장 실패:', error)
+        throw error
+      }
+      
+      // DB에서 가져온 데이터를 camelCase로 변환
+      const clientWithCamelCase = {
+        ...data,
+        lastOrder: data.last_order || data.lastOrder,
+        orderAmount: data.order_amount || data.orderAmount,
+        contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
+      }
+      
+      console.log('✅ [addClient] 변환된 데이터:', clientWithCamelCase)
+      setClients((prev) => [...prev, clientWithCamelCase])
+      return clientWithCamelCase
     } catch (error) {
-      console.error('고객 추가 중 오류 발생:', error)
+      console.error('❌ [addClient] 고객 추가 중 오류 발생:', error)
       throw error
     }
   }, [sanitizeData])
@@ -442,19 +529,51 @@ export const DataProvider = ({ children }) => {
   const updateClient = useCallback(async (id, clientData) => {
     try {
         const sanitized = sanitizeData(clientData, 'client')
-        // (orderAmount 처리 로직 기존 유지)
+        if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
+        
+        // DB 컬럼명은 snake_case이므로 매핑 필요
+        // ⚠️ 중요: 'lastOrder' -> 'last_order', 'orderAmount' -> 'order_amount'
+        const fieldMapping = {
+          'lastOrder': 'last_order',
+          'orderAmount': 'order_amount'
+        }
+        
         const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
         const filteredData = {}
-        allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+        allowedFields.forEach((field) => { 
+          if (sanitized[field] !== undefined) {
+            // camelCase를 snake_case로 매핑
+            const dbFieldName = fieldMapping[field] || field
+            filteredData[dbFieldName] = sanitized[field]
+          }
+        })
+        
+        // 디버깅 로그: 저장할 데이터 확인
+        console.log('💾 [updateClient] 저장할 데이터:', filteredData)
         
         const { data, error } = await supabase.from('clients').update(filteredData).eq('id', id).select().single()
-        if (error) throw error
         
-        const updatedClient = { ...data, contract_prices: typeof data.contract_prices === 'string' ? JSON.parse(data.contract_prices) : data.contract_prices || [] }
+        // 디버깅 로그: 저장 결과 확인
+        console.log('🔍 [updateClient] 저장 결과:', { data, error })
+        
+        if (error) {
+          console.error('❌ [updateClient] 저장 실패:', error)
+          throw error
+        }
+        
+        // DB에서 가져온 데이터를 camelCase로 변환
+        const updatedClient = { 
+          ...data, 
+          lastOrder: data.last_order || data.lastOrder,
+          orderAmount: data.order_amount || data.orderAmount,
+          contract_prices: typeof data.contract_prices === 'string' ? JSON.parse(data.contract_prices) : data.contract_prices || [] 
+        }
+        
+        console.log('✅ [updateClient] 변환된 데이터:', updatedClient)
         setClients((prev) => prev.map((client) => (client.id === id ? updatedClient : client)))
         return updatedClient
     } catch (error) {
-        console.error('고객 수정 오류:', error)
+        console.error('❌ [updateClient] 고객 수정 오류:', error)
         throw error
     }
   }, [sanitizeData])
@@ -490,6 +609,14 @@ export const DataProvider = ({ children }) => {
       const sanitized = sanitizeData(activityDataWithDate, 'activity')
 
       // [수정 3] 허용 필드 목록에 'next_action_date', 'next_action_detail' 추가
+      // DB 컬럼명은 snake_case이므로 매핑 필요
+      // ⚠️ 중요: 'user' 필드는 DB에서 'user_name' 컬럼으로 저장됨
+      const fieldMapping = {
+        'clientId': 'client_id',
+        'clientName': 'client_name',
+        'user': 'user_name'  // user는 예약어이므로 user_name으로 변경
+      }
+      
       const allowedFields = [
         'clientId',
         'type',
@@ -505,9 +632,14 @@ export const DataProvider = ({ children }) => {
       const filteredData = {}
       allowedFields.forEach((field) => {
         if (sanitized[field] !== undefined) {
-          filteredData[field] = sanitized[field]
+          // camelCase를 snake_case로 매핑 (user -> user_name)
+          const dbFieldName = fieldMapping[field] || field
+          filteredData[dbFieldName] = sanitized[field]
         }
       })
+      
+      // 디버깅 로그: 저장할 데이터 확인
+      console.log('💾 [addActivity] 저장할 데이터:', filteredData)
       
       const { data, error } = await supabase
         .from('activities')
@@ -515,14 +647,33 @@ export const DataProvider = ({ children }) => {
         .select()
         .single()
 
-      if (error) throw error
+      // 디버깅 로그: 저장 결과 확인
+      console.log('🔍 [addActivity] 저장 결과:', { data, error })
 
+      if (error) {
+        console.error('❌ [addActivity] 저장 실패:', error)
+        throw error
+      }
+
+      // DB에서 가져온 데이터를 camelCase로 변환
+      // ⚠️ 중요: DB의 'user_name' 컬럼을 'user' 필드로 변환
       const activityWithDate = {
         ...data,
+        clientId: data.client_id || data.clientId,
+        clientName: data.client_name || data.clientName,
+        user: data.user_name || data.user,  // user_name -> user 변환 (누락 수정)
         date: data.activity_date,
       }
 
-      setActivities((prev) => [activityWithDate, ...prev])
+      console.log('✅ [addActivity] 변환된 데이터:', activityWithDate)
+      console.log('📊 [addActivity] State 업데이트 전 activities 개수:', activities.length)
+      
+      setActivities((prev) => {
+        const newActivities = [activityWithDate, ...prev]
+        console.log('📊 [addActivity] State 업데이트 후 activities 개수:', newActivities.length)
+        return newActivities
+      })
+      
       return activityWithDate
     } catch (error) {
       console.error('활동 추가 중 오류 발생:', error)
@@ -545,6 +696,14 @@ export const DataProvider = ({ children }) => {
       const sanitized = sanitizeData(activityDataWithDate, 'activity')
 
       // [수정 4] 수정 시에도 허용 필드 목록에 'next_action_date', 'next_action_detail' 추가
+      // DB 컬럼명은 snake_case이므로 매핑 필요
+      // ⚠️ 중요: 'user' 필드는 DB에서 'user_name' 컬럼으로 저장됨 (예약어 문제)
+      const fieldMapping = {
+        'clientId': 'client_id',
+        'clientName': 'client_name',
+        'user': 'user_name'  // user는 예약어이므로 user_name으로 변경
+      }
+      
       const allowedFields = [
         'clientId',
         'type',
@@ -560,7 +719,9 @@ export const DataProvider = ({ children }) => {
       const filteredData = {}
       allowedFields.forEach((field) => {
         if (sanitized[field] !== undefined) {
-          filteredData[field] = sanitized[field]
+          // camelCase를 snake_case로 매핑 (user -> user_name)
+          const dbFieldName = fieldMapping[field] || field
+          filteredData[dbFieldName] = sanitized[field]
         }
       })
 
@@ -573,8 +734,13 @@ export const DataProvider = ({ children }) => {
 
       if (error) throw error
 
+      // DB에서 가져온 데이터를 camelCase로 변환
+      // ⚠️ 중요: DB의 'user_name' 컬럼을 'user' 필드로 변환
       const activityWithDate = {
         ...data,
+        clientId: data.client_id || data.clientId,
+        clientName: data.client_name || data.clientName,
+        user: data.user_name || data.user,  // user_name -> user 변환
         date: data.activity_date,
       }
 
@@ -605,17 +771,26 @@ export const DataProvider = ({ children }) => {
     try {
         if (saleData.rows && Array.isArray(saleData.rows)) {
             const rowsToInsert = saleData.rows.map((row) => ({
-                clientId: row.clientId || row.client_id,
+                client_id: row.clientId || row.client_id,
                 sale_date: row.sale_date,
                 item_name: (row.item_name || '').trim(),
                 quantity: Number(row.quantity) || 1,
                 unit_price: Number(row.unitPrice || row.unit_price || 0),
-                totalAmount: (Number(row.quantity) || 1) * (Number(row.unitPrice || row.unit_price || 0)),
-                notes: row.notes || ''
+                total_amount: (Number(row.quantity) || 1) * (Number(row.unitPrice || row.unit_price || 0)),
+                notes: row.notes || '',
+                client_name: row.clientName || ''
             }))
             const { data, error } = await supabase.from('sales').insert(rowsToInsert).select()
             if (error) throw error
-            const newSales = data.map((sale) => ({ ...sale, date: sale.sale_date, items: [{ productId: '', item_name: sale.item_name, quantity: sale.quantity, unitPrice: sale.unit_price, total: sale.total_amount }] }))
+            // DB에서 가져온 데이터를 camelCase로 변환
+            const newSales = data.map((sale) => ({ 
+              ...sale, 
+              clientId: sale.client_id || sale.clientId,
+              clientName: sale.client_name || sale.clientName,
+              totalAmount: sale.total_amount || sale.totalAmount,
+              date: sale.sale_date, 
+              items: [{ productId: '', item_name: sale.item_name, quantity: sale.quantity, unitPrice: sale.unit_price, total: sale.total_amount }] 
+            }))
             setSales((prev) => [...newSales, ...prev])
             return newSales[0]
         }
@@ -625,14 +800,34 @@ export const DataProvider = ({ children }) => {
         delete saleDataWithDate.date
         
         const sanitized = sanitizeData(saleDataWithDate, 'sale')
+        // DB 컬럼명은 snake_case이므로 매핑 필요
+        const fieldMapping = {
+          'clientId': 'client_id',
+          'clientName': 'client_name',
+          'totalAmount': 'total_amount'
+        }
+        
         const allowedFields = ['clientId', 'sale_date', 'items', 'item_name', 'totalAmount', 'notes', 'clientName']
         const filteredData = {}
-        allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+        allowedFields.forEach((field) => { 
+          if (sanitized[field] !== undefined) {
+            const dbFieldName = fieldMapping[field] || field
+            filteredData[dbFieldName] = sanitized[field]
+          }
+        })
         if (filteredData.items && filteredData.items.length > 0) filteredData.item_name = filteredData.items[0].item_name || ''
 
         const { data, error } = await supabase.from('sales').insert([filteredData]).select().single()
         if (error) throw error
-        const newSale = { ...data, date: data.sale_date, items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] }
+        // DB에서 가져온 데이터를 camelCase로 변환
+        const newSale = { 
+          ...data, 
+          clientId: data.client_id || data.clientId,
+          clientName: data.client_name || data.clientName,
+          totalAmount: data.total_amount || data.totalAmount,
+          date: data.sale_date, 
+          items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] 
+        }
         setSales((prev) => [newSale, ...prev])
         return newSale
     } catch (error) {
@@ -647,13 +842,33 @@ export const DataProvider = ({ children }) => {
         const saleDataWithDate = { ...saleData, sale_date: saleData.date || saleData.sale_date || null, clientName: client?.company || saleData.clientName, items: saleData.items || [], totalAmount: saleData.totalAmount || 0 }
         delete saleDataWithDate.date
         const sanitized = sanitizeData(saleDataWithDate, 'sale')
+        // DB 컬럼명은 snake_case이므로 매핑 필요
+        const fieldMapping = {
+          'clientId': 'client_id',
+          'clientName': 'client_name',
+          'totalAmount': 'total_amount'
+        }
+        
         const allowedFields = ['clientId', 'sale_date', 'items', 'totalAmount', 'notes', 'clientName']
         const filteredData = {}
-        allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+        allowedFields.forEach((field) => { 
+          if (sanitized[field] !== undefined) {
+            const dbFieldName = fieldMapping[field] || field
+            filteredData[dbFieldName] = sanitized[field]
+          }
+        })
         
         const { data, error } = await supabase.from('sales').update(filteredData).eq('id', id).select().single()
         if (error) throw error
-        const updatedSale = { ...data, date: data.sale_date, items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] }
+        // DB에서 가져온 데이터를 camelCase로 변환
+        const updatedSale = { 
+          ...data, 
+          clientId: data.client_id || data.clientId,
+          clientName: data.client_name || data.clientName,
+          totalAmount: data.total_amount || data.totalAmount,
+          date: data.sale_date, 
+          items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] 
+        }
         setSales((prev) => prev.map((sale) => (sale.id === id ? updatedSale : sale)))
         return updatedSale
     } catch (error) {

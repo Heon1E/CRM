@@ -11,33 +11,49 @@ const Navbar = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [companyName, setCompanyName] = useState('')
 
-  // localStorage에서 회사명 불러오기
+  // Supabase에서 회사명 불러오기
   useEffect(() => {
-    const loadCompanyName = () => {
+    if (!user) {
+      setCompanyName('')
+      return
+    }
+
+    const loadCompanyName = async () => {
       try {
-        const savedSettings = localStorage.getItem('crm_settings')
-        if (savedSettings) {
-          const parsed = JSON.parse(savedSettings)
-          if (parsed.companyName) {
-            setCompanyName(parsed.companyName)
-          }
+        const { data, error } = await supabase
+          .from('settings')
+          .select('company_name')
+          .eq('user_id', user.id)
+          .single()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('회사명 불러오기 오류:', error)
+        } else if (data && data.company_name) {
+          setCompanyName(data.company_name)
+        } else {
+          setCompanyName('')
         }
       } catch (error) {
-        console.error('회사명 불러오기 오류:', error)
+        console.error('회사명 불러오기 예외:', error)
+        setCompanyName('')
       }
     }
 
     loadCompanyName()
     
     // settingsUpdated 이벤트 리스너 등록 (설정 변경 시 즉시 반영)
-    window.addEventListener('settingsUpdated', loadCompanyName)
+    const handleSettingsUpdate = () => {
+      loadCompanyName()
+    }
+    
+    window.addEventListener('settingsUpdated', handleSettingsUpdate)
     
     return () => {
-      window.removeEventListener('settingsUpdated', loadCompanyName)
+      window.removeEventListener('settingsUpdated', handleSettingsUpdate)
     }
-  }, [])
+  }, [user])
 
-  // 동적 앱 타이틀: localStorage의 companyName이 있으면 '회사이름 CRM', 없으면 기본값 'Xavian CRM'
+  // 동적 앱 타이틀: Supabase settings의 company_name이 있으면 '회사이름 CRM', 없으면 기본값 'Xavian CRM'
   const appTitle = useMemo(() => {
     if (companyName && companyName.trim()) {
       return `${companyName.trim()} CRM`

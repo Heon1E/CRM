@@ -1,71 +1,197 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
+import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import AddProductModal from '../components/AddProductModal'
 import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
 
 const Settings = () => {
   const { products, deleteProduct, loading } = useData()
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('general') // 'general' or 'products'
   const [editingProductId, setEditingProductId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [settingsLoading, setSettingsLoading] = useState(true)
   
   // 설정 상태
   const [settings, setSettings] = useState({
-    companyName: '',
+    company_name: '',
     email: '',
-    emailNotification: true,
-    newClientNotification: true,
-    salesGoalNotification: false,
+    email_notification: true,
+    new_client_notification: true,
+    sales_goal_notification: false,
   })
 
-  // localStorage에서 설정 불러오기
+  // Supabase에서 설정 불러오기
   useEffect(() => {
-    const savedSettings = localStorage.getItem('crm_settings')
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings)
-        setSettings(prev => ({ ...prev, ...parsed }))
-      } catch (error) {
-        console.error('설정 불러오기 오류:', error)
-      }
-    } else {
-      // 기본값으로 localStorage 초기화
-      const defaultSettings = {
-        companyName: '',
-        email: '',
-        emailNotification: true,
-        newClientNotification: true,
-        salesGoalNotification: false,
-      }
-      localStorage.setItem('crm_settings', JSON.stringify(defaultSettings))
+    if (!user) {
+      setSettingsLoading(false)
+      return
     }
-  }, [])
+
+    const loadSettings = async () => {
+      try {
+        // 먼저 데이터 조회 시도
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()  // .single() 대신 .maybeSingle() 사용 (데이터 없으면 null 반환, 에러 없음)
+
+        console.log('🔍 [loadSettings] 조회 결과:', { data, error })
+
+        if (error) {
+          console.error('❌ [loadSettings] 설정 불러오기 오류:', error)
+          // 에러가 있어도 기본값 사용
+          setSettingsLoading(false)
+          return
+        }
+
+        if (data) {
+          // 데이터가 있으면 설정에 반영
+          console.log('✅ [loadSettings] 기존 설정 불러오기 성공')
+          setSettings({
+            company_name: data.company_name || '',
+            email: data.email || '',
+            email_notification: data.email_notification !== false,
+            new_client_notification: data.new_client_notification !== false,
+            sales_goal_notification: data.sales_goal_notification === true,
+          })
+        } else {
+          // 데이터가 없으면 기본값을 DB에 insert하고 다시 불러오기
+          console.log('⚠️ [loadSettings] 설정 데이터 없음, 기본값 생성 중...')
+          
+          const defaultSettings = {
+            user_id: user.id,
+            company_name: 'Xavian CRM',
+            email: '',
+            email_notification: true,
+            new_client_notification: true,
+            sales_goal_notification: false,
+          }
+
+          const { data: insertData, error: insertError } = await supabase
+            .from('settings')
+            .insert([defaultSettings])
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error('❌ [loadSettings] 기본 설정 생성 실패:', insertError)
+            // 기본값 생성 실패해도 기본값으로 화면 표시
+            setSettings({
+              company_name: 'Xavian CRM',
+              email: '',
+              email_notification: true,
+              new_client_notification: true,
+              sales_goal_notification: false,
+            })
+          } else {
+            console.log('✅ [loadSettings] 기본 설정 생성 성공:', insertData)
+            // 생성된 데이터를 설정에 반영
+            setSettings({
+              company_name: insertData.company_name || 'Xavian CRM',
+              email: insertData.email || '',
+              email_notification: insertData.email_notification !== false,
+              new_client_notification: insertData.new_client_notification !== false,
+              sales_goal_notification: insertData.sales_goal_notification === true,
+            })
+          }
+        }
+      } catch (error) {
+        console.error('❌ [loadSettings] 설정 불러오기 예외:', error)
+        // 예외 발생 시에도 기본값으로 화면 표시
+        setSettings({
+          company_name: 'Xavian CRM',
+          email: '',
+          email_notification: true,
+          new_client_notification: true,
+          sales_goal_notification: false,
+        })
+      } finally {
+        setSettingsLoading(false)
+      }
+    }
+
+    loadSettings()
+  }, [user])
 
   // 저장 핸들러
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!user) {
+      alert('로그인이 필요합니다.')
+      return
+    }
+
     try {
-      localStorage.setItem('crm_settings', JSON.stringify(settings))
+      setSettingsLoading(true)
+      
+      // Supabase에 upsert (있으면 업데이트, 없으면 삽입)
+      const { error } = await supabase
+        .from('settings')
+        .upsert({
+          user_id: user.id,
+          company_name: settings.company_name || null,
+          email: settings.email || null,
+          email_notification: settings.email_notification,
+          new_client_notification: settings.new_client_notification,
+          sales_goal_notification: settings.sales_goal_notification,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        })
+
+      if (error) throw error
+
       // 회사명 변경 시 전역 상태 업데이트를 위한 이벤트 발생
       window.dispatchEvent(new Event('settingsUpdated'))
       alert('설정이 저장되었습니다.')
     } catch (error) {
       console.error('설정 저장 오류:', error)
       alert('설정 저장 중 오류가 발생했습니다.')
+    } finally {
+      setSettingsLoading(false)
     }
   }
 
-  // 취소 핸들러 (변경사항 되돌리기)
-  const handleCancel = () => {
-    const savedSettings = localStorage.getItem('crm_settings')
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings)
-        setSettings(prev => ({ ...prev, ...parsed }))
-      } catch (error) {
+  // 취소 핸들러 (Supabase에서 다시 불러오기)
+  const handleCancel = async () => {
+    if (!user) return
+
+    try {
+      setSettingsLoading(true)
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
         console.error('설정 불러오기 오류:', error)
+      } else if (data) {
+        setSettings({
+          company_name: data.company_name || '',
+          email: data.email || '',
+          email_notification: data.email_notification !== false,
+          new_client_notification: data.new_client_notification !== false,
+          sales_goal_notification: data.sales_goal_notification === true,
+        })
+      } else {
+        // 데이터가 없으면 기본값으로 리셋
+        setSettings({
+          company_name: '',
+          email: '',
+          email_notification: true,
+          new_client_notification: true,
+          sales_goal_notification: false,
+        })
       }
+    } catch (error) {
+      console.error('설정 불러오기 예외:', error)
+    } finally {
+      setSettingsLoading(false)
     }
   }
 
@@ -130,9 +256,10 @@ const Settings = () => {
                 <input
                   type="text"
                   placeholder="Xavian"
-                  value={settings.companyName}
-                  onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  value={settings.company_name}
+                  onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+                  disabled={settingsLoading}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
@@ -144,7 +271,8 @@ const Settings = () => {
                   placeholder="contact@xavian-crm.com"
                   value={settings.email}
                   onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  disabled={settingsLoading}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -156,27 +284,30 @@ const Settings = () => {
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={settings.emailNotification}
-                  onChange={(e) => setSettings({ ...settings, emailNotification: e.target.checked })}
-                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4"
+                  checked={settings.email_notification}
+                  onChange={(e) => setSettings({ ...settings, email_notification: e.target.checked })}
+                  disabled={settingsLoading}
+                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4 disabled:cursor-not-allowed"
                 />
                 <span className="ml-3 text-sm font-medium text-gray-700">이메일 알림 받기</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={settings.newClientNotification}
-                  onChange={(e) => setSettings({ ...settings, newClientNotification: e.target.checked })}
-                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4"
+                  checked={settings.new_client_notification}
+                  onChange={(e) => setSettings({ ...settings, new_client_notification: e.target.checked })}
+                  disabled={settingsLoading}
+                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4 disabled:cursor-not-allowed"
                 />
                 <span className="ml-3 text-sm font-medium text-gray-700">새 고객 등록 알림</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={settings.salesGoalNotification}
-                  onChange={(e) => setSettings({ ...settings, salesGoalNotification: e.target.checked })}
-                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4"
+                  checked={settings.sales_goal_notification}
+                  onChange={(e) => setSettings({ ...settings, sales_goal_notification: e.target.checked })}
+                  disabled={settingsLoading}
+                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4 disabled:cursor-not-allowed"
                 />
                 <span className="ml-3 text-sm font-medium text-gray-700">매출 목표 달성 알림</span>
               </label>
@@ -186,15 +317,17 @@ const Settings = () => {
           <div className="flex justify-end space-x-3">
             <button
               onClick={handleCancel}
-              className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-medium shadow-sm"
+              disabled={settingsLoading}
+              className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               취소
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all duration-200 font-semibold shadow-sm"
+              disabled={settingsLoading}
+              className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all duration-200 font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              저장
+              {settingsLoading ? '저장 중...' : '저장'}
             </button>
           </div>
         </>
