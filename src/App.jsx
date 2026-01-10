@@ -15,6 +15,7 @@ import Issues from './pages/Issues'
 import Settings from './pages/Settings'
 import PipelineBoard from './pages/PipelineBoard'
 import Login from './pages/Login'
+import ShareProcessing from './pages/ShareProcessing'
 
 // 인증 상태에 따른 라우팅 컴포넌트
 const ProtectedRoutes = () => {
@@ -50,6 +51,7 @@ const ProtectedRoutes = () => {
         <Route path="/issues" element={<Issues />} />
         <Route path="/pipeline" element={<PipelineBoard />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/share-processing" element={<ShareProcessing />} />
       </Routes>
     </Layout>
   )

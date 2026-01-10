@@ -44,8 +44,14 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim()
 })
 
-// fetch 이벤트: 네트워크 우선, 실패 시 캐시 사용
+// fetch 이벤트: 네트워크 우선, 실패 시 캐시 사용 및 Share Target POST 처리
 self.addEventListener('fetch', (event) => {
+  // Share Target POST 요청 처리
+  if (event.request.method === 'POST' && event.request.url.includes('/share-receive')) {
+    event.respondWith(handleShareTarget(event.request))
+    return
+  }
+
   // GET 요청만 처리
   if (event.request.method !== 'GET') {
     return
@@ -196,3 +202,85 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('notificationclose', (event) => {
   // 알림이 닫혔을 때 필요한 작업 수행 (분석 등)
 })
+
+// Share Target POST 요청 처리 함수
+async function handleShareTarget(request) {
+  try {
+    // FormData 추출
+    const formData = await request.formData()
+    const audioFile = formData.get('media')
+    const title = formData.get('name') || '통화 녹음'
+
+    if (!audioFile || !(audioFile instanceof File)) {
+      console.error('[Service Worker] 오디오 파일이 없습니다.')
+      return new Response('오디오 파일이 필요합니다.', {
+        status: 400,
+        headers: { 'Content-Type': 'text/plain' }
+      })
+    }
+
+    // 오디오 파일을 ArrayBuffer로 변환
+    const arrayBuffer = await audioFile.arrayBuffer()
+    const fileName = audioFile.name || `recording_${Date.now()}.m4a`
+
+    // IndexedDB에 저장 (클라이언트가 가져올 수 있도록)
+    await saveSharedAudioToDB({
+      fileName,
+      title,
+      audioData: arrayBuffer,
+      mimeType: audioFile.type || 'audio/m4a',
+      timestamp: Date.now()
+    })
+
+    // 클라이언트에 메시지 전송 (파일 처리 시작 알림)
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    for (const client of clients) {
+      client.postMessage({
+        type: 'SHARED_AUDIO_RECEIVED',
+        data: {
+          fileName,
+          title,
+          timestamp: Date.now()
+        }
+      })
+    }
+
+    // 처리 페이지로 리다이렉트
+    return Response.redirect('/share-processing', 303)
+  } catch (error) {
+    console.error('[Service Worker] Share Target 처리 오류:', error)
+    return new Response('파일 처리 중 오류가 발생했습니다: ' + error.message, {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain' }
+    })
+  }
+}
+
+// IndexedDB에 공유된 오디오 파일 저장
+async function saveSharedAudioToDB(data) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('XavianCRM_SharedFiles', 1)
+
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const db = request.result
+      const transaction = db.transaction(['shared_audio'], 'readwrite')
+      const store = transaction.objectStore('shared_audio')
+
+      // 기존 데이터 삭제 (최신 하나만 유지)
+      store.clear().onsuccess = () => {
+        // 새 데이터 추가
+        const addRequest = store.add(data)
+        addRequest.onsuccess = () => resolve()
+        addRequest.onerror = () => reject(addRequest.error)
+      }
+    }
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result
+      if (!db.objectStoreNames.contains('shared_audio')) {
+        db.createObjectStore('shared_audio', { keyPath: 'timestamp' })
+      }
+    }
+  })
+}
