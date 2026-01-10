@@ -16,10 +16,24 @@ export function AuthProvider({ children }) {
     // 1. [핵심] 앱 켜지자마자 현재 세션 확인 (새로고침 시 데이터 복구의 핵심)
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        setUser(session?.user ?? null)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error('세션 확인 실패:', sessionError)
+          setUser(null)
+        } else if (session?.user) {
+          // user.id가 UUID 형식인지 확인
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          if (session.user.id && !uuidRegex.test(session.user.id)) {
+            console.error('⚠️ [AuthContext] user.id가 UUID 형식이 아닙니다:', session.user.id)
+            console.error('⚠️ [AuthContext] user 객체:', session.user)
+          }
+          setUser(session.user)
+        } else {
+          setUser(null)
+        }
       } catch (error) {
         console.error('세션 확인 실패:', error)
+        setUser(null)
       } finally {
         // 세션이 있든 없든 확인이 끝났으니 로딩 해제
         setLoading(false)
@@ -30,7 +44,17 @@ export function AuthProvider({ children }) {
 
     // 2. [핵심] 로그인/로그아웃 상태 변화 실시간 감지 (Auth Observer)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null)
+      if (session?.user) {
+        // user.id가 UUID 형식인지 확인
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (session.user.id && !uuidRegex.test(session.user.id)) {
+          console.error('⚠️ [AuthContext] onAuthStateChange: user.id가 UUID 형식이 아닙니다:', session.user.id)
+          console.error('⚠️ [AuthContext] user 객체:', session.user)
+        }
+        setUser(session.user)
+      } else {
+        setUser(null)
+      }
       setLoading(false) // 상태가 변하면 로딩은 무조건 끝난 것
     })
 

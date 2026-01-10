@@ -31,21 +31,44 @@ export const useData = () => {
 }
 
 export const DataProvider = ({ children }) => {
-  const { user, loading: authLoading } = useAuth() // AuthContext의 user와 loading 상태 참조
-  const { isOnline } = useOnlineStatus() // 온라인/오프라인 상태
+  const { user, loading: authLoading } = useAuth()
+  const { isOnline } = useOnlineStatus()
   const [products, setProducts] = useState([])
   const [clients, setClients] = useState([])
   const [activities, setActivities] = useState([])
   const [sales, setSales] = useState([])
   const [issues, setIssues] = useState([])
   const [loading, setLoading] = useState(true)
-  const [pendingSyncCount, setPendingSyncCount] = useState(0) // 동기화 대기 중인 작업 수
+  const [pendingSyncCount, setPendingSyncCount] = useState(0)
 
-  // 데이터 정제 헬퍼 함수 (Sanitize)
+  // UUID 정규식 (공통 사용)
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+  // 헬퍼: 확실한 UUID 가져오기
+  const getValidUserId = async (currentUser) => {
+    // 1. 현재 user 객체의 id가 유효한 UUID인지 확인
+    if (currentUser?.id && UUID_REGEX.test(currentUser.id)) {
+      return currentUser.id
+    }
+
+    // 2. 아니면 Supabase Auth에서 직접 가져오기
+    console.warn('[DataContext] 유효한 UUID를 찾기 위해 Supabase Auth 재조회 중...')
+    const { data: { user: authUser }, error } = await supabase.auth.getUser()
+    
+    if (error || !authUser) {
+      throw new Error('사용자 정보를 확인할 수 없습니다. 다시 로그인해주세요.')
+    }
+
+    if (authUser.id && UUID_REGEX.test(authUser.id)) {
+      return authUser.id
+    }
+
+    throw new Error('유효한 사용자 ID(UUID)를 확보할 수 없습니다.')
+  }
+
   const sanitizeData = useCallback((data, type) => {
     const sanitized = { ...data }
 
-    // [수정 1] 날짜 필드 정제 목록에 'next_action_date' 추가
     const dateFields = ['sale_date', 'activity_date', 'lastOrder', 'next_action_date']
     dateFields.forEach((field) => {
       if (sanitized[field] === '' || sanitized[field] === undefined) {
@@ -53,7 +76,6 @@ export const DataProvider = ({ children }) => {
       }
     })
 
-    // 숫자 필드 정제
     const numberFields = ['orderAmount', 'totalAmount', 'quantity', 'unitPrice']
     numberFields.forEach((field) => {
       if (sanitized[field] === '' || sanitized[field] === undefined || sanitized[field] === null) {
@@ -64,7 +86,6 @@ export const DataProvider = ({ children }) => {
       }
     })
 
-    // [수정 2] 텍스트 필드 정제 목록에 'next_action_detail' 추가
     const textFields = ['company', 'contact_person', 'phone', 'email', 'status', 'user', 'description', 'notes', 'clientName', 'name', 'type', 'standard', 'title', 'content', 'next_action_detail']
     textFields.forEach((field) => {
       if (sanitized[field] === null) {
@@ -72,7 +93,6 @@ export const DataProvider = ({ children }) => {
       }
     })
 
-    // Issue 타입의 경우 날짜 필드 추가
     if (type === 'issue') {
       const issueDateFields = ['target_date']
       issueDateFields.forEach((field) => {
@@ -82,7 +102,6 @@ export const DataProvider = ({ children }) => {
       })
     }
 
-    // 타입별 추가 정제
     if (type === 'client') {
       if (!Array.isArray(sanitized.contract_prices)) {
         sanitized.contract_prices = []
@@ -122,7 +141,6 @@ export const DataProvider = ({ children }) => {
       }
     }
 
-    // undefined 필드 제거
     Object.keys(sanitized).forEach((key) => {
       if (sanitized[key] === undefined) {
         delete sanitized[key]
@@ -143,41 +161,31 @@ export const DataProvider = ({ children }) => {
       }
     }
 
-    // 초기 로드 및 큐 업데이트 이벤트 리스너
     updateSyncCount()
     window.addEventListener('syncQueueUpdated', updateSyncCount)
-
     return () => {
       window.removeEventListener('syncQueueUpdated', updateSyncCount)
     }
   }, [])
 
-  // 온라인 복귀 시 자동 동기화
+  // 온라인 복귀 시 자동 동기화 (여기도 수정됨: 좀비 데이터 방지)
   useEffect(() => {
     if (!isOnline || !user) return
 
     const syncOfflineOperations = async () => {
       try {
-        // 일반 오프라인 작업 동기화
         const pendingOps = await getPendingOperations()
         
-        // 오프라인 명함 스캔 작업 처리
+        // 명함 스캔 재시도 로직 (기존 유지)
         const { getAllFromStore } = await import('../utils/offlineDB')
         const pendingScans = await getAllFromStore(STORES.PENDING_SCANS)
         const scansToProcess = pendingScans.filter(scan => scan.status === 'pending')
         
-        // 명함 스캔 재시도 (백그라운드 처리)
         for (const scan of scansToProcess) {
           if (!scan.imageBase64) continue
-          
           try {
-            // 명함 스캔 재처리 이벤트 발생 (BusinessCardScannerModal에서 처리)
             window.dispatchEvent(new CustomEvent('retryBusinessCardScan', {
-              detail: {
-                scanId: scan.id,
-                imageBase64: scan.imageBase64,
-                taskId: scan.taskId || `retry_${scan.id}`
-              }
+              detail: { scanId: scan.id, imageBase64: scan.imageBase64, taskId: scan.taskId || `retry_${scan.id}` }
             }))
           } catch (scanError) {
             console.error('[DataContext] 오프라인 명함 스캔 재시도 실패:', scanError)
@@ -188,10 +196,7 @@ export const DataProvider = ({ children }) => {
 
         for (const op of pendingOps) {
           try {
-            // 명함 스캔 대기 목록은 별도 처리
-            if (op.table === 'pending_scans' || op.table === 'business_card_scans') {
-              continue // 명함 스캔은 별도 처리
-            }
+            if (op.table === 'pending_scans' || op.table === 'business_card_scans') continue
             
             await updateQueueStatus(op.id, QUEUE_STATUS.SYNCING)
             
@@ -199,11 +204,29 @@ export const DataProvider = ({ children }) => {
             const storeName = getStoreName(op.table)
             
             if (op.operation === QUEUE_OPERATION.INSERT) {
-              // Insert: Supabase에 저장
-              result = await supabase.from(op.table).insert(op.data).select().single()
+              const syncData = { ...op.data }
+              
+              // [중요] 동기화 시 created_by 강제 교정
+              let validUserId = null
+              try {
+                 validUserId = await getValidUserId(user)
+              } catch (e) {
+                 console.error('[Sync] 사용자 ID 확보 실패, 건너뜀', e)
+                 continue 
+              }
+
+              // 무조건 덮어쓰기
+              syncData.created_by = validUserId
+
+              // 최후 검증
+              if (String(syncData.created_by).includes('@')) {
+                 throw new Error('Email detected in created_by during sync. Aborting insert.')
+              }
+              
+              result = await supabase.from(op.table).insert([syncData]).select().single()
+              
               if (result.error) throw result.error
               
-              // IndexedDB의 임시 ID를 실제 ID로 업데이트
               if (storeName && op.tempId) {
                 await deleteFromStore(storeName, op.tempId)
                 if (result.data) {
@@ -211,20 +234,16 @@ export const DataProvider = ({ children }) => {
                 }
               }
             } else if (op.operation === QUEUE_OPERATION.UPDATE) {
-              // Update: Supabase에 업데이트
               result = await supabase.from(op.table).update(op.data).eq('id', op.data.id).select().single()
               if (result.error) throw result.error
               
-              // IndexedDB도 업데이트
               if (storeName && result.data) {
                 await saveToStore(storeName, result.data)
               }
             } else if (op.operation === QUEUE_OPERATION.DELETE) {
-              // Delete: Supabase에서 삭제
               result = await supabase.from(op.table).delete().eq('id', op.data.id)
               if (result.error) throw result.error
               
-              // IndexedDB에서도 삭제
               if (storeName) {
                 await deleteFromStore(storeName, op.data.id)
               }
@@ -239,9 +258,7 @@ export const DataProvider = ({ children }) => {
           }
         }
         
-        // 데이터 새로고침 (동기화 완료 후)
         if (pendingOps.length > 0) {
-          // 상태만 업데이트 (전체 새로고침 대신 선택적 업데이트)
           window.dispatchEvent(new CustomEvent('syncCompleted'))
         }
       } catch (error) {
@@ -249,7 +266,6 @@ export const DataProvider = ({ children }) => {
       }
     }
 
-    // 온라인 복귀 이벤트 리스너
     const handleOnlineStatusChanged = (event) => {
       if (event.detail.isOnline && event.detail.wasOffline) {
         syncOfflineOperations()
@@ -257,63 +273,34 @@ export const DataProvider = ({ children }) => {
     }
 
     window.addEventListener('onlineStatusChanged', handleOnlineStatusChanged)
-
     return () => {
       window.removeEventListener('onlineStatusChanged', handleOnlineStatusChanged)
     }
   }, [isOnline, user])
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 (기존 유지)
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true)
-      return
-    }
-
-    if (!user) {
-      setLoading(false)
-      return
-    }
+    if (authLoading) { setLoading(true); return }
+    if (!user) { setLoading(false); return }
 
     const fetchAllData = async () => {
       setLoading(true)
       const errors = []
       
-      // 인증 확인 (강화) - 데이터 조회 시에도 확인
-      if (!user) {
-        setLoading(false)
-        return // 로그인되지 않은 경우 데이터를 로드하지 않음
-      }
-
-      // 세션 확인 (추가 보안)
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError || !session) {
-          setLoading(false)
-          return // 세션이 없으면 데이터를 로드하지 않음
-        }
+        if (sessionError || !session) { setLoading(false); return }
       } catch (sessionCheckError) {
-        console.error('세션 확인 실패:', sessionCheckError)
-        setLoading(false)
-        return
+        setLoading(false); return
       }
       
-      const timeoutId = setTimeout(() => {
-        console.warn('데이터 로딩 시간 초과: 강제로 화면을 표시합니다.')
-        setLoading(false)
-      }, 5000)
+      const timeoutId = setTimeout(() => { setLoading(false) }, 5000)
 
       try {
-        // 온라인 상태면 Supabase에서 가져오고 IndexedDB에 저장
-        // 오프라인 상태면 IndexedDB에서 가져오기
         if (!isOnline) {
-          // 오프라인: IndexedDB에서 로드
           const offlineData = await getOfflineData()
-          
-          if (offlineData.products && offlineData.products.length > 0) {
-            setProducts(offlineData.products)
-          }
-          if (offlineData.clients && offlineData.clients.length > 0) {
+          if (offlineData.products?.length > 0) setProducts(offlineData.products)
+          if (offlineData.clients?.length > 0) {
             setClients(offlineData.clients.map(c => ({
               ...c,
               lastOrder: c.last_order || c.lastOrder,
@@ -321,7 +308,7 @@ export const DataProvider = ({ children }) => {
               contract_prices: typeof c.contract_prices === 'string' ? (c.contract_prices ? JSON.parse(c.contract_prices) : []) : (c.contract_prices || [])
             })))
           }
-          if (offlineData.activities && offlineData.activities.length > 0) {
+          if (offlineData.activities?.length > 0) {
             setActivities(offlineData.activities.map(a => ({
               ...a,
               clientId: a.client_id || a.clientId,
@@ -330,26 +317,20 @@ export const DataProvider = ({ children }) => {
               date: a.activity_date
             })))
           }
-          if (offlineData.sales && offlineData.sales.length > 0) {
-            setSales(offlineData.sales)
-          }
-          if (offlineData.issues && offlineData.issues.length > 0) {
-            setIssues(offlineData.issues)
-          }
+          if (offlineData.sales?.length > 0) setSales(offlineData.sales)
+          if (offlineData.issues?.length > 0) setIssues(offlineData.issues)
           
           clearTimeout(timeoutId)
           setLoading(false)
           return
         }
 
-        // 온라인: Supabase에서 로드하고 IndexedDB에 저장
         const fetchProducts = async () => {
           try {
             const { data, error } = await supabase.from('products').select('*').order('name')
             if (error) throw error
             return { success: true, data: data || [] }
           } catch (error) {
-            console.error('Products 로드 실패:', error)
             errors.push('제품 데이터')
             return { success: false, data: [] }
           }
@@ -358,15 +339,9 @@ export const DataProvider = ({ children }) => {
         const fetchClients = async () => {
           try {
             const { data, error } = await supabase.from('clients').select('*').order('company')
-            
-            if (error) {
-              console.error('❌ [fetchClients] 에러 발생:', error)
-              throw error
-            }
-            
+            if (error) throw error
             return { success: true, data: data || [] }
           } catch (error) {
-            console.error('❌ [fetchClients] Clients 로드 실패:', error)
             errors.push('고객 데이터')
             return { success: false, data: [] }
           }
@@ -379,15 +354,9 @@ export const DataProvider = ({ children }) => {
               .select('*')
               .order('activity_date', { ascending: false })
               .order('created_at', { ascending: false })
-            
-            if (error) {
-              console.error('❌ [fetchActivities] 에러 발생:', error)
-              throw error
-            }
-            
+            if (error) throw error
             return { success: true, data: data || [] }
           } catch (error) {
-            console.error('❌ [fetchActivities] Activities 로드 실패:', error)
             errors.push('활동 데이터')
             return { success: false, data: [] }
           }
@@ -395,16 +364,10 @@ export const DataProvider = ({ children }) => {
 
         const fetchSales = async () => {
           try {
-            // 기본 조회로 수행 (foreign key 조인은 나중에 필요시 추가)
-            const result = await supabase
-              .from('sales')
-              .select('*')
-              .order('sale_date', { ascending: false })
-            
+            const result = await supabase.from('sales').select('*').order('sale_date', { ascending: false })
             if (result.error) throw result.error
             return { success: true, data: result.data || [] }
           } catch (error) {
-            console.error('Sales 로드 실패:', error)
             errors.push('매출 데이터')
             return { success: false, data: [] }
           }
@@ -416,18 +379,13 @@ export const DataProvider = ({ children }) => {
             if (error) throw error
             return { success: true, data: data || [] }
           } catch (error) {
-            console.error('Issues 로드 실패:', error)
             errors.push('이슈 데이터')
             return { success: false, data: [] }
           }
         }
 
         const results = await Promise.allSettled([
-          fetchProducts(),
-          fetchClients(),
-          fetchActivities(),
-          fetchSales(),
-          fetchIssues(),
+          fetchProducts(), fetchClients(), fetchActivities(), fetchSales(), fetchIssues()
         ])
 
         const productsResult = results[0].status === 'fulfilled' ? results[0].value : { success: false, data: null }
@@ -436,119 +394,42 @@ export const DataProvider = ({ children }) => {
         const salesResult = results[3].status === 'fulfilled' ? results[3].value : { success: false, data: null }
         const issuesResult = results[4].status === 'fulfilled' ? results[4].value : { success: false, data: null }
 
-        if (productsResult.success && productsResult.data !== null) {
-          const productsData = productsResult.data || []
-          setProducts(productsData)
-          // IndexedDB에 저장
-          if (productsData.length > 0) {
-            try {
-              await saveToStore(STORES.PRODUCTS, productsData)
-            } catch (error) {
-              console.error('[DataContext] Products IndexedDB 저장 실패:', error)
-            }
-          }
+        if (productsResult.success && productsResult.data) {
+          setProducts(productsResult.data)
+          await saveToStore(STORES.PRODUCTS, productsResult.data).catch(e => console.error(e))
         }
         
-        if (clientsResult.success && clientsResult.data !== null) {
-          const mappedClients = (clientsResult.data || []).map((client) => {
-            try {
-              return {
-                ...client,
-                lastOrder: client.last_order || client.lastOrder,
-                orderAmount: client.order_amount || client.orderAmount,
-                contact_person: client.contact_person || client.contact || '',
-                contract_prices: typeof client.contract_prices === 'string' ? (client.contract_prices ? JSON.parse(client.contract_prices) : []) : (client.contract_prices || []),
-              }
-            } catch (e) {
-              return { 
-                ...client, 
-                lastOrder: client.last_order || client.lastOrder,
-                orderAmount: client.order_amount || client.orderAmount,
-                contact_person: client.contact_person || client.contact || '', 
-                contract_prices: [] 
-              }
-            }
-          })
-          
+        if (clientsResult.success && clientsResult.data) {
+          const mappedClients = clientsResult.data.map((client) => ({
+             ...client,
+             lastOrder: client.last_order || client.lastOrder,
+             orderAmount: client.order_amount || client.orderAmount,
+             contact_person: client.contact_person || client.contact || '',
+             contract_prices: typeof client.contract_prices === 'string' ? (client.contract_prices ? JSON.parse(client.contract_prices) : []) : (client.contract_prices || []),
+          }))
           setClients(mappedClients)
-          // IndexedDB에 저장 (원본 데이터 형태로)
-          if (clientsResult.data && clientsResult.data.length > 0) {
-            try {
-              await saveToStore(STORES.CLIENTS, clientsResult.data)
-            } catch (error) {
-              console.error('[DataContext] Clients IndexedDB 저장 실패:', error)
-            }
-          }
-        } else {
-          console.warn('⚠️ [초기 로드] clientsResult 실패:', clientsResult)
+          await saveToStore(STORES.CLIENTS, clientsResult.data).catch(e => console.error(e))
         }
 
-        if (activitiesResult.success && activitiesResult.data !== null) {
-          const mappedActivities = (activitiesResult.data || []).map((activity) => ({
+        if (activitiesResult.success && activitiesResult.data) {
+          const mappedActivities = activitiesResult.data.map((activity) => ({
             ...activity,
             clientId: activity.client_id || activity.clientId,
             clientName: activity.client_name || activity.clientName,
-            user: activity.user_name || activity.user,  // user_name -> user 변환
+            user: activity.user_name || activity.user,
             date: activity.activity_date,
           }))
-          
           setActivities(mappedActivities)
-          // IndexedDB에 저장 (원본 데이터 형태로)
-          if (activitiesResult.data && activitiesResult.data.length > 0) {
-            try {
-              await saveToStore(STORES.ACTIVITIES, activitiesResult.data)
-            } catch (error) {
-              console.error('[DataContext] Activities IndexedDB 저장 실패:', error)
-            }
-          }
-        } else {
-          console.warn('⚠️ [초기 로드] activitiesResult 실패:', activitiesResult)
+          await saveToStore(STORES.ACTIVITIES, activitiesResult.data).catch(e => console.error(e))
         }
 
-        if (salesResult.success && salesResult.data !== null) {
-          const processGroupedSales = (rawData, productsData) => {
-            const groups = {}
-            rawData.forEach((row) => {
-              const timeKey = row.created_at ? row.created_at.substring(0, 16) : ''
-              const key = `${row.sale_date}_${row.clientId}_${timeKey}`
-
-              if (!groups[key]) {
-                groups[key] = {
-                  ...row,
-                  id: row.id,
-                  originalRows: [row],
-                  totalAmount: Number(row.totalAmount || 0),
-                  itemCount: 1,
-                  displayItemName: row.item_name || '',
-                  items: [{ id: row.id, productId: '', item_name: row.item_name || '', quantity: row.quantity || 1, unitPrice: row.unit_price || 0, unit_price: row.unit_price || 0 }],
-                }
-              } else {
-                groups[key].originalRows.push(row)
-                groups[key].totalAmount += Number(row.totalAmount || 0)
-                groups[key].itemCount += 1
-                groups[key].items.push({ id: row.id, productId: '', item_name: row.item_name || '', quantity: row.quantity || 1, unitPrice: row.unit_price || 0, unit_price: row.unit_price || 0 })
-              }
-            })
-
-            return Object.values(groups).map((group) => {
-              group.items = group.items.map((item) => {
-                const product = productsData?.find((p) => p.name === item.item_name)
-                return { ...item, productId: product?.id || '', productName: product?.name || item.item_name }
-              })
-              if (group.itemCount > 1) {
-                group.displayItemName = `${group.displayItemName} 외 ${group.itemCount - 1}건`
-              }
-              return group
-            })
-          }
-
-          const groupedSalesData = processGroupedSales(salesResult.data || [], productsResult.data || [])
+        if (salesResult.success && salesResult.data) {
+          const groupedSalesData = processGroupedSales(salesResult.data, productsResult.data || [])
           const mappedSales = groupedSalesData.map((group) => {
-            // DB에서 가져온 데이터를 camelCase로 변환
             let clientName = group.client_name || group.clientName
             if (!clientName && group.clients) {
               if (Array.isArray(group.clients) && group.clients.length > 0) clientName = group.clients[0].company
-              else if (group.clients && typeof group.clients === 'object' && group.clients.company) clientName = group.clients.company
+              else if (group.clients?.company) clientName = group.clients.company
             }
             return { 
               ...group, 
@@ -559,34 +440,15 @@ export const DataProvider = ({ children }) => {
             }
           })
           setSales(mappedSales)
-          // IndexedDB에 저장 (원본 데이터 형태로)
-          if (salesResult.data && salesResult.data.length > 0) {
-            try {
-              await saveToStore(STORES.SALES, salesResult.data)
-            } catch (error) {
-              console.error('[DataContext] Sales IndexedDB 저장 실패:', error)
-            }
-          }
+          await saveToStore(STORES.SALES, salesResult.data).catch(e => console.error(e))
         }
 
-        if (issuesResult.success && issuesResult.data !== null) {
-          const issuesData = issuesResult.data || []
-          setIssues(issuesData)
-          // IndexedDB에 저장
-          if (issuesData.length > 0) {
-            try {
-              await saveToStore(STORES.ISSUES, issuesData)
-            } catch (error) {
-              console.error('[DataContext] Issues IndexedDB 저장 실패:', error)
-            }
-          }
-        }
-
-        if (errors.length > 0) {
-          console.warn('일부 데이터를 불러오지 못했습니다:', errors.join(', '))
+        if (issuesResult.success && issuesResult.data) {
+          setIssues(issuesResult.data)
+          await saveToStore(STORES.ISSUES, issuesResult.data).catch(e => console.error(e))
         }
       } catch (error) {
-        console.error('데이터 로드 중 예상치 못한 오류 발생:', error)
+        console.error('데이터 로드 중 오류:', error)
       } finally {
         clearTimeout(timeoutId)
         setLoading(false)
@@ -597,24 +459,16 @@ export const DataProvider = ({ children }) => {
   }, [user, authLoading])
 
   const processGroupedSales = useCallback((rawData, productsData) => {
-    // DB에서 가져온 데이터의 컬럼명을 camelCase로 변환
     const groups = {}
     rawData.forEach((row) => {
-        // DB 컬럼명을 camelCase로 변환
         const clientId = row.client_id || row.clientId
         const totalAmount = Number(row.total_amount || row.totalAmount || 0)
         const clientName = row.client_name || row.clientName
-        
         const timeKey = row.created_at ? row.created_at.substring(0, 16) : ''
         const key = `${row.sale_date}_${clientId}_${timeKey}`
         if (!groups[key]) {
             groups[key] = {
-                ...row, 
-                id: row.id, 
-                clientId: clientId,
-                clientName: clientName,
-                totalAmount: totalAmount,
-                itemCount: 1, 
+                ...row, id: row.id, clientId, clientName, totalAmount, itemCount: 1, 
                 displayItemName: row.item_name || '',
                 items: [{ id: row.id, productId: '', item_name: row.item_name || '', quantity: row.quantity || 1, unitPrice: row.unit_price || 0, unit_price: row.unit_price || 0 }]
             }
@@ -636,444 +490,225 @@ export const DataProvider = ({ children }) => {
   }, [])
 
   const fetchDashboardData = useCallback(async () => {
-    // (기존 fetchDashboardData 로직 유지)
-    setLoading(true)
-    // ... (fetchDashboardData 내부 로직은 위 useEffect 로직과 거의 동일하므로 간소화를 위해 생략하지 않고, 이미 위에서 복사한 원본 유지)
-    // 사용자가 복사 붙여넣기 할 때 누락 없도록 원본 코드 유지
-    // 다만 여기서는 addActivity/updateActivity 수정이 핵심이므로, 그 부분에 집중
-    setLoading(false) // 임시 Placeholder
+    setLoading(true); setLoading(false); 
   }, [])
 
 
+  // ==============================================================================
   // Products CRUD
+  // ==============================================================================
   const addProduct = useCallback(async (productData) => {
-    try {
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 추가하려면 먼저 로그인해주세요.')
-      }
-
-      const sanitized = sanitizeData(productData, 'product')
-      const allowedFields = ['name', 'type', 'standard']
-      const filteredData = {}
-      allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
-      
-      // created_by 자동 설정 (팀 공유 데이터 구조)
-      filteredData.created_by = user.email || user.id || null
-      
-      const { data, error } = await supabase.from('products').insert([filteredData]).select().single()
-      if (error) throw error
-      
-      // IndexedDB에도 저장 (오프라인 캐시용)
-      if (isOnline) {
-        try {
-          await saveToStore(STORES.PRODUCTS, data)
-        } catch (cacheError) {
-          console.error('[DataContext] addProduct IndexedDB 저장 실패:', cacheError)
-        }
-      }
-      
-      setProducts((prev) => [...prev, data])
-      return data
-    } catch (error) {
-      console.error('제품 추가 중 오류 발생:', error)
-      alert(`제품 추가 중 오류가 발생했습니다: ${error.message}`)
-      throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    
+    const userId = await getValidUserId(user)
+    const sanitized = sanitizeData(productData, 'product')
+    const allowedFields = ['name', 'type', 'standard']
+    const filteredData = {}
+    allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+    
+    const { data, error } = await supabase.from('products').insert([{ ...filteredData, created_by: userId }]).select().single()
+    if (error) throw error
+    
+    if (isOnline) await saveToStore(STORES.PRODUCTS, data).catch(e => console.error(e))
+    setProducts((prev) => [...prev, data])
+    return data
   }, [sanitizeData, user, isOnline])
 
   const addProductsBulk = useCallback(async (productsData) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 추가하려면 먼저 로그인해주세요.')
-        }
-
-        if (!Array.isArray(productsData) || productsData.length === 0) throw new Error('등록할 제품 데이터가 없습니다.')
-        const createdBy = user.email || user.id || null
-        
-        const sanitizedProducts = productsData.map((product) => {
-            const sanitized = sanitizeData(product, 'product')
-            const allowedFields = ['name', 'type', 'standard']
-            const filteredData = {}
-            allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
-            // created_by 자동 설정 (팀 공유 데이터 구조)
-            filteredData.created_by = createdBy
-            return filteredData
-        })
-        const { data, error } = await supabase.from('products').insert(sanitizedProducts).select()
-        if (error) throw error
-        
-        // IndexedDB에도 저장 (오프라인 캐시용)
-        if (isOnline && data && data.length > 0) {
-          try {
-            await saveToStore(STORES.PRODUCTS, data)
-          } catch (cacheError) {
-            console.error('[DataContext] addProductsBulk IndexedDB 저장 실패:', cacheError)
-          }
-        }
-        
-        setProducts((prev) => [...prev, ...data])
-        return data
-    } catch (error) {
-        console.error('제품 일괄 등록 오류:', error)
-        throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const userId = await getValidUserId(user)
+    
+    const sanitizedProducts = productsData.map((product) => {
+        const sanitized = sanitizeData(product, 'product')
+        const allowedFields = ['name', 'type', 'standard']
+        const filteredData = {}
+        allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+        return { ...filteredData, created_by: userId }
+    })
+    
+    const { data, error } = await supabase.from('products').insert(sanitizedProducts).select()
+    if (error) throw error
+    
+    if (isOnline) await saveToStore(STORES.PRODUCTS, data).catch(e => console.error(e))
+    setProducts((prev) => [...prev, ...data])
+    return data
   }, [sanitizeData, user, isOnline])
 
   const updateProduct = useCallback(async (id, productData) => {
-    try {
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 수정하려면 먼저 로그인해주세요.')
-      }
-
-      const sanitized = sanitizeData(productData, 'product')
-      const allowedFields = ['name', 'type', 'standard']
-      const filteredData = {}
-      allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
-      
-      const { data, error } = await supabase.from('products').update(filteredData).eq('id', id).select().single()
-      if (error) throw error
-      
-      // IndexedDB도 업데이트 (오프라인 캐시용)
-      if (isOnline) {
-        try {
-          await saveToStore(STORES.PRODUCTS, data)
-        } catch (cacheError) {
-          console.error('[DataContext] updateProduct IndexedDB 저장 실패:', cacheError)
-        }
-      }
-      
-      setProducts((prev) => prev.map((product) => (product.id === id ? data : product)))
-      return data
-    } catch (error) {
-      console.error('제품 수정 중 오류 발생:', error)
-      throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const sanitized = sanitizeData(productData, 'product')
+    const allowedFields = ['name', 'type', 'standard']
+    const filteredData = {}
+    allowedFields.forEach((field) => { if (sanitized[field] !== undefined) filteredData[field] = sanitized[field] })
+    
+    const { data, error } = await supabase.from('products').update(filteredData).eq('id', id).select().single()
+    if (error) throw error
+    
+    if (isOnline) await saveToStore(STORES.PRODUCTS, data).catch(e => console.error(e))
+    setProducts((prev) => prev.map((product) => (product.id === id ? data : product)))
+    return data
   }, [sanitizeData, user, isOnline])
 
   const deleteProduct = useCallback(async (id) => {
-    try {
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 삭제하려면 먼저 로그인해주세요.')
-      }
-
-      const { error } = await supabase.from('products').delete().eq('id', id)
-      if (error) throw error
-      
-      // IndexedDB에서도 삭제
-      if (isOnline) {
-        try {
-          await deleteFromStore(STORES.PRODUCTS, id)
-        } catch (cacheError) {
-          console.error('[DataContext] deleteProduct IndexedDB 삭제 실패:', cacheError)
-        }
-      }
-      
-      setProducts((prev) => prev.filter((product) => product.id !== id))
-      // 관련 데이터 정리 로직은 생략 (기존 유지)
-    } catch (error) {
-      console.error('제품 삭제 중 오류 발생:', error)
-      throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) throw error
+    if (isOnline) await deleteFromStore(STORES.PRODUCTS, id).catch(e => console.error(e))
+    setProducts((prev) => prev.filter((product) => product.id !== id))
   }, [user, isOnline])
 
+  // ==============================================================================
   // Clients CRUD
+  // ==============================================================================
   const addClient = useCallback(async (clientData) => {
-    try {
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 추가하려면 먼저 로그인해주세요.')
-      }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const userId = await getValidUserId(user)
 
-      const sanitized = sanitizeData(clientData, 'client')
-      if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
+    const sanitized = sanitizeData(clientData, 'client')
+    if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
+    
+    const fieldMapping = { 'lastOrder': 'last_order', 'orderAmount': 'order_amount' }
+    const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
+    const filteredData = {}
+    allowedFields.forEach((field) => { 
+      if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
+    })
+    
+    // 강제 덮어쓰기
+    const insertData = { ...filteredData, created_by: userId }
+
+    if (isOnline) {
+      const { data, error } = await supabase.from('clients').insert([insertData]).select().single()
+      if (error) throw error
       
-      // DB 컬럼명은 snake_case이므로 매핑 필요
-      // ⚠️ 중요: 'lastOrder' -> 'last_order', 'orderAmount' -> 'order_amount'
-      const fieldMapping = {
-        'lastOrder': 'last_order',
-        'orderAmount': 'order_amount'
+      const clientWithCamelCase = {
+        ...data,
+        lastOrder: data.last_order || data.lastOrder,
+        orderAmount: data.order_amount || data.orderAmount,
+        contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
       }
-      
-      const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
-      const filteredData = {}
-      allowedFields.forEach((field) => { 
-        if (sanitized[field] !== undefined) {
-          // camelCase를 snake_case로 매핑
-          const dbFieldName = fieldMapping[field] || field
-          filteredData[dbFieldName] = sanitized[field]
-        }
-      })
-      
-      // created_by 자동 설정 (팀 공유 데이터 구조)
-      filteredData.created_by = user.email || user.id || null
-      
-      let clientWithCamelCase
-      
-      if (isOnline) {
-        // 온라인: Supabase에 바로 저장
-        const { data, error } = await supabase.from('clients').insert([filteredData]).select().single()
-        
-        if (error) {
-          console.error('❌ [addClient] 저장 실패:', error)
-          throw error
-        }
-        
-        // DB에서 가져온 데이터를 camelCase로 변환
-        clientWithCamelCase = {
-          ...data,
-          lastOrder: data.last_order || data.lastOrder,
-          orderAmount: data.order_amount || data.orderAmount,
-          contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
-        }
-        
-        // IndexedDB에도 저장
-        try {
-          await saveToStore(STORES.CLIENTS, data)
-        } catch (error) {
-          console.error('[DataContext] addClient IndexedDB 저장 실패:', error)
-        }
-      } else {
-        // 오프라인: 임시 ID 생성 및 IndexedDB에 저장, Sync Queue에 추가
-        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        const offlineData = {
-          ...filteredData,
-          id: tempId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-        
-        clientWithCamelCase = {
-          ...offlineData,
-          lastOrder: offlineData.last_order || offlineData.lastOrder,
-          orderAmount: offlineData.order_amount || offlineData.orderAmount,
-          contract_prices: typeof offlineData.contract_prices === 'string' ? (offlineData.contract_prices ? JSON.parse(offlineData.contract_prices) : []) : (offlineData.contract_prices || [])
-        }
-        
-        // IndexedDB에 임시 저장
-        try {
-          await saveToStore(STORES.CLIENTS, offlineData)
-        } catch (error) {
-          console.error('[DataContext] addClient IndexedDB 저장 실패:', error)
-          throw error
-        }
-        
-        // Sync Queue에 추가
-        try {
-          await addToQueue('clients', QUEUE_OPERATION.INSERT, filteredData, tempId)
-        } catch (error) {
-          console.error('[DataContext] addClient Sync Queue 추가 실패:', error)
-        }
-      }
-      
+      await saveToStore(STORES.CLIENTS, data).catch(e => console.error(e))
       setClients((prev) => [...prev, clientWithCamelCase])
       return clientWithCamelCase
-    } catch (error) {
-      console.error('❌ [addClient] 고객 추가 중 오류 발생:', error)
-      throw error
+    } else {
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      const offlineData = { ...insertData, id: tempId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+      
+      await saveToStore(STORES.CLIENTS, offlineData)
+      await addToQueue('clients', QUEUE_OPERATION.INSERT, insertData, tempId)
+      
+      const clientWithCamelCase = { ...offlineData, lastOrder: offlineData.last_order, orderAmount: offlineData.order_amount }
+      setClients((prev) => [...prev, clientWithCamelCase])
+      return clientWithCamelCase
     }
-  }, [sanitizeData, isOnline])
+  }, [sanitizeData, isOnline, user])
 
   const updateClient = useCallback(async (id, clientData) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 수정하려면 먼저 로그인해주세요.')
-        }
-
-        const sanitized = sanitizeData(clientData, 'client')
-        if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
-        
-        // DB 컬럼명은 snake_case이므로 매핑 필요
-        // ⚠️ 중요: 'lastOrder' -> 'last_order', 'orderAmount' -> 'order_amount'
-        const fieldMapping = {
-          'lastOrder': 'last_order',
-          'orderAmount': 'order_amount'
-        }
-        
-        const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
-        const filteredData = {}
-        allowedFields.forEach((field) => { 
-          if (sanitized[field] !== undefined) {
-            // camelCase를 snake_case로 매핑
-            const dbFieldName = fieldMapping[field] || field
-            filteredData[dbFieldName] = sanitized[field]
-          }
-        })
-        
-        if (isOnline) {
-          // 온라인: Supabase에 직접 업데이트
-          const { data, error } = await supabase.from('clients').update(filteredData).eq('id', id).select().single()
-          
-          if (error) {
-            console.error('❌ [updateClient] 저장 실패:', error)
-            throw error
-          }
-          
-          // IndexedDB도 업데이트 (오프라인 캐시용)
-          try {
-            await saveToStore(STORES.CLIENTS, data)
-          } catch (cacheError) {
-            console.error('[DataContext] updateClient IndexedDB 저장 실패:', cacheError)
-          }
-          
-          // DB에서 가져온 데이터를 camelCase로 변환
-          const updatedClient = { 
-            ...data, 
-            lastOrder: data.last_order || data.lastOrder,
-            orderAmount: data.order_amount || data.orderAmount,
-            contract_prices: typeof data.contract_prices === 'string' ? JSON.parse(data.contract_prices) : data.contract_prices || [] 
-          }
-          
-          setClients((prev) => prev.map((client) => (client.id === id ? updatedClient : client)))
-          return updatedClient
-        } else {
-          // 오프라인: IndexedDB에 저장하고 Sync Queue에 추가
-          const clientWithCamelCase = {
-            ...sanitized,
-            id: id,
-            lastOrder: sanitized.lastOrder || filteredData.last_order,
-            orderAmount: sanitized.orderAmount || filteredData.order_amount,
-            contract_prices: sanitized.contract_prices || filteredData.contract_prices || [],
-            is_offline: true,
-            updated_at: new Date().toISOString()
-          }
-          
-          // IndexedDB에 저장
-          await saveToStore(STORES.CLIENTS, clientWithCamelCase)
-          
-          // Sync Queue에 추가
-          await addToQueue('clients', QUEUE_OPERATION.UPDATE, filteredData, id)
-          
-          setClients((prev) => prev.map((client) => (client.id === id ? clientWithCamelCase : client)))
-          return clientWithCamelCase
-        }
-    } catch (error) {
-        console.error('❌ [updateClient] 고객 수정 오류:', error)
-        throw error
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const sanitized = sanitizeData(clientData, 'client')
+    if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
+    
+    const fieldMapping = { 'lastOrder': 'last_order', 'orderAmount': 'order_amount' }
+    const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
+    const filteredData = {}
+    allowedFields.forEach((field) => { 
+      if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
+    })
+    
+    if (isOnline) {
+      const { data, error } = await supabase.from('clients').update(filteredData).eq('id', id).select().single()
+      if (error) throw error
+      await saveToStore(STORES.CLIENTS, data).catch(e => console.error(e))
+      const updatedClient = { 
+        ...data, 
+        lastOrder: data.last_order || data.lastOrder, 
+        orderAmount: data.order_amount || data.orderAmount,
+        contract_prices: typeof data.contract_prices === 'string' ? JSON.parse(data.contract_prices) : data.contract_prices || [] 
+      }
+      setClients((prev) => prev.map((client) => (client.id === id ? updatedClient : client)))
+      return updatedClient
+    } else {
+      const clientWithCamelCase = { ...sanitized, id: id, is_offline: true, updated_at: new Date().toISOString() }
+      await saveToStore(STORES.CLIENTS, clientWithCamelCase)
+      await addToQueue('clients', QUEUE_OPERATION.UPDATE, filteredData, id)
+      setClients((prev) => prev.map((client) => (client.id === id ? clientWithCamelCase : client)))
+      return clientWithCamelCase
     }
   }, [sanitizeData, user, isOnline])
 
   const deleteClient = useCallback(async (id) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 삭제하려면 먼저 로그인해주세요.')
-        }
-
-        const { error } = await supabase.from('clients').delete().eq('id', id)
-        if (error) throw error
-        
-        // IndexedDB에서도 삭제
-        if (isOnline) {
-          try {
-            await deleteFromStore(STORES.CLIENTS, id)
-          } catch (cacheError) {
-            console.error('[DataContext] deleteClient IndexedDB 삭제 실패:', cacheError)
-          }
-        }
-        
-        setClients((prev) => prev.filter((client) => client.id !== id))
-        setActivities((prev) => prev.filter((activity) => activity.clientId !== id))
-        setSales((prev) => prev.filter((sale) => sale.clientId !== id))
-    } catch (error) {
-        console.error('고객 삭제 오류:', error)
-        throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const { error } = await supabase.from('clients').delete().eq('id', id)
+    if (error) throw error
+    if (isOnline) await deleteFromStore(STORES.CLIENTS, id).catch(e => console.error(e))
+    setClients((prev) => prev.filter((client) => client.id !== id))
+    setActivities((prev) => prev.filter((activity) => activity.clientId !== id))
+    setSales((prev) => prev.filter((sale) => sale.clientId !== id))
   }, [user, isOnline])
 
   // ==============================================================================
   // ★★★ [핵심 수정 구간: Activities CRUD] ★★★
-  // next_action_date, next_action_detail이 Supabase로 전달되도록 allowedFields에 추가함
   // ==============================================================================
   const addActivity = useCallback(async (activityData) => {
     try {
+      if (!user) throw new Error('로그인이 필요합니다.')
+      
+      // 1. UUID 확보 (실패시 에러 throw)
+      const userId = await getValidUserId(user)
+      
+      // 2. 데이터 정제
       const client = clients.find((c) => c.id === activityData.clientId)
       const activityDataWithDate = {
         ...activityData,
         activity_date: activityData.activity_date || activityData.date || null,
         clientName: client?.company || '알 수 없음',
       }
-      delete activityDataWithDate.date
-      delete activityDataWithDate.time
-
-      const sanitized = sanitizeData(activityDataWithDate, 'activity')
-
-      // [수정 3] 허용 필드 목록에 'next_action_date', 'next_action_detail' 추가
-      // DB 컬럼명은 snake_case이므로 매핑 필요
-      // ⚠️ 중요: 'user' 필드는 DB에서 'user_name' 컬럼으로 저장됨
-      const fieldMapping = {
-        'clientId': 'client_id',
-        'clientName': 'client_name',
-        'user': 'user_name'  // user는 예약어이므로 user_name으로 변경
-      }
       
-      const allowedFields = [
-        'clientId',
-        'type',
-        'activity_date',
-        'user',
-        'description',
-        'status',
-        'clientName',
-        'next_action_date', 
-        'next_action_detail'
-      ]
+      const sanitized = sanitizeData(activityDataWithDate, 'activity')
+      
+      const fieldMapping = { 'clientId': 'client_id', 'clientName': 'client_name', 'user': 'user_name' }
+      const allowedFields = ['clientId', 'type', 'activity_date', 'user', 'description', 'status', 'clientName', 'next_action_date', 'next_action_detail']
       
       const filteredData = {}
       allowedFields.forEach((field) => {
-        if (sanitized[field] !== undefined) {
-          // camelCase를 snake_case로 매핑 (user -> user_name)
-          const dbFieldName = fieldMapping[field] || field
-          filteredData[dbFieldName] = sanitized[field]
-        }
+        if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
       })
 
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 추가하려면 먼저 로그인해주세요.')
+      // 3. 최종 전송 데이터 객체 생성 (순서 중요: ...filteredData 다음 created_by)
+      const finalInsertData = {
+        ...filteredData,
+        created_by: userId
       }
 
-      // created_by 자동 설정 (팀 공유 데이터 구조)
-      filteredData.created_by = user.email || user.id || null
+      // 4. 안전장치: 이메일 체크
+      if (String(finalInsertData.created_by).includes('@')) {
+         throw new Error('SYSTEM ERROR: User ID contains email. Aborting save.')
+      }
 
       if (isOnline) {
-        // 온라인: Supabase에 직접 저장
-        const { data: insertedData, error } = await supabase
-          .from('activities')
-          .insert([filteredData])
-          .select()
-          .single()
+        // 온라인: Supabase에 저장
+        const { data: insertedData, error } = await supabase.from('activities').insert([finalInsertData]).select().single()
 
         if (error) {
-          console.error('❌ [addActivity] 저장 실패:', error)
+          console.error('[addActivity] Supabase Error:', error)
           throw error
         }
 
-        // DB에서 가져온 데이터를 camelCase로 변환
-        // ⚠️ 중요: DB의 'user_name' 컬럼을 'user' 필드로 변환
-        const activityWithDate = {
+        const activityWithCamelCase = {
           ...insertedData,
           clientId: insertedData.client_id || insertedData.clientId,
           clientName: insertedData.client_name || insertedData.clientName,
-          user: insertedData.user_name || insertedData.user,  // user_name -> user 변환
+          user: insertedData.user_name || insertedData.user,
           date: insertedData.activity_date,
         }
 
-        // IndexedDB에도 저장 (오프라인 캐시용)
-        await saveToStore(STORES.ACTIVITIES, activityWithDate)
-        
-        setActivities((prev) => [activityWithDate, ...prev])
-        return activityWithDate
+        await saveToStore(STORES.ACTIVITIES, activityWithCamelCase)
+        setActivities((prev) => [activityWithCamelCase, ...prev])
+        return activityWithCamelCase
+
       } else {
-        // 오프라인: 임시 ID 생성, IndexedDB에 저장, Sync Queue에 추가
+        // 오프라인
         const tempId = `offline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        
-        // created_by 자동 설정 (오프라인에서도)
-        filteredData.created_by = user?.email || user?.id || null
         
         const activityWithCamelCase = {
           ...sanitized,
@@ -1082,431 +717,237 @@ export const DataProvider = ({ children }) => {
           clientName: sanitized.clientName || filteredData.client_name,
           user: sanitized.user || filteredData.user_name,
           date: sanitized.activity_date || filteredData.activity_date,
-          created_by: filteredData.created_by,
+          created_by: userId,
           is_offline: true,
           created_at: new Date().toISOString()
         }
         
-        // IndexedDB에 저장
         await saveToStore(STORES.ACTIVITIES, activityWithCamelCase)
-        
-        // Sync Queue에 추가
-        await addToQueue('activities', QUEUE_OPERATION.INSERT, filteredData, tempId)
+        await addToQueue('activities', QUEUE_OPERATION.INSERT, finalInsertData, tempId) // Queue에도 올바른 finalInsertData 저장
         
         setActivities((prev) => [...prev, activityWithCamelCase])
         return activityWithCamelCase
       }
-    } catch (error) {
-      console.error('활동 추가 중 오류 발생:', error)
-      
-      // 네트워크 에러인 경우 오프라인 처리를 시도
-      if (!isOnline || error.message?.includes('network') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
-        try {
-          // 오프라인으로 전환된 경우: 로컬에 저장
-          const client = clients.find((c) => c.id === activityData.clientId)
-          const activityDataWithDate = {
-            ...activityData,
-            activity_date: activityData.activity_date || activityData.date || null,
-            clientName: client?.company || '알 수 없음',
-          }
-          delete activityDataWithDate.date
-          delete activityDataWithDate.time
 
-          const sanitized = sanitizeData(activityDataWithDate, 'activity')
-          
-          const fieldMapping = {
-            'clientId': 'client_id',
-            'clientName': 'client_name',
-            'user': 'user_name'
-          }
-          
-          const allowedFields = [
-            'clientId', 'type', 'activity_date', 'user', 'description', 'status',
-            'clientName', 'next_action_date', 'next_action_detail'
-          ]
-          
-          const filteredData = {}
-          allowedFields.forEach((field) => {
-            if (sanitized[field] !== undefined) {
-              const dbFieldName = fieldMapping[field] || field
-              filteredData[dbFieldName] = sanitized[field]
-            }
-          })
-          
-          // created_by 자동 설정 (오프라인에서도)
-          filteredData.created_by = user?.email || user?.id || null
-          
-          const tempId = `offline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-          
-          const activityWithCamelCase = {
-            ...sanitized,
-            id: tempId,
-            clientId: sanitized.clientId || filteredData.client_id,
-            clientName: sanitized.clientName || filteredData.client_name,
-            user: sanitized.user || filteredData.user_name,
-            date: sanitized.activity_date || filteredData.activity_date,
-            is_offline: true,
-            created_at: new Date().toISOString()
-          }
-          
-          await saveToStore(STORES.ACTIVITIES, activityWithCamelCase)
-          await addToQueue('activities', QUEUE_OPERATION.INSERT, filteredData, tempId)
-          
-          setActivities((prev) => [...prev, activityWithCamelCase])
-          return activityWithCamelCase
-        } catch (offlineError) {
-          console.error('오프라인 활동 저장 실패:', offlineError)
-          throw new Error('활동 추가 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.')
-        }
-      }
-      
+    } catch (error) {
+      console.error('활동 추가 실패:', error)
       throw error
     }
   }, [clients, sanitizeData, isOnline, user])
 
   const updateActivity = useCallback(async (id, activityData) => {
-    try {
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 수정하려면 먼저 로그인해주세요.')
-      }
+    if (!user) throw new Error('로그인이 필요합니다.')
 
-      const client = clients.find((c) => c.id === activityData.clientId)
-      const activityDataWithDate = {
-        ...activityData,
-        activity_date: activityData.activity_date || activityData.date || null,
-        clientName: client?.company || activityData.clientName,
-      }
-      delete activityDataWithDate.date
-      delete activityDataWithDate.time
+    const client = clients.find((c) => c.id === activityData.clientId)
+    const activityDataWithDate = {
+      ...activityData,
+      activity_date: activityData.activity_date || activityData.date || null,
+      clientName: client?.company || activityData.clientName,
+    }
+    const sanitized = sanitizeData(activityDataWithDate, 'activity')
+    
+    const fieldMapping = { 'clientId': 'client_id', 'clientName': 'client_name', 'user': 'user_name' }
+    const allowedFields = ['clientId', 'type', 'activity_date', 'user', 'description', 'status', 'clientName', 'next_action_date', 'next_action_detail']
+    
+    const filteredData = {}
+    allowedFields.forEach((field) => {
+      if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
+    })
 
-      const sanitized = sanitizeData(activityDataWithDate, 'activity')
-
-      // [수정 4] 수정 시에도 허용 필드 목록에 'next_action_date', 'next_action_detail' 추가
-      // DB 컬럼명은 snake_case이므로 매핑 필요
-      // ⚠️ 중요: 'user' 필드는 DB에서 'user_name' 컬럼으로 저장됨 (예약어 문제)
-      const fieldMapping = {
-        'clientId': 'client_id',
-        'clientName': 'client_name',
-        'user': 'user_name'  // user는 예약어이므로 user_name으로 변경
-      }
+    if (isOnline) {
+      const { data, error } = await supabase.from('activities').update(filteredData).eq('id', id).select().single()
+      if (error) throw error
+      await saveToStore(STORES.ACTIVITIES, data).catch(e => console.error(e))
       
-      const allowedFields = [
-        'clientId',
-        'type',
-        'activity_date',
-        'user',
-        'description',
-        'status',
-        'clientName',
-        'next_action_date', 
-        'next_action_detail'
-      ]
-      
-      const filteredData = {}
-      allowedFields.forEach((field) => {
-        if (sanitized[field] !== undefined) {
-          // camelCase를 snake_case로 매핑 (user -> user_name)
-          const dbFieldName = fieldMapping[field] || field
-          filteredData[dbFieldName] = sanitized[field]
-        }
-      })
-
-      if (isOnline) {
-        // 온라인: Supabase에 직접 업데이트
-        const { data, error } = await supabase
-          .from('activities')
-          .update(filteredData)
-          .eq('id', id)
-          .select()
-          .single()
-
-        if (error) throw error
-
-        // IndexedDB도 업데이트 (오프라인 캐시용)
-        try {
-          await saveToStore(STORES.ACTIVITIES, data)
-        } catch (cacheError) {
-          console.error('[DataContext] updateActivity IndexedDB 저장 실패:', cacheError)
-        }
-
-        // DB에서 가져온 데이터를 camelCase로 변환
-        // ⚠️ 중요: DB의 'user_name' 컬럼을 'user' 필드로 변환
-        const activityWithDate = {
-          ...data,
-          clientId: data.client_id || data.clientId,
-          clientName: data.client_name || data.clientName,
-          user: data.user_name || data.user,  // user_name -> user 변환
-          date: data.activity_date,
-        }
-
-        setActivities((prev) =>
-          prev.map((activity) => (activity.id === id ? activityWithDate : activity))
-        )
-        return activityWithDate
-      } else {
-        // 오프라인: IndexedDB에 저장하고 Sync Queue에 추가
-        const activityWithCamelCase = {
-          ...sanitized,
-          id: id,
-          clientId: sanitized.clientId || filteredData.client_id,
-          clientName: sanitized.clientName || filteredData.client_name,
-          user: sanitized.user || filteredData.user_name,
-          date: sanitized.activity_date || filteredData.activity_date,
-          next_action_date: sanitized.next_action_date || filteredData.next_action_date,
-          next_action_detail: sanitized.next_action_detail || filteredData.next_action_detail,
-          is_offline: true,
-          updated_at: new Date().toISOString()
-        }
-        
-        // IndexedDB에 저장
-        await saveToStore(STORES.ACTIVITIES, activityWithCamelCase)
-        
-        // Sync Queue에 추가
-        await addToQueue('activities', QUEUE_OPERATION.UPDATE, filteredData, id)
-        
-        setActivities((prev) => prev.map((activity) => (activity.id === id ? activityWithCamelCase : activity)))
-        return activityWithCamelCase
+      const activityWithDate = {
+        ...data,
+        clientId: data.client_id || data.clientId,
+        clientName: data.client_name || data.clientName,
+        user: data.user_name || data.user,
+        date: data.activity_date,
       }
-    } catch (error) {
-      console.error('활동 수정 중 오류 발생:', error)
-      throw error
+      setActivities((prev) => prev.map((activity) => (activity.id === id ? activityWithDate : activity)))
+      return activityWithDate
+    } else {
+      const activityWithCamelCase = {
+        ...sanitized, id: id, is_offline: true, updated_at: new Date().toISOString(),
+        date: sanitized.activity_date || filteredData.activity_date
+      }
+      await saveToStore(STORES.ACTIVITIES, activityWithCamelCase)
+      await addToQueue('activities', QUEUE_OPERATION.UPDATE, filteredData, id)
+      setActivities((prev) => prev.map((activity) => (activity.id === id ? activityWithCamelCase : activity)))
+      return activityWithCamelCase
     }
   }, [clients, sanitizeData, user, isOnline])
 
   const deleteActivity = useCallback(async (id) => {
-    try {
-      // 인증 확인 (강화)
-      if (!user) {
-        throw new Error('로그인이 필요합니다. 데이터를 삭제하려면 먼저 로그인해주세요.')
-      }
-
-      const { error } = await supabase.from('activities').delete().eq('id', id)
-      if (error) throw error
-      
-      // IndexedDB에서도 삭제
-      if (isOnline) {
-        try {
-          await deleteFromStore(STORES.ACTIVITIES, id)
-        } catch (cacheError) {
-          console.error('[DataContext] deleteActivity IndexedDB 삭제 실패:', cacheError)
-        }
-      }
-      
-      setActivities((prev) => prev.filter((activity) => activity.id !== id))
-    } catch (error) {
-      console.error('활동 삭제 중 오류 발생:', error)
-      throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const { error } = await supabase.from('activities').delete().eq('id', id)
+    if (error) throw error
+    if (isOnline) await deleteFromStore(STORES.ACTIVITIES, id).catch(e => console.error(e))
+    setActivities((prev) => prev.filter((activity) => activity.id !== id))
   }, [user, isOnline])
 
-  // Sales CRUD (기존 유지)
+  // ==============================================================================
+  // Sales CRUD
+  // ==============================================================================
   const addSale = useCallback(async (saleData) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 추가하려면 먼저 로그인해주세요.')
-        }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const userId = await getValidUserId(user)
 
-        const createdBy = user.email || user.id || null
-
-        if (saleData.rows && Array.isArray(saleData.rows)) {
-            const rowsToInsert = saleData.rows.map((row) => ({
-                client_id: row.clientId || row.client_id,
-                sale_date: row.sale_date,
-                item_name: (row.item_name || '').trim(),
-                quantity: Number(row.quantity) || 1,
-                unit_price: Number(row.unitPrice || row.unit_price || 0),
-                total_amount: (Number(row.quantity) || 1) * (Number(row.unitPrice || row.unit_price || 0)),
-                notes: row.notes || '',
-                client_name: row.clientName || '',
-                created_by: createdBy // created_by 자동 설정
-            }))
-            const { data, error } = await supabase.from('sales').insert(rowsToInsert).select()
-            if (error) throw error
-            
-            // IndexedDB에도 저장 (오프라인 캐시용)
-            if (isOnline && data && data.length > 0) {
-              try {
-                await saveToStore(STORES.SALES, data)
-              } catch (cacheError) {
-                console.error('[DataContext] addSale IndexedDB 저장 실패:', cacheError)
-              }
-            }
-            
-            // DB에서 가져온 데이터를 camelCase로 변환
-            const newSales = data.map((sale) => ({ 
-              ...sale, 
-              clientId: sale.client_id || sale.clientId,
-              clientName: sale.client_name || sale.clientName,
-              totalAmount: sale.total_amount || sale.totalAmount,
-              date: sale.sale_date, 
-              items: [{ productId: '', item_name: sale.item_name, quantity: sale.quantity, unitPrice: sale.unit_price, total: sale.total_amount }] 
-            }))
-            setSales((prev) => [...newSales, ...prev])
-            return newSales[0]
-        }
-        
-        const client = clients.find((c) => c.id === saleData.clientId)
-        const saleDataWithDate = { ...saleData, sale_date: saleData.date || saleData.sale_date || null, clientName: client?.company || '알 수 없음', totalAmount: saleData.totalAmount || 0 }
-        delete saleDataWithDate.date
-        
-        const sanitized = sanitizeData(saleDataWithDate, 'sale')
-        // DB 컬럼명은 snake_case이므로 매핑 필요
-        const fieldMapping = {
-          'clientId': 'client_id',
-          'clientName': 'client_name',
-          'totalAmount': 'total_amount'
-        }
-        
-        const allowedFields = ['clientId', 'sale_date', 'items', 'item_name', 'totalAmount', 'notes', 'clientName']
-        const filteredData = {}
-        allowedFields.forEach((field) => { 
-          if (sanitized[field] !== undefined) {
-            const dbFieldName = fieldMapping[field] || field
-            filteredData[dbFieldName] = sanitized[field]
-          }
-        })
-        if (filteredData.items && filteredData.items.length > 0) filteredData.item_name = filteredData.items[0].item_name || ''
-
-        // created_by 자동 설정 (팀 공유 데이터 구조)
-        filteredData.created_by = createdBy
-
-        const { data, error } = await supabase.from('sales').insert([filteredData]).select().single()
+    if (saleData.rows && Array.isArray(saleData.rows)) {
+        const rowsToInsert = saleData.rows.map((row) => ({
+            client_id: row.clientId || row.client_id,
+            sale_date: row.sale_date,
+            item_name: (row.item_name || '').trim(),
+            quantity: Number(row.quantity) || 1,
+            unit_price: Number(row.unitPrice || row.unit_price || 0),
+            total_amount: (Number(row.quantity) || 1) * (Number(row.unitPrice || row.unit_price || 0)),
+            notes: row.notes || '',
+            client_name: row.clientName || '',
+            created_by: userId
+        }))
+        const { data, error } = await supabase.from('sales').insert(rowsToInsert).select()
         if (error) throw error
+        if (isOnline) await saveToStore(STORES.SALES, data).catch(e => console.error(e))
         
-        // IndexedDB에도 저장 (오프라인 캐시용)
-        if (isOnline) {
-          try {
-            await saveToStore(STORES.SALES, data)
-          } catch (cacheError) {
-            console.error('[DataContext] addSale IndexedDB 저장 실패:', cacheError)
-          }
-        }
-        
-        // DB에서 가져온 데이터를 camelCase로 변환
-        const newSale = { 
-          ...data, 
-          clientId: data.client_id || data.clientId,
-          clientName: data.client_name || data.clientName,
-          totalAmount: data.total_amount || data.totalAmount,
-          date: data.sale_date, 
-          items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] 
-        }
-        setSales((prev) => [newSale, ...prev])
-        return newSale
-    } catch (error) {
-        console.error('매출 추가 오류:', error)
-        throw error
+        const newSales = data.map((sale) => ({ 
+            ...sale, 
+            clientId: sale.client_id || sale.clientId,
+            clientName: sale.client_name || sale.clientName,
+            totalAmount: sale.total_amount || sale.totalAmount,
+            date: sale.sale_date, 
+            items: [{ productId: '', item_name: sale.item_name, quantity: sale.quantity, unitPrice: sale.unit_price, total: sale.total_amount }] 
+        }))
+        setSales((prev) => [...newSales, ...prev])
+        return newSales[0]
     }
+    
+    const client = clients.find((c) => c.id === saleData.clientId)
+    const saleDataWithDate = { ...saleData, sale_date: saleData.date || saleData.sale_date || null, clientName: client?.company || '알 수 없음', totalAmount: saleData.totalAmount || 0 }
+    const sanitized = sanitizeData(saleDataWithDate, 'sale')
+    const fieldMapping = { 'clientId': 'client_id', 'clientName': 'client_name', 'totalAmount': 'total_amount' }
+    const allowedFields = ['clientId', 'sale_date', 'items', 'item_name', 'totalAmount', 'notes', 'clientName']
+    const filteredData = {}
+    allowedFields.forEach((field) => { 
+        if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
+    })
+    if (filteredData.items && filteredData.items.length > 0) filteredData.item_name = filteredData.items[0].item_name || ''
+
+    const insertData = { ...filteredData, created_by: userId }
+    const { data, error } = await supabase.from('sales').insert([insertData]).select().single()
+    if (error) throw error
+    
+    if (isOnline) await saveToStore(STORES.SALES, data).catch(e => console.error(e))
+    const newSale = { 
+        ...data, 
+        clientId: data.client_id || data.clientId,
+        clientName: data.client_name || data.clientName,
+        totalAmount: data.total_amount || data.totalAmount,
+        date: data.sale_date, 
+        items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] 
+    }
+    setSales((prev) => [newSale, ...prev])
+    return newSale
   }, [clients, sanitizeData, user, isOnline])
 
   const updateSale = useCallback(async (id, saleData) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 수정하려면 먼저 로그인해주세요.')
-        }
-
-        const client = clients.find((c) => c.id === saleData.clientId)
-        const saleDataWithDate = { ...saleData, sale_date: saleData.date || saleData.sale_date || null, clientName: client?.company || saleData.clientName, items: saleData.items || [], totalAmount: saleData.totalAmount || 0 }
-        delete saleDataWithDate.date
-        const sanitized = sanitizeData(saleDataWithDate, 'sale')
-        // DB 컬럼명은 snake_case이므로 매핑 필요
-        const fieldMapping = {
-          'clientId': 'client_id',
-          'clientName': 'client_name',
-          'totalAmount': 'total_amount'
-        }
-        
-        const allowedFields = ['clientId', 'sale_date', 'items', 'totalAmount', 'notes', 'clientName']
-        const filteredData = {}
-        allowedFields.forEach((field) => { 
-          if (sanitized[field] !== undefined) {
-            const dbFieldName = fieldMapping[field] || field
-            filteredData[dbFieldName] = sanitized[field]
-          }
-        })
-        
-        if (isOnline) {
-          // 온라인: Supabase에 직접 업데이트
-          const { data, error } = await supabase.from('sales').update(filteredData).eq('id', id).select().single()
-          if (error) throw error
-          
-          // IndexedDB도 업데이트 (오프라인 캐시용)
-          try {
-            await saveToStore(STORES.SALES, data)
-          } catch (cacheError) {
-            console.error('[DataContext] updateSale IndexedDB 저장 실패:', cacheError)
-          }
-          
-          // DB에서 가져온 데이터를 camelCase로 변환
-          const updatedSale = { 
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const client = clients.find((c) => c.id === saleData.clientId)
+    const saleDataWithDate = { ...saleData, sale_date: saleData.date || saleData.sale_date || null, clientName: client?.company || saleData.clientName, items: saleData.items || [], totalAmount: saleData.totalAmount || 0 }
+    const sanitized = sanitizeData(saleDataWithDate, 'sale')
+    const fieldMapping = { 'clientId': 'client_id', 'clientName': 'client_name', 'totalAmount': 'total_amount' }
+    const allowedFields = ['clientId', 'sale_date', 'items', 'totalAmount', 'notes', 'clientName']
+    const filteredData = {}
+    allowedFields.forEach((field) => { 
+        if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
+    })
+    
+    if (isOnline) {
+        const { data, error } = await supabase.from('sales').update(filteredData).eq('id', id).select().single()
+        if (error) throw error
+        await saveToStore(STORES.SALES, data).catch(e => console.error(e))
+        const updatedSale = { 
             ...data, 
             clientId: data.client_id || data.clientId,
             clientName: data.client_name || data.clientName,
             totalAmount: data.total_amount || data.totalAmount,
             date: data.sale_date, 
             items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [] 
-          }
-          setSales((prev) => prev.map((sale) => (sale.id === id ? updatedSale : sale)))
-          return updatedSale
-        } else {
-          // 오프라인: IndexedDB에 저장하고 Sync Queue에 추가
-          const saleWithCamelCase = {
-            ...sanitized,
-            id: id,
-            clientId: sanitized.clientId || filteredData.client_id,
-            clientName: sanitized.clientName || filteredData.client_name,
-            totalAmount: sanitized.totalAmount || filteredData.total_amount,
-            date: sanitized.sale_date || filteredData.sale_date,
-            items: sanitized.items || filteredData.items || [],
-            is_offline: true,
-            updated_at: new Date().toISOString()
-          }
-          
-          // IndexedDB에 저장
-          await saveToStore(STORES.SALES, saleWithCamelCase)
-          
-          // Sync Queue에 추가
-          await addToQueue('sales', QUEUE_OPERATION.UPDATE, filteredData, id)
-          
-          setSales((prev) => prev.map((sale) => (sale.id === id ? saleWithCamelCase : sale)))
-          return saleWithCamelCase
         }
-    } catch (error) {
-        console.error('매출 수정 오류:', error)
-        throw error
+        setSales((prev) => prev.map((sale) => (sale.id === id ? updatedSale : sale)))
+        return updatedSale
+    } else {
+        const saleWithCamelCase = { ...sanitized, id: id, is_offline: true, updated_at: new Date().toISOString() }
+        await saveToStore(STORES.SALES, saleWithCamelCase)
+        await addToQueue('sales', QUEUE_OPERATION.UPDATE, filteredData, id)
+        setSales((prev) => prev.map((sale) => (sale.id === id ? saleWithCamelCase : sale)))
+        return saleWithCamelCase
     }
   }, [clients, sanitizeData, user, isOnline])
 
   const deleteSale = useCallback(async (id) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 삭제하려면 먼저 로그인해주세요.')
-        }
-
-        const { error } = await supabase.from('sales').delete().eq('id', id)
-        if (error) throw error
-        
-        // IndexedDB에서도 삭제
-        if (isOnline) {
-          try {
-            await deleteFromStore(STORES.SALES, id)
-          } catch (cacheError) {
-            console.error('[DataContext] deleteSale IndexedDB 삭제 실패:', cacheError)
-          }
-        }
-        
-        setSales((prev) => prev.filter((sale) => sale.id !== id))
-    } catch (error) {
-        console.error('매출 삭제 오류:', error)
-        throw error
-    }
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const { error } = await supabase.from('sales').delete().eq('id', id)
+    if (error) throw error
+    if (isOnline) await deleteFromStore(STORES.SALES, id).catch(e => console.error(e))
+    setSales((prev) => prev.filter((sale) => sale.id !== id))
   }, [user, isOnline])
 
-  // 통계 및 주간 데이터 (기존 유지)
+  // ==============================================================================
+  // Issues CRUD
+  // ==============================================================================
+  const addIssue = useCallback(async (issueData) => {
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const userId = await getValidUserId(user)
+    
+    const sanitized = sanitizeData(issueData, 'issue')
+    let dateValue = sanitized.date || sanitized.target_date || ''
+    if (!dateValue) { const t = new Date(); dateValue = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}` }
+    const allowedFields = ['title', 'content', 'target_date', 'status']
+    const filteredData = { date: dateValue }
+    allowedFields.forEach((f) => { if (sanitized[f] !== undefined) filteredData[f] = sanitized[f] })
+    
+    const { data, error } = await supabase.from('issues').insert([{ ...filteredData, created_by: userId }]).select().single()
+    if (error) throw error
+    
+    if (isOnline) await saveToStore(STORES.ISSUES, data).catch(e => console.error(e))
+    setIssues((prev) => [data, ...prev])
+    return data
+  }, [sanitizeData, user, isOnline])
+
+  const updateIssue = useCallback(async (id, issueData) => {
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const sanitized = sanitizeData(issueData, 'issue')
+    const allowedFields = ['title', 'content', 'target_date', 'status']
+    const filteredData = {}
+    allowedFields.forEach((f) => { if (sanitized[f] !== undefined) filteredData[f] = sanitized[f] })
+    if (sanitized.date || sanitized.target_date) filteredData.date = sanitized.date || sanitized.target_date
+
+    if (isOnline) {
+      const { data, error } = await supabase.from('issues').update(filteredData).eq('id', id).select().single()
+      if (error) throw error
+      await saveToStore(STORES.ISSUES, data).catch(e => console.error(e))
+      setIssues((prev) => prev.map((i) => (i.id === id ? data : i)))
+      return data
+    } else {
+      const issueWithOffline = { ...sanitized, id: id, is_offline: true, updated_at: new Date().toISOString() }
+      await saveToStore(STORES.ISSUES, issueWithOffline)
+      await addToQueue('issues', QUEUE_OPERATION.UPDATE, filteredData, id)
+      setIssues((prev) => prev.map((i) => (i.id === id ? issueWithOffline : i)))
+      return issueWithOffline
+    }
+  }, [sanitizeData, user, isOnline])
+
+  const deleteIssue = useCallback(async (id) => {
+    if (!user) throw new Error('로그인이 필요합니다.')
+    const { error } = await supabase.from('issues').delete().eq('id', id)
+    if (error) throw error
+    if (isOnline) await deleteFromStore(STORES.ISSUES, id).catch(e => console.error(e))
+    setIssues((prev) => prev.filter((i) => i.id !== id))
+  }, [user, isOnline])
+
+  // Stats
   const getStats = useCallback(() => {
     const totalClients = clients.length
     const activeClients = clients.filter((c) => c.status === '활성').length
@@ -1554,128 +995,9 @@ export const DataProvider = ({ children }) => {
     return weeks.length > 0 ? weeks : [{ week: '1주차', 매출: 0, startDate: firstDay.toISOString().split('T')[0], endDate: lastDay.toISOString().split('T')[0] }]
   }, [sales])
 
-  // Issues CRUD
-  const addIssue = useCallback(async (issueData) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 추가하려면 먼저 로그인해주세요.')
-        }
-
-        const sanitized = sanitizeData(issueData, 'issue')
-        let dateValue = sanitized.date || sanitized.target_date || ''
-        if (!dateValue) { const t = new Date(); dateValue = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}` }
-        const allowedFields = ['title', 'content', 'target_date', 'status']
-        const filteredData = { date: dateValue }
-        allowedFields.forEach((f) => { if (sanitized[f] !== undefined) filteredData[f] = sanitized[f] })
-        
-        // created_by 자동 설정 (팀 공유 데이터 구조)
-        filteredData.created_by = user.email || user.id || null
-        
-        const { data, error } = await supabase.from('issues').insert([filteredData]).select().single()
-        if (error) throw error
-        
-        // IndexedDB에도 저장 (오프라인 캐시용)
-        if (isOnline) {
-          try {
-            await saveToStore(STORES.ISSUES, data)
-          } catch (cacheError) {
-            console.error('[DataContext] addIssue IndexedDB 저장 실패:', cacheError)
-          }
-        }
-        
-        setIssues((prev) => [data, ...prev])
-        return data
-    } catch (error) {
-        console.error('ISSUE 추가 오류:', error)
-        throw error
-    }
-  }, [sanitizeData, user, isOnline])
-
-  const updateIssue = useCallback(async (id, issueData) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 수정하려면 먼저 로그인해주세요.')
-        }
-
-        const sanitized = sanitizeData(issueData, 'issue')
-        const allowedFields = ['title', 'content', 'target_date', 'status']
-        const filteredData = {}
-        allowedFields.forEach((f) => { if (sanitized[f] !== undefined) filteredData[f] = sanitized[f] })
-        if (sanitized.date || sanitized.target_date) filteredData.date = sanitized.date || sanitized.target_date
-
-        if (isOnline) {
-          // 온라인: Supabase에 직접 업데이트
-          const { data, error } = await supabase.from('issues').update(filteredData).eq('id', id).select().single()
-          if (error) throw error
-          
-          // IndexedDB도 업데이트 (오프라인 캐시용)
-          try {
-            await saveToStore(STORES.ISSUES, data)
-          } catch (cacheError) {
-            console.error('[DataContext] updateIssue IndexedDB 저장 실패:', cacheError)
-          }
-          
-          setIssues((prev) => prev.map((i) => (i.id === id ? data : i)))
-          return data
-        } else {
-          // 오프라인: IndexedDB에 저장하고 Sync Queue에 추가
-          const issueWithOffline = {
-            ...sanitized,
-            id: id,
-            title: sanitized.title || filteredData.title,
-            content: sanitized.content || filteredData.content,
-            target_date: sanitized.target_date || filteredData.target_date || sanitized.date || filteredData.date,
-            status: sanitized.status || filteredData.status,
-            is_offline: true,
-            updated_at: new Date().toISOString()
-          }
-          
-          // IndexedDB에 저장
-          await saveToStore(STORES.ISSUES, issueWithOffline)
-          
-          // Sync Queue에 추가
-          await addToQueue('issues', QUEUE_OPERATION.UPDATE, filteredData, id)
-          
-          setIssues((prev) => prev.map((i) => (i.id === id ? issueWithOffline : i)))
-          return issueWithOffline
-        }
-    } catch (error) {
-        console.error('ISSUE 수정 오류:', error)
-        throw error
-    }
-  }, [sanitizeData, user, isOnline])
-
-  const deleteIssue = useCallback(async (id) => {
-    try {
-        // 인증 확인 (강화)
-        if (!user) {
-          throw new Error('로그인이 필요합니다. 데이터를 삭제하려면 먼저 로그인해주세요.')
-        }
-
-        const { error } = await supabase.from('issues').delete().eq('id', id)
-        if (error) throw error
-        
-        // IndexedDB에서도 삭제
-        if (isOnline) {
-          try {
-            await deleteFromStore(STORES.ISSUES, id)
-          } catch (cacheError) {
-            console.error('[DataContext] deleteIssue IndexedDB 삭제 실패:', cacheError)
-          }
-        }
-        
-        setIssues((prev) => prev.filter((i) => i.id !== id))
-    } catch (error) {
-        console.error('ISSUE 삭제 오류:', error)
-        throw error
-    }
-  }, [user, isOnline])
-
   const value = {
     products, clients, activities, sales, issues, loading, 
-    isOnline, pendingSyncCount, // 오프라인 상태 및 동기화 대기 작업 수
+    isOnline, pendingSyncCount,
     fetchDashboardData,
     addProduct, addProductsBulk, updateProduct, deleteProduct,
     addClient, updateClient, deleteClient,
