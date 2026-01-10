@@ -1,12 +1,13 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Edit, Download } from 'lucide-react'
+import { Edit, Download, Loader2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import EditActivityModal from '../components/EditActivityModal'
 import AddActivityModal from '../components/AddActivityModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import { exportActivitiesToExcel } from '../utils/excelExport'
 import { formatActivityTitle, formatActivityText } from '../utils/koreanJosa'
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 
 const Activities = () => {
   const { activities, loading, updateActivity, deleteActivity } = useData()
@@ -50,25 +51,71 @@ const Activities = () => {
       : 'bg-amber-50 text-amber-700'
   }
 
-  // 상태 필터링 적용
-  const filteredActivities = statusFilter
-    ? (activities || []).filter((activity) => activity.status === statusFilter)
-    : (activities || [])
+  // 상태 필터링 적용 (useMemo로 최적화)
+  const filteredActivities = useMemo(() => {
+    const allActivities = activities || []
+    return statusFilter
+      ? allActivities.filter((activity) => activity.status === statusFilter)
+      : allActivities
+  }, [activities, statusFilter])
 
-  // 날짜별로 그룹화
-  const groupedActivities = filteredActivities.reduce((acc, activity) => {
-    const date = activity.activity_date || activity.date
-    if (!acc[date]) {
-      acc[date] = []
-    }
-    acc[date].push(activity)
-    return acc
-  }, {})
+  // 날짜별로 그룹화 (useMemo로 최적화)
+  const groupedActivities = useMemo(() => {
+    return filteredActivities.reduce((acc, activity) => {
+      const date = activity.activity_date || activity.date
+      if (!acc[date]) {
+        acc[date] = []
+      }
+      acc[date].push(activity)
+      return acc
+    }, {})
+  }, [filteredActivities])
 
-  // 날짜 내림차순 정렬
-  const sortedDates = Object.keys(groupedActivities).sort((a, b) => {
-    return new Date(b) - new Date(a)
-  })
+  // 날짜 내림차순 정렬 (useMemo로 최적화)
+  const sortedDates = useMemo(() => {
+    return Object.keys(groupedActivities).sort((a, b) => {
+      return new Date(b) - new Date(a)
+    })
+  }, [groupedActivities])
+
+  // 무한 스크롤을 위한 평탄화된 활동 목록
+  const flattenedActivities = useMemo(() => {
+    const flat = []
+    sortedDates.forEach((date) => {
+      const dateActivities = groupedActivities[date]
+      dateActivities.forEach((activity) => {
+        flat.push({ ...activity, _dateKey: date }) // 날짜 키를 함께 저장
+      })
+    })
+    return flat
+  }, [sortedDates, groupedActivities])
+
+  // 무한 스크롤 훅 사용
+  const { visibleItems, hasMore, containerRef } = useInfiniteScroll(
+    flattenedActivities,
+    30, // 페이지당 30개 (활동은 더 많이 표시)
+    { threshold: 100, enabled: !loading }
+  )
+
+  // 표시할 그룹 복원 (무한 스크롤에 맞게)
+  const visibleGroupedActivities = useMemo(() => {
+    const grouped = {}
+    visibleItems.forEach((activity) => {
+      const date = activity._dateKey || activity.activity_date || activity.date
+      if (!grouped[date]) {
+        grouped[date] = []
+      }
+      grouped[date].push(activity)
+    })
+    return grouped
+  }, [visibleItems])
+
+  // 표시할 날짜 목록
+  const visibleDates = useMemo(() => {
+    return Object.keys(visibleGroupedActivities).sort((a, b) => {
+      return new Date(b) - new Date(a)
+    })
+  }, [visibleGroupedActivities])
 
   const handleExport = () => {
     exportActivitiesToExcel(activities)
@@ -120,11 +167,11 @@ const Activities = () => {
       </div>
 
       <div className="card p-5 md:p-6">
-        <div className="relative">
+        <div className="relative" ref={containerRef}>
           {/* Timeline */}
-          {sortedDates.length > 0 ? (
-            sortedDates.map((date, dateIndex) => {
-              const dateActivities = groupedActivities[date]
+          {visibleDates.length > 0 ? (
+            visibleDates.map((date, dateIndex) => {
+              const dateActivities = visibleGroupedActivities[date]
               return (
                 <div key={date} className={dateIndex > 0 ? 'mt-8' : ''}>
                   {/* Date Header */}
@@ -159,7 +206,7 @@ const Activities = () => {
                           <SwipeableListItem
                             onEdit={() => setEditingActivityId(activity.id)}
                             onDelete={() => {
-                              if (window.confirm('이 활동을 삭제하시겠습니까?')) {
+                              if (window.confirm('정말 삭제하시겠습니까?\n\n이 활동 기록이 영구적으로 삭제됩니다.')) {
                                 deleteActivity(activity.id).catch((error) => {
                                   console.error('활동 삭제 중 오류:', error)
                                   alert('삭제 중 오류가 발생했습니다.')
@@ -194,9 +241,17 @@ const Activities = () => {
                                     </button>
                                   </div>
                                   {/* 거래처 중심 제목: [거래처] - [핵심요약] */}
-                                  <h3 className="font-bold text-base md:text-lg text-gray-900 mb-2 break-words">
-                                    {formatActivityTitle(activity.clientName, activity.description)}
-                                  </h3>
+                                  <div className="flex items-start justify-between mb-2 gap-2">
+                                    <h3 className="font-bold text-base md:text-lg text-gray-900 break-words flex-1">
+                                      {formatActivityTitle(activity.clientName, activity.description)}
+                                    </h3>
+                                    {/* 회의록 태그 표시 */}
+                                    {activity.description && activity.description.includes('[회의록]') && (
+                                      <span className="px-2 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg whitespace-nowrap flex-shrink-0">
+                                        태그: 회의록
+                                      </span>
+                                    )}
+                                  </div>
                                   {/* 상세 문구: [거래처명]의 [정제된_외부참석자]와 [활동종류] */}
                                   <p className="text-sm text-gray-600 mb-3 leading-relaxed break-words">
                                     {formatActivityText(
@@ -235,6 +290,15 @@ const Activities = () => {
             })
           ) : (
             <div className="text-center py-8 text-gray-500">활동 내역이 없습니다.</div>
+          )}
+          {/* 무한 스크롤 트리거 */}
+          {hasMore && (
+            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+              <div className="flex items-center justify-center space-x-2 text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">더 많은 활동을 불러오는 중...</span>
+              </div>
+            </div>
           )}
         </div>
       </div>

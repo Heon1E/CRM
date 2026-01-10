@@ -238,34 +238,41 @@ const SalesCalendar = () => {
         .fc-daygrid-event { background: transparent !important; border: none !important; margin-top: 1px !important; padding: 1px 2px !important; }
         .fc-daygrid-event:hover { background: #f3f4f6 !important; border-radius: 4px; }
         @media (max-width: 767px) {
-          .fc-toolbar { padding: 0.5rem 0 !important; }
-          .fc-button { padding: 0.25rem 0.5rem !important; font-size: 0.75rem !important; }
-          .fc-toolbar-chunk { margin: 0 0.25rem !important; }
-          /* 모바일에서 날짜 셀 높이 줄이기 */
-          .fc-daygrid-day-frame { min-height: 60px !important; }
-          .fc-daygrid-day { height: auto !important; min-height: 60px !important; }
-          .fc-daygrid-day-number { padding: 2px 4px !important; font-size: 0.75rem !important; }
-          .fc-col-header-cell { padding: 4px 2px !important; font-size: 0.75rem !important; }
-          .fc-col-header-cell-cushion { padding: 2px !important; }
-          /* 모바일 이벤트 점만 표시 */
+          .fc-toolbar { padding: 0.25rem 0 !important; margin-bottom: 0.25rem !important; }
+          .fc-button { padding: 0.2rem 0.4rem !important; font-size: 0.7rem !important; min-height: 32px !important; }
+          .fc-toolbar-chunk { margin: 0 0.15rem !important; }
+          .fc-toolbar-title { font-size: 0.875rem !important; }
+          /* 모바일에서 날짜 셀 높이 더 줄이기 (컴팩트 모드) */
+          .fc-daygrid-day-frame { min-height: 40px !important; padding: 2px !important; }
+          .fc-daygrid-day { height: auto !important; min-height: 40px !important; max-height: 50px !important; }
+          .fc-daygrid-day-number { padding: 1px 3px !important; font-size: 0.7rem !important; line-height: 1.2 !important; }
+          .fc-col-header-cell { padding: 2px 1px !important; font-size: 0.7rem !important; font-weight: 600 !important; }
+          .fc-col-header-cell-cushion { padding: 1px !important; }
+          /* 모바일 이벤트 점만 표시 (더 작게) */
           .fc-daygrid-event-harness { margin: 0 !important; }
           .fc-daygrid-event { margin: 1px 0 !important; padding: 0 !important; height: auto !important; }
+          /* 달력 전체 높이 제한 (컴팩트 모드) */
+          .fc-dayGridMonth-view { height: auto !important; max-height: 380px !important; }
+          .fc-scroller { overflow-y: auto !important; max-height: 380px !important; }
+          .fc-daygrid-body { max-height: 340px !important; }
         }
       `}</style>
 
-      <div className="card p-4 md:p-6 bg-white rounded-xl shadow-sm border border-gray-100">
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[dayGridPlugin, interactionPlugin, googleCalendarPlugin]}
-          initialView="dayGridMonth"
-          locale="ko"
-          headerToolbar={{
-            left: 'prev',
-            center: 'title',
-            right: 'next today'
-          }}
-          height="auto"
-          googleCalendarApiKey={GOOGLE_API_KEY}
+      <div className="card p-3 md:p-6 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* 모바일에서 달력 높이 제한을 위한 래퍼 */}
+        <div className="md:block" style={{ maxHeight: '100%' }}>
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, interactionPlugin, googleCalendarPlugin]}
+            initialView="dayGridMonth"
+            locale="ko"
+            headerToolbar={{
+              left: 'prev',
+              center: 'title',
+              right: 'next today'
+            }}
+            height="auto"
+            googleCalendarApiKey={GOOGLE_API_KEY}
           dateClick={handleDateClick}
           eventSources={[
             { events: crmEvents, id: 'crm-source' },
@@ -362,6 +369,7 @@ const SalesCalendar = () => {
             )
           }}
         />
+        </div>
       </div>
 
       {/* 일일 일정 요약 모달 */}

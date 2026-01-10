@@ -23,7 +23,14 @@ export const BackgroundTaskProvider = ({ children }) => {
       if (prev.find(t => t.id === taskId)) {
         return prev // 이미 존재하면 추가하지 않음
       }
-      return [...prev, { id: taskId, name: taskName, startTime: Date.now() }]
+      const newTasks = [...prev, { id: taskId, name: taskName, startTime: Date.now() }]
+      
+      // 작업 상태 변경 이벤트 전달
+      window.dispatchEvent(new CustomEvent('backgroundTaskUpdated', {
+        detail: { activeTasks: newTasks }
+      }))
+      
+      return newTasks
     })
   }, [])
 
@@ -32,7 +39,16 @@ export const BackgroundTaskProvider = ({ children }) => {
    * @param {string} taskId - 작업 ID
    */
   const removeTask = useCallback((taskId) => {
-    setActiveTasks(prev => prev.filter(t => t.id !== taskId))
+    setActiveTasks(prev => {
+      const newTasks = prev.filter(t => t.id !== taskId)
+      
+      // 작업 상태 변경 이벤트 전달
+      window.dispatchEvent(new CustomEvent('backgroundTaskUpdated', {
+        detail: { activeTasks: newTasks }
+      }))
+      
+      return newTasks
+    })
   }, [])
 
   /**
@@ -40,6 +56,11 @@ export const BackgroundTaskProvider = ({ children }) => {
    */
   const clearTasks = useCallback(() => {
     setActiveTasks([])
+    
+    // 작업 상태 변경 이벤트 전달
+    window.dispatchEvent(new CustomEvent('backgroundTaskUpdated', {
+      detail: { activeTasks: [] }
+    }))
   }, [])
 
   /**

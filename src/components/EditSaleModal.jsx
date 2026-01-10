@@ -496,7 +496,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
       return
     }
 
-    if (window.confirm('정말로 이 매출 기록을 삭제하시겠습니까?')) {
+    if (window.confirm('정말 삭제하시겠습니까?\n\n이 매출 기록이 영구적으로 삭제됩니다.')) {
       try {
         // 원본 items의 모든 id를 가져와서 삭제
         const idsToDelete = originalItems.map((item) => item.id).filter((id) => id != null)

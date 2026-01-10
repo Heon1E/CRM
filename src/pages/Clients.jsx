@@ -1,17 +1,20 @@
 import React, { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Edit, Download, Users, Camera } from 'lucide-react'
+import { Search, Edit, Download, Users, Camera, Loader2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import EditClientModal from '../components/EditClientModal'
 import AddClientModal from '../components/AddClientModal'
 import BusinessCardScannerModal from '../components/BusinessCardScannerModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import { exportClientsToExcel } from '../utils/excelExport'
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
+import { useDebounce } from '../hooks/useDebounce'
 
 const Clients = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { clients, sales, loading, deleteClient } = useData()
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 150) // 검색 디바운스 (150ms)
   const [editingClientId, setEditingClientId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false)
@@ -30,24 +33,66 @@ const Clients = () => {
     }, {})
   }, [clients])
 
-  // 검색 필터링된 그룹핑 데이터
+  // 검색 필터링된 그룹핑 데이터 (디바운스된 검색어 사용으로 최적화)
   const filteredGroupedClients = useMemo(() => {
-    if (!searchTerm.trim()) return groupedClients
+    if (!debouncedSearchTerm.trim()) return groupedClients
 
+    const searchLower = debouncedSearchTerm.toLowerCase()
     const filtered = {}
-    Object.keys(groupedClients).forEach((company) => {
+    
+    // 검색 최적화: 객체 순회를 최소화하고 조기 종료 사용
+    for (const company of Object.keys(groupedClients)) {
       const companyClients = groupedClients[company]
+      const companyLower = company.toLowerCase()
+      
+      // 회사명 검색이 빠르므로 먼저 체크
+      if (companyLower.includes(searchLower)) {
+        filtered[company] = companyClients
+        continue
+      }
+      
+      // 담당자명 검색 (필요한 경우에만)
       const matches = companyClients.filter(
-        (client) =>
-          company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (client.contact_person || '').toLowerCase().includes(searchTerm.toLowerCase())
+        (client) => (client.contact_person || '').toLowerCase().includes(searchLower)
       )
       if (matches.length > 0) {
         filtered[company] = matches
       }
-    })
+    }
     return filtered
-  }, [groupedClients, searchTerm])
+  }, [groupedClients, debouncedSearchTerm])
+
+  // 무한 스크롤 적용: 그룹핑된 클라이언트를 평탄화하여 페이징 처리
+  const flattenedClients = useMemo(() => {
+    const flat = []
+    Object.keys(filteredGroupedClients).forEach((company) => {
+      const companyClients = filteredGroupedClients[company]
+      companyClients.forEach((client) => {
+        flat.push({ ...client, _groupKey: company }) // 그룹 키를 함께 저장
+      })
+    })
+    return flat
+  }, [filteredGroupedClients])
+
+  // 무한 스크롤 훅 사용
+  const { visibleItems, hasMore, containerRef } = useInfiniteScroll(
+    flattenedClients,
+    20, // 페이지당 20개
+    { threshold: 100, enabled: !loading }
+  )
+
+  // 표시할 그룹 복원 (무한 스크롤에 맞게)
+  const visibleGroupedClients = useMemo(() => {
+    const grouped = {}
+    visibleItems.forEach((client) => {
+      const company = client._groupKey || client.company || '기타'
+      if (!grouped[company]) {
+        grouped[company] = []
+      }
+      grouped[company].push(client)
+    })
+    return grouped
+  }, [visibleItems])
 
   // 상태 색상 함수
   const getStatusColor = (status) => {
@@ -232,11 +277,14 @@ const Clients = () => {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-border-light">
-              {Object.keys(filteredGroupedClients).length > 0 ? (
-                Object.keys(filteredGroupedClients).map((company) => {
-                  const companyClients = filteredGroupedClients[company]
-                  const primaryContact = companyClients[0] // 첫 번째 담당자를 대표로
+            <tbody className="bg-white divide-y divide-border-light" ref={containerRef}>
+              {Object.keys(visibleGroupedClients).length > 0 ? (
+                Object.keys(visibleGroupedClients).map((company) => {
+                  // visibleGroupedClients는 무한 스크롤에 보이는 항목만 포함하므로,
+                  // 통계 계산을 위해 전체 필터링된 데이터 사용
+                  const visibleClients = visibleGroupedClients[company]
+                  const companyClients = filteredGroupedClients[company] || visibleClients
+                  const primaryContact = visibleClients[0] // 첫 번째 담당자를 대표로 (보이는 항목 기준)
                   const hasMultipleContacts = companyClients.length > 1
                   const stats = getCompanyStats(companyClients)
                   const contactsTooltip = getContactsTooltip(companyClients)
@@ -310,7 +358,18 @@ const Clients = () => {
               ) : (
                 <tr>
                   <td colSpan="8" className="px-6 py-8 text-center text-text-secondary">
-                    검색 결과가 없습니다.
+                    {searchTerm ? '검색 결과가 없습니다.' : '거래처가 없습니다.'}
+                  </td>
+                </tr>
+              )}
+              {/* 무한 스크롤 트리거 */}
+              {hasMore && (
+                <tr>
+                  <td colSpan="8" className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center space-x-2 text-text-secondary">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">더 많은 데이터를 불러오는 중...</span>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -319,10 +378,10 @@ const Clients = () => {
         </div>
 
         {/* 모바일: Card View with Swipe (768px 미만) */}
-        <div className="md:hidden divide-y divide-border-light">
-          {Object.keys(filteredGroupedClients).length > 0 ? (
-            Object.keys(filteredGroupedClients).map((company) => {
-              const companyClients = filteredGroupedClients[company]
+        <div className="md:hidden divide-y divide-border-light" ref={containerRef}>
+          {Object.keys(visibleGroupedClients).length > 0 ? (
+            Object.keys(visibleGroupedClients).map((company) => {
+              const companyClients = visibleGroupedClients[company]
               const primaryContact = companyClients[0]
               const hasMultipleContacts = companyClients.length > 1
               const stats = getCompanyStats(companyClients)
@@ -332,7 +391,7 @@ const Clients = () => {
                   key={company}
                   onEdit={() => setEditingClientId(primaryContact?.id)}
                   onDelete={() => {
-                    if (window.confirm(`"${company}" 고객을 삭제하시겠습니까?`)) {
+                    if (window.confirm(`정말 삭제하시겠습니까?\n\n"${company}" 고객 정보가 영구적으로 삭제됩니다.`)) {
                       deleteClient(primaryContact?.id).catch((error) => {
                         console.error('고객 삭제 오류:', error)
                         alert('삭제 중 오류가 발생했습니다.')
@@ -400,7 +459,16 @@ const Clients = () => {
             })
           ) : (
             <div className="px-6 py-8 text-center text-text-secondary">
-              검색 결과가 없습니다.
+              {searchTerm ? '검색 결과가 없습니다.' : '거래처가 없습니다.'}
+            </div>
+          )}
+          {/* 무한 스크롤 트리거 (모바일) */}
+          {hasMore && (
+            <div className="px-6 py-4 text-center border-t border-gray-200">
+              <div className="flex items-center justify-center space-x-2 text-text-secondary">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">더 많은 데이터를 불러오는 중...</span>
+              </div>
             </div>
           )}
         </div>

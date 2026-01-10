@@ -36,7 +36,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
           </div>
 
           {/* Content */}
-          <div className="px-6 py-5">{children}</div>
+          <div className="px-6 py-5 modal-content">{children}</div>
         </div>
       </div>
     </div>

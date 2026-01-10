@@ -4,13 +4,14 @@ const DB_NAME = 'XavianCRM'
 const DB_VERSION = 1
 
 // IndexedDB 스토어 이름들
-const STORES = {
+export const STORES = {
   CLIENTS: 'clients',
   ACTIVITIES: 'activities',
   SALES: 'sales',
   PRODUCTS: 'products',
   ISSUES: 'issues',
-  SETTINGS: 'settings'
+  SETTINGS: 'settings',
+  PENDING_SCANS: 'pending_scans' // 오프라인 명함 스캔 대기 목록
 }
 
 /**
@@ -36,6 +37,10 @@ export const initDB = async () => {
             if (storeName === STORES.SALES) {
               store.createIndex('sale_date', 'sale_date', { unique: false })
               store.createIndex('client_id', 'client_id', { unique: false })
+            }
+            if (storeName === STORES.PENDING_SCANS) {
+              store.createIndex('status', 'status', { unique: false })
+              store.createIndex('timestamp', 'timestamp', { unique: false })
             }
           }
         })
@@ -178,6 +183,3 @@ export const getStoreName = (tableName) => {
   }
   return mapping[tableName] || null
 }
-
-// 스토어 이름들을 외부에서도 사용할 수 있도록 export
-export { STORES }

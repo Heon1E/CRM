@@ -91,7 +91,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
       onClose()
       return
     }
-    if (window.confirm('정말로 이 고객을 삭제하시겠습니까? 관련된 모든 활동 내역도 함께 삭제됩니다.')) {
+    if (window.confirm('정말 삭제하시겠습니까?\n\n이 고객 정보가 영구적으로 삭제되며, 관련된 모든 활동 내역도 함께 삭제됩니다.')) {
       try {
         await deleteClient(clientId)
         alert('고객이 삭제되었습니다.')

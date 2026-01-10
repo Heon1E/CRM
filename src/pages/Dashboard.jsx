@@ -7,6 +7,9 @@ import EditActivityModal from '../components/EditActivityModal'
 import SalesCalendar from '../components/SalesCalendar'
 import AddIssueModal from '../components/AddIssueModal'
 import EditIssueModal from '../components/EditIssueModal'
+import AppInstallGuide from '../components/AppInstallGuide'
+import VoiceControl from '../components/VoiceControl'
+import MobileFAB from '../components/MobileFAB'
 import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { formatActivityText, formatActivityTitle, getParticle } from '../utils/koreanJosa'
 
@@ -88,6 +91,17 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {/* 상단 헤더 영역: 제목 + 음성 제어 + 앱 설치 버튼 (PC에서만 표시) */}
+      <div className="hidden md:flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
+        <div className="flex-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-text-primary">대시보드</h1>
+        </div>
+        <div className="flex items-center space-x-3 flex-shrink-0">
+          <VoiceControl />
+          <AppInstallGuide />
+        </div>
+      </div>
+
       {/* KPI Cards - 반응형 그리드: 모바일 2개, 태블릿 2개, PC 4개 */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
         <MetricCard
@@ -489,6 +503,9 @@ const Dashboard = () => {
         onClose={() => setEditingIssueId(null)}
         issueId={editingIssueId}
       />
+
+      {/* 모바일 전용 FAB 버튼 (우측 하단 고정) */}
+      <MobileFAB />
     </div>
   )
 }

@@ -158,7 +158,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
   }
 
   const handleDelete = async () => {
-    if (!window.confirm('정말로 이 ISSUE를 삭제하시겠습니까?')) {
+    if (!window.confirm('정말 삭제하시겠습니까?\n\n이 이슈 정보가 영구적으로 삭제됩니다.')) {
       return
     }
 

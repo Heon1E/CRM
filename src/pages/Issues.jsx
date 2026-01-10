@@ -66,12 +66,12 @@ const Issues = () => {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('정말로 이 ISSUE를 삭제하시겠습니까?')) {
+    if (window.confirm('정말 삭제하시겠습니까?\n\n이 이슈 정보가 영구적으로 삭제됩니다.')) {
       try {
         await deleteIssue(id)
-        alert('ISSUE가 삭제되었습니다.')
+        alert('이슈가 삭제되었습니다.')
       } catch (error) {
-        console.error('ISSUE 삭제 중 오류:', error)
+        console.error('이슈 삭제 중 오류:', error)
       }
     }
   }

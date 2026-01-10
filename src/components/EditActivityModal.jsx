@@ -262,7 +262,7 @@ ${currentText}`
       onClose()
       return
     }
-    if (window.confirm('정말로 이 활동 내역을 삭제하시겠습니까?')) {
+    if (window.confirm('정말 삭제하시겠습니까?\n\n이 활동 기록이 영구적으로 삭제됩니다.')) {
       try {
         await deleteActivity(activityId)
         alert('활동 내역이 삭제되었습니다.')

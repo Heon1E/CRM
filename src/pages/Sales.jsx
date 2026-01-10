@@ -158,7 +158,7 @@ const Sales = () => {
                   key={sale.id}
                   onEdit={() => setEditingSaleGroup(sale)}
                   onDelete={() => {
-                    if (window.confirm('이 매출 기록을 삭제하시겠습니까?')) {
+                    if (window.confirm('정말 삭제하시겠습니까?\n\n이 매출 기록이 영구적으로 삭제됩니다.')) {
                       deleteSale(sale.id).catch((error) => {
                         console.error('매출 삭제 오류:', error)
                         alert('삭제 중 오류가 발생했습니다.')

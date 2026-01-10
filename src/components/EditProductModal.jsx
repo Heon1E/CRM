@@ -70,7 +70,7 @@ const EditProductModal = ({ isOpen, onClose, productId }) => {
       onClose()
       return
     }
-    if (window.confirm('정말로 이 제품을 삭제하시겠습니까? 관련된 계약 단가 정보도 함께 삭제됩니다.')) {
+    if (window.confirm('정말 삭제하시겠습니까?\n\n이 제품 정보가 영구적으로 삭제되며, 관련된 계약 단가 정보도 함께 삭제됩니다.')) {
       try {
         await deleteProduct(productId)
         alert('제품이 삭제되었습니다.')

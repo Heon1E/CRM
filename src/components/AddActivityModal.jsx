@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import useEnterMove from '../hooks/useEnterMove'
 // GoogleGenerativeAI SDK 대신 REST API 직접 호출 방식 사용
 import { Sparkles, Loader2, X, Plus } from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
+import toast from 'react-hot-toast'
 
 const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   const { clients, addActivity, addIssue } = useData()
+  const { isOnline } = useOnlineStatus()
   const formRef = useRef(null)
 
   const [formData, setFormData] = useState({
@@ -188,27 +191,71 @@ ${currentText}`
       // 참석자 배열을 콤마로 구분된 문자열로 변환하여 user 필드에 저장
       const userString = attendees.length > 0 ? attendees.join(', ') : ''
       
-      // 영업 활동 등록
+      // 오프라인 상태 확인 및 처리
+      if (!isOnline) {
+        toast.warning('현재 오프라인 상태입니다. 데이터는 로컬에 저장되며, 연결 시 자동으로 업로드됩니다.', {
+          duration: 5000,
+          icon: '⚠️'
+        })
+      }
+      
+      // 영업 활동 등록 (오프라인 지원 - addActivity 내부에서 처리됨)
       const activity = await addActivity({
         ...formData,
         user: userString,
       })
 
-      // 이슈로 등록 체크박스가 체크되어 있으면 이슈도 함께 등록
+      // 이슈로 등록 체크박스가 체크되어 있으면 이슈도 함께 등록 (오프라인 지원)
       if (registerAsIssue) {
         const selectedClient = clients.find(c => c.id === formData.clientId)
         const issueTitle = `${selectedClient?.company || '고객'} - ${formData.type}`
         
-        await addIssue({
-          title: issueTitle,
-          content: formData.description,
-          status: '등록',
-          target_date: formData.activity_date,
-          date: formData.activity_date
-        })
-        alert('활동 내역이 추가되었고, 이슈로도 등록되었습니다.')
+        try {
+          await addIssue({
+            title: issueTitle,
+            content: formData.description,
+            status: '등록',
+            target_date: formData.activity_date,
+            date: formData.activity_date
+          })
+          
+          if (isOnline) {
+            toast.success('활동 내역이 추가되었고, 이슈로도 등록되었습니다.', {
+              duration: 4000,
+              icon: '✅'
+            })
+          } else {
+            toast.success('활동 내역과 이슈가 로컬에 저장되었습니다. 연결 시 자동으로 업로드됩니다.', {
+              duration: 5000,
+              icon: '💾'
+            })
+          }
+        } catch (issueError) {
+          console.error('이슈 등록 중 오류:', issueError)
+          if (!isOnline) {
+            toast.info('활동 내역은 저장되었지만, 이슈 등록은 연결 복구 후 재시도됩니다.', {
+              duration: 5000,
+              icon: 'ℹ️'
+            })
+          } else {
+            toast.error('활동 내역은 추가되었지만, 이슈 등록에 실패했습니다.', {
+              duration: 5000,
+              icon: '❌'
+            })
+          }
+        }
       } else {
-        alert('활동 내역이 추가되었습니다.')
+        if (isOnline) {
+          toast.success('활동 내역이 추가되었습니다.', {
+            duration: 3000,
+            icon: '✅'
+          })
+        } else {
+          toast.success('활동 내역이 로컬에 저장되었습니다. 연결 시 자동으로 업로드됩니다.', {
+            duration: 5000,
+            icon: '💾'
+          })
+        }
       }
 
       // 폼 초기화
@@ -229,7 +276,21 @@ ${currentText}`
       onClose()
     } catch (error) {
       console.error('활동 등록 오류:', error)
-      alert('활동 내역 등록 중 오류가 발생했습니다.')
+      
+      // 오프라인 상태이거나 네트워크 에러인 경우 특별 처리
+      if (!isOnline || error.message?.includes('network') || error.message?.includes('fetch')) {
+        toast.warning('오프라인 상태로 전환되었습니다. 데이터는 로컬에 저장되었으며, 연결 복구 시 자동으로 업로드됩니다.', {
+          duration: 6000,
+          icon: '💾'
+        })
+        // 오프라인 상태에서는 모달을 닫고, 데이터는 이미 로컬에 저장됨
+        onClose()
+      } else {
+        toast.error(`활동 내역 등록 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`, {
+          duration: 5000,
+          icon: '❌'
+        })
+      }
     }
   }
 

@@ -250,9 +250,9 @@ const Navbar = () => {
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-white border-b border-border-light z-50" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-      <div className="flex items-center justify-between h-16 px-2 md:px-6">
-        {/* Logo */}
-        <div className="flex items-center space-x-4 flex-shrink-0">
+      <div className="flex items-center justify-between h-16 px-2 md:px-6 relative">
+        {/* PC: Logo (왼쪽), 모바일: 숨김 */}
+        <div className="hidden md:flex items-center space-x-4 flex-shrink-0">
           <h1 className="text-xl font-bold text-brand-blue">{appTitle}</h1>
         </div>
 
@@ -287,13 +287,13 @@ const Navbar = () => {
           </div>
         </div>
         
-        {/* 모바일: 앱 타이틀만 표시 (메뉴는 하단 탭바로 이동) */}
-        <div className="md:hidden flex-1 flex items-center justify-center">
-          <h1 className="text-lg font-bold text-brand-blue">{appTitle}</h1>
+        {/* 모바일: 앱 타이틀만 중앙에 표시 (단일 제목, User Section과 겹치지 않도록) */}
+        <div className="md:hidden absolute left-0 right-0 z-0 pointer-events-none flex justify-center items-center">
+          <h1 className="text-base md:text-lg font-bold text-brand-blue text-center whitespace-nowrap max-w-[calc(100%-8rem)] truncate">{appTitle}</h1>
         </div>
 
-        {/* User Section */}
-        <div className="flex items-center space-x-2 md:space-x-3 flex-shrink-0">
+        {/* User Section (오른쪽 고정, 모바일에서는 아이콘만 표시하여 공간 절약) */}
+        <div className="flex items-center space-x-0 md:space-x-3 flex-shrink-0 relative z-10 ml-auto">
           {!user ? (
             /* 로그인 안 된 상태: Google 로그인 버튼 */
             <button
@@ -324,21 +324,23 @@ const Navbar = () => {
               </span>
             </button>
           ) : (
-            /* 로그인 된 상태: 백업 버튼 + 사용자 정보 + 로그아웃 버튼 */
+              /* 로그인 된 상태: 백업 버튼 + 사용자 정보 + 로그아웃 버튼 */
             <>
-              {/* 데이터 백업 버튼 */}
+              {/* 데이터 백업 버튼 (모바일에서는 아이콘만) */}
               <button
                 onClick={handleBackup}
                 disabled={isBackingUp}
-                className="flex items-center space-x-1 md:space-x-2 px-2 md:px-3 py-2 text-text-body hover:bg-gray-50 hover:text-text-primary rounded-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center px-2 py-2 md:px-3 md:space-x-2 text-text-body hover:bg-gray-50 hover:text-text-primary rounded-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px] min-w-[44px]"
                 title="데이터 백업"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <Cloud className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden lg:inline text-sm">
+                <Cloud className="w-5 h-5 md:w-5 md:h-5" />
+                <span className="hidden lg:inline text-sm ml-1 md:ml-0">
                   {isBackingUp ? '백업 중...' : '데이터 백업'}
                 </span>
               </button>
 
+              {/* PC: 사용자 정보 표시 */}
               <div className="hidden md:flex items-center space-x-2">
                 <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
                   <User className="w-4 h-4 text-brand-blue" />
@@ -353,13 +355,15 @@ const Navbar = () => {
                 </div>
               </div>
 
+              {/* 로그아웃 버튼 (모바일에서는 아이콘만) */}
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-1 md:space-x-2 px-2 md:px-3 py-2 text-text-body hover:bg-gray-50 hover:text-text-primary rounded-button transition-colors"
+                className="flex items-center justify-center px-2 py-2 md:px-3 md:space-x-2 text-text-body hover:bg-gray-50 hover:text-text-primary rounded-button transition-colors touch-manipulation min-h-[44px] min-w-[44px]"
                 title="로그아웃"
+                style={{ WebkitTapHighlightColor: 'transparent' }}
               >
-                <LogOut className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden lg:inline text-sm">로그아웃</span>
+                <LogOut className="w-5 h-5 md:w-5 md:h-5" />
+                <span className="hidden lg:inline text-sm ml-1 md:ml-0">로그아웃</span>
               </button>
             </>
           )}

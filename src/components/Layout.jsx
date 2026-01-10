@@ -5,6 +5,7 @@ import PWAInstallPrompt from './PWAInstallPrompt'
 import OfflineIndicator from './OfflineIndicator'
 import NotificationPermissionPrompt from './NotificationPermissionPrompt'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator'
+import StatusBar from './StatusBar'
 
 const Layout = ({ children }) => {
   // Guard Clause: children이 없으면 빈 화면 방지 (.cursorrules 규칙 준수)
@@ -35,19 +36,25 @@ const Layout = ({ children }) => {
 
       {/* 컨텐츠 영역 
           - PC: Navbar 높이만큼 padding-top (16 = 4rem)
-          - 모바일: Navbar 높이 + 오프라인 인디케이터 + 하단 탭바 높이
+          - 모바일: Navbar 높이 + 오프라인 인디케이터 + 하단 탭바 높이 + 상태 표시줄
+          - 모바일 키보드 대응: 입력 필드 포커스 시 스크롤 가능하도록
       */}
       <main 
-        className="flex-1 w-full pt-16 pb-16 md:pb-0 transition-all duration-300" 
+        className="flex-1 w-full pt-16 pb-20 md:pb-0 transition-all duration-300" 
         id="main-content"
         style={{ 
-          paddingTop: '4rem' // Navbar (4rem) + OfflineIndicator (동적)
+          paddingTop: '4rem', // Navbar (4rem) + OfflineIndicator (동적)
+          paddingBottom: '5rem', // 하단 탭바 (4rem) + 상태 표시줄 (1rem, 있으면)
+          minHeight: 'calc(100vh - 4rem)', // 최소 높이 설정 (모바일 키보드 대응)
         }}
       >
         <div className="p-4 md:p-6">
           {children}
         </div>
       </main>
+
+      {/* 하단 상태 표시줄 (모바일에서만 표시, 하단 탭바 위) */}
+      <StatusBar />
 
       {/* 하단 탭 바 (모바일에서만 표시, 768px 이하) */}
       <BottomNavigation />
