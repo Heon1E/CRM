@@ -1,0 +1,300 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #F4F5F7;
+    color: #474747;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #26292C;
+    font-weight: 600;
+  }
+}
+
+@layer components {
+  /* Pipedrive 스타일 버튼 */
+  .btn-primary {
+    @apply text-white rounded px-4 py-2.5 font-semibold transition-colors;
+    background-color: #317AE2;
+    box-shadow: none;
+  }
+  
+  .btn-primary:hover {
+    background-color: #2563D1;
+  }
+
+  .btn-success {
+    @apply text-white rounded px-4 py-2.5 font-semibold transition-colors;
+    background-color: #00890E;
+    box-shadow: none;
+  }
+
+  .btn-success:hover {
+    background-color: #00700B;
+  }
+
+  .btn-secondary {
+    @apply bg-white rounded px-4 py-2.5 font-medium transition-colors;
+    color: #474747;
+    border: 1px solid #E0E0E0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+
+  .btn-secondary:hover {
+    @apply bg-gray-50;
+    border-color: #D8D8D8;
+  }
+
+  /* Pipedrive 스타일 입력창 */
+  .input-field {
+    @apply w-full px-3 py-2.5 bg-white rounded;
+    color: #474747;
+    border: 1px solid #D8D8D8;
+    box-shadow: none;
+  }
+
+  .input-field:focus {
+    @apply outline-none;
+    border-color: #317AE2;
+    box-shadow: 0 0 0 1px #317AE2;
+  }
+
+  /* Pipedrive 스타일 카드 */
+  .card {
+    @apply bg-white rounded-lg;
+    border: 1px solid #E0E0E0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  }
+
+  .card-hover {
+    @apply card transition-shadow;
+  }
+
+  .card-hover:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+}
+
+/* 스크롤바 숨기기 (모바일 가로 스크롤용) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 토스트 애니메이션 */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* react-big-calendar 커스터마이징 */
+.rbc-calendar {
+  font-family: inherit;
+}
+
+.rbc-header {
+  border-bottom: 1px solid var(--color-border-default);
+  padding: 8px 4px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.rbc-day-bg {
+  border-color: var(--color-border-default);
+}
+
+.rbc-today {
+  background-color: #E6F7E9;
+}
+
+.rbc-event {
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  display: block !important; /* 박스 형태로 강제 */
+  color: white !important; /* 텍스트 색상 강제 */
+}
+
+.rbc-event-content {
+  display: block !important;
+  color: white !important; /* 텍스트 색상 강제 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+/* 구글 이벤트 전용 스타일 */
+.rbc-google-event .rbc-event-content,
+.rbc-google-event .rbc-event-content-wrapper {
+  color: white !important;
+  font-weight: 500;
+}
+
+.rbc-event-content-wrapper {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: inherit;
+}
+
+.rbc-event:focus {
+  outline: none;
+}
+
+.rbc-off-range-bg {
+  background-color: #F9FAFB;
+}
+
+.rbc-toolbar {
+  margin-bottom: 16px;
+}
+
+.rbc-toolbar button {
+  color: var(--color-text-body);
+  border: 1px solid var(--color-border-input);
+  border-radius: 4px;
+  padding: 6px 12px;
+  background-color: white;
+  transition: all 0.2s;
+}
+
+.rbc-toolbar button:hover {
+  background-color: var(--color-background-default);
+  border-color: var(--color-primary);
+}
+
+.rbc-toolbar button.rbc-active {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+/* 한국형 캘린더 스타일 - 네이버 캘린더 스타일 */
+.rbc-date-header-custom {
+  width: 100%;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.rbc-date-number {
+  font-weight: 600;
+  line-height: 1.2;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+.rbc-holiday-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+.rbc-date-events-wrapper {
+  flex: 1;
+  width: 100%;
+  overflow: hidden;
+  margin-top: 2px;
+  min-height: 0;
+}
+
+/* 날짜 셀 레이아웃 */
+.rbc-month-view .rbc-date-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px;
+  min-height: 80px;
+  width: 100%;
+  position: relative;
+}
+
+.rbc-off-range-bg {
+  background-color: #F9FAFB;
+}
+
+/* 일요일 빨간색 - 월간 뷰에서 첫 번째 열 */
+.rbc-month-view .rbc-day-bg:first-child .rbc-date-header-custom .rbc-date-number {
+  color: #ef4444 !important;
+}
+
+/* 토요일 파란색 - 월간 뷰에서 마지막 열 */
+.rbc-month-view .rbc-day-bg:last-child .rbc-date-header-custom .rbc-date-number {
+  color: #3b82f6 !important;
+}
+
+/* 이벤트 호버 효과 */
+.rbc-event:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+  transition: all 0.2s;
+}
+
+/* 날짜 셀 클릭 가능 표시 */
+.rbc-month-view .rbc-day-bg {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.rbc-month-view .rbc-day-bg:hover {
+  background-color: #F0F9FF;
+}
+
+/* 오늘 날짜 배경 강조 (글씨 색은 유지) */
+.rbc-today {
+  background-color: #E6F7E9 !important;
+}
+
+/* 날짜 셀 내부 레이아웃 정리 */
+.rbc-month-view .rbc-date-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 4px;
+  min-height: 80px;
+  width: 100%;
+}
+
+/* 이벤트 리스트 스타일 */
+.rbc-month-view .rbc-event {
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 날짜 헤더 기본 스타일 제거 */
+.rbc-month-view .rbc-date-cell .rbc-header {
+  border: none;
+  padding: 0;
+  margin: 0;
+}

@@ -1,0 +1,17 @@
+# Project Rules for React + Supabase CRM
+
+# 1. Database & Security (Supabase)
+- 모든 데이터 Insert/Update 시, 반드시 **데이터 정제(Sanitization)** 과정을 거친다.
+- 날짜 필드(Date)가 빈 문자열('')이거나 undefined이면 무조건 `null`로 변환하여 전송한다. (빈 문자열 전송 금지)
+- 숫자 필드(Numeric)가 비어있으면 `0`으로 변환한다.
+- 텍스트 필드에 `null`이 들어오면 빈 문자열('')로 변환하여 UI 에러를 방지한다.
+- Supabase 테이블 컬럼명(snake_case)과 프론트엔드 변수명(camelCase) 매핑을 철저히 확인한다.
+
+# 2. UI/UX (React)
+- 데이터가 로딩 중이거나 없을 때, 절대 화면이 백지(White Screen)가 되지 않도록 Guard Clause(`if (!data) return ...`)를 사용한다.
+- 모달(Modal)을 닫거나 삭제 후 재오픈 시, 폼 상태(Form State)를 반드시 초기화(Reset)한다.
+- 사용자 입력값은 항상 유효성을 검증(Validation)한다.
+
+# 3. Error Handling
+- 모든 비동기 요청(Supabase Query)은 `try-catch`로 감싸고, 사용자에게 명확한 에러 메시지(Alert)를 보여준다.
+- 'Column does not exist' 같은 스키마 에러 발생 시, 쿼리문 수정보다 DB 스키마 확인을 우선한다.
