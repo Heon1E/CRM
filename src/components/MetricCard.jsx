@@ -1,15 +1,18 @@
 import React from 'react'
 
-const MetricCard = ({ title, value, icon, trend, trendValue, onClick, clickable }) => {
+const MetricCard = ({ title, value, icon, trend, trendValue, onClick, clickable, bgColor }) => {
   // Guard Clause: 필수 props 체크 (.cursorrules 규칙 준수)
   if (!title || value === undefined) {
     return null
   }
 
+  // 배경색 클래스 (기본값: 흰색)
+  const bgColorClass = bgColor || 'bg-white'
+
   return (
     <div
       onClick={clickable && onClick ? onClick : undefined}
-      className={`card card-hover p-3 md:p-5 lg:p-6 w-full ${
+      className={`card card-hover p-3 md:p-5 lg:p-6 w-full ${bgColorClass} ${
         clickable && onClick ? 'cursor-pointer hover:border-brand-blue' : ''
       }`}
     >

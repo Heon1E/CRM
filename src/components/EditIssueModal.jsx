@@ -249,13 +249,13 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
               onClick={onClose}
               className="btn-secondary"
             >
-              취소
+              Cancel
             </button>
             <button
               type="submit"
               className="btn-success"
             >
-              저장
+              Save
             </button>
           </div>
         </div>

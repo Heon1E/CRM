@@ -14,6 +14,7 @@ const commonConfig = {
     popup: 'rounded-lg',
     confirmButton: 'px-4 py-2 rounded-md font-medium',
     cancelButton: 'px-4 py-2 rounded-md font-medium',
+    htmlContainer: 'text-left break-words whitespace-normal',
   },
 }
 

@@ -10,6 +10,7 @@ import { formatActivityTitle, formatActivityText } from '../utils/koreanJosa'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 
 const Activities = () => {
+  // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { activities, loading, updateActivity, deleteActivity } = useData()
   const [searchParams] = useSearchParams()
   const [editingActivityId, setEditingActivityId] = useState(null)
@@ -17,39 +18,6 @@ const Activities = () => {
 
   // 쿼리 파라미터에서 status 필터 가져오기
   const statusFilter = searchParams.get('status')
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
-      </div>
-    )
-  }
-
-  const getTypeColor = (type) => {
-    switch (type) {
-      case '미팅':
-        return 'bg-blue-50 text-blue-700'
-      case '제안서':
-        return 'bg-purple-50 text-purple-700'
-      case '전화':
-        return 'bg-emerald-50 text-emerald-700'
-      case '계약':
-        return 'bg-purple-50 text-purple-700'
-      case '견적':
-        return 'bg-amber-50 text-amber-700'
-      case '이메일':
-        return 'bg-gray-100 text-gray-600'
-      default:
-        return 'bg-gray-100 text-gray-600'
-    }
-  }
-
-  const getStatusColor = (status) => {
-    return status === '완료'
-      ? 'bg-emerald-50 text-emerald-700'
-      : 'bg-amber-50 text-amber-700'
-  }
 
   // 상태 필터링 적용 (useMemo로 최적화)
   const filteredActivities = useMemo(() => {
@@ -117,6 +85,40 @@ const Activities = () => {
     })
   }, [visibleGroupedActivities])
 
+  // Guard Clause: 모든 Hook 선언이 끝난 후에 조기 리턴
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-gray-500">데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
+  const getTypeColor = (type) => {
+    switch (type) {
+      case '미팅':
+        return 'bg-blue-50 text-blue-700'
+      case '제안서':
+        return 'bg-purple-50 text-purple-700'
+      case '전화':
+        return 'bg-emerald-50 text-emerald-700'
+      case '계약':
+        return 'bg-purple-50 text-purple-700'
+      case '견적':
+        return 'bg-amber-50 text-amber-700'
+      case '이메일':
+        return 'bg-gray-100 text-gray-600'
+      default:
+        return 'bg-gray-100 text-gray-600'
+    }
+  }
+
+  const getStatusColor = (status) => {
+    return status === '완료'
+      ? 'bg-emerald-50 text-emerald-700'
+      : 'bg-amber-50 text-amber-700'
+  }
+
   const handleExport = () => {
     exportActivitiesToExcel(activities)
   }
@@ -157,7 +159,7 @@ const Activities = () => {
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            className="flex-1 sm:flex-none px-4 py-3 bg-green-600 text-white border border-green-600 rounded-xl hover:bg-green-700 hover:border-green-700 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm touch-manipulation min-h-[44px]"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span>+</span>

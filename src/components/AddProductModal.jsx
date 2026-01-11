@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
+import { showWarning, showSuccess, showError } from '../utils/alert'
 
 const AddProductModal = ({ isOpen, onClose }) => {
   const { addProduct } = useData()
@@ -16,26 +17,42 @@ const AddProductModal = ({ isOpen, onClose }) => {
   // 전역 엔터 네비게이션 적용
   useEnterMove({ formRef, enabled: isOpen })
 
-  const handleSubmit = (e) => {
+  // 모달이 닫힐 때 상태 초기화
+  React.useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        name: '',
+        type: 'IBC',
+        standard: '',
+      })
+    }
+  }, [isOpen])
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.name.trim()) {
-      alert('품목명을 입력해주세요.')
+      await showWarning('품목명을 입력해주세요.')
       return
     }
 
-    addProduct(formData)
-    alert('제품이 추가되었습니다.')
-    setFormData({
-      name: '',
-      type: 'IBC',
-      standard: '',
-    })
-    onClose()
+    try {
+      await addProduct(formData)
+      await showSuccess('제품이 추가되었습니다.')
+      setFormData({
+        name: '',
+        type: 'IBC',
+        standard: '',
+      })
+      onClose()
+    } catch (error) {
+      console.error('제품 추가 중 오류:', error)
+      await showError(error.message || '제품 추가 중 오류가 발생했습니다.')
+    }
   }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="제품 추가">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             품목명 <span className="text-red-500">*</span>
@@ -44,7 +61,8 @@ const AddProductModal = ({ isOpen, onClose }) => {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="input-field"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+            placeholder="품목명을 입력하세요"
             required
           />
         </div>
@@ -56,7 +74,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
           <select
             value={formData.type}
             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            className="input-field"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white"
             required
           >
             <option value="IBC">IBC</option>
@@ -72,22 +90,22 @@ const AddProductModal = ({ isOpen, onClose }) => {
             type="text"
             value={formData.standard}
             onChange={(e) => setFormData({ ...formData, standard: e.target.value })}
-            className="input-field"
-            placeholder="규격을 자유롭게 입력하세요"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+            placeholder="규격을 입력하세요 (선택사항)"
           />
         </div>
 
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary"
+            className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors duration-200 font-medium"
           >
             취소
           </button>
           <button
             type="submit"
-            className="btn-success"
+            className="px-5 py-2.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 font-medium shadow-sm hover:shadow"
           >
             저장
           </button>

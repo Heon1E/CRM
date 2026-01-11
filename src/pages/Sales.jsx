@@ -42,7 +42,7 @@ const Sales = () => {
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Download className="w-4 h-4" />
-            <span>엑셀 다운로드</span>
+            <span>DB Download</span>
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
@@ -184,7 +184,14 @@ const Sales = () => {
                       <div className="flex items-start space-x-2">
                         <span className="font-medium whitespace-nowrap">품목:</span>
                         <span className="break-words flex-1">
-                          {sale.displayItemName || sale.items?.[0]?.item_name || sale.items?.[0]?.productName || '-'}
+                          {(() => {
+                            const itemName = sale.displayItemName || sale.items?.[0]?.item_name || sale.items?.[0]?.productName || '-'
+                            const itemCount = sale.itemCount || sale.items?.length || 0
+                            if (itemCount > 1) {
+                              return `${itemName} 외 ${itemCount - 1}건`
+                            }
+                            return itemName
+                          })()}
                         </span>
                         <span className="text-xs text-gray-500 whitespace-nowrap">
                           ({sale.itemCount || sale.items?.length || 1}건)

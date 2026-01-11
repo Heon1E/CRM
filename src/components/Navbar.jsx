@@ -65,14 +65,14 @@ const Navbar = () => {
     return userCompanyName ? `${userCompanyName} CRM` : 'Xavian CRM'
   }, [user, companyName])
 
-  // 메뉴에서 '제품 관리'와 'ISSUE' 제거
+  // 메뉴 순서: Dashboard -> Activities -> Pipeline -> Sales -> Clients -> Settings
   const menuItems = [
-    { path: '/', label: '대시보드', icon: LayoutDashboard },
-    { path: '/clients', label: '고객 관리', icon: Users },
-    { path: '/activities', label: '영업 활동', icon: Activity },
-    { path: '/pipeline', label: '영업 파이프라인', icon: TrendingUp },
-    { path: '/sales', label: '매출 관리', icon: DollarSign },
-    { path: '/settings', label: '설정', icon: Settings },
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/activities', label: 'Activities', icon: Activity },
+    { path: '/pipeline', label: 'Pipeline', icon: TrendingUp },
+    { path: '/sales', label: 'Sales', icon: DollarSign },
+    { path: '/clients', label: 'Clients', icon: Users },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ]
 
   const handleGoogleLogin = async () => {

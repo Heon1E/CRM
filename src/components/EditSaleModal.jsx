@@ -5,10 +5,11 @@ import { Plus, X } from 'lucide-react'
 import ProductCombobox from './ProductCombobox'
 import useEnterMove from '../hooks/useEnterMove'
 import { supabase } from '../lib/supabase'
+import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 
 const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
-  const { clients, products, deleteSale } = useData()
+  const { clients, products, updateSale, deleteSale } = useData()
   const formRef = useRef(null)
 
   // 원본 데이터 저장 (Diff 알고리즘용)
@@ -30,107 +31,81 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
   // saleGroup이 변경되거나 모달이 열릴 때 폼 초기화
   useEffect(() => {
     if (saleGroup && isOpen) {
-      // saleGroup에 originalRows가 있으면 사용, 없으면 Supabase에서 조회
-      const loadOriginalRows = async () => {
-        try {
-          const clientId = saleGroup?.clientId
-          const saleDate = saleGroup?.sale_date || saleGroup?.date
+      // 그룹화된 매출 객체에서 직접 items 배열 사용
+      try {
+        // saleGroup.items 배열이 이미 존재하므로 직접 사용
+        const items = Array.isArray(saleGroup?.items) && saleGroup.items.length > 0
+          ? saleGroup.items
+              .filter((item) => item != null)
+              .map((item) => {
+                // item_name으로 productId 찾기
+                const product = products?.find((p) => p.name === (item.item_name || item.productName || item.name))
+                
+                // unit_price 매핑 (DB 컬럼명 우선, fallback으로 unitPrice)
+                const unitPrice = item.unit_price !== undefined && item.unit_price !== null 
+                  ? Number(item.unit_price) 
+                  : (item.unitPrice !== undefined && item.unitPrice !== null ? Number(item.unitPrice) : 0)
+                
+                const mappedItem = {
+                  id: item.id, // 개별 레코드 ID (있으면)
+                  productId: product?.id || '',
+                  item_name: item.item_name || item.productName || item.name || '',
+                  quantity: item.quantity || 1,
+                  unitPrice: unitPrice,
+                }
+                
+                // 디버깅: 단가 매핑 확인
+                console.log('[EditSaleModal] 품목 매핑:', {
+                  원본: { unit_price: item.unit_price, unitPrice: item.unitPrice },
+                  매핑된_unitPrice: mappedItem.unitPrice,
+                  item_name: mappedItem.item_name
+                })
+                
+                return mappedItem
+              })
+          : []
 
-          if (!clientId || !saleDate) {
-            console.warn('거래처 또는 날짜 정보가 없습니다.')
-            return
-          }
-
-          // 날짜 변환
-          let dateStr = ''
-          if (saleDate instanceof Date) {
-            dateStr = saleDate.toISOString().split('T')[0]
-          } else if (typeof saleDate === 'string') {
-            dateStr = saleDate.split('T')[0]
-          } else {
-            dateStr = saleDate
-          }
-
-          // originalRows가 있으면 사용 (그룹핑된 데이터에서 전달됨)
-          let originalRows = saleGroup?.originalRows
-
-          if (!originalRows || originalRows.length === 0) {
-            // originalRows가 없으면 Supabase에서 조회
-            const { data: fetchedRows, error } = await supabase
-              .from('sales')
-              .select('*')
-              .eq('clientId', clientId)
-              .eq('sale_date', dateStr)
-              .order('created_at', { ascending: true })
-
-            if (error) {
-              console.error('원본 데이터 조회 오류:', error)
-              // 에러 발생 시 기존 items 사용
-              originalRows = saleGroup?.items || []
-            } else {
-              originalRows = fetchedRows || []
-            }
-          }
-
-          // 원본 행들을 items 배열로 변환
-          const items =
-            originalRows?.map((row) => ({
-              id: row.id, // DB 행의 id
-              productId: '', // productId는 item_name으로 찾아야 함
-              item_name: row.item_name || '',
-              quantity: row.quantity || 1,
-              unitPrice: row.unit_price || 0,
-            })) || []
-
-          // productId 찾기 (item_name으로 products에서 찾기)
-          const itemsWithProductId = items.map((item) => {
-            const product = products?.find((p) => p.name === item.item_name)
-            return {
-              ...item,
-              productId: product?.id || '',
-            }
-          })
-
-          // 원본 데이터 저장 (Diff 알고리즘용)
-          setOriginalItems(itemsWithProductId)
-          setOriginalClientId(clientId)
-          setOriginalSaleDate(dateStr)
-
-          setFormData({
-            clientId: clientId,
-            sale_date: dateStr,
-            items: itemsWithProductId,
-            notes: originalRows?.[0]?.notes || saleGroup?.notes || '',
-          })
-        } catch (error) {
-          console.error('원본 데이터 로드 중 오류:', error)
-          // 에러 발생 시 기존 items 사용
-          const items = Array.isArray(saleGroup?.items)
-            ? saleGroup.items
-                .filter((item) => item != null)
-                .map((item) => ({
-                  id: item.id || null,
-                  productId: item?.productId || '',
-                  item_name: item?.item_name || item?.productName || item?.name || '',
-                  quantity: item?.quantity || 1,
-                  unitPrice: item?.unitPrice || item?.unit_price || 0,
-                }))
-            : []
-
-          setOriginalItems(items)
-          setOriginalClientId(saleGroup?.clientId || '')
-          setOriginalSaleDate(saleGroup?.sale_date || saleGroup?.date || '')
-
-          setFormData({
-            clientId: saleGroup?.clientId || '',
-            sale_date: saleGroup?.sale_date || saleGroup?.date || '',
-            items: items,
-            notes: saleGroup?.notes || '',
-          })
+        // 날짜 변환 (YYYY-MM-DD 형식)
+        let dateStr = ''
+        const saleDate = saleGroup.sale_date || saleGroup.date
+        if (saleDate instanceof Date) {
+          dateStr = saleDate.toISOString().split('T')[0]
+        } else if (typeof saleDate === 'string') {
+          dateStr = saleDate.split('T')[0]
+        } else {
+          dateStr = saleDate || ''
         }
-      }
 
-      loadOriginalRows()
+        // 거래처 ID
+        const clientId = saleGroup.client_id || saleGroup.clientId || ''
+
+        // 원본 데이터 저장
+        setOriginalItems(items)
+        setOriginalClientId(clientId)
+        setOriginalSaleDate(dateStr)
+
+        // 폼 데이터 설정
+        setFormData({
+          clientId: clientId,
+          sale_date: dateStr,
+          items: items,
+          notes: saleGroup.notes || '',
+        })
+
+        console.log('[EditSaleModal] 로드된 데이터:', { clientId, sale_date: dateStr, itemsCount: items.length, items })
+      } catch (error) {
+        console.error('매출 데이터 로드 중 오류:', error)
+        // 에러 발생 시 빈 데이터로 초기화
+        setFormData({
+          clientId: '',
+          sale_date: '',
+          items: [],
+          notes: '',
+        })
+        setOriginalItems([])
+        setOriginalClientId('')
+        setOriginalSaleDate('')
+      }
     } else if (!isOpen) {
       // 모달이 닫힐 때도 폼 초기화
       setFormData({
@@ -359,13 +334,13 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
     return sum + quantity * unitPrice
   }, 0)
 
-  // Diff 알고리즘: 삭제/수정/추가 처리
+  // 하나의 주문 레코드로 업데이트
   const handleSubmit = async (e) => {
     e.preventDefault()
 
     // 기본 유효성 검사
     if (!formData.clientId) {
-      alert('거래처를 선택해주세요.')
+      await showWarning('거래처를 선택해주세요.')
       return
     }
 
@@ -376,143 +351,88 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
     })
 
     if (validItems.length === 0) {
-      alert('저장할 유효한 품목이 없습니다.')
+      await showWarning('저장할 유효한 품목이 없습니다.')
       return
     }
 
     try {
-      // 날짜 정제: 빈 문자열이면 null로 변환
-      const saleDate = formData.sale_date === '' || formData.sale_date === undefined ? null : formData.sale_date
-
-      // 1. 삭제: 원본에 있었는데 현재 리스트에 없는 항목 삭제
-      const originalIds = originalItems.map((item) => item.id).filter((id) => id != null)
-      const currentIds = validItems.map((item) => item.id).filter((id) => id != null)
-      const idsToDelete = originalIds.filter((id) => !currentIds.includes(id))
-
-      // 2. 수정: ID가 있고 내용이 바뀐 항목 업데이트
-      const itemsToUpdate = validItems.filter((item) => {
-        if (!item.id) return false // ID가 없으면 새 항목
-
-        const originalItem = originalItems.find((orig) => orig.id === item.id)
-        if (!originalItem) return false
-
-        // 내용이 바뀌었는지 확인
-        return (
-          originalItem.item_name !== item.item_name ||
-          originalItem.quantity !== item.quantity ||
-          originalItem.unitPrice !== item.unitPrice ||
-          originalClientId !== formData.clientId ||
-          originalSaleDate !== formData.sale_date
-        )
+      // 스마트 품목 합산 로직: 품목명과 단가가 모두 일치하는 항목들을 하나로 합치기
+      const mergedItemsMap = new Map()
+      
+      validItems.forEach((item) => {
+        const name = (item.item_name || item.itemName || item.product_name || '').trim()
+        const qty = Number(item.quantity) || 1
+        const price = Number(item.unitPrice) || Number(item.unit_price) || 0
+        
+        if (!name || name === '') {
+          return // 품목명이 없으면 건너뛰기
+        }
+        
+        // 합산 키: 품목명 + 단가 (단가까지 일치해야 합산)
+        const mergeKey = `${name}|${price}`
+        
+        if (mergedItemsMap.has(mergeKey)) {
+          // 이미 같은 품목명+단가 조합이 있으면 수량만 더하기
+          const existing = mergedItemsMap.get(mergeKey)
+          existing.quantity += qty
+        } else {
+          // 새로운 항목 추가
+          mergedItemsMap.set(mergeKey, {
+            item_name: name,
+            quantity: qty,
+            unit_price: price
+          })
+        }
+      })
+      
+      // 합산된 항목들을 배열로 변환
+      const mergedItems = Array.from(mergedItemsMap.values())
+      
+      if (mergedItems.length === 0) {
+        await showWarning('저장할 유효한 품목이 없습니다.')
+        return
+      }
+      
+      // updateSale 함수 호출 (DataContext의 updateSale이 단일 레코드 업데이트를 처리)
+      await updateSale(saleGroup.id, {
+        clientId: formData.clientId,
+        sale_date: formData.sale_date,
+        notes: formData.notes,
+        items: mergedItems
       })
 
-      // 3. 추가: ID가 없는 새 항목
-      const itemsToInsert = validItems.filter((item) => !item.id)
-
-      // 병렬 처리: 삭제, 수정, 추가를 Promise.all로 처리
-      const promises = []
-
-      // 삭제 처리
-      if (idsToDelete.length > 0) {
-        promises.push(
-          supabase
-            .from('sales')
-            .delete()
-            .in('id', idsToDelete)
-        )
-      }
-
-      // 수정 처리
-      if (itemsToUpdate.length > 0) {
-        itemsToUpdate.forEach((item) => {
-          const qty = Number(item.quantity) || 1
-          const price = Number(item.unitPrice) || 0
-          const total = qty * price
-
-          promises.push(
-            supabase
-              .from('sales')
-              .update({
-                clientId: formData.clientId,
-                sale_date: saleDate,
-                item_name: item.item_name.trim(),
-                quantity: qty,
-                unit_price: price,
-                totalAmount: total,
-                notes: formData.notes || '',
-              })
-              .eq('id', item.id)
-          )
-        })
-      }
-
-      // 추가 처리
-      if (itemsToInsert.length > 0) {
-        const rowsToInsert = itemsToInsert.map((item) => {
-          const qty = Number(item.quantity) || 1
-          const price = Number(item.unitPrice) || 0
-          const total = qty * price
-
-          return {
-            clientId: formData.clientId,
-            sale_date: saleDate,
-            item_name: item.item_name.trim(),
-            quantity: qty,
-            unit_price: price,
-            totalAmount: total,
-            notes: formData.notes || '',
-          }
-        })
-
-        promises.push(supabase.from('sales').insert(rowsToInsert))
-      }
-
-      // 모든 작업 병렬 실행
-      const results = await Promise.all(promises)
-
-      // 에러 확인
-      const errors = results.filter((result) => result.error)
-      if (errors.length > 0) {
-        console.error('매출 수정 중 오류:', errors)
-        throw new Error('일부 데이터를 저장하지 못했습니다.')
-      }
-
-      alert('매출이 수정되었습니다.')
+      await showSuccess('매출이 수정되었습니다.')
       onClose()
-
-      // 페이지 새로고침하여 최신 데이터 반영
-      window.location.reload()
     } catch (error) {
       console.error('매출 수정 중 오류:', error)
-      alert(`매출 수정 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`)
+      await showError(`매출 수정 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`)
     }
   }
 
-  // 그룹 전체 삭제
+  // 주문 전체 삭제
   const handleDelete = async () => {
     if (!saleGroup) {
-      alert('매출 정보를 찾을 수 없습니다.')
+      await showWarning('매출 정보를 찾을 수 없습니다.')
       onClose()
       return
     }
 
-    if (window.confirm('정말 삭제하시겠습니까?\n\n이 매출 기록이 영구적으로 삭제됩니다.')) {
+    const isConfirmed = await showConfirm(
+      '정말 삭제하시겠습니까?',
+      '이 매출 기록이 영구적으로 삭제됩니다.',
+      '삭제',
+      '취소'
+    )
+
+    if (isConfirmed) {
       try {
-        // 원본 items의 모든 id를 가져와서 삭제
-        const idsToDelete = originalItems.map((item) => item.id).filter((id) => id != null)
-
-        if (idsToDelete.length > 0) {
-          await supabase.from('sales').delete().in('id', idsToDelete)
-        }
-
-        alert('매출 기록이 삭제되었습니다.')
+        // 하나의 레코드만 삭제
+        await deleteSale(saleGroup.id)
+        await showSuccess('매출 기록이 삭제되었습니다.')
         onClose()
-
-        // 페이지 새로고침하여 최신 데이터 반영
-        window.location.reload()
       } catch (error) {
         console.error('매출 삭제 중 오류:', error)
-        alert('매출 삭제 중 오류가 발생했습니다.')
+        await showError('매출 삭제 중 오류가 발생했습니다.')
       }
     }
   }
@@ -685,25 +605,25 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
           />
         </div>
 
-        <div className="flex justify-between pt-4">
+        <div className="flex justify-between items-center pt-6 border-t border-gray-200">
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="px-5 py-2.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-all duration-200 font-medium shadow-sm hover:shadow"
           >
             삭제
           </button>
-          <div className="space-x-3">
+          <div className="flex space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-all duration-200 font-medium"
             >
               취소
             </button>
             <button
               type="submit"
-              className="btn-success"
+              className="px-5 py-2.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all duration-200 font-medium shadow-sm hover:shadow"
             >
               저장
             </button>

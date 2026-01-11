@@ -10,9 +10,11 @@ import toast from 'react-hot-toast'
 import { showWarning, showError } from '../utils/alert'
 
 const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
-  const { clients, addActivity, addIssue } = useData()
+  // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
+  const { clients, addActivity, addIssue, registerModal } = useData()
   const { isOnline } = useOnlineStatus()
   const formRef = useRef(null)
+  const attendeeInputRef = useRef(null)
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -25,27 +27,6 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
     next_action_detail: '',
   })
   const [registerAsIssue, setRegisterAsIssue] = useState(false)
-
-  // initialDate가 변경되면 next_action_date 업데이트
-  useEffect(() => {
-    if (initialDate) {
-      setFormData((prev) => ({
-        ...prev,
-        next_action_date: initialDate,
-      }))
-    }
-  }, [initialDate])
-
-  // 모달이 닫힐 때 상태 초기화
-  useEffect(() => {
-    if (!isOpen) {
-      setRegisterAsIssue(false)
-      setAttendees([])
-      setAttendeeInput('')
-      setCharCount(0)
-    }
-  }, [isOpen])
-
   const [attendees, setAttendees] = useState([]) // 참석자 배열
   const [attendeeInput, setAttendeeInput] = useState('') // 참석자 입력 필드
   const [charCount, setCharCount] = useState(0)
@@ -54,12 +35,55 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   // 전역 엔터 네비게이션 적용 (textarea는 Shift+Enter로 줄바꿈)
   useEnterMove({ formRef, enabled: isOpen })
 
+  // 모달 열림 상태를 DataContext에 등록 (데이터 새로고침 방지)
+  useEffect(() => {
+    if (isOpen && registerModal) {
+      const unregister = registerModal()
+      return unregister
+    }
+  }, [isOpen, registerModal])
+
+  // initialDate가 변경되면 next_action_date 업데이트 (모달이 열려있을 때만)
+  useEffect(() => {
+    if (isOpen && initialDate) {
+      setFormData((prev) => ({
+        ...prev,
+        next_action_date: initialDate,
+      }))
+    }
+  }, [initialDate, isOpen])
+
+  // 모달이 닫힐 때만 상태 초기화 (입력 데이터 보존)
+  useEffect(() => {
+    if (!isOpen) {
+      // 모달이 닫힐 때만 초기화 (등록 성공 또는 취소 버튼 클릭 시)
+      setRegisterAsIssue(false)
+      setAttendees([])
+      setAttendeeInput('')
+      setCharCount(0)
+      setFormData({
+        clientId: '',
+        type: '미팅',
+        activity_date: new Date().toISOString().split('T')[0],
+        user: '',
+        description: '',
+        status: '완료',
+        next_action_date: initialDate || '',
+        next_action_detail: '',
+      })
+    }
+  }, [isOpen, initialDate])
+
   // 참석자 추가
   const handleAddAttendee = () => {
     const name = attendeeInput.trim()
     if (name && !attendees.includes(name)) {
       setAttendees([...attendees, name])
       setAttendeeInput('')
+      // 참석자 추가 후 입력창에 포커스 반환
+      setTimeout(() => {
+        attendeeInputRef.current?.focus()
+      }, 0)
     }
   }
 
@@ -259,21 +283,7 @@ ${currentText}`
         }
       }
 
-      // 폼 초기화
-      setFormData({
-        clientId: '',
-        type: '미팅',
-        activity_date: new Date().toISOString().split('T')[0],
-        user: '',
-        description: '',
-        status: '완료',
-        next_action_date: initialDate || '',
-        next_action_detail: '',
-      })
-      setAttendees([])
-      setAttendeeInput('')
-      setCharCount(0)
-      setRegisterAsIssue(false)
+      // 등록 성공 후 모달 닫기 (useEffect에서 초기화 처리됨)
       onClose()
     } catch (error) {
       console.error('활동 등록 오류:', error)
@@ -398,6 +408,7 @@ ${currentText}`
           </label>
           <div className="flex gap-2 mb-2">
             <input
+              ref={attendeeInputRef}
               type="text"
               value={attendeeInput}
               onChange={(e) => setAttendeeInput(e.target.value)}
@@ -408,10 +419,10 @@ ${currentText}`
             <button
               type="button"
               onClick={handleAddAttendee}
-              className="btn-success flex items-center space-x-1"
+              className="px-4 py-2.5 bg-green-600 text-white border border-green-600 rounded-lg hover:bg-green-700 hover:border-green-700 transition-all duration-200 flex items-center justify-center space-x-1 font-medium h-[42px]"
             >
               <Plus className="w-4 h-4" />
-              <span>추가</span>
+              <span>Add</span>
             </button>
           </div>
           {/* 참석자 태그 표시 */}
@@ -497,19 +508,19 @@ ${currentText}`
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end space-x-3 pt-4 px-6">
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary"
+            className="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 font-medium"
           >
-            취소
+            Cancel
           </button>
           <button
             type="submit"
-            className="btn-success"
+            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 font-medium"
           >
-            저장
+            Save
           </button>
         </div>
       </form>

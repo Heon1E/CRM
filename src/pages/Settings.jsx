@@ -6,6 +6,8 @@ import { supabase } from '../lib/supabase'
 import AddProductModal from '../components/AddProductModal'
 import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
+import ClientExcelUpload from '../components/ClientExcelUpload'
+import SalesExcelUpload from '../components/SalesExcelUpload'
 
 const Settings = () => {
   const { products, deleteProduct, loading } = useData()
@@ -305,6 +307,30 @@ const Settings = () => {
                 />
                 <span className="ml-3 text-sm font-medium text-gray-700">매출 목표 달성 알림</span>
               </label>
+            </div>
+          </div>
+
+          {/* 데이터 일괄 관리 섹션 */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-5">데이터 일괄 관리</h2>
+            <div className="space-y-6">
+              {/* 거래처 일괄 등록 */}
+              <div>
+                <h3 className="text-base font-semibold text-gray-800 mb-3">거래처 일괄 등록</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  엑셀 파일을 업로드하여 거래처를 일괄 등록할 수 있습니다. 담당자1은 자동으로 키맨으로 지정됩니다.
+                </p>
+                <ClientExcelUpload />
+              </div>
+
+              {/* 매출 일괄 등록 */}
+              <div>
+                <h3 className="text-base font-semibold text-gray-800 mb-3">매출 일괄 등록</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  엑셀 파일을 업로드하여 매출을 일괄 등록할 수 있습니다. 거래처명은 정확히 일치해야 합니다.
+                </p>
+                <SalesExcelUpload />
+              </div>
             </div>
           </div>
 

@@ -7,10 +7,10 @@ const BottomNavigation = () => {
 
   // 모바일에서만 표시할 메뉴 항목 (간소화)
   const menuItems = [
-    { path: '/', label: '홈', icon: LayoutDashboard },
-    { path: '/clients', label: '고객', icon: Users },
-    { path: '/activities', label: '활동', icon: Activity },
-    { path: '/settings', label: '설정', icon: Settings },
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/clients', label: 'Clients', icon: Users },
+    { path: '/activities', label: 'Activities', icon: Activity },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ]
 
   return (

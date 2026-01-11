@@ -12,7 +12,7 @@ import { useDebounce } from '../hooks/useDebounce'
 
 const Clients = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
-  const { clients, sales, loading, deleteClient } = useData()
+  const { clients, sales, activities, loading, deleteClient } = useData()
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearchTerm = useDebounce(searchTerm, 150) // 검색 디바운스 (150ms)
   const [editingClientId, setEditingClientId] = useState(null)
@@ -94,14 +94,14 @@ const Clients = () => {
     return grouped
   }, [visibleItems])
 
-  // 상태 색상 함수
+  // 상태 색상 함수 (매출, 신규, 단절 통일)
   const getStatusColor = (status) => {
     switch (status) {
-      case '활성':
+      case '매출':
         return 'bg-emerald-50 text-emerald-700'
-      case '대기':
-        return 'bg-amber-50 text-amber-700'
-      case '비활성':
+      case '신규':
+        return 'bg-blue-50 text-blue-700'
+      case '단절':
         return 'bg-gray-100 text-gray-600'
       default:
         return 'bg-gray-100 text-gray-600'
@@ -118,6 +118,25 @@ const Clients = () => {
     // 가장 최근 날짜 찾기
     const dates = clientSales
       .map((sale) => sale.sale_date || sale.date)
+      .filter((date) => date)
+      .sort((a, b) => new Date(b) - new Date(a))
+
+    return dates.length > 0 ? dates[0] : null
+  }
+
+  // 고객별 최근 컨택일 계산 (activities 데이터에서 집계)
+  const getLastContactDate = (clientId) => {
+    if (!activities || !Array.isArray(activities)) return null
+
+    const clientActivities = activities.filter((activity) => {
+      const activityClientId = activity.clientId || activity.client_id
+      return activityClientId === clientId
+    })
+    if (clientActivities.length === 0) return null
+
+    // 가장 최근 날짜 찾기
+    const dates = clientActivities
+      .map((activity) => activity.activity_date || activity.date || activity.created_at)
       .filter((date) => date)
       .sort((a, b) => new Date(b) - new Date(a))
 
@@ -147,8 +166,14 @@ const Clients = () => {
   // 회사별 통계 계산
   const getCompanyStats = (companyClients) => {
     // 모든 담당자의 주문일 중 가장 최근 것
-    const allDates = companyClients
+    const allOrderDates = companyClients
       .map((client) => getLastOrderDate(client.id))
+      .filter((date) => date)
+      .sort((a, b) => new Date(b) - new Date(a))
+
+    // 모든 담당자의 컨택일 중 가장 최근 것
+    const allContactDates = companyClients
+      .map((client) => getLastContactDate(client.id))
       .filter((date) => date)
       .sort((a, b) => new Date(b) - new Date(a))
 
@@ -158,7 +183,8 @@ const Clients = () => {
     }, 0)
 
     return {
-      lastOrder: allDates.length > 0 ? allDates[0] : null,
+      lastOrder: allOrderDates.length > 0 ? allOrderDates[0] : null,
+      lastContact: allContactDates.length > 0 ? allContactDates[0] : null,
       totalAmount: totalAmount,
     }
   }
@@ -205,8 +231,7 @@ const Clients = () => {
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">엑셀 다운로드</span>
-            <span className="sm:hidden">다운로드</span>
+            <span>DB Download</span>
           </button>
           <button
             onClick={() => setIsScannerModalOpen(true)}
@@ -268,6 +293,9 @@ const Clients = () => {
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
                   최근 주문일
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                  Recent Contact Date
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
                   누적 주문 금액 (올해)
@@ -337,6 +365,9 @@ const Clients = () => {
                       <td className="px-6 py-5 whitespace-nowrap text-sm text-text-secondary">
                         {stats.lastOrder ? stats.lastOrder.split('T')[0] : '-'}
                       </td>
+                      <td className="px-6 py-5 whitespace-nowrap text-sm text-text-secondary">
+                        {stats.lastContact ? stats.lastContact.split('T')[0] : '-'}
+                      </td>
                       <td className="px-6 py-5 whitespace-nowrap text-sm font-semibold text-text-primary">
                         {stats.totalAmount === 0
                           ? '0원'
@@ -357,7 +388,7 @@ const Clients = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="8" className="px-6 py-8 text-center text-text-secondary">
+                  <td colSpan="9" className="px-6 py-8 text-center text-text-secondary">
                     {searchTerm ? '검색 결과가 없습니다.' : '거래처가 없습니다.'}
                   </td>
                 </tr>
@@ -365,7 +396,7 @@ const Clients = () => {
               {/* 무한 스크롤 트리거 */}
               {hasMore && (
                 <tr>
-                  <td colSpan="8" className="px-6 py-4 text-center">
+                  <td colSpan="9" className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center space-x-2 text-text-secondary">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span className="text-sm">더 많은 데이터를 불러오는 중...</span>
@@ -444,6 +475,10 @@ const Clients = () => {
                       <div className="flex items-center space-x-2 mt-2 pt-2 border-t border-gray-100">
                         <span className="text-xs text-text-secondary">
                           최근 주문: {stats.lastOrder ? stats.lastOrder.split('T')[0] : '-'}
+                        </span>
+                        <span className="text-xs text-text-secondary">•</span>
+                        <span className="text-xs text-text-secondary">
+                          최근 컨택: {stats.lastContact ? stats.lastContact.split('T')[0] : '-'}
                         </span>
                         <span className="text-xs text-text-secondary">•</span>
                         <span className="text-xs font-semibold text-text-primary">

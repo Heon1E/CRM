@@ -5,6 +5,7 @@ import { Plus, X } from 'lucide-react'
 import ProductCombobox from './ProductCombobox'
 import useEnterMove from '../hooks/useEnterMove'
 import { supabase } from '../lib/supabase'
+import { showWarning, showSuccess, showError } from '../utils/alert'
 
 const AddSaleModal = ({ isOpen, onClose }) => {
   const { clients, products, addSale } = useData()
@@ -230,13 +231,25 @@ const AddSaleModal = ({ isOpen, onClose }) => {
     return sum + (quantity * unitPrice)
   }, 0)
 
+  // 모달이 닫힐 때 상태 초기화
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        clientId: '',
+        sale_date: new Date().toISOString().split('T')[0],
+        items: [{ productId: '', item_name: '', quantity: 1, unitPrice: 0 }],
+        notes: '',
+      })
+    }
+  }, [isOpen])
+
   // 저장 로직: 모든 키 전송 전략 (snake_case와 camelCase 모두 포함)
   const handleSubmit = async (e) => {
     e.preventDefault()
     
     // 기본 유효성 검사
     if (!formData.clientId) {
-      alert('거래처를 선택해주세요.')
+      await showWarning('거래처를 선택해주세요.')
       return
     }
     
@@ -247,47 +260,80 @@ const AddSaleModal = ({ isOpen, onClose }) => {
     })
     
     if (validItems.length === 0) {
-      alert('저장할 유효한 품목이 없습니다.')
+      await showWarning('저장할 유효한 품목이 없습니다.')
       return
     }
 
     try {
-      // 2. Payload 구성: 확인된 실제 DB 컬럼명으로 정확히 매핑
-      const rowsToInsert = validItems.map((item) => {
+      // 2. 스마트 품목 합산 로직: 품목명과 단가가 모두 일치하는 항목들을 하나로 합치기
+      const mergedItemsMap = new Map()
+      
+      validItems.forEach((item) => {
         // 숫자 변환 (안전장치)
         const qty = Number(item.quantity) || 1
         // 단가: unitPrice 변수에서 가져오되, 없으면 0
         const price = Number(item.unitPrice) || Number(item.unit_price) || 0
-        const total = qty * price
         
         // 품목명: 여러 변수명 중 값 있는 것 찾기
         const name = (item.item_name || item.product_name || item.itemName || '').trim()
         
         if (!name || name === '') {
-          throw new Error('품목명이 없습니다.')
+          return // 품목명이 없으면 건너뛰기
         }
         
-        // 확인된 실제 DB 컬럼명으로 정확히 매핑
+        // 합산 키: 품목명 + 단가 (단가까지 일치해야 합산)
+        const mergeKey = `${name}|${price}`
+        
+        if (mergedItemsMap.has(mergeKey)) {
+          // 이미 같은 품목명+단가 조합이 있으면 수량만 더하기
+          const existing = mergedItemsMap.get(mergeKey)
+          existing.quantity += qty
+          existing.totalAmount = existing.quantity * price
+        } else {
+          // 새로운 항목 추가
+          mergedItemsMap.set(mergeKey, {
+            item_name: name,
+            quantity: qty,
+            unitPrice: price,
+            totalAmount: qty * price
+          })
+        }
+      })
+      
+      // 합산된 항목들을 배열로 변환
+      const mergedItems = Array.from(mergedItemsMap.values())
+      
+      if (mergedItems.length === 0) {
+        await showWarning('저장할 유효한 품목이 없습니다.')
+        return
+      }
+      
+      // 3. Payload 구성: 확인된 실제 DB 컬럼명으로 정확히 매핑
+      const rowsToInsert = mergedItems.map((item) => {
+        // DB 컬럼명(snake_case)으로 정확히 매핑
         return {
-          clientId: formData.clientId,        // camelCase (확인됨: client_id 아님!)
+          clientId: formData.clientId,        // addSale 함수에서 client_id로 변환됨
           sale_date: formData.sale_date,       // snake_case
-          item_name: name,                     // snake_case
-          quantity: qty,
-          unit_price: price,                   // snake_case
-          totalAmount: total,                  // camelCase (NOT NULL 제약조건)
+          item_name: item.item_name,           // snake_case
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,          // addSale 함수에서 unit_price로 변환됨
+          totalAmount: item.totalAmount,      // addSale 함수에서 total_amount로 변환됨
           notes: formData.notes || '',
         }
       })
 
-      // 3. 변환된 배열을 그대로 insert (Bulk Insert)
+      // 4. 변환된 배열을 그대로 insert (Bulk Insert)
       // payload 생성: Flatten된 rows 배열 전송
       const payload = {
         rows: rowsToInsert,  // 모든 키가 포함된 행 배열
       }
+      
+      // 디버깅: 전송 전 최종 확인
+      console.log('[AddSaleModal] 전송될 데이터 (최종 검증):', payload)
+      console.log('[AddSaleModal] 각 행의 키 목록:', rowsToInsert.map(r => Object.keys(r)))
 
       await addSale(payload)
-
-      alert('매출이 추가되었습니다.')
+      await showSuccess('매출이 추가되었습니다.')
       
       // 폼 초기화
       setFormData({
@@ -299,22 +345,22 @@ const AddSaleModal = ({ isOpen, onClose }) => {
       onClose()
     } catch (error) {
       console.error('매출 추가 중 오류:', error)
-      alert(`매출 추가 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`)
+      await showError(error.message || '매출 추가 중 오류가 발생했습니다.')
     }
   }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="매출 추가" size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               거래처 <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.clientId}
               onChange={(e) => handleClientChange(e.target.value)}
-              className="input-field"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white"
               required
             >
               <option value="">거래처 선택</option>
@@ -327,14 +373,14 @@ const AddSaleModal = ({ isOpen, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
               날짜 <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
               value={formData.sale_date}
               onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
-              className="input-field"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
               required
             />
           </div>
@@ -343,13 +389,13 @@ const AddSaleModal = ({ isOpen, onClose }) => {
         {/* 품목 리스트 */}
         <div>
           <div className="flex justify-between items-center mb-3">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-semibold text-gray-700">
               품목 <span className="text-red-500">*</span>
             </label>
             <button
               type="button"
               onClick={addItem}
-              className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1 transition-colors"
+              className="px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium flex items-center space-x-1 rounded-md transition-colors duration-200"
             >
               <Plus className="w-4 h-4" />
               <span>품목 추가</span>
@@ -361,14 +407,14 @@ const AddSaleModal = ({ isOpen, onClose }) => {
               const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
               
               return (
-                <div key={index} className="border border-border-light rounded-card p-4">
+                <div key={index} className="border border-gray-200 rounded-md p-4 bg-gray-50">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-medium text-gray-700">품목 {index + 1}</span>
+                    <span className="text-sm font-semibold text-gray-700">품목 {index + 1}</span>
                     {formData.items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors duration-200"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -377,7 +423,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
 
                   <div className="grid grid-cols-3 gap-3">
                     <div className="relative z-50" data-product-index={index}>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">품목명</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">품목명</label>
                       <ProductCombobox
                         products={products || []}
                         value={item.productId || ''}
@@ -388,7 +434,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">수량</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">수량</label>
                       <input
                         ref={(el) => {
                           if (el) quantityInputRefs.current[`quantity-${index}`] = el
@@ -407,14 +453,14 @@ const AddSaleModal = ({ isOpen, onClose }) => {
                             }
                           }
                         }}
-                        className="input-field text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-sm"
                         min="1"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">단가 (원)</label>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">단가 (원)</label>
                       <input
                         ref={(el) => {
                           if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el
@@ -429,7 +475,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
                             addItem(true)
                           }
                         }}
-                        className="input-field text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-sm"
                         min="0"
                         required
                       />
@@ -437,7 +483,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
                   </div>
 
                   <div className="mt-2 text-right">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-semibold text-gray-900">
                       공급가액: {itemTotal.toLocaleString()}원
                     </span>
                   </div>
@@ -448,22 +494,22 @@ const AddSaleModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* 총액 */}
-        <div className="bg-gray-50 rounded-lg p-4">
+        <div className="bg-indigo-50 rounded-md p-4 border border-indigo-100">
           <div className="flex justify-between items-center">
             <span className="text-lg font-semibold text-gray-900">총 매출액</span>
-            <span className="text-xl font-bold text-purple-600">
+            <span className="text-xl font-bold text-indigo-600">
               {totalAmount.toLocaleString()}원
             </span>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">비고</label>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">비고</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={3}
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 resize-none"
             placeholder="비고 사항을 입력하세요"
           />
         </div>
@@ -472,15 +518,15 @@ const AddSaleModal = ({ isOpen, onClose }) => {
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary"
+            className="btn-secondary px-4 py-2.5 font-medium"
           >
-            취소
+            Cancel
           </button>
           <button
             type="submit"
-            className="btn-success"
+            className="btn px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 font-medium"
           >
-            저장
+            Save
           </button>
         </div>
       </form>

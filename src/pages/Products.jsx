@@ -4,6 +4,7 @@ import { useData } from '../contexts/DataContext'
 import AddProductModal from '../components/AddProductModal'
 import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
+import { showSuccess, showError, showConfirm } from '../utils/alert'
 
 const Products = () => {
   const { products, deleteProduct, loading } = useData()
@@ -18,10 +19,21 @@ const Products = () => {
     )
   }
 
-  const handleDelete = (id) => {
-    if (window.confirm('정말 삭제하시겠습니까?\n\n이 제품 정보가 영구적으로 삭제되며, 관련된 계약 단가 정보도 함께 삭제됩니다.')) {
-      deleteProduct(id)
-      alert('제품이 삭제되었습니다.')
+  const handleDelete = async (id) => {
+    const confirmed = await showConfirm(
+      '이 제품 정보가 영구적으로 삭제되며, 관련된 계약 단가 정보도 함께 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (confirmed) {
+      try {
+        await deleteProduct(id)
+        await showSuccess('제품이 삭제되었습니다.')
+      } catch (error) {
+        console.error('제품 삭제 중 오류:', error)
+        await showError(error.message || '제품 삭제 중 오류가 발생했습니다.')
+      }
     }
   }
 
@@ -36,7 +48,8 @@ const Products = () => {
           <ProductExcelUpload />
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success w-full sm:w-auto flex items-center justify-center space-x-2"
+            className="btn-success flex items-center justify-center gap-2 touch-manipulation min-h-[44px] px-4 py-3 w-full sm:w-auto"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Plus className="w-4 h-4" />
             <span>제품 추가</span>

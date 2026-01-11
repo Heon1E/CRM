@@ -9,9 +9,10 @@ import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert
 
 const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
-  const { activities, clients, updateActivity, deleteActivity } = useData()
+  const { activities, clients, updateActivity, deleteActivity, registerModal } = useData()
   const activity = activities?.find((a) => a.id === activityId)
   const formRef = useRef(null)
+  const attendeeInputRef = useRef(null)
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -102,6 +103,14 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   // 전역 엔터 네비게이션 적용 (textarea는 Shift+Enter로 줄바꿈)
   useEnterMove({ formRef, enabled: isOpen })
 
+  // 모달 열림 상태를 DataContext에 등록 (데이터 새로고침 방지)
+  useEffect(() => {
+    if (isOpen && registerModal) {
+      const unregister = registerModal()
+      return unregister
+    }
+  }, [isOpen, registerModal])
+
   // Guard Clause: activity가 없으면 아무것도 렌더링하지 않음 (.cursorrules 규칙 준수)
   // 모든 Hook 선언이 끝난 후에 조기 리턴
   if (!isOpen || !activityId || !activity) {
@@ -114,6 +123,10 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
     if (name && !attendees.includes(name)) {
       setAttendees([...attendees, name])
       setAttendeeInput('')
+      // 참석자 추가 후 입력창에 포커스 반환
+      setTimeout(() => {
+        attendeeInputRef.current?.focus()
+      }, 0)
     }
   }
 
@@ -384,6 +397,7 @@ ${currentText}`
           </label>
           <div className="flex gap-2 mb-2">
             <input
+              ref={attendeeInputRef}
               type="text"
               value={attendeeInput}
               onChange={(e) => setAttendeeInput(e.target.value)}
@@ -394,10 +408,10 @@ ${currentText}`
             <button
               type="button"
               onClick={handleAddAttendee}
-              className="btn-success flex items-center space-x-1"
+              className="btn-success flex items-center space-x-1 px-4 py-2.5 h-[42px]"
             >
               <Plus className="w-4 h-4" />
-              <span>추가</span>
+              <span>Add</span>
             </button>
           </div>
           {/* 참석자 태그 표시 */}
@@ -468,19 +482,19 @@ ${currentText}`
           >
             삭제
           </button>
-          <div className="space-x-3">
+          <div className="flex space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="btn-secondary px-6 py-2"
             >
-              취소
+              Cancel
             </button>
             <button
               type="submit"
-              className="btn-success"
+              className="btn-success px-6 py-2"
             >
-              저장
+              Save
             </button>
           </div>
         </div>

@@ -167,13 +167,13 @@ const AddIssueModal = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="btn-secondary"
           >
-            취소
+            Cancel
           </button>
           <button
             type="submit"
             className="btn-success"
           >
-            저장
+            Save
           </button>
         </div>
       </form>
