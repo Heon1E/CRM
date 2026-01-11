@@ -1,14 +1,15 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Activity, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, Activity, Settings, TrendingUp } from 'lucide-react'
 
 const BottomNavigation = () => {
   const location = useLocation()
 
-  // 모바일에서만 표시할 메뉴 항목 (간소화)
+  // 모바일에서만 표시할 메뉴 항목 (5개 메뉴)
   const menuItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/clients', label: 'Clients', icon: Users },
+    { path: '/pipeline', label: 'Pipeline', icon: TrendingUp },
     { path: '/activities', label: 'Activities', icon: Activity },
     { path: '/settings', label: 'Settings', icon: Settings },
   ]
@@ -35,8 +36,8 @@ const BottomNavigation = () => {
                 WebkitTapHighlightColor: 'transparent'
               }}
             >
-              <Icon className={`w-6 h-6 mb-1 ${isActive ? 'text-brand-blue' : 'text-gray-500'}`} />
-              <span className={`text-xs font-medium ${isActive ? 'text-brand-blue' : 'text-gray-500'}`}>
+              <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'text-brand-blue' : 'text-gray-500'}`} />
+              <span className={`text-[10px] font-medium ${isActive ? 'text-brand-blue' : 'text-gray-500'}`}>
                 {item.label}
               </span>
             </Link>

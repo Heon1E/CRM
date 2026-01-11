@@ -1,25 +1,59 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import { CheckCircle2, TrendingUp, ArrowRight } from 'lucide-react'
 import Toast from '../components/Toast'
+import { showConfirm } from '../utils/alert'
 
 const PipelineBoard = () => {
-  const { clients, loading, updateClient } = useData()
+  const { clients, loading, updateClient, addSale } = useData()
   const [toast, setToast] = useState(null)
 
   // 영업 단계 정의 (거래중 제외)
   const stages = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
 
-  // status가 '거래중'이 아닌 클라이언트만 필터링
+  // 파이프라인 대상자 필터링: '신규' 또는 '단절' 상태인 거래처만 포함
+  // '활성' 상태인 거래처는 파이프라인에서 제외
   const activeClients = useMemo(() => {
     if (!clients || !Array.isArray(clients)) return []
     return clients.filter((client) => {
       const status = client.status || ''
-      return status !== '거래중' && status !== 'Active'
+      // 파이프라인 단계에 해당하는 상태 또는 '신규', '단절' 상태만 포함
+      const pipelineStatuses = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
+      return pipelineStatuses.includes(status) || status === '신규' || status === '단절'
     })
   }, [clients])
+
+  // 기존 데이터 자동 동기화: '신규' 또는 '단절' 상태인 거래처를 첫 번째 단계('잠재고객')로 자동 설정
+  useEffect(() => {
+    if (loading || !clients || !Array.isArray(clients)) return
+    
+    const syncNewClients = async () => {
+      // 파이프라인 단계 정의 (Hook 순서 유지를 위해 상수로 정의)
+      const pipelineStages = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
+      
+      // '신규' 또는 '단절' 상태인 거래처 중 파이프라인 단계에 없는 것들 찾기
+      const newOrInactiveClients = clients.filter((client) => {
+        const status = client.status || ''
+        return (status === '신규' || status === '단절') && !pipelineStages.includes(status)
+      })
+
+      // 각 거래처를 '잠재고객' 단계로 자동 설정
+      for (const client of newOrInactiveClients) {
+        try {
+          await updateClient(client.id, {
+            ...client,
+            status: '잠재고객',
+          })
+        } catch (error) {
+          console.error(`거래처 자동 동기화 오류 (${client.company || client.id}):`, error)
+        }
+      }
+    }
+
+    syncNewClients()
+  }, [clients, loading, updateClient])
 
   // 단계별로 클라이언트 그룹화
   const clientsByStage = useMemo(() => {
@@ -56,18 +90,74 @@ const PipelineBoard = () => {
     try {
       // '계약 성사' 영역으로 드롭한 경우
       if (destination.droppableId === 'win-zone') {
-        // status를 '거래중'으로 변경
+        // 사용자 확인
+        const confirmed = await showConfirm(
+          '계약이 완료되었습니다. 해당 거래처를 \'활성\' 고객으로 전환하고 매출 실적에 반영하시겠습니까?',
+          '축하합니다! 계약 성사',
+          '활성 고객 전환',
+          '취소',
+          'success',
+          '#10b981' // 녹색 (green-500)
+        )
+
+        if (!confirmed) {
+          // 취소하면 드래그 취소
+          return
+        }
+
+        // 1. 거래처 status를 '활성'으로 변경
         await updateClient(clientId, {
           ...client,
-          status: '거래중',
+          status: '활성',
         })
+
+        // 2. 매출 테이블에 새 데이터 추가 (날짜: 오늘, 거래처: 해당 거래처, 금액: 0 또는 기본값)
+        const today = new Date().toISOString().split('T')[0]
+        try {
+          await addSale({
+            rows: [{
+              clientId: clientId,
+              sale_date: today,
+              item_name: '계약 완료',
+              quantity: 1,
+              unitPrice: 0,
+              totalAmount: 0,
+              notes: '파이프라인에서 계약 완료로 자동 등록',
+            }]
+          })
+        } catch (saleError) {
+          console.error('매출 등록 오류:', saleError)
+          // 매출 등록 실패해도 거래처 상태 변경은 유지
+        }
+
         // 토스트 메시지 표시
-        setToast('🎉 계약이 성사되었습니다!')
+        setToast('계약이 성사되어 \'활성\' 고객으로 전환되었습니다')
         return
       }
 
       // 일반 단계로 드롭한 경우
       const newStatus = destination.droppableId
+      const oldStatus = client.status || ''
+
+      // 이전 단계로 되돌리는 경우 확인 (활성 -> 파이프라인 단계로 되돌리는 경우)
+      if (oldStatus === '활성' && stages.includes(newStatus)) {
+        const confirmed = window.confirm(
+          '이미 \'활성\' 상태인 고객을 파이프라인 단계로 되돌리시겠습니까?\n\n' +
+          '상태를 \'신규\'로 변경하시겠습니까? (취소 시 현재 상태 유지)'
+        )
+        if (confirmed) {
+          // 사용자가 확인하면 '신규'로 변경
+          await updateClient(clientId, {
+            ...client,
+            status: '신규',
+          })
+          setToast('고객 상태가 \'신규\'로 변경되었습니다')
+          return
+        } else {
+          // 취소하면 상태 유지 (드래그 취소)
+          return
+        }
+      }
 
       // 유효한 단계인지 확인
       if (stages.includes(newStatus)) {

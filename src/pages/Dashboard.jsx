@@ -8,8 +8,6 @@ import SalesCalendar from '../components/SalesCalendar'
 import AddIssueModal from '../components/AddIssueModal'
 import EditIssueModal from '../components/EditIssueModal'
 import AppInstallGuide from '../components/AppInstallGuide'
-import VoiceControl from '../components/VoiceControl'
-import MobileFAB from '../components/MobileFAB'
 import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
 
@@ -106,7 +104,6 @@ const Dashboard = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-text-primary">Dashboard</h1>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto justify-end md:hidden">
-          <VoiceControl />
           <AppInstallGuide />
         </div>
       </div>
@@ -573,7 +570,6 @@ const Dashboard = () => {
         issueId={editingIssueId}
       />
 
-      <MobileFAB />
     </div>
   )
 }

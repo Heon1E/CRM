@@ -86,22 +86,27 @@ export const showInfo = (message, title = '알림') => {
  * @param {string} title - 제목 (기본: '확인')
  * @param {string} confirmText - 확인 버튼 텍스트 (기본: '삭제')
  * @param {string} cancelText - 취소 버튼 텍스트 (기본: '취소')
+ * @param {string} icon - 아이콘 타입 (기본: 'warning', 'success', 'info', 'question' 가능)
+ * @param {string} confirmButtonColor - 확인 버튼 색상 (기본: '#6366f1')
  * @returns {Promise<boolean>} - 확인 시 true, 취소 시 false
  */
 export const showConfirm = async (
   message,
   title = '확인',
   confirmText = '삭제',
-  cancelText = '취소'
+  cancelText = '취소',
+  icon = 'warning',
+  confirmButtonColor = '#6366f1'
 ) => {
   const result = await ReactSwal.fire({
     ...commonConfig,
-    icon: 'warning',
+    icon: icon,
     title,
     text: message,
     showCancelButton: true,
     confirmButtonText: confirmText,
     cancelButtonText: cancelText,
+    confirmButtonColor: confirmButtonColor,
     reverseButtons: true, // 확인 버튼을 오른쪽에 배치
     focusConfirm: false,
     focusCancel: true, // 기본 포커스를 취소 버튼에
