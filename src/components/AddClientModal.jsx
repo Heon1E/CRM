@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
+import { showWarning, showSuccess } from '../utils/alert'
 
 const AddClientModal = ({ isOpen, onClose }) => {
   const { addClient } = useData()
@@ -19,28 +20,33 @@ const AddClientModal = ({ isOpen, onClose }) => {
   // 전역 엔터 네비게이션 적용
   useEnterMove({ formRef, enabled: isOpen })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.company.trim()) {
-      alert('회사명을 입력해주세요.')
+      await showWarning('회사명을 입력해주세요.')
       return
     }
 
-    addClient({
-      ...formData,
-      contract_prices: formData.contract_prices,
-    })
+    try {
+      await addClient({
+        ...formData,
+        contract_prices: formData.contract_prices,
+      })
 
-    alert('고객이 추가되었습니다.')
-    setFormData({
-      company: '',
-      contact_person: '',
-      phone: '',
-      email: '',
-      status: '활성',
-      contract_prices: [],
-    })
-    onClose()
+      await showSuccess('고객이 추가되었습니다.')
+      setFormData({
+        company: '',
+        contact_person: '',
+        phone: '',
+        email: '',
+        status: '활성',
+        contract_prices: [],
+      })
+      onClose()
+    } catch (error) {
+      console.error('고객 추가 중 오류:', error)
+      await showError('고객 추가 중 오류가 발생했습니다.')
+    }
   }
 
   return (

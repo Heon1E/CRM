@@ -561,45 +561,106 @@ export const DataProvider = ({ children }) => {
   // Clients CRUD
   // ==============================================================================
   const addClient = useCallback(async (clientData) => {
-    if (!user) throw new Error('로그인이 필요합니다.')
-    const userId = await getValidUserId(user)
-
-    const sanitized = sanitizeData(clientData, 'client')
-    if (sanitized.orderAmount && sanitized.orderAmount < 10000) sanitized.orderAmount = sanitized.orderAmount * 10000
-    
-    const fieldMapping = { 'lastOrder': 'last_order', 'orderAmount': 'order_amount' }
-    const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
-    const filteredData = {}
-    allowedFields.forEach((field) => { 
-      if (sanitized[field] !== undefined) filteredData[fieldMapping[field] || field] = sanitized[field]
-    })
-    
-    // 강제 덮어쓰기
-    const insertData = { ...filteredData, created_by: userId }
-
-    if (isOnline) {
-      const { data, error } = await supabase.from('clients').insert([insertData]).select().single()
-      if (error) throw error
+    try {
+      if (!user) throw new Error('로그인이 필요합니다.')
       
-      const clientWithCamelCase = {
-        ...data,
-        lastOrder: data.last_order || data.lastOrder,
-        orderAmount: data.order_amount || data.orderAmount,
-        contract_prices: typeof data.contract_prices === 'string' ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) : (data.contract_prices || [])
+      // 1. UUID 확보 (실패시 에러 throw)
+      const userId = await getValidUserId(user)
+      
+      // 2. 데이터 정제
+      const sanitized = sanitizeData(clientData, 'client')
+      
+      // ⚠️ 핵심: sanitized에서 created_by가 이메일로 남아있을 수 있으므로 명시적으로 삭제
+      delete sanitized.created_by
+      
+      if (sanitized.orderAmount && sanitized.orderAmount < 10000) {
+        sanitized.orderAmount = sanitized.orderAmount * 10000
       }
-      await saveToStore(STORES.CLIENTS, data).catch(e => console.error(e))
-      setClients((prev) => [...prev, clientWithCamelCase])
-      return clientWithCamelCase
-    } else {
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      const offlineData = { ...insertData, id: tempId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
       
-      await saveToStore(STORES.CLIENTS, offlineData)
-      await addToQueue('clients', QUEUE_OPERATION.INSERT, insertData, tempId)
+      const fieldMapping = { 'lastOrder': 'last_order', 'orderAmount': 'order_amount' }
+      const allowedFields = ['company', 'contact_person', 'phone', 'email', 'status', 'lastOrder', 'orderAmount', 'contract_prices']
+      const filteredData = {}
+      allowedFields.forEach((field) => { 
+        if (sanitized[field] !== undefined) {
+          filteredData[fieldMapping[field] || field] = sanitized[field]
+        }
+      })
       
-      const clientWithCamelCase = { ...offlineData, lastOrder: offlineData.last_order, orderAmount: offlineData.order_amount }
-      setClients((prev) => [...prev, clientWithCamelCase])
-      return clientWithCamelCase
+      // 3. 최종 전송 데이터 객체 생성 (순서 중요: ...filteredData 다음 created_by)
+      const finalInsertData = {
+        ...filteredData,
+        created_by: userId  // ⚠️ 핵심: 반드시 UUID로 덮어쓰기
+      }
+      
+      // 4. 안전장치: 이메일 체크
+      if (String(finalInsertData.created_by).includes('@')) {
+        console.error('❌ [addClient] 최종 검증 실패: finalInsertData.created_by에 이메일이 포함되어 있습니다!', finalInsertData.created_by)
+        throw new Error('SYSTEM ERROR: User ID contains email. Aborting save.')
+      }
+      
+      // 5. UUID 검증 (최종 확인)
+      if (!UUID_REGEX.test(finalInsertData.created_by)) {
+        console.error('❌ [addClient] 최종 검증 실패: finalInsertData.created_by가 UUID 형식이 아닙니다!', finalInsertData.created_by)
+        throw new Error('사용자 ID 형식이 올바르지 않습니다. 다시 로그인해주세요.')
+      }
+      
+      // ⚠️ 최종 전송 데이터 확인 로그 (디버깅용)
+      console.log('[addClient] 최종 전송 데이터:', finalInsertData)
+      console.log('[addClient] 최종 전송 데이터 created_by:', finalInsertData.created_by)
+      console.log('[addClient] userId 변수:', userId)
+      console.log('[addClient] userId === finalInsertData.created_by:', userId === finalInsertData.created_by)
+
+      if (isOnline) {
+        // 온라인: Supabase에 저장
+        const { data, error } = await supabase
+          .from('clients')
+          .insert([finalInsertData])
+          .select()
+          .single()
+        
+        if (error) {
+          console.error('[addClient] Supabase Error:', error)
+          throw error
+        }
+        
+        const clientWithCamelCase = {
+          ...data,
+          lastOrder: data.last_order || data.lastOrder,
+          orderAmount: data.order_amount || data.orderAmount,
+          contract_prices: typeof data.contract_prices === 'string' 
+            ? (data.contract_prices ? JSON.parse(data.contract_prices) : []) 
+            : (data.contract_prices || [])
+        }
+        
+        await saveToStore(STORES.CLIENTS, data).catch(e => console.error(e))
+        setClients((prev) => [...prev, clientWithCamelCase])
+        return clientWithCamelCase
+        
+      } else {
+        // 오프라인
+        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        const offlineData = { 
+          ...finalInsertData, 
+          id: tempId, 
+          created_at: new Date().toISOString(), 
+          updated_at: new Date().toISOString() 
+        }
+        
+        await saveToStore(STORES.CLIENTS, offlineData)
+        await addToQueue('clients', QUEUE_OPERATION.INSERT, finalInsertData, tempId) // Queue에도 올바른 finalInsertData 저장
+        
+        const clientWithCamelCase = { 
+          ...offlineData, 
+          lastOrder: offlineData.last_order, 
+          orderAmount: offlineData.order_amount 
+        }
+        setClients((prev) => [...prev, clientWithCamelCase])
+        return clientWithCamelCase
+      }
+      
+    } catch (error) {
+      console.error('[addClient] 고객 추가 실패:', error)
+      throw error
     }
   }, [sanitizeData, isOnline, user])
 

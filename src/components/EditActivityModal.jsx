@@ -5,6 +5,7 @@ import useEnterMove from '../hooks/useEnterMove'
 // GoogleGenerativeAI SDK 대신 REST API 직접 호출 방식 사용
 import { Sparkles, Loader2, X, Plus } from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
+import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 
 const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
@@ -143,13 +144,13 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
     const currentText = formData.description.trim()
     
     if (!currentText) {
-      alert('정리할 내용을 먼저 입력해주세요.')
+      await showWarning('정리할 내용을 먼저 입력해주세요.')
       return
     }
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY
     if (!apiKey) {
-      alert('API Key가 설정되지 않았습니다.')
+      await showWarning('API Key가 설정되지 않았습니다.')
       return
     }
 
@@ -192,11 +193,11 @@ ${currentText}`
         console.error('Gemini API Error:', response.status, errorData)
 
         if (response.status === 429) {
-          alert('사용량이 많아 잠시 지연되고 있습니다. 1분 뒤 다시 시도해주세요. (429)')
+          await showError('사용량이 많아 잠시 지연되고 있습니다. 1분 뒤 다시 시도해주세요. (429)')
         } else if (response.status === 404) {
-          alert('AI 모델을 찾을 수 없습니다. 관리자에게 문의하세요. (404)')
+          await showError('AI 모델을 찾을 수 없습니다. 관리자에게 문의하세요. (404)')
         } else {
-          alert(`AI 서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요. (Error: ${response.status})`)
+          await showError(`AI 서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요. (Error: ${response.status})`)
         }
         return // 더 이상 진행하지 않음
       }
@@ -217,7 +218,7 @@ ${currentText}`
 
     } catch (error) {
       console.error('AI 정리 중 로직 오류:', error)
-      alert('작업을 처리하는 중 오류가 발생했습니다.')
+      await showError('작업을 처리하는 중 오류가 발생했습니다.')
     } finally {
       // [수정 3] 성공하든 실패하든 로딩 상태는 무조건 해제
       setIsAILoading(false)
@@ -227,16 +228,16 @@ ${currentText}`
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!activityId || !activity) {
-      alert('활동 내역을 찾을 수 없습니다.')
+      await showError('활동 내역을 찾을 수 없습니다.')
       onClose()
       return
     }
     if (!formData.clientId) {
-      alert('고객을 선택해주세요.')
+      await showWarning('고객을 선택해주세요.')
       return
     }
     if (!formData.activity_date) {
-      alert('날짜를 입력해주세요.')
+      await showWarning('날짜를 입력해주세요.')
       return
     }
 
@@ -248,28 +249,34 @@ ${currentText}`
         ...formData,
         user: userString,
       })
-      alert('활동 내역이 수정되었습니다.')
+      await showSuccess('활동 내역이 수정되었습니다.')
       onClose()
     } catch (error) {
       console.error('활동 수정 중 오류:', error)
-      alert('활동 내역 수정 중 오류가 발생했습니다.')
+      await showError('활동 내역 수정 중 오류가 발생했습니다.')
     }
   }
 
   const handleDelete = async () => {
     if (!activityId || !activity) {
-      alert('활동 내역을 찾을 수 없습니다.')
+      await showError('활동 내역을 찾을 수 없습니다.')
       onClose()
       return
     }
-    if (window.confirm('정말 삭제하시겠습니까?\n\n이 활동 기록이 영구적으로 삭제됩니다.')) {
+    const confirmed = await showConfirm(
+      '이 활동 기록이 영구적으로 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (confirmed) {
       try {
         await deleteActivity(activityId)
-        alert('활동 내역이 삭제되었습니다.')
+        await showSuccess('활동 내역이 삭제되었습니다.')
         onClose()
       } catch (error) {
         console.error('활동 삭제 중 오류:', error)
-        alert('활동 내역 삭제 중 오류가 발생했습니다.')
+        await showError('활동 내역 삭제 중 오류가 발생했습니다.')
       }
     }
   }

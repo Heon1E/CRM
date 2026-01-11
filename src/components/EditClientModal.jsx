@@ -3,6 +3,7 @@ import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'
 import useEnterMove from '../hooks/useEnterMove'
+import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 
 const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
@@ -63,12 +64,12 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!clientId || !client) {
-      alert('고객 정보를 찾을 수 없습니다.')
+      await showError('고객 정보를 찾을 수 없습니다.')
       onClose()
       return
     }
     if (!formData.company?.trim()) {
-      alert('회사명을 입력해주세요.')
+      await showWarning('회사명을 입력해주세요.')
       return
     }
 
@@ -77,46 +78,52 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
         ...formData,
         contract_prices: Array.isArray(formData.contract_prices) ? formData.contract_prices : [],
       })
-      alert('고객 정보가 수정되었습니다.')
+      await showSuccess('고객 정보가 수정되었습니다.')
       onClose()
     } catch (error) {
       console.error('고객 수정 중 오류:', error)
-      alert('고객 정보 수정 중 오류가 발생했습니다.')
+      await showError('고객 정보 수정 중 오류가 발생했습니다.')
     }
   }
 
   const handleDelete = async () => {
     if (!clientId || !client) {
-      alert('고객 정보를 찾을 수 없습니다.')
+      await showError('고객 정보를 찾을 수 없습니다.')
       onClose()
       return
     }
-    if (window.confirm('정말 삭제하시겠습니까?\n\n이 고객 정보가 영구적으로 삭제되며, 관련된 모든 활동 내역도 함께 삭제됩니다.')) {
+    const confirmed = await showConfirm(
+      '이 고객 정보가 영구적으로 삭제되며, 관련된 모든 활동 내역도 함께 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (confirmed) {
       try {
         await deleteClient(clientId)
-        alert('고객이 삭제되었습니다.')
+        await showSuccess('고객이 삭제되었습니다.')
         onClose()
       } catch (error) {
         console.error('고객 삭제 중 오류:', error)
-        alert('고객 삭제 중 오류가 발생했습니다.')
+        await showError('고객 삭제 중 오류가 발생했습니다.')
       }
     }
   }
 
-  const handleAddContractPrice = () => {
+  const handleAddContractPrice = async () => {
     if (!newContractPrice?.productId) {
-      alert('제품을 선택해주세요.')
+      await showWarning('제품을 선택해주세요.')
       return
     }
     if (!newContractPrice?.price || parseFloat(newContractPrice.price) <= 0) {
-      alert('단가를 입력해주세요.')
+      await showWarning('단가를 입력해주세요.')
       return
     }
 
     // 이미 등록된 제품인지 확인
     const currentPrices = Array.isArray(formData.contract_prices) ? formData.contract_prices : []
     if (currentPrices.some((cp) => cp?.productId === newContractPrice.productId)) {
-      alert('이미 등록된 제품입니다.')
+      await showWarning('이미 등록된 제품입니다.')
       return
     }
 
