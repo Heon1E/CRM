@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 /**
  * Vercel Serverless Function for Business Card Analysis
- * Using gemini-1.5-flash with JSON mode for reliable parsing
+ * Final Production Standard - Using gemini-1.5-pro with Canonical Structure
  */
 export default async function handler(req, res) {
   // CORS Setup
@@ -15,9 +15,12 @@ export default async function handler(req, res) {
 
   try {
     const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
-    if (!API_KEY) return res.status(500).json({ error: 'Server API Key missing' })
+    if (!API_KEY) {
+      console.error('[API] Missing API Key')
+      return res.status(500).json({ error: 'Server configuration error' })
+    }
 
-    // Parse Body
+    // Body Parsing
     let body = req.body
     if (typeof body === 'string') {
       try {
@@ -29,7 +32,7 @@ export default async function handler(req, res) {
     const { imageBase64 } = body
     if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-    // Clean Base64
+    // Base64 Cleaning
     let cleanBase64 = imageBase64
     let mimeType = 'image/jpeg'
     if (imageBase64.includes(',')) {
@@ -39,39 +42,53 @@ export default async function handler(req, res) {
       else if (parts[0].includes('webp')) mimeType = 'image/webp'
     }
 
-    // Initialize Model (Use 1.5 Flash with JSON Mode)
+    // Initialize Model (1.5 Pro + JSON Mode)
     const genAI = new GoogleGenerativeAI(API_KEY)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash', // Works on server with updated SDK
+      model: 'gemini-1.5-pro',
       generationConfig: {
-        responseMimeType: 'application/json', // Native JSON support
+        responseMimeType: 'application/json',
       },
     })
 
     const promptText = `
-      Extract business card info. 
+      Extract business card info.
       Fields: company, contact_person, position, phone, email, address.
       Use "" for missing fields.
     `
 
-    const result = await model.generateContent([
-      { inlineData: { data: cleanBase64, mimeType: mimeType } },
-      { text: promptText },
-    ])
+    // Canonical Request Structure (The Fix)
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: promptText },
+            { inlineData: { data: cleanBase64, mimeType: mimeType } },
+          ],
+        },
+      ],
+    })
 
     const response = await result.response
     const text = response.text()
-    console.log('[API] Response:', text.substring(0, 100))
+    console.log('[API] Raw Response:', text.substring(0, 100))
 
-    // Direct JSON Parse (Safe due to JSON Mode)
-    const data = JSON.parse(text)
+    // Safety Net: Robust JSON Parsing
+    let data
+    try {
+      data = JSON.parse(text)
+    } catch (parseError) {
+      console.error('[API] JSON Parse Failed:', text)
+      throw new Error('AI returned invalid JSON')
+    }
+
     return res.status(200).json(data)
   } catch (error) {
     console.error('[API Error]', error)
-    // Return actual error message for debugging
     return res.status(500).json({
-      error: error.message || 'Server Error',
-      details: error.toString(),
+      error: '명함 분석에 실패했습니다.',
+      details: error.message,
     })
   }
 }
