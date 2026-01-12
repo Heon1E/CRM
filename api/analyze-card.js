@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 /**
  * Vercel Serverless Function for Business Card Analysis
- * Final Production Standard - Using gemini-1.5-pro with Canonical Structure
+ * Debug Mode - Returns detailed error information for troubleshooting
  */
 export default async function handler(req, res) {
   // CORS Setup
@@ -14,50 +14,45 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
-    const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
-    if (!API_KEY) {
-      console.error('[API] Missing API Key')
-      return res.status(500).json({ error: 'Server configuration error' })
+    // 1. Debug: Check Environment Variables
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
+    const keyStatus = apiKey ? `Found (Starts with ${apiKey.substring(0, 4)}...)` : 'MISSING'
+    console.log(`[DEBUG] API Key Status: ${keyStatus}`)
+
+    if (!apiKey) {
+      throw new Error(`Server Environment Error: GEMINI_API_KEY is missing. Status: ${keyStatus}`)
     }
 
-    // Body Parsing
+    // 2. Debug: Check Request Body
     let body = req.body
     if (typeof body === 'string') {
       try {
         body = JSON.parse(body)
       } catch (e) {
-        return res.status(400).json({ error: 'Invalid JSON body' })
+        throw new Error('Request body is not valid JSON')
       }
     }
     const { imageBase64 } = body
-    if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
+    if (!imageBase64) throw new Error('No imageBase64 data received in body')
 
-    // Base64 Cleaning
-    let cleanBase64 = imageBase64
-    let mimeType = 'image/jpeg'
-    if (imageBase64.includes(',')) {
-      const parts = imageBase64.split(',')
-      cleanBase64 = parts[1]
-      if (parts[0].includes('png')) mimeType = 'image/png'
-      else if (parts[0].includes('webp')) mimeType = 'image/webp'
-    }
+    console.log(`[DEBUG] Image received. Length: ${imageBase64.length}`)
 
-    // Initialize Model (1.5 Pro + JSON Mode)
-    const genAI = new GoogleGenerativeAI(API_KEY)
+    // 3. Initialize Model
+    const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-pro',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
+      model: 'gemini-1.5-flash',
+      generationConfig: { responseMimeType: 'application/json' },
     })
 
-    const promptText = `
-      Extract business card info.
-      Fields: company, contact_person, position, phone, email, address.
-      Use "" for missing fields.
-    `
+    const promptText = `Extract business card info into JSON. Fields: company, contact_person, position, phone, email, address. Use "" for missing.`
 
-    // Canonical Request Structure (The Fix)
+    // 4. Clean Base64
+    const parts = imageBase64.split(',')
+    const cleanBase64 = parts[1] || parts[0] // Fallback if no header
+    const mimeType = parts[0].includes('png') ? 'image/png' : 'image/jpeg'
+
+    // 5. Generate
+    console.log('[DEBUG] Calling Gemini API...')
     const result = await model.generateContent({
       contents: [
         {
@@ -72,23 +67,19 @@ export default async function handler(req, res) {
 
     const response = await result.response
     const text = response.text()
-    console.log('[API] Raw Response:', text.substring(0, 100))
+    console.log('[DEBUG] Gemini Raw Response:', text.substring(0, 50))
 
-    // Safety Net: Robust JSON Parsing
-    let data
-    try {
-      data = JSON.parse(text)
-    } catch (parseError) {
-      console.error('[API] JSON Parse Failed:', text)
-      throw new Error('AI returned invalid JSON')
-    }
-
+    const data = JSON.parse(text)
     return res.status(200).json(data)
   } catch (error) {
-    console.error('[API Error]', error)
+    console.error('[CRITICAL ERROR]', error)
+
+    // 6. Return REAL Error to Frontend (Temporary for Debugging)
     return res.status(500).json({
-      error: '명함 분석에 실패했습니다.',
-      details: error.message,
+      error: 'CRITICAL_SERVER_ERROR',
+      message: error.message,
+      stack: error.stack, // This will tell us EXACTLY where it failed
+      details: error.response ? JSON.stringify(error.response) : 'No response details',
     })
   }
 }
