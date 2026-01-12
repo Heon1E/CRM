@@ -74,10 +74,13 @@ export default async function handler(req, res) {
     return res.status(200).json(data)
   } catch (error) {
     console.error('[CRITICAL ERROR]', error)
+    
+    // Return RAW error details for debugging (Production-ready error handling)
     return res.status(500).json({
-      error: 'SERVER_ERROR',
+      error: '명함 분석에 실패했습니다. (AI 응답 오류)',
       message: error.message,
-      stack: error.stack,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      details: error.response?.data || error.toString(),
     })
   }
 }
