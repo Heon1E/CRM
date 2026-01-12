@@ -5,172 +5,118 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
  * Handles Gemini API calls server-side to bypass CORS and region restrictions
  */
 export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  // 1. CORS 설정 (보안 강화 및 에러 방지)
+  const allowedOrigins = [
+    'https://crm-orpin-three.vercel.app', // 실제 배포 도메인
+    'http://localhost:5173',               // 로컬 개발 환경
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    // 개발 편의를 위해 일단 * 허용하되, 배포 시엔 위 리스트만 허용하는 게 정석
+    res.setHeader('Access-Control-Allow-Origin', '*'); 
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Handle preflight requests
+  // Preflight 요청 처리
   if (req.method === 'OPTIONS') {
-    return res.status(200).end()
+    return res.status(200).end();
   }
 
-  // Only allow POST requests
+  // POST만 허용
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get API key from environment variable (try both VITE_ and non-VITE_ versions)
-    const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
+    // 2. API 키 확인
+    const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
     if (!API_KEY) {
-      console.error('[API] GEMINI_API_KEY is not set')
-      return res.status(500).json({ error: 'API 키가 설정되지 않았습니다.' })
+      console.error('[API] GEMINI_API_KEY is not set');
+      return res.status(500).json({ error: '서버 API 키 설정 오류' });
     }
 
-    // Parse request body (Vercel automatically parses JSON, but ensure it's an object)
-    let body = req.body
+    // 3. Body 파싱 (Vercel은 자동이지만 안전장치 추가)
+    let body = req.body;
     if (typeof body === 'string') {
       try {
-        body = JSON.parse(body)
+        body = JSON.parse(body);
       } catch (e) {
-        return res.status(400).json({ error: 'Invalid JSON in request body' })
+        return res.status(400).json({ error: 'Invalid JSON body' });
       }
     }
 
-    // Get image data from request body
-    const { imageBase64 } = body
-
-    if (!imageBase64 || typeof imageBase64 !== 'string') {
-      return res.status(400).json({ error: '유효한 이미지 데이터가 없습니다.' })
+    const { imageBase64 } = body;
+    if (!imageBase64) {
+      return res.status(400).json({ error: '이미지 데이터가 없습니다.' });
     }
 
-    // 1. Clean Base64 Data
-    let base64Data = imageBase64
-    let mimeType = 'image/jpeg'
+    // 4. Base64 정리 (헤더 제거)
+    let cleanBase64 = imageBase64;
+    let mimeType = 'image/jpeg';
 
     if (imageBase64.includes(',')) {
-      const parts = imageBase64.split(',')
-      const header = parts[0]
-      base64Data = parts[1]
-
-      if (header.includes('image/png')) {
-        mimeType = 'image/png'
-      } else if (header.includes('image/webp')) {
-        mimeType = 'image/webp'
-      }
+      const parts = imageBase64.split(',');
+      cleanBase64 = parts[1];
+      const header = parts[0];
+      
+      if (header.includes('png')) mimeType = 'image/png';
+      else if (header.includes('webp')) mimeType = 'image/webp';
     }
 
-    // 2. Initialize Gemini API (Server-side: gemini-1.5-flash works perfectly)
-    const genAI = new GoogleGenerativeAI(API_KEY)
-    const model = genAI.getGenerativeModel({
+    // 5. Gemini 호출 (서버이므로 1.5-flash 사용 가능!)
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ 
       model: 'gemini-1.5-flash',
       generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 1024,
-        responseMimeType: 'application/json',
-      },
-    })
+        responseMimeType: 'application/json' // JSON 강제
+      }
+    });
 
-    // 3. JSON Schema for structured output
-    const schema = {
-      type: 'object',
-      properties: {
-        company: { type: 'string', description: 'Company name' },
-        contact_person: { type: 'string', description: 'Contact person name' },
-        position: { type: 'string', description: 'Job title or position' },
-        phone: { type: 'string', description: 'Phone number' },
-        email: { type: 'string', description: 'Email address' },
-        address: { type: 'string', description: 'Full address' },
-      },
-      required: ['company', 'contact_person', 'position', 'phone', 'email', 'address'],
-    }
+    const prompt = `
+      Extract business card info into this JSON structure:
+      {
+        "company": "Company Name",
+        "contact_person": "Name",
+        "position": "Job Title",
+        "phone": "010-xxxx-xxxx",
+        "email": "email@address.com",
+        "address": "Full Address"
+      }
+      If not found, use empty string "".
+    `;
 
-    // 4. Prompt for business card extraction
-    const promptText = `
-      Analyze this business card image and extract the following information.
-      Return the result as a JSON object matching the provided schema.
-      
-      Fields to extract:
-      - company: Company name (including legal entity type like 주식회사, (주), etc.)
-      - contact_person: Person's name
-      - position: Job title (사장, 대표, 과장, 차장, 부장, 이사, 팀장, 실장, 대리, 주임, 사원, etc.)
-      - phone: Phone number (format: 010-1234-5678)
-      - email: Email address
-      - address: Full address (시/도/구/동 포함)
-
-      If a field is not found, use an empty string "".
-    `
-
-    // 5. Generate content with image and prompt
     const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType,
-        },
-      },
-      {
-        text: promptText,
-      },
-    ])
+      { inlineData: { data: cleanBase64, mimeType: mimeType } },
+      { text: prompt }
+    ]);
 
-    // 6. Parse response
-    const response = await result.response
-    const text = response.text()
+    const responseText = result.response.text();
+    console.log('[API] Raw Response:', responseText.substring(0, 100) + '...');
 
-    console.log('[API] Gemini Response:', text.substring(0, 200))
-
-    // 7. Parse JSON response (should be valid JSON due to responseMimeType)
-    let extractedInfo
+    // 6. 결과 파싱 및 반환
+    let data;
     try {
-      // Remove markdown code blocks if present
-      let jsonString = text.trim()
-      if (jsonString.includes('```')) {
-        jsonString = jsonString.replace(/```json|```/g, '').trim()
-      }
-
-      // Find JSON object
-      const jsonMatch = jsonString.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        jsonString = jsonMatch[0]
-      }
-
-      extractedInfo = JSON.parse(jsonString)
-    } catch (parseError) {
-      console.error('[API] JSON Parse Error:', parseError)
-      return res.status(500).json({ error: '분석 결과 형식이 올바르지 않습니다.' })
+      // 마크다운 코드블록 제거 등 클리닝 없이 바로 파싱 시도 (JSON 모드 사용했으므로)
+      data = JSON.parse(responseText);
+    } catch (e) {
+      // 혹시 모르니 클리닝 후 재시도
+      const cleaned = responseText.replace(/```json|```/g, '').trim();
+      data = JSON.parse(cleaned);
     }
 
-    // 8. Return structured data
-    return res.status(200).json({
-      company: extractedInfo.company || '',
-      contact_person: extractedInfo.contact_person || '',
-      position: extractedInfo.position || '',
-      phone: extractedInfo.phone || '',
-      email: extractedInfo.email || '',
-      address: extractedInfo.address || '',
-    })
+    return res.status(200).json(data);
+
   } catch (error) {
-    console.error('[API] Error:', error)
-
-    // Friendly error messages
-    const msg = error.message?.toLowerCase() || ''
-    const status = error.status || error.response?.status
-
-    if (status === 404 || msg.includes('not found')) {
-      return res.status(404).json({ error: 'AI 모델에 연결할 수 없습니다. (지역/버전 호환성 문제)' })
-    } else if (status === 400 || msg.includes('invalid')) {
-      return res.status(400).json({ error: '이미지 형식이 올바르지 않거나 너무 큽니다.' })
-    } else if (status === 403 || msg.includes('permission') || msg.includes('api_key')) {
-      return res.status(403).json({ error: 'API 키가 유효하지 않습니다.' })
-    } else if (status === 429 || msg.includes('quota') || msg.includes('rate limit')) {
-      return res.status(429).json({ error: 'AI 서버 사용량이 많습니다. 잠시 후 다시 시도해주세요.' })
-    } else if (status === 503 || msg.includes('overloaded')) {
-      return res.status(503).json({ error: 'AI 서버 사용량이 많습니다. 잠시 후 다시 시도해주세요.' })
-    }
-
-    return res.status(500).json({ error: '명함 분석에 실패했습니다. 다시 시도해주세요.' })
+    console.error('[API Error]', error);
+    return res.status(500).json({ 
+      error: error.message || '서버 내부 오류 발생' 
+    });
   }
 }
