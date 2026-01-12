@@ -8,6 +8,7 @@ import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
 import ClientExcelUpload from '../components/ClientExcelUpload'
 import SalesExcelUpload from '../components/SalesExcelUpload'
+import { showSuccess, showError, showConfirm } from '../utils/alert'
 
 const Settings = () => {
   const { products, deleteProduct, loading } = useData()
@@ -143,10 +144,10 @@ const Settings = () => {
 
       // 회사명 변경 시 전역 상태 업데이트를 위한 이벤트 발생
       window.dispatchEvent(new Event('settingsUpdated'))
-      alert('설정이 저장되었습니다.')
+      await showSuccess('설정이 저장되었습니다.')
     } catch (error) {
       console.error('설정 저장 오류:', error)
-      alert('설정 저장 중 오류가 발생했습니다.')
+      await showError('설정 저장 중 오류가 발생했습니다.')
     } finally {
       setSettingsLoading(false)
     }
@@ -191,10 +192,21 @@ const Settings = () => {
     }
   }
 
-  const handleDelete = (id) => {
-    if (window.confirm('정말 삭제하시겠습니까?\n\n이 제품 정보가 영구적으로 삭제되며, 관련된 계약 단가 정보도 함께 삭제됩니다.')) {
-      deleteProduct(id)
-      alert('제품이 삭제되었습니다.')
+  const handleDelete = async (id) => {
+    const confirmed = await showConfirm(
+      '이 제품 정보가 영구적으로 삭제되며, 관련된 계약 단가 정보도 함께 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (confirmed) {
+      try {
+        await deleteProduct(id)
+        await showSuccess('제품이 삭제되었습니다.')
+      } catch (error) {
+        console.error('제품 삭제 오류:', error)
+        await showError('제품 삭제 중 오류가 발생했습니다.')
+      }
     }
   }
 

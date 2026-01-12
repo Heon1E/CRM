@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import { Upload, Download, Loader2 } from 'lucide-react'
 import { downloadProductTemplate, parseProductExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'
+import { showWarning, showSuccess, showError } from '../utils/alert'
 
 const ProductExcelUpload = () => {
   const { addProductsBulk } = useData()
@@ -20,7 +21,7 @@ const ProductExcelUpload = () => {
 
     // 파일 확장자 검증
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      alert('엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.')
+      await showWarning('엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.')
       return
     }
 
@@ -31,14 +32,14 @@ const ProductExcelUpload = () => {
       const products = await parseProductExcel(file)
 
       if (products.length === 0) {
-        alert('등록할 제품 데이터가 없습니다. 엑셀 파일을 확인해주세요.')
+        await showWarning('등록할 제품 데이터가 없습니다. 엑셀 파일을 확인해주세요.')
         setIsUploading(false)
         return
       }
 
       // 일괄 등록
       await addProductsBulk(products)
-      alert(`${products.length}개의 제품이 일괄 등록되었습니다.`)
+      await showSuccess(`${products.length}개의 제품이 일괄 등록되었습니다.`)
 
       // 파일 입력 초기화
       if (fileInputRef.current) {
@@ -46,7 +47,7 @@ const ProductExcelUpload = () => {
       }
     } catch (error) {
       console.error('엑셀 업로드 오류:', error)
-      alert(`엑셀 업로드 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`)
+      await showError(`엑셀 업로드 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`)
     } finally {
       setIsUploading(false)
     }

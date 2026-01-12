@@ -9,6 +9,7 @@ import SwipeableListItem from '../components/SwipeableListItem'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useDebounce } from '../hooks/useDebounce'
+import { showConfirm, showError } from '../utils/alert'
 
 const Clients = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
@@ -18,6 +19,7 @@ const Clients = () => {
   const [editingClientId, setEditingClientId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false)
+  const [scannedClientData, setScannedClientData] = useState(null) // 명함 스캔 데이터
 
   // 회사명 기준으로 그룹핑 (Hook 선언 후에 수행)
   const groupedClients = useMemo(() => {
@@ -421,12 +423,20 @@ const Clients = () => {
                 <SwipeableListItem
                   key={company}
                   onEdit={() => setEditingClientId(primaryContact?.id)}
-                  onDelete={() => {
-                    if (window.confirm(`정말 삭제하시겠습니까?\n\n"${company}" 고객 정보가 영구적으로 삭제됩니다.`)) {
-                      deleteClient(primaryContact?.id).catch((error) => {
+                  onDelete={async () => {
+                    const confirmed = await showConfirm(
+                      `"${company}" 고객 정보가 영구적으로 삭제됩니다.`,
+                      '정말 삭제하시겠습니까?',
+                      '삭제',
+                      '취소'
+                    )
+                    if (confirmed) {
+                      try {
+                        await deleteClient(primaryContact?.id)
+                      } catch (error) {
                         console.error('고객 삭제 오류:', error)
-                        alert('삭제 중 오류가 발생했습니다.')
-                      })
+                        await showError('삭제 중 오류가 발생했습니다.')
+                      }
                     }
                   }}
                   enabled={true}
@@ -512,7 +522,11 @@ const Clients = () => {
       {/* Modals */}
       <AddClientModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false)
+          setScannedClientData(null) // 모달 닫을 때 스캔 데이터 초기화
+        }}
+        initialData={scannedClientData} // 명함 스캔 데이터 전달
       />
       <EditClientModal
         isOpen={editingClientId !== null}
@@ -521,12 +535,26 @@ const Clients = () => {
       />
       <BusinessCardScannerModal
         isOpen={isScannerModalOpen}
-        onClose={() => setIsScannerModalOpen(false)}
+        onClose={() => {
+          setIsScannerModalOpen(false)
+          setScannedClientData(null) // 모달 닫을 때 스캔 데이터 초기화
+        }}
         onSuccess={(result) => {
-          // 성공 후 모달 자동 닫기 (1.5초 후)
-          setTimeout(() => {
+          // 명함 스캔 성공 시, 추출된 정보가 있으면 거래처 입력 폼에 데이터 채우기
+          if (result && result.extractedInfo) {
+            // 추출된 정보를 거래처 입력 폼에 전달
+            setScannedClientData(result.extractedInfo)
             setIsScannerModalOpen(false)
-          }, 1500)
+            // 회사명이 있으면 거래처 입력 폼 열기
+            if (result.extractedInfo.company) {
+              setIsAddModalOpen(true)
+            }
+          } else {
+            // 이미 등록되었거나 업데이트된 경우 모달만 닫기
+            setTimeout(() => {
+              setIsScannerModalOpen(false)
+            }, 1500)
+          }
         }}
       />
     </div>

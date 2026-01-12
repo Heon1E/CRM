@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Camera, Image, Sparkles } from 'lucide-react'
+import { X, Camera, Image, Sparkles, Loader2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -7,6 +7,8 @@ import { extractBusinessCardInfo } from '../utils/geminiAPI'
 import { compressImage } from '../utils/imageCompression'
 import { saveToStore, deleteFromStore, STORES } from '../utils/offlineDB'
 import { addToQueue, QUEUE_OPERATION } from '../utils/syncQueue'
+import { supabase } from '../lib/supabase'
+import { showError, showSuccess } from '../utils/alert'
 import toast from 'react-hot-toast'
 
 /**
@@ -14,27 +16,27 @@ import toast from 'react-hot-toast'
  * 카메라 촬영 또는 갤러리 이미지 선택 → 백그라운드에서 Gemini API 처리 → 고객 정보 추출 및 등록
  */
 const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
-  const { clients, addClient, updateClient } = useData()
+  const { clients, addClient, updateClient, replaceClientContacts } = useData()
   const { addTask, removeTask } = useBackgroundTask()
   const { isOnline } = useOnlineStatus()
   const [imageSrc, setImageSrc] = useState(null)
   const [imageFile, setImageFile] = useState(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false) // AI 분석 중 상태
   const fileInputRef = useRef(null)
   const cameraInputRef = useRef(null)
 
   // 고객 데이터 처리 (조회/등록/업데이트) - 스마트 DB 매핑 (데이터 보존 우선) - useCallback으로 최적화
   const processClientData = useCallback(async (info) => {
     try {
-      // 동일한 이름과 회사명으로 기존 고객 조회
-      const existingClient = clients.find(c => 
-        c.contact_person === info.contact_person && 
-        c.company === info.company &&
-        info.contact_person && info.company
-      ) || (info.company && clients.find(c => 
-        c.company === info.company && 
-        info.company
-      ))
+      // 회사명 기준으로 기존 고객 조회 (핵심 식별자) - 정확한 비교를 위해 trim() 및 대소문자 무시 처리
+      const companyName = info.company ? String(info.company).trim() : ''
+      const existingClient = companyName 
+        ? clients.find(c => {
+            const existingCompany = c.company ? String(c.company).trim() : ''
+            return existingCompany.toLowerCase() === companyName.toLowerCase()
+          })
+        : null
 
       let result = {
         action: '',
@@ -44,12 +46,58 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
       }
 
       if (existingClient) {
-        // 기존 고객 업데이트: 기존 필드가 비어있을 때만 채우기 (기존 값 보존)
+        // 기존 고객 업데이트: 담당자 정보를 client_contacts 테이블에 저장
         const updateData = {}
         const addedFields = []
+        let contactsToAdd = []
+        let existingContacts = []
 
-        // 각 필드 확인: 기존 값이 null, undefined, 빈 문자열일 때만 업데이트
+        // 기존 담당자 목록 확인 (담당자 정보가 있든 없든 먼저 조회)
+        const { data: contactsData } = await supabase
+          .from('client_contacts')
+          .select('*')
+          .eq('client_id', existingClient.id)
+        existingContacts = contactsData || []
+
+        // 담당자 정보가 있으면 client_contacts 테이블에 추가
+        if (info.contact_person) {
+          // 동일한 이름의 담당자가 있는지 확인
+          const hasContact = existingContacts.some(c => c.name === info.contact_person)
+          
+          if (!hasContact) {
+            // 새로운 담당자 추가 (대표 담당자로 지정)
+            contactsToAdd.push({
+              name: info.contact_person,
+              department_role: info.position || '',
+              phone: info.phone || '',
+              email: info.email || '',
+              is_primary: true, // 대표 담당자로 지정
+            })
+          } else {
+            // 기존 담당자 정보 업데이트 (이메일 등 누락된 정보만)
+            const existingContact = existingContacts.find(c => c.name === info.contact_person)
+            if (existingContact) {
+              const contactUpdate = {}
+              if (info.email && !existingContact.email) contactUpdate.email = info.email
+              if (info.phone && !existingContact.phone) contactUpdate.phone = info.phone
+              if (info.position && !existingContact.department_role) contactUpdate.department_role = info.position
+              
+              if (Object.keys(contactUpdate).length > 0) {
+                await supabase
+                  .from('client_contacts')
+                  .update(contactUpdate)
+                  .eq('id', existingContact.id)
+                addedFields.push(...Object.keys(contactUpdate))
+              }
+            }
+          }
+        }
+
+        // clients 테이블 필드 업데이트 (담당자 정보 제외)
         Object.keys(info).forEach(key => {
+          // contact_person, phone, email은 client_contacts 테이블로 이관되므로 제외
+          if (['contact_person', 'phone', 'email', 'position'].includes(key)) return
+          
           const existingValue = existingClient[key]
           const newValue = info[key]
           
@@ -61,7 +109,16 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
           }
         })
 
-        if (Object.keys(updateData).length > 0) {
+        // 담당자 정보가 있으면 client_contacts 테이블에 저장
+        if (contactsToAdd.length > 0) {
+          await replaceClientContacts(existingClient.id, [
+            ...(existingContacts || []),
+            ...contactsToAdd
+          ])
+          addedFields.push('담당자')
+        }
+
+        if (Object.keys(updateData).length > 0 || contactsToAdd.length > 0) {
           // 업데이트 실행
           const updated = await updateClient(existingClient.id, updateData)
           result.action = 'updated'
@@ -76,23 +133,36 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
       } else {
         // 신규 고객 등록 (정보가 있는 필드만 포함)
         const newClient = {}
+        const contacts = []
         
         if (info.company) newClient.company = info.company
-        if (info.contact_person) newClient.contact_person = info.contact_person
-        if (info.phone) newClient.phone = info.phone
-        if (info.email) newClient.email = info.email
         if (info.address) newClient.address = info.address
         
-        // 최소한 회사명이나 이름 중 하나는 있어야 등록
-        if (newClient.company || newClient.contact_person) {
-          newClient.status = '대기'
-          const created = await addClient(newClient)
+        // 담당자 정보는 client_contacts 테이블에 저장
+        if (info.contact_person) {
+          contacts.push({
+            name: info.contact_person,
+            department_role: info.position || '',
+            phone: info.phone || '',
+            email: info.email || '',
+            is_primary: true, // 대표 담당자로 지정
+          })
+        }
+        
+        // 최소한 회사명은 있어야 등록
+        if (newClient.company) {
+          newClient.status = '신규'
+          const created = await addClient({
+            ...newClient,
+            contacts: contacts // 담당자 정보를 contacts 배열로 전달
+          })
           result.action = 'created'
           result.client = created
           result.addedFields = Object.keys(newClient).filter(key => newClient[key] && key !== 'status')
+          if (contacts.length > 0) result.addedFields.push('담당자')
         } else {
           result.action = 'failed'
-          result.error = '회사명 또는 이름 정보가 필요합니다.'
+          result.error = '회사명 정보가 필요합니다.'
         }
       }
 
@@ -106,7 +176,7 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
         error: error.message || '알 수 없는 오류가 발생했습니다.'
       }
     }
-  }, [clients, addClient, updateClient])
+  }, [clients, addClient, updateClient, replaceClientContacts])
 
   // 백그라운드 처리 함수 (비동기 실행) - 오프라인 지원 - useCallback으로 최적화
   const processBusinessCardInBackground = useCallback(async (imageBase64, taskId) => {
@@ -162,7 +232,10 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
       // 온라인 상태: Gemini API로 정보 추출
       let extractedInfo
       try {
+        // 분석 시작 상태 표시
+        setIsAnalyzing(true)
         extractedInfo = await extractBusinessCardInfo(imageBase64)
+        setIsAnalyzing(false)
         
         // 추출된 정보 검증 (최소한 하나의 필드는 있어야 함)
         const hasValidInfo = extractedInfo.company || extractedInfo.contact_person || 
@@ -171,17 +244,17 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
           throw new Error('명함 정보를 읽을 수 없습니다. 선명한 명함 사진을 다시 찍어주세요.')
         }
       } catch (extractError) {
+        setIsAnalyzing(false)
         // 에러 메시지가 이미 한글로 되어 있으면 그대로 사용, 아니면 기본 메시지 사용
-        const errorMessage = extractError.message || 'AI 분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'
+        const errorMessage = extractError.message || '분석 서비스 연결 불가: 서버 점검 중입니다. 잠시 후 다시 시도해주세요.'
         
         // 작업 실패: 백그라운드 작업 목록에서 제거
         removeTask(taskId)
         
-        // 완료 후에만 에러 표시 (로딩 중이 아니므로 안전)
-        toast.error(errorMessage, {
-          duration: 5000,
-          icon: '❌'
-        })
+        // 공통 모달 디자인으로 에러 표시 (콘솔 로그뿐만 아니라 사용자 화면에 출력)
+        console.error('명함 분석 에러:', extractError)
+        await showError(errorMessage, '명함 분석 실패')
+        
         return // 처리를 중단하고 종료
       }
 
@@ -222,11 +295,9 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
         // 작업 실패: 백그라운드 작업 목록에서 제거
         removeTask(taskId)
         
-        // 완료 후에만 에러 표시
-        toast.error(`데이터베이스 처리 중 오류가 발생했습니다: ${processError.message || '알 수 없는 오류'}`, {
-          duration: 5000,
-          icon: '❌'
-        })
+        // 공통 모달 디자인으로 에러 표시
+        console.error('데이터베이스 처리 중 오류:', processError)
+        await showError(`데이터베이스 처리 중 오류가 발생했습니다: ${processError.message || '알 수 없는 오류'}`, '데이터 처리 실패')
         return // 처리를 중단하고 종료
       }
 
@@ -274,16 +345,17 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
           })
         }
 
-        // 성공 콜백 호출
+        // 성공 콜백 호출 (추출된 정보도 함께 전달)
         if (onSuccess) {
-          onSuccess(result)
+          onSuccess({
+            ...result,
+            extractedInfo: extractedInfo // 추출된 원본 정보도 함께 전달
+          })
         }
       } else {
-        // 처리 실패 (하지만 에러는 이미 표시됨)
-        toast.error(`명함 분석 실패: ${result.error || '알 수 없는 오류'}`, {
-          duration: 5000,
-          icon: '❌'
-        })
+        // 처리 실패 (공통 모달 디자인으로 에러 표시)
+        console.error('명함 분석 실패:', result.error)
+        await showError(`명함 분석 실패: ${result.error || '알 수 없는 오류'}`, '명함 분석 실패')
       }
 
     } catch (error) {
@@ -300,13 +372,10 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
         errorMessage = error.message
       }
       
-      // 완료 후에만 에러 표시
-      toast.error(errorMessage, {
-        duration: 5000,
-        icon: '❌'
-      })
+      // 공통 모달 디자인으로 에러 표시 (콘솔 로그뿐만 아니라 사용자 화면에 출력)
+      await showError(errorMessage, '명함 분석 실패')
     }
-  }, [isOnline, clients, addClient, updateClient, processClientData, removeTask, onSuccess])
+  }, [isOnline, clients, addClient, updateClient, replaceClientContacts, processClientData, removeTask, onSuccess])
 
   // 오프라인 명함 스캔 재시도 리스너 (전역 리스너 - 모달이 열려있지 않아도 작동)
   useEffect(() => {
@@ -354,12 +423,12 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       setIsUploading(true)
 
-      // 이미지 압축 (명함 스캔용 최적 설정)
+      // 이미지 압축 (명함 스캔용 최적 설정 - 1MB 이하, 최대 1024px로 강제 리사이징)
       const compressed = await compressImage(file, {
-        maxWidth: 1920, // 최대 너비
-        maxHeight: 1920, // 최대 높이
+        maxWidth: 1024, // 모바일 고해상도 이미지 대응: 최대 1024px로 강제 리사이징
+        maxHeight: 1024, // 모바일 고해상도 이미지 대응: 최대 1024px로 강제 리사이징
         quality: 0.85, // JPEG 품질 (0.85는 명함 인식에 적절)
-        maxSizeKB: 500, // 최대 파일 크기 (500KB)
+        maxSizeKB: 1024, // 최대 파일 크기 (1MB = 1024KB) - API 전송 한계 대응
       })
 
       // 압축된 이미지 설정
@@ -440,6 +509,7 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
     }
 
     setIsUploading(true)
+    setIsAnalyzing(true)
 
     try {
       // 이미 압축된 이미지 Base64 사용 (handleFileSelect에서 이미 압축됨)
@@ -465,35 +535,35 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
         // 백그라운드 작업 추가
         addTask(taskId, '명함 분석')
 
-        // 즉시 사용자에게 피드백 및 모달 닫기
-        toast.success('명함 분석을 시작했습니다. 완료되면 알림을 드릴게요.', {
+        // 즉시 사용자에게 피드백 (명확한 진행 상태 표시)
+        toast.info('AI가 명함을 읽고 있습니다...', {
           duration: 3000,
-          icon: '📸'
+          icon: '🔍'
         })
 
-        // 모달 닫기 (사용자를 자유로운 상태로)
+        // 백그라운드에서 비동기 처리 시작 (await로 대기)
+        try {
+          await processBusinessCardInBackground(imageBase64, taskId)
+          // 분석 완료 후 모달 닫기
+          setIsUploading(false)
+          setIsAnalyzing(false)
+          handleReset()
+          onClose()
+      } catch (error) {
+        // 예상치 못한 에러만 처리 (일반적인 에러는 내부에서 처리됨)
+        console.error('백그라운드 처리 시작 중 예상치 못한 오류:', error)
         setIsUploading(false)
-        handleReset()
-        onClose()
-
-        // 백그라운드에서 비동기 처리 시작 (await 없이 실행)
-        // 에러는 processBusinessCardInBackground 내부에서 처리하므로 여기서는 catch 불필요
-        processBusinessCardInBackground(imageBase64, taskId).catch((error) => {
-          // 예상치 못한 에러만 처리 (일반적인 에러는 내부에서 처리됨)
-          console.error('백그라운드 처리 시작 중 예상치 못한 오류:', error)
-          removeTask(taskId)
-          
-          // 에러 메시지 한글화
-          let errorMessage = 'AI 분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'
-          if (error.message && !error.message.match(/^[a-zA-Z0-9\s\-_]+$/)) {
-            errorMessage = error.message
-          }
-          
-          toast.error(errorMessage, {
-            duration: 5000,
-            icon: '❌'
-          })
-        })
+        setIsAnalyzing(false)
+        removeTask(taskId)
+        
+        // 에러 메시지 한글화 및 공통 모달 디자인으로 표시
+        let errorMessage = '분석 서비스 연결 불가: 서버 점검 중입니다. 잠시 후 다시 시도해주세요.'
+        if (error.message && !error.message.match(/^[a-zA-Z0-9\s\-_]+$/)) {
+          errorMessage = error.message
+        }
+        
+        await showError(errorMessage, '명함 분석 실패')
+      }
       }
     } catch (error) {
       console.error('이미지 처리 중 오류:', error)
@@ -645,12 +715,21 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
                     </button>
                     <button
                       onClick={handleProcessImage}
-                      disabled={!imageSrc || isUploading}
+                      disabled={!imageSrc || isUploading || isAnalyzing}
                       className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium touch-manipulation min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                       style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
-                      <Sparkles className="w-4 h-4" />
-                      <span>AI 분석 시작</span>
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>AI가 명함을 읽고 있습니다...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4" />
+                          <span>AI 분석 시작</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 )}

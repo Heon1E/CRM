@@ -157,6 +157,10 @@ export const DataProvider = ({ children }) => {
   const sanitizeData = useCallback((data, type) => {
     const sanitized = { ...data }
     
+    // 공통: DB에 존재하지 않는 임시 필드 제거 (rowIndex 등) - PGRST204 에러 방지
+    delete sanitized.rowIndex
+    delete sanitized.clientName // 엑셀 파싱 시 사용된 임시 필드
+    
     // clients 테이블 전용 처리
     if (type === 'client') {
       // DB에 없는 필드 제거 (clients 테이블에 존재하지 않는 필드들)
@@ -174,6 +178,8 @@ export const DataProvider = ({ children }) => {
       delete sanitized.totalAmount
       delete sanitized.clientId
       delete sanitized.date
+      delete sanitized.price // DB에 없는 필드 (products 테이블용)
+      delete sanitized.unit_price // DB에 없는 필드 (sales 테이블용)
       
       // 디버깅: DB에 전송될 데이터 확인 (최종 검증)
       console.log('[sanitizeData] clients 테이블에 저장될 데이터 (최종 검증):', sanitized)
@@ -475,25 +481,70 @@ export const DataProvider = ({ children }) => {
   const addSale = useCallback(async (s) => {
     const uid = await getValidUserId(user)
     
-    // DB 컬럼명(snake_case)으로 변환
-    const rows = s.rows.map(r => {
+    // 중복 체크: 거래처명과 판매날짜가 모두 일치하는 데이터가 이미 있는지 확인
+    const rowsToInsert = []
+    const skippedRows = []
+    
+    for (const r of s.rows) {
+      const clientId = r.clientId || r.client_id
+      const saleDate = r.sale_date || r.saleDate
+      
+      // 기존 sales 데이터에서 중복 확인 (그룹화된 데이터를 평탄화하여 확인)
+      const existingSale = sales.find(sale => {
+        const saleClientId = sale.client_id || sale.clientId
+        const saleDateStr = sale.sale_date || sale.date
+        return saleClientId === clientId && saleDateStr === saleDate
+      })
+      
+      if (existingSale) {
+        skippedRows.push({
+          clientId: clientId,
+          saleDate: saleDate,
+          reason: '이미 존재하는 매출 데이터입니다.'
+        })
+        continue
+      }
+      
+      rowsToInsert.push(r)
+    }
+    
+    // 건너뛴 항목이 있으면 로그 출력
+    if (skippedRows.length > 0) {
+      console.log(`건너뛴 매출 데이터: ${skippedRows.length}건`)
+    }
+    
+    // 등록할 데이터가 없으면 조기 종료
+    if (rowsToInsert.length === 0) {
+      return { skipped: skippedRows.length }
+    }
+    
+    // DB 컬럼명(snake_case)으로 변환 및 필드 정제 (PGRST204 에러 방지)
+    const rows = rowsToInsert.map(r => {
       const row = {
         client_id: r.clientId || r.client_id,
-        sale_date: r.sale_date || r.saleDate,
-        item_name: r.item_name || r.itemName || '',
+        sale_date: r.sale_date || r.saleDate || null,
+        item_name: r.item_name || r.itemName || '', // 품목명이 없어도 등록 가능
         quantity: Number(r.quantity) || 0,
         unit_price: Number(r.unitPrice || r.unit_price) || 0,
         total_amount: Number(r.totalAmount || r.total_amount || (r.quantity * (r.unitPrice || r.unit_price))) || 0,
-        notes: r.notes || '',
+        notes: r.notes || '', // 비고가 없어도 등록 가능
         created_by: uid
       }
       
-      // DB에 없는 필드 제거
+      // 빈 문자열 날짜 필드를 null로 변환
+      if (!row.sale_date || row.sale_date === '') {
+        row.sale_date = null
+      }
+      
+      // DB에 없는 필드 제거 (임시 필드 및 camelCase 필드) - PGRST204 에러 방지
       delete row.clientId
       delete row.totalAmount
       delete row.unitPrice
       delete row.saleDate
       delete row.itemName
+      delete row.rowIndex // 엑셀 파싱 시 추가된 임시 필드 제거
+      delete row.clientName // 엑셀 파싱 시 사용된 임시 필드 제거
+      delete row.price // DB에 없는 필드 (unit_price 사용)
       
       return row
     })
@@ -545,7 +596,9 @@ export const DataProvider = ({ children }) => {
       // 전체 데이터를 다시 그룹화 (새로 추가된 데이터가 기존 그룹과 합쳐질 수 있음)
       return processGroupedSales(allSales)
     })
-  }, [user, processGroupedSales])
+    
+    return { inserted: rows.length, skipped: skippedRows.length }
+  }, [user, processGroupedSales, sales])
 
   // 매출 수정 (그룹 내 모든 항목 업데이트)
   const updateSale = useCallback(async (groupId, saleData) => {
@@ -631,6 +684,53 @@ export const DataProvider = ({ children }) => {
   }, [user, sales, processGroupedSales])
 
   // 매출 삭제 (그룹 내 모든 항목 삭제)
+  // 제품 삭제 함수
+  const deleteProduct = useCallback(async (productId) => {
+    try {
+      // 제품 정보 가져오기
+      const product = products.find(p => p.id === productId)
+      if (!product) {
+        throw new Error('삭제할 제품을 찾을 수 없습니다.')
+      }
+
+      // 매출 기록에 해당 제품명이 사용되고 있는지 확인 (item_name으로 확인)
+      const { data: salesWithProduct, error: checkError } = await supabase
+        .from('sales')
+        .select('id, item_name')
+        .eq('item_name', product.name)
+        .limit(1)
+      
+      if (checkError) {
+        console.error('매출 기록 확인 중 오류:', checkError)
+        // 확인 실패해도 삭제 시도 (DB 제약조건에서 처리)
+      }
+      
+      if (salesWithProduct && salesWithProduct.length > 0) {
+        throw new Error('해당 제품은 매출 기록이 있어 삭제할 수 없습니다. 대신 숨기거나 이름을 변경하세요.')
+      }
+
+      // 제품 삭제
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId)
+      
+      if (error) {
+        // 외래 키 제약조건 에러 처리
+        if (error.code === '23503' || error.message?.includes('foreign key') || error.message?.includes('violates foreign key')) {
+          throw new Error('해당 제품은 매출 기록이 있어 삭제할 수 없습니다. 대신 숨기거나 이름을 변경하세요.')
+        }
+        throw error
+      }
+
+      // 상태 업데이트: 제품 제거
+      setProducts(prev => prev.filter(p => p.id !== productId))
+    } catch (error) {
+      console.error('제품 삭제 중 오류:', error)
+      throw error
+    }
+  }, [products])
+
   const deleteSale = useCallback(async (groupId) => {
     try {
       // 그룹 ID로 기존 그룹 찾기
@@ -744,15 +844,28 @@ export const DataProvider = ({ children }) => {
     }
   }, [])
 
-  // 거래처 일괄 등록 함수
+  // 거래처 일괄 등록 함수 (중복 방지 로직 포함)
   const addClientsBulk = useCallback(async (clientsData) => {
     const uid = await getValidUserId(user)
     const results = []
     const errors = []
+    const skipped = []
 
     for (let i = 0; i < clientsData.length; i++) {
       const clientData = clientsData[i]
       try {
+        // 중복 체크: 회사명만으로 체크 (핵심 식별자)
+        const existingClient = clients.find(c => c.company === clientData.company)
+
+        if (existingClient) {
+          skipped.push({
+            rowIndex: clientData.rowIndex || i + 1,
+            company: clientData.company || '알 수 없음',
+            reason: '이미 존재하는 거래처입니다.'
+          })
+          continue
+        }
+
         // clients 테이블에 저장
         const sanitized = sanitizeData(clientData, 'client')
         const { data, error } = await supabase
@@ -804,6 +917,12 @@ export const DataProvider = ({ children }) => {
       setClients(prev => [...prev, ...results])
     }
 
+    // 건너뛴 항목이 있으면 메시지에 포함
+    if (skipped.length > 0) {
+      const skippedMessage = skipped.map(s => `${s.rowIndex}번째 행 (${s.company}): ${s.reason}`).join('\n')
+      console.log(`건너뛴 거래처:\n${skippedMessage}`)
+    }
+
     // 오류가 있으면 예외 발생
     if (errors.length > 0) {
       const errorMessage = errors.map(e => `${e.rowIndex}번째 행 (${e.company}): ${e.error}`).join('\n')
@@ -811,7 +930,7 @@ export const DataProvider = ({ children }) => {
     }
 
     return results
-  }, [user, sanitizeData, replaceClientContacts])
+  }, [user, sanitizeData, replaceClientContacts, clients])
 
   // 활동 내역 추가
   const addActivity = useCallback(async (activityData) => {
@@ -938,6 +1057,40 @@ export const DataProvider = ({ children }) => {
     return insertedData
   }, [user])
 
+  // 이슈 수정
+  const updateIssue = useCallback(async (id, issueData) => {
+    // DB 컬럼명(snake_case)으로 변환
+    const data = {
+      title: issueData.title || '',
+      content: issueData.content || issueData.description || '',
+      status: issueData.status || '등록',
+      target_date: issueData.target_date || issueData.date || null,
+    }
+    
+    // 빈 문자열 날짜 필드를 null로 변환
+    if (!data.target_date || data.target_date === '') {
+      data.target_date = null
+    }
+    
+    // DB에 없는 필드 제거
+    delete data.date
+    delete data.description
+    
+    const { data: updatedData, error } = await supabase.from('issues').update(data).eq('id', id).select().single()
+    if (error) throw error
+    
+    setIssues(prev => prev.map(item => item.id === id ? updatedData : item))
+    return updatedData
+  }, [])
+
+  // 이슈 삭제
+  const deleteIssue = useCallback(async (id) => {
+    const { error } = await supabase.from('issues').delete().eq('id', id)
+    if (error) throw error
+    
+    setIssues(prev => prev.filter(item => item.id !== id))
+  }, [])
+
   // 모달 열림/닫힘 추적 함수
   const registerModal = useCallback(() => {
     setOpenModalCount(prev => prev + 1)
@@ -946,17 +1099,93 @@ export const DataProvider = ({ children }) => {
     }
   }, [])
 
+  // 제품 일괄 등록 함수 (중복 방지 로직 포함)
+  const addProductsBulk = useCallback(async (productsData) => {
+    const uid = await getValidUserId(user)
+    const results = []
+    const errors = []
+    const skipped = []
+
+    for (let i = 0; i < productsData.length; i++) {
+      const productData = productsData[i]
+      try {
+        // 중복 체크: 제품명이 동일한 경우 건너뛰기
+        const existingProduct = products.find(p => p.name === productData.name)
+        
+        if (existingProduct) {
+          skipped.push({
+            rowIndex: productData.rowIndex || i + 1,
+            name: productData.name || '알 수 없음',
+            reason: '이미 존재하는 제품입니다.'
+          })
+          continue
+        }
+
+        // DB 전송 전 rowIndex 등 임시 필드 제거 및 DB 스키마 확인
+        // products 테이블 스키마: name, type, standard (단가 필드 제거됨)
+        const productToInsert = {
+          name: productData.name,
+          type: productData.type || '', // 비어있어도 등록 가능
+          standard: productData.standard || '', // 비어있어도 등록 가능
+          created_by: uid
+        }
+        // DB에 존재하지 않는 임시 필드 제거 (PGRST204 에러 방지)
+        delete productToInsert.rowIndex
+        delete productToInsert.clientName
+        delete productToInsert.unitPrice
+        delete productToInsert.unit_price
+        delete productToInsert.price // 단가 필드 제거
+        
+        const { data, error } = await supabase
+          .from('products')
+          .insert([productToInsert])
+          .select()
+          .single()
+
+        if (error) throw error
+        results.push(data)
+      } catch (error) {
+        console.error(`제품 등록 오류 (${productData.rowIndex || i + 1}번째 행):`, error)
+        errors.push({
+          rowIndex: productData.rowIndex || i + 1,
+          name: productData.name || '알 수 없음',
+          error: error.message || '알 수 없는 오류'
+        })
+      }
+    }
+
+    // 성공한 제품들을 상태에 추가
+    if (results.length > 0) {
+      setProducts(prev => [...prev, ...results])
+    }
+
+    // 건너뛴 항목이 있으면 메시지에 포함
+    if (skipped.length > 0) {
+      const skippedMessage = skipped.map(s => `${s.rowIndex}번째 행 (${s.name}): ${s.reason}`).join('\n')
+      console.log(`건너뛴 제품:\n${skippedMessage}`)
+    }
+
+    // 오류가 있으면 예외 발생
+    if (errors.length > 0) {
+      const errorMessage = errors.map(e => `${e.rowIndex}번째 행 (${e.name}): ${e.error}`).join('\n')
+      throw new Error(`일부 제품 등록에 실패했습니다:\n${errorMessage}`)
+    }
+
+    return results
+  }, [user, products])
+
   const value = {
     products, clients, activities, sales, issues, loading, isOnline, pendingSyncCount,
     addClient, updateClient, replaceClientContacts, addSale, updateSale, deleteSale, getStats, getWeeklySalesData,
-    fetchClientContacts, deleteClient, addClientsBulk,
-    addActivity, updateActivity, deleteActivity, addIssue,
+    fetchClientContacts, deleteClient, addClientsBulk, addProductsBulk,
+    addActivity, updateActivity, deleteActivity, addIssue, updateIssue, deleteIssue,
     registerModal, // 모달 상태 등록 함수
     addProduct: async (p) => { 
       const uid = await getValidUserId(user); 
       const { data } = await supabase.from('products').insert([{ ...p, created_by: uid }]).select().single();
       setProducts(prev => [...prev, data])
-    }
+    },
+    deleteProduct // 제품 삭제 함수 추가
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

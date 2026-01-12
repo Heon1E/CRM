@@ -8,6 +8,7 @@ import SwipeableListItem from '../components/SwipeableListItem'
 import { exportActivitiesToExcel } from '../utils/excelExport'
 import { formatActivityTitle, formatActivityText } from '../utils/koreanJosa'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
+import { showError, showConfirm } from '../utils/alert'
 
 const Activities = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
@@ -133,7 +134,7 @@ const Activities = () => {
       })
     } catch (error) {
       console.error('상태 변경 중 오류:', error)
-      alert('상태 변경 중 오류가 발생했습니다.')
+      await showError('상태 변경 중 오류가 발생했습니다.')
     }
   }
 
@@ -207,12 +208,20 @@ const Activities = () => {
                         <div className="flex-1">
                           <SwipeableListItem
                             onEdit={() => setEditingActivityId(activity.id)}
-                            onDelete={() => {
-                              if (window.confirm('정말 삭제하시겠습니까?\n\n이 활동 기록이 영구적으로 삭제됩니다.')) {
-                                deleteActivity(activity.id).catch((error) => {
+                            onDelete={async () => {
+                              const confirmed = await showConfirm(
+                                '이 활동 기록이 영구적으로 삭제됩니다.',
+                                '정말 삭제하시겠습니까?',
+                                '삭제',
+                                '취소'
+                              )
+                              if (confirmed) {
+                                try {
+                                  await deleteActivity(activity.id)
+                                } catch (error) {
                                   console.error('활동 삭제 중 오류:', error)
-                                  alert('삭제 중 오류가 발생했습니다.')
-                                })
+                                  await showError('삭제 중 오류가 발생했습니다.')
+                                }
                               }
                             }}
                             enabled={true}

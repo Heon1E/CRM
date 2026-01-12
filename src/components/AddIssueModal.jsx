@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
+import { showWarning, showSuccess, showError } from '../utils/alert'
 
 const AddIssueModal = ({ isOpen, onClose }) => {
   const { addIssue } = useData()
@@ -29,7 +30,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.title.trim()) {
-      alert('제목을 입력해주세요.')
+      await showWarning('제목을 입력해주세요.')
       return
     }
 
@@ -82,7 +83,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       // 전송 직전에 데이터 확인
       
       await addIssue(payload)
-      alert('ISSUE가 추가되었습니다.')
+      await showSuccess('ISSUE가 추가되었습니다.')
       setFormData({
         title: '',
         content: '',
@@ -93,7 +94,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       onClose()
     } catch (error) {
       console.error('ISSUE 추가 중 오류:', error)
-      alert('ISSUE 추가 중 오류가 발생했습니다.')
+      await showError('ISSUE 추가 중 오류가 발생했습니다.')
     }
   }
 

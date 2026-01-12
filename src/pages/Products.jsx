@@ -21,7 +21,7 @@ const Products = () => {
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(
-      '이 제품 정보가 영구적으로 삭제되며, 관련된 계약 단가 정보도 함께 삭제됩니다.',
+      '이 제품 정보가 영구적으로 삭제됩니다.',
       '정말 삭제하시겠습니까?',
       '삭제',
       '취소'

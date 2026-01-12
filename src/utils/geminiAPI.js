@@ -46,11 +46,11 @@ export const extractBusinessCardInfo = async (imageBase64) => {
       throw new Error('지원하지 않는 이미지 형식입니다. JPG, PNG, WebP 형식의 명함 사진을 사용해주세요.')
     }
 
-    // Gemini API 초기화
+    // Gemini API 초기화 (최신 모델 사용)
     const genAI = new GoogleGenerativeAI(API_KEY)
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
-    // 프롬프트 구성
+    // 프롬프트 구성 (JSON 형식 강제)
     const prompt = `
 다음 명함 이미지에서 비즈니스 정보를 추출해주세요. 
 한국어 명함 형식에 맞춰 다음 정보를 정확하게 추출해주세요:
@@ -62,7 +62,9 @@ export const extractBusinessCardInfo = async (imageBase64) => {
 5. **이메일** (email): 이메일 주소
 6. **주소** (address): 회사 주소 (시/도/구/동 포함)
 
-다음 JSON 형식으로만 응답해주세요. 추출할 수 없는 정보는 빈 문자열("")로 반환해주세요. 
+**중요: 응답은 반드시 JSON 형식으로만 해주세요. 다른 설명이나 텍스트 없이 순수 JSON만 반환해주세요.**
+
+추출할 수 없는 정보는 빈 문자열("")로 반환해주세요. 
 추측하지 말고, 이미지에서 확실하게 확인된 정보만 추출해주세요.
 
 {
@@ -79,7 +81,7 @@ export const extractBusinessCardInfo = async (imageBase64) => {
     let result
     let timeoutId = null
     try {
-      // 타임아웃 Promise 생성
+      // 타임아웃 Promise 생성 (30초로 설정 - 네트워크 불안정 대응)
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
           reject(new Error('timeout'))
@@ -117,7 +119,12 @@ export const extractBusinessCardInfo = async (imageBase64) => {
       
       // 에러 메시지 확인 및 한글화
       if (apiError.message === 'timeout') {
-        throw new Error('AI 분석 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
+        throw new Error('서버 응답 시간이 초과되었습니다. 서버 점검 중일 수 있습니다. 잠시 후 다시 시도해주세요.')
+      }
+      
+      // 네트워크 에러 처리
+      if (apiError.message?.includes('Failed to fetch') || apiError.message?.includes('NetworkError')) {
+        throw new Error('네트워크 연결에 문제가 있습니다. 인터넷 연결을 확인하고 잠시 후 다시 시도해주세요.')
       }
       
       // Gemini API 에러 처리
@@ -265,7 +272,7 @@ export const extractBusinessCardInfo = async (imageBase64) => {
     console.error('Gemini API 호출 중 오류:', error)
     
     // 에러 메시지 한글화 및 분류
-    let userFriendlyMessage = 'AI 분석 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'
+    let userFriendlyMessage = '분석 서비스 연결 불가: 서버 점검 중입니다. 잠시 후 다시 시도해주세요.'
     
     // HTTP 상태 코드별 에러 메시지
     if (error.status || error.statusCode) {
@@ -274,10 +281,12 @@ export const extractBusinessCardInfo = async (imageBase64) => {
         userFriendlyMessage = 'AI 분석 서비스 권한이 없습니다. API 키를 확인해주세요.'
       } else if (status === 400) {
         userFriendlyMessage = '명함 정보를 읽을 수 없습니다. 선명한 명함 사진을 다시 찍어주세요.'
+      } else if (status === 413) {
+        userFriendlyMessage = '이미지 파일이 너무 큽니다. 더 작은 이미지를 사용해주세요.'
       } else if (status === 429) {
         userFriendlyMessage = 'AI 분석 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
-      } else if (status === 500 || status === 502 || status === 503) {
-        userFriendlyMessage = 'AI 분석 서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      } else if (status === 500 || status === 502 || status === 503 || status === 504) {
+        userFriendlyMessage = '서버 점검 중입니다. 잠시 후 다시 시도해주세요.'
       }
     }
     

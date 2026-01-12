@@ -15,10 +15,10 @@
  */
 export const compressImage = async (file, options = {}) => {
   const {
-    maxWidth = 1920,
-    maxHeight = 1920,
+    maxWidth = 1024, // 모바일 고해상도 이미지 대응: 최대 1024px로 강제 리사이징
+    maxHeight = 1024, // 모바일 고해상도 이미지 대응: 최대 1024px로 강제 리사이징
     quality = 0.8,
-    maxSizeKB = 500,
+    maxSizeKB = 1024, // 1MB (1024KB) - API 전송 한계 대응
   } = options
 
   return new Promise((resolve, reject) => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
+import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 
 const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
   const { issues, updateIssue, deleteIssue } = useData()
@@ -71,7 +72,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.title.trim()) {
-      alert('제목을 입력해주세요.')
+      await showWarning('제목을 입력해주세요.')
       return
     }
 
@@ -137,37 +138,43 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
         targetDateValue = null // 목표일이 없으면 null
       }
       
-      // payload 생성: date와 target_date 컬럼에 명시적으로 할당
+      // payload 생성: DB 컬럼명(snake_case)에 맞게 변환
       const payload = {
         title: formData.title.trim(),
         content: formData.content || '',
-        date: dateValue, // 등록일 (NOT NULL 컬럼) - 기존 date 유지 또는 오늘 날짜
         target_date: targetDateValue, // 목표일 (사용자가 선택한 날짜 또는 null)
-        status: formData.status || '등록',
+        status: formData.status || '등록', // 상태 필드 (DB의 status 컬럼과 정확히 매핑)
       }
       
-      // 전송 직전에 데이터 확인
+      // date 필드는 등록일이므로 수정 시 변경하지 않음 (DB에서 자동으로 updated_at이 갱신됨)
       
       await updateIssue(issueId, payload)
-      alert('ISSUE가 수정되었습니다.')
+      await showSuccess('ISSUE가 수정되었습니다.')
       onClose()
     } catch (error) {
       console.error('ISSUE 수정 중 오류:', error)
-      alert('ISSUE 수정 중 오류가 발생했습니다.')
+      await showError('ISSUE 수정 중 오류가 발생했습니다.')
     }
   }
 
   const handleDelete = async () => {
-    if (!window.confirm('정말 삭제하시겠습니까?\n\n이 이슈 정보가 영구적으로 삭제됩니다.')) {
+    const confirmed = await showConfirm(
+      '이 이슈 정보가 영구적으로 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (!confirmed) {
       return
     }
 
     try {
       await deleteIssue(issueId)
-      alert('ISSUE가 삭제되었습니다.')
+      await showSuccess('ISSUE가 삭제되었습니다.')
       onClose()
     } catch (error) {
       console.error('ISSUE 삭제 중 오류:', error)
+      await showError('ISSUE 삭제 중 오류가 발생했습니다.')
     }
   }
 

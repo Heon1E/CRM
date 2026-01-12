@@ -114,13 +114,13 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
     const currentText = formData.description.trim()
     
     if (!currentText) {
-      alert('정리할 내용을 먼저 입력해주세요.')
+      await showWarning('정리할 내용을 먼저 입력해주세요.')
       return
     }
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY
     if (!apiKey) {
-      alert('API Key가 설정되지 않았습니다.')
+      await showWarning('API Key가 설정되지 않았습니다.')
       return
     }
 

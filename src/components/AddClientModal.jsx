@@ -6,7 +6,7 @@ import { showWarning, showSuccess, showError } from '../utils/alert'
 import { formatKoreanPhone } from '../utils/phoneFormatter'
 import { Plus, X } from 'lucide-react'
 
-const AddClientModal = ({ isOpen, onClose }) => {
+const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
   const { addClient } = useData()
   const formRef = useRef(null)
 
@@ -26,9 +26,34 @@ const AddClientModal = ({ isOpen, onClose }) => {
   // 전역 엔터 네비게이션 적용
   useEnterMove({ formRef, enabled: isOpen })
 
-  // 모달이 닫힐 때 상태 초기화
+  // 모달이 열릴 때 initialData가 있으면 폼에 채우기 (initialData 변경 시 즉시 반영)
   React.useEffect(() => {
-    if (!isOpen) {
+    if (isOpen && initialData) {
+      // 회사명만 있어도 폼이 정상적으로 열리고 등록 준비 상태가 되어야 함
+      // initialData의 모든 필드를 안전하게 처리 (null, undefined 대응)
+      setFormData({
+        company: String(initialData.company || '').trim(),
+        phone: String(initialData.phone || '').trim(),
+        email: String(initialData.email || '').trim(),
+        status: initialData.status || '신규',
+        contract_prices: Array.isArray(initialData.contract_prices) ? initialData.contract_prices : [],
+      })
+      
+      // 담당자 정보가 있으면 contacts에 추가, 없어도 빈 배열로 등록 가능
+      if (initialData.contact_person || initialData.position) {
+        setContacts([{
+          name: String(initialData.contact_person || '').trim(),
+          department_role: String(initialData.position || '').trim(),
+          phone: String(initialData.phone || '').trim(),
+          email: String(initialData.email || '').trim(),
+          is_primary: true, // 명함 스캔으로 추가된 담당자는 대표 담당자로 설정
+        }])
+      } else {
+        // 담당자 정보가 없어도 빈 배열로 등록 가능 (회사명만 있어도 등록 가능)
+        setContacts([{ name: '', department_role: '', phone: '', email: '', is_primary: false }])
+      }
+    } else if (!isOpen) {
+      // 모달이 닫힐 때 상태 초기화
       setFormData({
         company: '',
         phone: '',
@@ -38,7 +63,7 @@ const AddClientModal = ({ isOpen, onClose }) => {
       })
       setContacts([{ name: '', department_role: '', phone: '', email: '', is_primary: false }])
     }
-  }, [isOpen])
+  }, [isOpen, initialData])
 
   // 담당자 추가
   const handleAddContact = () => {

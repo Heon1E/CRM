@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
-import { Edit, Download, Plus } from 'lucide-react'
+import { Edit, Download, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import AddSaleModal from '../components/AddSaleModal'
 import EditSaleModal from '../components/EditSaleModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import { exportSalesToExcel } from '../utils/excelExport'
+import { showConfirm, showError, showSuccess } from '../utils/alert'
 
 const Sales = () => {
   const { sales, clients, products, loading, deleteSale } = useData()
@@ -26,6 +27,25 @@ const Sales = () => {
 
   const handleExport = () => {
     exportSalesToExcel(sales)
+  }
+
+  // 매출 삭제 핸들러
+  const handleDelete = async (saleId) => {
+    const confirmed = await showConfirm(
+      '이 매출 기록이 영구적으로 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (confirmed) {
+      try {
+        await deleteSale(saleId)
+        await showSuccess('매출 기록이 삭제되었습니다.')
+      } catch (error) {
+        console.error('매출 삭제 오류:', error)
+        await showError(error.message || '삭제 중 오류가 발생했습니다.')
+      }
+    }
   }
 
   return (
@@ -121,14 +141,24 @@ const Sales = () => {
                       <div className="max-w-xs truncate">{sale.notes || '-'}</div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => setEditingSaleGroup(sale)}
-                        className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
-                        style={{ WebkitTapHighlightColor: 'transparent' }}
-                      >
-                        <Edit className="w-4 h-4" />
-                        <span>수정</span>
-                      </button>
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => setEditingSaleGroup(sale)}
+                          className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                          style={{ WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <Edit className="w-4 h-4" />
+                          <span>수정</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(sale.id)}
+                          className="text-red-500 hover:text-red-600 font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                          style={{ WebkitTapHighlightColor: 'transparent' }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span>삭제</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -157,14 +187,7 @@ const Sales = () => {
                 <SwipeableListItem
                   key={sale.id}
                   onEdit={() => setEditingSaleGroup(sale)}
-                  onDelete={() => {
-                    if (window.confirm('정말 삭제하시겠습니까?\n\n이 매출 기록이 영구적으로 삭제됩니다.')) {
-                      deleteSale(sale.id).catch((error) => {
-                        console.error('매출 삭제 오류:', error)
-                        alert('삭제 중 오류가 발생했습니다.')
-                      })
-                    }
-                  }}
+                  onDelete={() => handleDelete(sale.id)}
                   enabled={true}
                 >
                   <div className="p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation min-h-[44px]">

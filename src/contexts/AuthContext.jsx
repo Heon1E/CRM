@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase' // ★ 본인의 supabase 클라이언트 경로로 수정 필요
+import { supabase } from '../lib/supabase'
+import { showError } from '../utils/alert' // ★ 본인의 supabase 클라이언트 경로로 수정 필요
 
 const AuthContext = createContext()
 
@@ -77,7 +78,7 @@ export function AuthProvider({ children }) {
       if (error) throw error
     } catch (error) {
       console.error('구글 로그인 에러:', error)
-      alert('로그인에 실패했습니다.')
+      await showError('로그인에 실패했습니다.')
     }
   }
 

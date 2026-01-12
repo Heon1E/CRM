@@ -31,11 +31,8 @@ const ClientExcelUpload = () => {
       // 엑셀 파일 파싱
       const clients = await parseClientExcel(file)
 
-      if (clients.length === 0) {
-        await showWarning('등록할 거래처 데이터가 없습니다. 엑셀 파일을 확인해주세요.')
-        setIsUploading(false)
-        return
-      }
+      // 회사명이 있는 데이터만 등록 (회사명이 없으면 이미 필터링됨)
+      // clients.length === 0 체크는 제거 (회사명이 없으면 null 반환되어 필터링되므로)
 
       // 일괄 등록
       await addClientsBulk(clients)

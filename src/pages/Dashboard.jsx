@@ -10,6 +10,7 @@ import EditIssueModal from '../components/EditIssueModal'
 import AppInstallGuide from '../components/AppInstallGuide'
 import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
+import { showSuccess, showError } from '../utils/alert'
 
 const Dashboard = () => {
   const { activities, clients, getStats, getWeeklySalesData, issues, updateIssue, loading } = useData()
@@ -396,10 +397,10 @@ const Dashboard = () => {
                                           updated_at: new Date().toISOString()
                                         })
                                         setEditingIssueId(null)
-                                        alert('이슈가 수정되었습니다.')
+                                        await showSuccess('이슈가 수정되었습니다.')
                                       } catch (error) {
                                         console.error('이슈 수정 오류:', error)
-                                        alert('이슈 수정 중 오류가 발생했습니다.')
+                                        await showError('이슈 수정 중 오류가 발생했습니다.')
                                       }
                                     }}
                                     className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
@@ -448,7 +449,7 @@ const Dashboard = () => {
                                         }
                                       } catch (error) {
                                         console.error('상태 변경 오류:', error)
-                                        alert('상태 변경 중 오류가 발생했습니다.')
+                                        await showError('상태 변경 중 오류가 발생했습니다.')
                                       }
                                     }}
                                     onClick={(e) => e.stopPropagation()}

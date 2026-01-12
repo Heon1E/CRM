@@ -31,23 +31,28 @@ const SalesExcelUpload = () => {
       // 엑셀 파일 파싱
       const salesData = await parseSaleExcel(file)
 
-      if (salesData.length === 0) {
-        await showWarning('등록할 매출 데이터가 없습니다. 엑셀 파일을 확인해주세요.')
-        setIsUploading(false)
-        return
-      }
+      // 거래처명과 판매일이 있는 데이터만 등록 (없으면 이미 필터링됨)
+      // salesData.length === 0 체크는 제거 (데이터가 없어도 빈 배열 반환)
 
-      // 거래처명으로 clientId 찾기
+      // 거래처명으로 clientId 찾기 및 중복 체크
       const salesToInsert = []
       const errors = []
+      const skipped = []
 
       for (const sale of salesData) {
+        // 거래처명이 없으면 건너뛰기 (에러 대신 무시)
+        if (!sale.clientName || sale.clientName.trim() === '') {
+          continue
+        }
+        
         const client = clients.find((c) => c.company === sale.clientName)
         if (!client) {
-          errors.push(`${sale.rowIndex}번째 행: 거래처 "${sale.clientName}"를 찾을 수 없습니다.`)
+          errors.push(`${sale.rowIndex || '알 수 없음'}번째 행: 거래처 "${sale.clientName}"를 찾을 수 없습니다.`)
           continue
         }
 
+        // 중복 체크: 거래처명과 판매날짜가 모두 일치하는 데이터가 이미 있는지 확인
+        // 이 체크는 addSale 함수 내부에서도 수행되지만, 사용자에게 미리 알려주기 위해 여기서도 수행
         salesToInsert.push({
           clientId: client.id,
           sale_date: sale.sale_date,

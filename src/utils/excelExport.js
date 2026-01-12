@@ -62,7 +62,6 @@ export const downloadProductTemplate = () => {
       품목명: '',
       종류: '',
       규격: '',
-      단가: '',
     },
   ]
 
@@ -75,7 +74,6 @@ export const downloadProductTemplate = () => {
     { wch: 20 }, // 품목명
     { wch: 15 }, // 종류
     { wch: 20 }, // 규격
-    { wch: 15 }, // 단가
   ]
 
   const fileName = `제품등록양식_${new Date().toISOString().split('T')[0]}.xlsx`
@@ -90,30 +88,31 @@ export const parseProductExcel = (file) => {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
+        // UTF-8 인코딩 명시적으로 설정
+        const workbook = XLSX.read(data, { type: 'array', codepage: 65001 })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        // UTF-8로 한글 컬럼명 정확히 읽기
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' })
 
         // 데이터 변환 및 검증
         const products = jsonData
           .map((row, index) => {
-            const name = row['품목명'] || row['name'] || ''
-            const type = row['종류'] || row['type'] || ''
-            const standard = row['규격'] || row['standard'] || ''
-            const price = row['단가'] || row['price'] || 0
+            // 다양한 한글 컬럼명 변형 지원 (UTF-8 인코딩 보장) - null/undefined 안전 처리
+            const name = ((row['품목명'] || row['제품명'] || row['name'] || row['product_name'] || row['Name'] || row['NAME'] || row['Product'] || row['PRODUCT'] || '') || '').toString().trim()
+            const type = ((row['종류'] || row['type'] || row['category'] || row['Type'] || row['TYPE'] || row['Category'] || row['CATEGORY'] || '') || '').toString().trim()
+            const standard = ((row['규격'] || row['standard'] || row['spec'] || row['Standard'] || row['STANDARD'] || row['Spec'] || row['SPEC'] || '') || '').toString().trim()
 
-            // 필수 필드 검증
-            if (!name || !name.trim()) {
+            // 필수 필드 검증: 제품명만 필수 (종류, 규격은 선택사항)
+            if (!name || name === '') {
               return null // 빈 행은 제외
             }
 
             return {
-              name: name.trim(),
-              type: type.trim() || '',
-              standard: standard.trim() || '',
-              price: typeof price === 'number' ? price : parseFloat(price) || 0,
-              rowIndex: index + 2, // 엑셀 행 번호 (헤더 제외)
+              name: name,
+              type: type || '', // 비어있어도 등록 가능
+              standard: standard || '', // 비어있어도 등록 가능
+              rowIndex: index + 2, // 엑셀 행 번호 (헤더 제외) - DB 전송 전 제거됨
             }
           })
           .filter((product) => product !== null) // null 제거
@@ -171,54 +170,54 @@ export const parseClientExcel = (file) => {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
+        // UTF-8 인코딩 명시적으로 설정
+        const workbook = XLSX.read(data, { type: 'array', codepage: 65001 })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        // UTF-8로 한글 컬럼명 정확히 읽기
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' })
 
         // 데이터 변환 및 검증
         const clients = jsonData
           .map((row, index) => {
-            const company = row['회사명'] || row['company'] || ''
-            const contact1Name = row['담당자1'] || row['담당자1_이름'] || row['contact1'] || ''
-            const contact1Role = row['담당자1_직책'] || row['담당자1_부서'] || row['contact1_role'] || ''
-            const contact1Phone = row['담당자1_전화번호'] || row['담당자1_연락처'] || row['contact1_phone'] || ''
-            const contact1Email = row['담당자1_이메일'] || row['담당자1_메일'] || row['contact1_email'] || ''
-            const status = row['상태'] || row['status'] || '신규'
+            // 다양한 한글 컬럼명 변형 지원 (UTF-8 인코딩 보장) - null/undefined 안전 처리
+            const company = ((row['회사명'] || row['company'] || row['회사'] || row['Company'] || row['COMPANY'] || '') || '').toString().trim()
+            const contact1Name = ((row['담당자1'] || row['담당자1_이름'] || row['담당자'] || row['contact1'] || row['Contact'] || row['CONTACT'] || '') || '').toString().trim()
+            const contact1Role = ((row['담당자1_직책'] || row['담당자1_부서'] || row['직책'] || row['contact1_role'] || row['Role'] || row['ROLE'] || '') || '').toString().trim()
+            const contact1Phone = ((row['담당자1_전화번호'] || row['담당자1_연락처'] || row['전화번호'] || row['연락처'] || row['contact1_phone'] || row['Phone'] || row['PHONE'] || '') || '').toString().trim()
+            const contact1Email = ((row['담당자1_이메일'] || row['담당자1_메일'] || row['이메일'] || row['email'] || row['contact1_email'] || row['Email'] || row['EMAIL'] || '') || '').toString().trim()
+            const status = ((row['상태'] || row['status'] || row['Status'] || row['STATUS'] || '신규') || '신규').toString().trim()
 
-            // 필수 필드 검증: 회사명과 담당자1 이름은 필수
-            if (!company || !company.trim()) {
+            // 필수 필드 검증: 회사명만 필수 (담당자 정보는 선택사항)
+            if (!company || company === '') {
               return null // 빈 행은 제외
             }
 
-            if (!contact1Name || !contact1Name.trim()) {
-              throw new Error(`${index + 2}번째 행: 담당자1 이름이 필수입니다.`)
+            // 담당자 정보가 있으면 contacts 배열에 추가, 없으면 빈 배열
+            const contacts = []
+            if (contact1Name && contact1Name !== '') {
+              contacts.push({
+                name: contact1Name,
+                department_role: contact1Role || '',
+                phone: contact1Phone || '',
+                email: contact1Email || '',
+                is_primary: true, // 첫 번째 담당자를 키맨으로 자동 설정
+              })
             }
 
             // 자동 연동 필드 제외 (last_order, order_amount)
             // DB 스키마에 맞는 컬럼명 사용 (snake_case)
             return {
-              company: company.trim(),
-              status: status.trim() || '신규',
-              contacts: [
-                {
-                  name: contact1Name.trim(),
-                  department_role: (contact1Role || '').trim(),
-                  phone: (contact1Phone || '').trim(),
-                  email: (contact1Email || '').trim(),
-                  is_primary: true, // 첫 번째 담당자를 키맨으로 자동 설정
-                },
-              ],
+              company: company,
+              status: status || '신규',
+              contacts: contacts, // 담당자 정보가 없어도 빈 배열로 등록 가능
               rowIndex: index + 2, // 엑셀 행 번호 (헤더 제외)
             }
           })
           .filter((client) => client !== null) // null 제거
 
-        if (clients.length === 0) {
-          reject(new Error('등록할 거래처 데이터가 없습니다. 엑셀 파일을 확인해주세요.'))
-          return
-        }
-
+        // 회사명이 있는 데이터만 필터링 (회사명이 없으면 null로 반환되어 이미 필터링됨)
+        // clients.length === 0 체크는 제거 (회사명이 없으면 null 반환되어 필터링되므로)
         resolve(clients)
       } catch (error) {
         reject(new Error(`엑셀 파일 파싱 중 오류가 발생했습니다: ${error.message}`))
@@ -272,51 +271,50 @@ export const parseSaleExcel = (file) => {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
+        // UTF-8 인코딩 명시적으로 설정
+        const workbook = XLSX.read(data, { type: 'array', codepage: 65001 })
         const firstSheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[firstSheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        // UTF-8로 한글 컬럼명 정확히 읽기
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' })
 
         // 데이터 변환 및 검증
         const salesData = []
         
         jsonData.forEach((row, index) => {
-          const saleDate = row['날짜'] || row['date'] || row['sale_date'] || ''
-          const clientName = row['거래처'] || row['client'] || row['clientName'] || ''
-          const itemName = row['품목명'] || row['item'] || row['item_name'] || ''
-          const quantity = row['수량'] || row['quantity'] || 0
-          const unitPrice = row['단가'] || row['unit_price'] || row['price'] || 0
-          const notes = row['비고'] || row['notes'] || ''
+          // 다양한 한글 컬럼명 변형 지원 (UTF-8 인코딩 보장) - null/undefined 안전 처리
+          const saleDate = ((row['날짜'] || row['판매날짜'] || row['매출일'] || row['date'] || row['sale_date'] || row['Date'] || row['DATE'] || row['SaleDate'] || row['SALE_DATE'] || '') || '').toString().trim()
+          const clientName = ((row['거래처'] || row['거래처명'] || row['회사명'] || row['client'] || row['clientName'] || row['Client'] || row['CLIENT'] || row['Company'] || row['COMPANY'] || '') || '').toString().trim()
+          const itemName = ((row['품목명'] || row['제품명'] || row['item'] || row['item_name'] || row['product_name'] || row['Item'] || row['ITEM'] || row['Product'] || row['PRODUCT'] || '') || '').toString().trim()
+          const quantityValue = row['수량'] || row['quantity'] || row['Quantity'] || row['QUANTITY'] || 0
+          const quantity = typeof quantityValue === 'number' ? quantityValue : (quantityValue ? parseFloat(quantityValue) : 1) || 1
+          const unitPriceValue = row['단가'] || row['unit_price'] || row['price'] || row['Price'] || row['PRICE'] || row['UnitPrice'] || row['UNIT_PRICE'] || 0
+          const unitPrice = typeof unitPriceValue === 'number' ? unitPriceValue : (unitPriceValue ? parseFloat(unitPriceValue) : 0) || 0
+          const notes = ((row['비고'] || row['notes'] || row['메모'] || row['Notes'] || row['NOTES'] || row['Memo'] || row['MEMO'] || '') || '').toString().trim()
 
-          // 필수 필드 검증: 날짜, 거래처, 품목명은 필수
-          if (!saleDate || !saleDate.trim()) {
+          // 필수 필드 검증: 거래처명과 매출일만 필수 (품목명, 비고는 선택사항)
+          if (!saleDate || saleDate === '') {
             return // 빈 행은 제외
           }
 
-          if (!clientName || !clientName.trim()) {
-            throw new Error(`${index + 2}번째 행: 거래처가 필수입니다.`)
+          if (!clientName || clientName === '') {
+            return // 거래처명이 없으면 해당 행 건너뛰기 (에러 대신 무시)
           }
 
-          if (!itemName || !itemName.trim()) {
-            throw new Error(`${index + 2}번째 행: 품목명이 필수입니다.`)
-          }
-
+          // 품목명이 없어도 등록 가능 (기본값: 빈 문자열)
           salesData.push({
-            sale_date: saleDate.trim(),
-            clientName: clientName.trim(),
-            item_name: itemName.trim(),
-            quantity: Number(quantity) || 1,
-            unitPrice: Number(unitPrice) || 0,
-            notes: notes.trim() || '',
+            sale_date: saleDate,
+            clientName: clientName,
+            item_name: itemName || '', // 품목명이 없어도 등록 가능
+            quantity: quantity,
+            unitPrice: unitPrice,
+            notes: notes || '', // 비고가 없어도 등록 가능
             rowIndex: index + 2, // 엑셀 행 번호 (헤더 제외)
           })
         })
 
-        if (salesData.length === 0) {
-          reject(new Error('등록할 매출 데이터가 없습니다. 엑셀 파일을 확인해주세요.'))
-          return
-        }
-
+        // 거래처명과 판매일이 있는 데이터만 필터링 (없으면 return으로 건너뛰어짐)
+        // salesData.length === 0 체크는 제거 (데이터가 없어도 빈 배열 반환)
         resolve(salesData)
       } catch (error) {
         reject(new Error(`엑셀 파일 파싱 중 오류가 발생했습니다: ${error.message}`))

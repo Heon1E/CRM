@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import AddIssueModal from '../components/AddIssueModal'
 import EditIssueModal from '../components/EditIssueModal'
+import { showConfirm, showSuccess, showError } from '../utils/alert'
 
 const Issues = () => {
   const { issues, loading, deleteIssue } = useData()
@@ -66,12 +67,19 @@ const Issues = () => {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('정말 삭제하시겠습니까?\n\n이 이슈 정보가 영구적으로 삭제됩니다.')) {
+    const confirmed = await showConfirm(
+      '이 이슈 정보가 영구적으로 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+    if (confirmed) {
       try {
         await deleteIssue(id)
-        alert('이슈가 삭제되었습니다.')
+        await showSuccess('이슈가 삭제되었습니다.')
       } catch (error) {
         console.error('이슈 삭제 중 오류:', error)
+        await showError('이슈 삭제 중 오류가 발생했습니다.')
       }
     }
   }
