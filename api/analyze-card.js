@@ -2,10 +2,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 /**
  * Vercel Serverless Function for Business Card Analysis
- * Production-ready implementation with strict SDK compliance
+ * Using gemini-1.5-flash with JSON mode for reliable parsing
  */
 export default async function handler(req, res) {
-  // 1. CORS Setup (Production Ready)
+  // CORS Setup
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -15,24 +15,21 @@ export default async function handler(req, res) {
 
   try {
     const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
-    if (!API_KEY) {
-      console.error('[API] Missing API Key')
-      return res.status(500).json({ error: 'Server configuration error' })
-    }
+    if (!API_KEY) return res.status(500).json({ error: 'Server API Key missing' })
 
-    // 2. Parse & Validate Body
+    // Parse Body
     let body = req.body
     if (typeof body === 'string') {
       try {
         body = JSON.parse(body)
       } catch (e) {
-        return res.status(400).json({ error: 'Invalid JSON' })
+        return res.status(400).json({ error: 'Invalid JSON body' })
       }
     }
     const { imageBase64 } = body
     if (!imageBase64) return res.status(400).json({ error: 'No image provided' })
 
-    // 3. Prepare Image Data
+    // Clean Base64
     let cleanBase64 = imageBase64
     let mimeType = 'image/jpeg'
     if (imageBase64.includes(',')) {
@@ -42,52 +39,39 @@ export default async function handler(req, res) {
       else if (parts[0].includes('webp')) mimeType = 'image/webp'
     }
 
-    // 4. Initialize Model (Stable Vision)
+    // Initialize Model (Use 1.5 Flash with JSON Mode)
     const genAI = new GoogleGenerativeAI(API_KEY)
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' })
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash', // Works on server with updated SDK
+      generationConfig: {
+        responseMimeType: 'application/json', // Native JSON support
+      },
+    })
 
-    // 5. Strict Prompt
     const promptText = `
-      Analyze this business card image.
-      Extract these fields into a raw JSON object: company, contact_person, position, phone, email, address.
-      Rules:
-      - Use empty string "" if a field is missing.
-      - Return ONLY valid JSON.
-      - Do NOT use Markdown code blocks.
+      Extract business card info. 
+      Fields: company, contact_person, position, phone, email, address.
+      Use "" for missing fields.
     `
 
-    // 6. Generate Content (Canonical Structure)
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: promptText }, // Context first
-            { inlineData: { data: cleanBase64, mimeType: mimeType } }, // Image second
-          ],
-        },
-      ],
-    })
+    const result = await model.generateContent([
+      { inlineData: { data: cleanBase64, mimeType: mimeType } },
+      { text: promptText },
+    ])
 
     const response = await result.response
     const text = response.text()
-    console.log('[API] Response Preview:', text.substring(0, 50) + '...')
+    console.log('[API] Response:', text.substring(0, 100))
 
-    // 7. Robust Parsing & Cleaning
-    let jsonString = text.replace(/```json|```/g, '').trim()
-    const jsonMatch = jsonString.match(/\{[\s\S]*\}/)
-    if (jsonMatch) jsonString = jsonMatch[0]
-
-    const data = JSON.parse(jsonString)
+    // Direct JSON Parse (Safe due to JSON Mode)
+    const data = JSON.parse(text)
     return res.status(200).json(data)
   } catch (error) {
-    // 8. Secure Error Handling
-    console.error('[Server Error]', error) // Log full error internally
-
-    // Return generic message to client to avoid leaking internals
+    console.error('[API Error]', error)
+    // Return actual error message for debugging
     return res.status(500).json({
-      error: '명함 분석에 실패했습니다. (AI 응답 오류)',
-      code: 'AI_PROCESSING_FAILED',
+      error: error.message || 'Server Error',
+      details: error.toString(),
     })
   }
 }
