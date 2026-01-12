@@ -5,22 +5,42 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
  * Handles Gemini API calls server-side to bypass CORS and region restrictions
  */
 export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    // Get API key from environment variable
-    const API_KEY = process.env.VITE_GEMINI_API_KEY
+    // Get API key from environment variable (try both VITE_ and non-VITE_ versions)
+    const API_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
 
     if (!API_KEY) {
-      console.error('[API] VITE_GEMINI_API_KEY is not set')
+      console.error('[API] GEMINI_API_KEY is not set')
       return res.status(500).json({ error: 'API 키가 설정되지 않았습니다.' })
     }
 
+    // Parse request body (Vercel automatically parses JSON, but ensure it's an object)
+    let body = req.body
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body)
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid JSON in request body' })
+      }
+    }
+
     // Get image data from request body
-    const { imageBase64 } = req.body
+    const { imageBase64 } = body
 
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return res.status(400).json({ error: '유효한 이미지 데이터가 없습니다.' })
