@@ -70,12 +70,12 @@ export const extractBusinessCardInfo = async (imageBase64) => {
       return result.response;
     };
 
-    // 4. 첫 번째 모델로 시도 (gemini-1.5-flash-001)
+    // 4. 첫 번째 모델로 시도 (gemini-1.5-flash-latest)
     let response;
     let text;
     try {
-      console.log('[Gemini API] 모델 gemini-1.5-flash-001로 호출 시도...');
-      response = await callGeminiAPI('gemini-1.5-flash-001');
+      console.log('[Gemini API] 모델 gemini-1.5-flash-latest로 호출 시도...');
+      response = await callGeminiAPI('gemini-1.5-flash-latest');
       text = response.text();
     } catch (firstError) {
       // 404 에러 또는 모델을 찾을 수 없는 경우 Fallback 모델로 재시도
@@ -84,7 +84,7 @@ export const extractBusinessCardInfo = async (imageBase64) => {
                               firstError.message?.includes('NOT_FOUND');
       
       if (isModelNotFound) {
-        console.warn('[Gemini API] gemini-1.5-flash-001 모델을 찾을 수 없음, Fallback 모델로 재시도...');
+        console.warn('[Gemini API] gemini-1.5-flash-latest 모델을 찾을 수 없음, Fallback 모델로 재시도...');
         try {
           console.log('[Gemini API] Fallback 모델 gemini-pro-vision으로 호출 시도...');
           response = await callGeminiAPI('gemini-pro-vision');
