@@ -18,14 +18,13 @@ export const extractBusinessCardInfo = async (imageBase64) => {
     }
 
     // 3. Send POST request to backend API
+    // IMPORTANT: Must stringify the body and set Content-Type header
     const response = await fetch('/api/analyze-card', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json', // MUST specify content type
       },
-      body: JSON.stringify({
-        imageBase64: imageBase64,
-      }),
+      body: JSON.stringify({ imageBase64: imageBase64 }), // MUST stringify the body
     })
 
     // 4. Handle response
