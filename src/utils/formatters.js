@@ -1,0 +1,108 @@
+/**
+ * 공통 포맷팅 유틸리티 함수
+ * 날짜, 금액 등 반복되는 포맷팅 로직을 통합
+ */
+
+/**
+ * 날짜를 YYYY-MM-DD 형식으로 변환
+ * @param {string|Date} dateString - 날짜 문자열 또는 Date 객체
+ * @returns {string} YYYY-MM-DD 형식의 날짜 문자열
+ */
+export const formatDate = (dateString) => {
+  if (!dateString) return '날짜 없음'
+  
+  // ISO 형식 문자열인 경우 (예: "2026-01-07T00:00:00...")
+  if (typeof dateString === 'string' && dateString.includes('T')) {
+    return dateString.split('T')[0]
+  }
+  
+  // 이미 YYYY-MM-DD 형식인 경우
+  if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+    return dateString.substring(0, 10)
+  }
+  
+  // Date 객체인 경우
+  if (dateString instanceof Date) {
+    const year = dateString.getFullYear()
+    const month = String(dateString.getMonth() + 1).padStart(2, '0')
+    const day = String(dateString.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
+  // 그 외의 경우 Date 객체로 변환 시도
+  try {
+    const date = new Date(dateString)
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+  } catch (e) {
+    // 변환 실패 시 원본 반환
+  }
+  
+  return dateString
+}
+
+/**
+ * 날짜를 input[type="date"] 형식으로 변환
+ * @param {string|Date} dateString - 날짜 문자열 또는 Date 객체
+ * @returns {string} YYYY-MM-DD 형식의 날짜 문자열 (input용)
+ */
+export const parseDateForInput = (dateString) => {
+  if (!dateString) return ''
+  
+  // ISO 형식 문자열인 경우
+  if (typeof dateString === 'string' && dateString.includes('T')) {
+    return dateString.split('T')[0]
+  }
+  
+  // 이미 YYYY-MM-DD 형식인 경우
+  if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+    return dateString.substring(0, 10)
+  }
+  
+  // Date 객체인 경우
+  if (dateString instanceof Date) {
+    const year = dateString.getFullYear()
+    const month = String(dateString.getMonth() + 1).padStart(2, '0')
+    const day = String(dateString.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
+  // 그 외의 경우 Date 객체로 변환 시도
+  try {
+    const date = new Date(dateString)
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+  } catch (e) {
+    // 변환 실패 시 빈 문자열 반환
+  }
+  
+  return ''
+}
+
+/**
+ * 금액을 만원 단위로 포맷팅
+ * @param {number} amount - 금액 (원 단위)
+ * @returns {string} 포맷팅된 금액 문자열 (예: "1,234만원")
+ */
+export const formatCurrency = (amount) => {
+  if (!amount || amount === 0) return '0만원'
+  return `${(amount / 10000).toLocaleString()}만원`
+}
+
+/**
+ * 금액을 천 단위 콤마로 포맷팅
+ * @param {number} amount - 금액
+ * @returns {string} 포맷팅된 금액 문자열 (예: "1,234,567")
+ */
+export const formatNumber = (amount) => {
+  if (!amount && amount !== 0) return '0'
+  return amount.toLocaleString()
+}

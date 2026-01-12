@@ -6,6 +6,7 @@ import useEnterMove from '../hooks/useEnterMove'
 import { Sparkles, Loader2, X, Plus } from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
 import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
+import { parseDateForInput } from '../utils/formatters'
 
 const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
@@ -30,35 +31,11 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   const [charCount, setCharCount] = useState(0)
   const [isAILoading, setIsAILoading] = useState(false)
 
-  // 날짜 파싱 헬퍼 함수
-  const parseDateForInput = (dateValue) => {
-    if (!dateValue) return ''
-    
-    // 이미 YYYY-MM-DD 형식이면 그대로 반환
-    if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-      return dateValue
-    }
-    
-    // ISO 문자열이나 Date 객체인 경우
-    try {
-      const date = new Date(dateValue)
-      if (isNaN(date.getTime())) return ''
-      
-      // YYYY-MM-DD 형식으로 변환
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    } catch (error) {
-      console.error('날짜 파싱 오류:', error)
-      return ''
-    }
-  }
 
   // activity가 변경되거나 모달이 닫힐 때 폼 초기화 (.cursorrules 규칙: 모달 재오픈 시 폼 상태 초기화)
   useEffect(() => {
     if (activity && activityId) {
-      // 날짜 파싱 적용
+      // 날짜 파싱 적용 (공통 유틸리티 함수 사용)
       const parsedDate = parseDateForInput(activity?.activity_date || activity?.date || '')
       
       const parsedNextActionDate = parseDateForInput(activity?.next_action_date || '')

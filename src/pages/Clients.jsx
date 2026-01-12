@@ -10,6 +10,7 @@ import { exportClientsToExcel } from '../utils/excelExport'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll'
 import { useDebounce } from '../hooks/useDebounce'
 import { showConfirm, showError } from '../utils/alert'
+import { formatCurrency } from '../utils/formatters'
 
 const Clients = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
@@ -373,7 +374,7 @@ const Clients = () => {
                       <td className="px-6 py-5 whitespace-nowrap text-sm font-semibold text-text-primary">
                         {stats.totalAmount === 0
                           ? '0원'
-                          : `${(stats.totalAmount / 10000).toLocaleString()}만원`}
+                          : formatCurrency(stats.totalAmount || 0)}
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap text-sm">
                         <button
@@ -494,7 +495,7 @@ const Clients = () => {
                         <span className="text-xs font-semibold text-text-primary">
                           {stats.totalAmount === 0
                             ? '0원'
-                            : `${(stats.totalAmount / 10000).toLocaleString()}만원`}
+                            : formatCurrency(stats.totalAmount || 0)}
                         </span>
                       </div>
                     </div>

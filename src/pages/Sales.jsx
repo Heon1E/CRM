@@ -6,6 +6,7 @@ import EditSaleModal from '../components/EditSaleModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import { exportSalesToExcel } from '../utils/excelExport'
 import { showConfirm, showError, showSuccess } from '../utils/alert'
+import { formatCurrency } from '../utils/formatters'
 
 const Sales = () => {
   const { sales, clients, products, loading, deleteSale } = useData()
@@ -135,7 +136,7 @@ const Sales = () => {
                       {sale.itemCount || sale.items?.length || 1}건
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {((sale.totalAmount || 0) / 10000).toLocaleString()}만원
+                      {formatCurrency(sale.totalAmount || 0)}
                     </td>
                     <td className="px-6 py-5 text-sm text-gray-500">
                       <div className="max-w-xs truncate">{sale.notes || '-'}</div>
@@ -196,7 +197,7 @@ const Sales = () => {
                         {sale.date || sale.sale_date || '-'}
                       </h3>
                       <span className="ml-2 text-base font-bold text-gray-900 whitespace-nowrap">
-                        {((sale.totalAmount || 0) / 10000).toLocaleString()}만원
+                        {formatCurrency(sale.totalAmount || 0)}
                       </span>
                     </div>
                     <div className="space-y-1.5 text-sm text-gray-600">

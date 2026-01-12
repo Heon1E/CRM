@@ -11,6 +11,7 @@ import AppInstallGuide from '../components/AppInstallGuide'
 import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
 import { showSuccess, showError } from '../utils/alert'
+import { formatDate, formatCurrency } from '../utils/formatters'
 
 const Dashboard = () => {
   const { activities, clients, getStats, getWeeklySalesData, issues, updateIssue, loading } = useData()
@@ -41,43 +42,6 @@ const Dashboard = () => {
     navigate('/activities?status=진행중')
   }
 
-  // 날짜 포맷팅 함수 (YYYY-MM-DD 형식으로 변환)
-  const formatDate = (dateString) => {
-    if (!dateString) return '날짜 없음'
-    
-    // ISO 형식 문자열인 경우 (예: "2026-01-07T00:00:00...")
-    if (typeof dateString === 'string' && dateString.includes('T')) {
-      return dateString.split('T')[0]
-    }
-    
-    // 이미 YYYY-MM-DD 형식인 경우
-    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
-      return dateString.substring(0, 10)
-    }
-    
-    // Date 객체인 경우
-    if (dateString instanceof Date) {
-      const year = dateString.getFullYear()
-      const month = String(dateString.getMonth() + 1).padStart(2, '0')
-      const day = String(dateString.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
-    
-    // 그 외의 경우 Date 객체로 변환 시도
-    try {
-      const date = new Date(dateString)
-      if (!isNaN(date.getTime())) {
-        const year = date.getFullYear()
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const day = String(date.getDate()).padStart(2, '0')
-        return `${year}-${month}-${day}`
-      }
-    } catch (e) {
-      // 변환 실패 시 원본 반환
-    }
-    
-    return dateString
-  }
 
   // 최근 활동 (최신 5개)
   const recentActivities = activities
@@ -123,7 +87,7 @@ const Dashboard = () => {
           />
           <MetricCard
             title="이번 달 매출"
-            value={`${(stats.thisMonthSales / 10000).toLocaleString()}만원`}
+            value={formatCurrency(stats.thisMonthSales || 0)}
             icon="💰"
             trend={stats.salesGrowthRate >= 0 ? 'up' : 'down'}
             trendValue={`${Math.abs(stats.salesGrowthRate).toFixed(1)}%`}
@@ -192,7 +156,7 @@ const Dashboard = () => {
                     <YAxis
                       stroke="#6b7280"
                       tick={{ fill: '#6b7280', fontSize: 12 }}
-                      tickFormatter={(value) => `${value.toLocaleString()}만원`}
+                      tickFormatter={(value) => formatCurrency(value * 10000)}
                       width={70}
                       domain={['dataMin - 1', 'auto']}
                     />
@@ -204,7 +168,7 @@ const Dashboard = () => {
                         fontSize: '14px',
                         padding: '8px 12px',
                       }}
-                      formatter={(value) => [`${Number(value).toLocaleString()}만원`, '매출']}
+                      formatter={(value) => [formatCurrency(Number(value) * 10000), '매출']}
                       labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }} />

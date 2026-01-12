@@ -38,7 +38,8 @@ const StatusBar = () => {
   }, [])
 
   // 상태가 없으면 표시하지 않음 (모바일에서만 표시)
-  const hasStatus = (activeTasks && activeTasks.length > 0) || pendingSyncCount > 0 || !isOnline
+  // 명함 분석 관련 activeTasks는 상단 BackgroundTaskIndicator에서만 표시하므로 제외
+  const hasStatus = pendingSyncCount > 0 || !isOnline
   
   if (!hasStatus) {
     return null
@@ -57,8 +58,6 @@ const StatusBar = () => {
             ? 'bg-red-50 border-t border-red-200 text-red-800'
             : pendingSyncCount > 0
             ? 'bg-yellow-50 border-t border-yellow-200 text-yellow-800'
-            : (activeTasks && activeTasks.length > 0)
-            ? 'bg-blue-50 border-t border-blue-200 text-blue-800'
             : 'bg-gray-50 border-t border-gray-200 text-gray-800'
         }
         shadow-lg
@@ -82,13 +81,6 @@ const StatusBar = () => {
             <CloudUpload className="w-4 h-4 flex-shrink-0 animate-pulse" />
             <span className="text-xs font-medium truncate">
               동기화 대기: {pendingSyncCount}개
-            </span>
-          </>
-        ) : (activeTasks && activeTasks.length > 0) ? (
-          <>
-            <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-            <span className="text-xs font-medium truncate">
-              {activeTasks[activeTasks.length - 1]?.name || '처리 중'}...
             </span>
           </>
         ) : null}

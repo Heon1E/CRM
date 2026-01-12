@@ -1,4 +1,5 @@
 ﻿import * as XLSX from 'xlsx'
+import { formatCurrency } from './formatters'
 
 export const exportClientsToExcel = (clients) => {
   const data = clients.map((client) => ({
@@ -43,7 +44,7 @@ export const exportSalesToExcel = (sales) => {
     거래처: sale.clientName,
     품목수: sale.items.length,
     대표품목: sale.items.length > 0 ? sale.items[0].productName : '',
-    총매출액: `${(sale.totalAmount / 10000).toLocaleString()}만원`,
+    총매출액: formatCurrency(sale.totalAmount || 0),
     비고: sale.notes || '',
   }))
 

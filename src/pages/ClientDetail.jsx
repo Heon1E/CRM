@@ -14,6 +14,7 @@ import {
   TrendingDown,
   Minus,
 } from 'lucide-react'
+import { formatCurrency } from '../utils/formatters'
 
 const ClientDetail = () => {
   // 모든 Hook 선언을 최상단에 배치
@@ -325,11 +326,7 @@ const ClientDetail = () => {
               <div>
                 <p className="text-xs text-text-secondary mb-1">이번 달 매출</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {(thisMonthSales / 10000).toLocaleString('ko-KR', {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  })}
-                  만원
+                  {formatCurrency(thisMonthSales || 0)}
                 </p>
               </div>
 
@@ -337,11 +334,7 @@ const ClientDetail = () => {
               <div className="pt-3 border-t border-border-light">
                 <p className="text-xs text-text-secondary mb-1">올해 누적 매출 (YTD)</p>
                 <p className="text-lg font-bold text-text-primary">
-                  {(ytdSales / 10000).toLocaleString('ko-KR', {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  })}
-                  만원
+                  {formatCurrency(ytdSales || 0)}
                 </p>
               </div>
 
@@ -467,11 +460,7 @@ const ClientDetail = () => {
               <div className="text-right">
                 <p className="text-xs text-text-secondary">올해 누적 매출액</p>
                 <p className="text-xl font-bold text-brand-green">
-                  {(ytdSales / 10000).toLocaleString('ko-KR', {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  })}
-                  만원
+                  {formatCurrency(ytdSales || 0)}
                 </p>
               </div>
             </div>
@@ -541,7 +530,7 @@ const ClientDetail = () => {
                             )}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-text-primary text-right">
-                            {(sale.totalAmount / 10000).toLocaleString()}만원
+                            {formatCurrency(sale.totalAmount || 0)}
                           </td>
                           <td className="px-4 py-4 text-sm text-text-secondary">
                             <div className="max-w-xs truncate">
