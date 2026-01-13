@@ -184,18 +184,29 @@ const Sales = () => {
         ? slip.originalSales[0].id 
         : slip.id
 
-      // 해당 sale의 상세 데이터 조회 (items 배열 포함)
+      // 해당 sale의 상세 데이터 조회 (sales_items JOIN 포함)
       const { data: saleData, error } = await supabase
         .from('sales')
-        .select('*')
+        .select(`
+          *,
+          sales_items (*)
+        `)
         .eq('id', saleId)
         .single()
 
       if (error) throw error
 
+      // 디버깅: 조회된 데이터 구조 확인
+      console.log('[Sales.jsx] Fetched Data:', saleData)
+      console.log('[Sales.jsx] sales_items:', saleData?.sales_items)
+      console.log('[Sales.jsx] items:', saleData?.items)
+
       if (saleData) {
         // 클라이언트 정보 매핑
         const client = clients?.find(c => c.id === saleData.client_id)
+        
+        // items 배열 매핑: sales_items가 있으면 그것을 사용, 없으면 items 확인
+        const itemsArray = saleData.sales_items || saleData.items || []
         
         // 상세 데이터를 모달에 전달
         const detailedSale = {
@@ -203,10 +214,12 @@ const Sales = () => {
           id: saleData.id,
           clientId: saleData.client_id,
           clientName: client?.company || '알 수 없음',
-          items: saleData.items || [], // items 배열 명시적으로 포함
+          // 변수명 매핑: sales_items → items로 명시적으로 연결
+          items: itemsArray,
           totalAmount: saleData.total_amount || saleData.totalAmount || 0,
         }
 
+        console.log('[Sales.jsx] Mapped detailedSale:', detailedSale)
         setEditingSaleGroup(detailedSale)
       }
     } catch (error) {

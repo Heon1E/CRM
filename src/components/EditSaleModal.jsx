@@ -40,7 +40,10 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
           if (saleGroup.id && (!saleGroup.items || saleGroup.items.length === 0)) {
             const { data: fetchedData, error } = await supabase
               .from('sales')
-              .select('*')
+              .select(`
+                *,
+                sales_items (*)
+              `)
               .eq('id', saleGroup.id)
               .single()
 
@@ -49,8 +52,15 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
             }
           }
 
-          // items 배열 추출 (우선순위: saleData.items > saleGroup.items)
-          const itemsArray = saleData.items || saleGroup.items || []
+          // 디버깅: 조회된 데이터 구조 확인
+          console.log('[EditSaleModal] Fetched Data:', saleData)
+          console.log('[EditSaleModal] sales_items:', saleData?.sales_items)
+          console.log('[EditSaleModal] items:', saleData?.items)
+          console.log('[EditSaleModal] saleGroup.items:', saleGroup?.items)
+
+          // items 배열 추출 (우선순위: sales_items > saleData.items > saleGroup.items)
+          // 변수명 매핑: sales_items 테이블의 데이터를 items로 연결
+          const itemsArray = saleData.sales_items || saleData.items || saleGroup.items || []
           
           // items 배열이 비어있으면 빈 배열로 처리
           const items = Array.isArray(itemsArray) && itemsArray.length > 0
