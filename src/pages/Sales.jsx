@@ -184,29 +184,38 @@ const Sales = () => {
         ? slip.originalSales[0].id 
         : slip.id
 
-      // 해당 sale의 상세 데이터 조회 (sales_items JOIN 포함)
-      const { data: saleData, error } = await supabase
+      // Step 1: sales 테이블에서 기본 정보 조회
+      const { data: saleData, error: saleError } = await supabase
         .from('sales')
-        .select(`
-          *,
-          sales_items (*)
-        `)
+        .select('*')
         .eq('id', saleId)
         .single()
 
-      if (error) throw error
+      if (saleError) throw saleError
+
+      // Step 2: sales_items 테이블에서 sale_id로 품목 목록 조회
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('sales_items')
+        .select('*')
+        .eq('sale_id', saleId)
+
+      if (itemsError) {
+        console.warn('[Sales.jsx] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
+      }
 
       // 디버깅: 조회된 데이터 구조 확인
-      console.log('[Sales.jsx] Fetched Data:', saleData)
-      console.log('[Sales.jsx] sales_items:', saleData?.sales_items)
-      console.log('[Sales.jsx] items:', saleData?.items)
+      console.log('[Sales.jsx] Step 1 - Sale Data:', saleData)
+      console.log('[Sales.jsx] Step 2 - Items Data:', itemsData)
+      console.log('[Sales.jsx] Sale items (JSON):', saleData?.items)
 
       if (saleData) {
         // 클라이언트 정보 매핑
         const client = clients?.find(c => c.id === saleData.client_id)
         
-        // items 배열 매핑: sales_items가 있으면 그것을 사용, 없으면 items 확인
-        const itemsArray = saleData.sales_items || saleData.items || []
+        // Step 3: 두 데이터 합치기 (우선순위: sales_items > items JSON 배열)
+        const itemsArray = itemsData && itemsData.length > 0 
+          ? itemsData 
+          : (saleData.items || [])
         
         // 상세 데이터를 모달에 전달
         const detailedSale = {
@@ -214,12 +223,12 @@ const Sales = () => {
           id: saleData.id,
           clientId: saleData.client_id,
           clientName: client?.company || '알 수 없음',
-          // 변수명 매핑: sales_items → items로 명시적으로 연결
+          // 분리 조회한 items 배열 명시적으로 연결
           items: itemsArray,
           totalAmount: saleData.total_amount || saleData.totalAmount || 0,
         }
 
-        console.log('[Sales.jsx] Mapped detailedSale:', detailedSale)
+        console.log('[Sales.jsx] Step 3 - Merged detailedSale:', detailedSale)
         setEditingSaleGroup(detailedSale)
       }
     } catch (error) {

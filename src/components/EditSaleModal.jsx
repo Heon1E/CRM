@@ -38,29 +38,51 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
           let saleData = saleGroup
           
           if (saleGroup.id && (!saleGroup.items || saleGroup.items.length === 0)) {
-            const { data: fetchedData, error } = await supabase
+            // Step 1: sales 테이블에서 기본 정보 조회
+            const { data: fetchedSaleData, error: saleError } = await supabase
               .from('sales')
-              .select(`
-                *,
-                sales_items (*)
-              `)
+              .select('*')
               .eq('id', saleGroup.id)
               .single()
 
-            if (!error && fetchedData) {
-              saleData = fetchedData
+            if (saleError) {
+              console.error('[EditSaleModal] sales 조회 오류:', saleError)
+            } else if (fetchedSaleData) {
+              saleData = fetchedSaleData
+
+              // Step 2: sales_items 테이블에서 sale_id로 품목 목록 조회
+              const { data: fetchedItemsData, error: itemsError } = await supabase
+                .from('sales_items')
+                .select('*')
+                .eq('sale_id', saleGroup.id)
+
+              if (itemsError) {
+                console.warn('[EditSaleModal] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
+              }
+
+              // Step 3: 두 데이터 합치기
+              if (fetchedItemsData && fetchedItemsData.length > 0) {
+                saleData = {
+                  ...fetchedSaleData,
+                  items: fetchedItemsData
+                }
+              } else {
+                // sales_items가 없으면 sales 테이블의 items JSON 배열 사용
+                saleData = {
+                  ...fetchedSaleData,
+                  items: fetchedSaleData.items || []
+                }
+              }
             }
           }
 
           // 디버깅: 조회된 데이터 구조 확인
-          console.log('[EditSaleModal] Fetched Data:', saleData)
-          console.log('[EditSaleModal] sales_items:', saleData?.sales_items)
-          console.log('[EditSaleModal] items:', saleData?.items)
-          console.log('[EditSaleModal] saleGroup.items:', saleGroup?.items)
+          console.log('[EditSaleModal] Step 1 - Sale Data:', saleData)
+          console.log('[EditSaleModal] Step 2 - Items from saleData:', saleData?.items)
+          console.log('[EditSaleModal] Step 3 - saleGroup.items:', saleGroup?.items)
 
-          // items 배열 추출 (우선순위: sales_items > saleData.items > saleGroup.items)
-          // 변수명 매핑: sales_items 테이블의 데이터를 items로 연결
-          const itemsArray = saleData.sales_items || saleData.items || saleGroup.items || []
+          // items 배열 추출 (우선순위: saleData.items > saleGroup.items)
+          const itemsArray = saleData.items || saleGroup.items || []
           
           // items 배열이 비어있으면 빈 배열로 처리
           const items = Array.isArray(itemsArray) && itemsArray.length > 0
