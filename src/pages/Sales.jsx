@@ -172,13 +172,46 @@ const Sales = () => {
   }
 
   // 수정 핸들러 (그룹핑된 전표의 첫 번째 sale을 기준으로 수정)
-  const handleEdit = (slip) => {
-    if (slip && slip.originalSales && slip.originalSales.length > 0) {
-      // 그룹 내 첫 번째 sale을 기준으로 수정 모달 열기
-      setEditingSaleGroup(slip.originalSales[0])
-    } else if (slip && slip.id) {
-      // originalSales가 없으면 slip 자체를 사용
-      setEditingSaleGroup(slip)
+  const handleEdit = async (slip) => {
+    if (!slip || !slip.id) {
+      showError('매출 데이터를 찾을 수 없습니다.')
+      return
+    }
+
+    try {
+      // 그룹 내 첫 번째 sale의 ID로 상세 데이터 다시 조회
+      const saleId = slip.originalSales && slip.originalSales.length > 0 
+        ? slip.originalSales[0].id 
+        : slip.id
+
+      // 해당 sale의 상세 데이터 조회 (items 배열 포함)
+      const { data: saleData, error } = await supabase
+        .from('sales')
+        .select('*')
+        .eq('id', saleId)
+        .single()
+
+      if (error) throw error
+
+      if (saleData) {
+        // 클라이언트 정보 매핑
+        const client = clients?.find(c => c.id === saleData.client_id)
+        
+        // 상세 데이터를 모달에 전달
+        const detailedSale = {
+          ...saleData,
+          id: saleData.id,
+          clientId: saleData.client_id,
+          clientName: client?.company || '알 수 없음',
+          items: saleData.items || [], // items 배열 명시적으로 포함
+          totalAmount: saleData.total_amount || saleData.totalAmount || 0,
+        }
+
+        setEditingSaleGroup(detailedSale)
+      }
+    } catch (error) {
+      console.error('매출 데이터 조회 오류:', error)
+      showError('매출 데이터를 불러오는 중 오류가 발생했습니다.')
     }
   }
 

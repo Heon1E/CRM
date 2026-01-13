@@ -31,81 +31,109 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
   // saleGroup이 변경되거나 모달이 열릴 때 폼 초기화
   useEffect(() => {
     if (saleGroup && isOpen) {
-      // 그룹화된 매출 객체에서 직접 items 배열 사용
-      try {
-        // saleGroup.items 배열이 이미 존재하므로 직접 사용
-        const items = Array.isArray(saleGroup?.items) && saleGroup.items.length > 0
-          ? saleGroup.items
-              .filter((item) => item != null)
-              .map((item) => {
-                // item_name으로 productId 찾기
-                const product = products?.find((p) => p.name === (item.item_name || item.productName || item.name))
-                
-                // unit_price 매핑 (DB 컬럼명 우선, fallback으로 unitPrice)
-                const unitPrice = item.unit_price !== undefined && item.unit_price !== null 
-                  ? Number(item.unit_price) 
-                  : (item.unitPrice !== undefined && item.unitPrice !== null ? Number(item.unitPrice) : 0)
-                
-                const mappedItem = {
-                  id: item.id, // 개별 레코드 ID (있으면)
-                  productId: product?.id || '',
-                  item_name: item.item_name || item.productName || item.name || '',
-                  quantity: item.quantity || 1,
-                  unitPrice: unitPrice,
-                }
-                
-                // 디버깅: 단가 매핑 확인
-                console.log('[EditSaleModal] 품목 매핑:', {
-                  원본: { unit_price: item.unit_price, unitPrice: item.unitPrice },
-                  매핑된_unitPrice: mappedItem.unitPrice,
-                  item_name: mappedItem.item_name
+      // 모달이 열릴 때 상세 데이터 다시 조회 (items 배열 확보)
+      const loadSaleData = async () => {
+        try {
+          // saleGroup에 id가 있으면 상세 데이터 다시 조회
+          let saleData = saleGroup
+          
+          if (saleGroup.id && (!saleGroup.items || saleGroup.items.length === 0)) {
+            const { data: fetchedData, error } = await supabase
+              .from('sales')
+              .select('*')
+              .eq('id', saleGroup.id)
+              .single()
+
+            if (!error && fetchedData) {
+              saleData = fetchedData
+            }
+          }
+
+          // items 배열 추출 (우선순위: saleData.items > saleGroup.items)
+          const itemsArray = saleData.items || saleGroup.items || []
+          
+          // items 배열이 비어있으면 빈 배열로 처리
+          const items = Array.isArray(itemsArray) && itemsArray.length > 0
+            ? itemsArray
+                .filter((item) => item != null)
+                .map((item) => {
+                  // item_name으로 productId 찾기
+                  const product = products?.find((p) => p.name === (item.item_name || item.productName || item.name))
+                  
+                  // unit_price 매핑 (DB 컬럼명 우선, fallback으로 unitPrice)
+                  const unitPrice = item.unit_price !== undefined && item.unit_price !== null 
+                    ? Number(item.unit_price) 
+                    : (item.unitPrice !== undefined && item.unitPrice !== null ? Number(item.unitPrice) : 0)
+                  
+                  const mappedItem = {
+                    id: item.id, // 개별 레코드 ID (있으면)
+                    productId: product?.id || '',
+                    item_name: item.item_name || item.productName || item.name || '',
+                    quantity: item.quantity || 1,
+                    unitPrice: unitPrice,
+                  }
+                  
+                  // 디버깅: 단가 매핑 확인
+                  console.log('[EditSaleModal] 품목 매핑:', {
+                    원본: { unit_price: item.unit_price, unitPrice: item.unitPrice },
+                    매핑된_unitPrice: mappedItem.unitPrice,
+                    item_name: mappedItem.item_name
+                  })
+                  
+                  return mappedItem
                 })
-                
-                return mappedItem
-              })
-          : []
+            : []
 
-        // 날짜 변환 (YYYY-MM-DD 형식)
-        let dateStr = ''
-        const saleDate = saleGroup.sale_date || saleGroup.date
-        if (saleDate instanceof Date) {
-          dateStr = saleDate.toISOString().split('T')[0]
-        } else if (typeof saleDate === 'string') {
-          dateStr = saleDate.split('T')[0]
-        } else {
-          dateStr = saleDate || ''
+          // 날짜 변환 (YYYY-MM-DD 형식)
+          let dateStr = ''
+          const saleDate = saleData.sale_date || saleGroup.sale_date || saleData.date || saleGroup.date
+          if (saleDate instanceof Date) {
+            dateStr = saleDate.toISOString().split('T')[0]
+          } else if (typeof saleDate === 'string') {
+            dateStr = saleDate.split('T')[0]
+          } else {
+            dateStr = saleDate || ''
+          }
+
+          // 거래처 ID
+          const clientId = saleData.client_id || saleGroup.client_id || saleData.clientId || saleGroup.clientId || ''
+
+          // 원본 데이터 저장
+          setOriginalItems(items)
+          setOriginalClientId(clientId)
+          setOriginalSaleDate(dateStr)
+
+          // 폼 데이터 설정
+          setFormData({
+            clientId: clientId,
+            sale_date: dateStr,
+            items: items,
+            notes: saleData.notes || saleGroup.notes || '',
+          })
+
+          console.log('[EditSaleModal] 로드된 데이터:', { 
+            clientId, 
+            sale_date: dateStr, 
+            itemsCount: items.length, 
+            items,
+            saleData: saleData
+          })
+        } catch (error) {
+          console.error('매출 데이터 로드 중 오류:', error)
+          // 에러 발생 시 빈 데이터로 초기화
+          setFormData({
+            clientId: '',
+            sale_date: '',
+            items: [],
+            notes: '',
+          })
+          setOriginalItems([])
+          setOriginalClientId('')
+          setOriginalSaleDate('')
         }
-
-        // 거래처 ID
-        const clientId = saleGroup.client_id || saleGroup.clientId || ''
-
-        // 원본 데이터 저장
-        setOriginalItems(items)
-        setOriginalClientId(clientId)
-        setOriginalSaleDate(dateStr)
-
-        // 폼 데이터 설정
-        setFormData({
-          clientId: clientId,
-          sale_date: dateStr,
-          items: items,
-          notes: saleGroup.notes || '',
-        })
-
-        console.log('[EditSaleModal] 로드된 데이터:', { clientId, sale_date: dateStr, itemsCount: items.length, items })
-      } catch (error) {
-        console.error('매출 데이터 로드 중 오류:', error)
-        // 에러 발생 시 빈 데이터로 초기화
-        setFormData({
-          clientId: '',
-          sale_date: '',
-          items: [],
-          notes: '',
-        })
-        setOriginalItems([])
-        setOriginalClientId('')
-        setOriginalSaleDate('')
       }
+
+      loadSaleData()
     } else if (!isOpen) {
       // 모달이 닫힐 때도 폼 초기화
       setFormData({
