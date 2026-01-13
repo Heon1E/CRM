@@ -1,15 +1,58 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Edit, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
+import { supabase } from '../lib/supabase'
 import AddProductModal from '../components/AddProductModal'
 import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
+import Pagination from '../components/common/Pagination'
 import { showSuccess, showError, showConfirm } from '../utils/alert'
 
+const PAGE_SIZE = 15
+
 const Products = () => {
-  const { products, deleteProduct, loading } = useData()
+  const { deleteProduct } = useData()
   const [editingProductId, setEditingProductId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+
+  // 데이터 페칭 함수
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const from = (page - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+
+      const { data, error, count } = await supabase
+        .from('products')
+        .select('*', { count: 'exact' })
+        .order('name')
+        .range(from, to)
+
+      if (error) throw error
+
+      setProducts(data || [])
+      setTotalCount(count || 0)
+    } catch (error) {
+      console.error('제품 데이터 로드 오류:', error)
+      showError('제품 데이터를 불러오는 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 페이지 변경 시 데이터 다시 로드
+  useEffect(() => {
+    fetchData()
+  }, [page])
+
+  // 제품 삭제 후 데이터 새로고침
+  const handleDeleteSuccess = () => {
+    fetchData()
+  }
 
   if (loading) {
     return (
@@ -30,6 +73,12 @@ const Products = () => {
       try {
         await deleteProduct(id)
         await showSuccess('제품이 삭제되었습니다.')
+        // 삭제 후 현재 페이지가 비어있으면 이전 페이지로 이동
+        if (products.length === 1 && page > 1) {
+          setPage(page - 1)
+        } else {
+          fetchData()
+        }
       } catch (error) {
         console.error('제품 삭제 중 오류:', error)
         await showError(error.message || '제품 삭제 중 오류가 발생했습니다.')
@@ -42,7 +91,7 @@ const Products = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">제품 관리</h1>
-          <p className="text-gray-500 mt-1.5 text-sm md:text-base">총 {products.length}개 제품</p>
+          <p className="text-gray-500 mt-1.5 text-sm md:text-base">총 {totalCount}개 제품</p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <ProductExcelUpload />
@@ -119,6 +168,13 @@ const Products = () => {
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
+        <Pagination
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          currentPage={page}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* Modals */}

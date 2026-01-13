@@ -11,7 +11,7 @@ import AppInstallGuide from '../components/AppInstallGuide'
 import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
 import { showSuccess, showError } from '../utils/alert'
-import { formatDate, formatCurrency } from '../utils/formatters'
+import { formatDate, formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
 const Dashboard = () => {
   const { activities, clients, getStats, getWeeklySalesData, issues, updateIssue, loading } = useData()
@@ -87,7 +87,7 @@ const Dashboard = () => {
           />
           <MetricCard
             title="이번 달 매출"
-            value={formatCurrency(stats.thisMonthSales || 0)}
+            value={formatKoreanCurrency(stats.thisMonthSales || 0)}
             icon="💰"
             trend={stats.salesGrowthRate >= 0 ? 'up' : 'down'}
             trendValue={`${Math.abs(stats.salesGrowthRate).toFixed(1)}%`}

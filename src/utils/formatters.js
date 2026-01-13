@@ -106,3 +106,36 @@ export const formatNumber = (amount) => {
   if (!amount && amount !== 0) return '0'
   return amount.toLocaleString()
 }
+
+/**
+ * 금액을 한국 전통 단위(억, 만원)로 포맷팅
+ * @param {number} amount - 금액 (원 단위)
+ * @returns {string} 포맷팅된 금액 문자열 (예: "8억 9,443만원" 또는 "1,234만원")
+ */
+export const formatKoreanCurrency = (amount) => {
+  if (!amount || amount === 0) return '0만원'
+  
+  // 원 단위로 변환 (만원 단위로 들어올 수도 있으므로 확인)
+  // 만약 이미 만원 단위라면 10000을 곱하지 않음
+  // 일반적으로 DB에는 원 단위로 저장되므로 그대로 사용
+  const amountInWon = amount
+  
+  // 억 단위 계산 (1억 = 100,000,000원)
+  const eok = Math.floor(amountInWon / 100000000)
+  
+  // 만원 단위 계산 (나머지에서 만원 단위 추출, 소수점 제거)
+  const man = Math.floor((amountInWon % 100000000) / 10000)
+  
+  // 결과 반환
+  if (eok > 0) {
+    // 억 단위가 있으면 "X억 Y만원" 형식
+    if (man > 0) {
+      return `${eok}억 ${man.toLocaleString()}만원`
+    } else {
+      return `${eok}억원`
+    }
+  } else {
+    // 억 단위가 없으면 "Y만원" 형식
+    return `${man.toLocaleString()}만원`
+  }
+}

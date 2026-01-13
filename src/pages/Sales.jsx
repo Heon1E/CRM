@@ -1,17 +1,70 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Edit, Download, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
+import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
 import EditSaleModal from '../components/EditSaleModal'
 import SwipeableListItem from '../components/SwipeableListItem'
+import Pagination from '../components/common/Pagination'
 import { exportSalesToExcel } from '../utils/excelExport'
 import { showConfirm, showError, showSuccess } from '../utils/alert'
 import { formatCurrency } from '../utils/formatters'
 
+const PAGE_SIZE = 15
+
 const Sales = () => {
-  const { sales, clients, products, loading, deleteSale } = useData()
+  const { clients, products, deleteSale } = useData()
   const [editingSaleGroup, setEditingSaleGroup] = useState(null) // 그룹 전체 데이터 저장
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [sales, setSales] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+
+  // 데이터 페칭 함수
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const from = (page - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+
+      const { data, error, count } = await supabase
+        .from('sales')
+        .select('*', { count: 'exact' })
+        .order('sale_date', { ascending: false })
+        .range(from, to)
+
+      if (error) throw error
+
+      // 데이터 정규화 및 클라이언트 정보 매핑
+      const normalizedSales = (data || []).map(sale => {
+        const client = clients?.find(c => c.id === sale.client_id)
+        return {
+          ...sale,
+          date: sale.sale_date || sale.date,
+          clientId: sale.client_id,
+          clientName: client?.company || '알 수 없음',
+          totalAmount: sale.total_amount || sale.totalAmount || 0,
+          items: sale.items || [],
+          displayItemName: sale.items?.[0]?.item_name || sale.items?.[0]?.productName || '',
+          itemCount: sale.items?.length || 1,
+        }
+      })
+
+      setSales(normalizedSales)
+      setTotalCount(count || 0)
+    } catch (error) {
+      console.error('매출 데이터 로드 오류:', error)
+      showError('매출 데이터를 불러오는 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 페이지 변경 시 데이터 다시 로드
+  useEffect(() => {
+    fetchData()
+  }, [page, clients])
 
   if (loading) {
     return (
@@ -21,10 +74,8 @@ const Sales = () => {
     )
   }
 
-  // 날짜 내림차순 정렬
-  const sortedSales = [...(sales || [])].sort((a, b) => {
-    return new Date(b.date || b.sale_date) - new Date(a.date || a.sale_date)
-  })
+  // 데이터는 이미 서버에서 정렬되어 있으므로 추가 정렬 불필요
+  const sortedSales = sales
 
   const handleExport = () => {
     exportSalesToExcel(sales)
@@ -42,6 +93,12 @@ const Sales = () => {
       try {
         await deleteSale(saleId)
         await showSuccess('매출 기록이 삭제되었습니다.')
+        // 삭제 후 현재 페이지가 비어있으면 이전 페이지로 이동
+        if (sales.length === 1 && page > 1) {
+          setPage(page - 1)
+        } else {
+          fetchData()
+        }
       } catch (error) {
         console.error('매출 삭제 오류:', error)
         await showError(error.message || '삭제 중 오류가 발생했습니다.')
@@ -54,7 +111,7 @@ const Sales = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">매출 관리</h1>
-          <p className="text-text-secondary mt-1.5 text-sm md:text-base">총 {sales.length}건의 매출 기록</p>
+          <p className="text-text-secondary mt-1.5 text-sm md:text-base">총 {totalCount}건의 매출 기록</p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <button
@@ -173,8 +230,17 @@ const Sales = () => {
             </tbody>
           </table>
         </div>
+        {/* Pagination */}
+        <Pagination
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          currentPage={page}
+          onPageChange={setPage}
+        />
+      </div>
 
-        {/* 모바일: Card View with Swipe (768px 미만) */}
+      {/* 모바일: Card View with Swipe (768px 미만) */}
+      <div className="card overflow-hidden md:hidden">
         <div className="md:hidden divide-y divide-border-light">
           {sortedSales.length > 0 ? (
             sortedSales.map((sale) => {
@@ -237,6 +303,13 @@ const Sales = () => {
             </div>
           )}
         </div>
+        {/* Pagination (모바일) */}
+        <Pagination
+          totalCount={totalCount}
+          pageSize={PAGE_SIZE}
+          currentPage={page}
+          onPageChange={setPage}
+        />
       </div>
 
       {/* Modals */}
