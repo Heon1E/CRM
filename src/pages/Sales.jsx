@@ -12,6 +12,7 @@ import { formatKoreanCurrency } from '../utils/formatters'
 const PAGE_SIZE = 15
 
 const Sales = () => {
+  // ===== 모든 Hooks를 최상단에 선언 =====
   const { clients } = useData()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [sales, setSales] = useState([])
@@ -63,14 +64,6 @@ const Sales = () => {
   useEffect(() => {
     fetchData()
   }, [page, clients])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
-      </div>
-    )
-  }
 
   // 전표 그룹핑 함수: 같은 날짜 + 같은 고객으로 그룹핑
   const groupSalesBySlip = useMemo(() => {
@@ -157,6 +150,16 @@ const Sales = () => {
   // 그룹핑된 데이터 사용
   const sortedSales = groupSalesBySlip
 
+  // ===== 모든 Hooks 선언이 끝난 후에 조건부 return 배치 =====
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-gray-500">데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
+  // ===== 일반 함수들은 조건부 return 이후에 정의 =====
   const handleExport = () => {
     exportSalesToExcel(sales)
   }
