@@ -578,7 +578,6 @@ const Clients = () => {
           onPageChange={setPage}
         />
       </div>
-      </div>
 
       {/* Modals */}
       <AddClientModal
