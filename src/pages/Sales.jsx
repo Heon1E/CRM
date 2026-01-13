@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Edit, Download, Plus, Trash2 } from 'lucide-react'
+import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
 import SwipeableListItem from '../components/SwipeableListItem'
@@ -11,13 +12,14 @@ import { formatKoreanCurrency } from '../utils/formatters'
 const PAGE_SIZE = 15
 
 const Sales = () => {
+  const { clients } = useData()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  // 데이터 페칭 함수 (sales_slips 뷰에서 가져오기)
+  // 데이터 페칭 함수 (sales 테이블에서 가져오기)
   const fetchData = async () => {
     try {
       setLoading(true)
@@ -25,23 +27,25 @@ const Sales = () => {
       const to = from + PAGE_SIZE - 1
 
       const { data, error, count } = await supabase
-        .from('sales_slips')
+        .from('sales')
         .select('*', { count: 'exact' })
         .order('sale_date', { ascending: false })
         .range(from, to)
 
       if (error) throw error
 
-      // sales_slips 뷰의 데이터를 그대로 사용 (이미 그룹핑됨)
-      const normalizedSales = (data || []).map(slip => {
+      // sales 테이블 데이터 정규화 및 클라이언트 정보 매핑
+      const normalizedSales = (data || []).map(sale => {
+        const client = clients?.find(c => c.id === sale.client_id)
         return {
-          id: slip.id,
-          date: slip.sale_date || '',
-          customerName: slip.customer_name || '알 수 없음',
-          slipTitle: slip.slip_title || '',
-          totalAmount: slip.total_amount || 0,
-          itemCount: slip.item_count || 1,
-          lastCreatedAt: slip.last_created_at || '',
+          ...sale,
+          date: sale.sale_date || sale.date,
+          clientId: sale.client_id,
+          clientName: client?.company || '알 수 없음',
+          totalAmount: sale.total_amount || sale.totalAmount || 0,
+          items: sale.items || [],
+          displayItemName: sale.items?.[0]?.item_name || sale.items?.[0]?.productName || '',
+          itemCount: sale.items?.length || 1,
         }
       })
 
@@ -58,7 +62,7 @@ const Sales = () => {
   // 페이지 변경 시 데이터 다시 로드
   useEffect(() => {
     fetchData()
-  }, [page])
+  }, [page, clients])
 
   if (loading) {
     return (
@@ -68,11 +72,92 @@ const Sales = () => {
     )
   }
 
-  // sales_slips 뷰에서 이미 그룹핑된 데이터를 사용하므로 추가 그룹핑 불필요
-  const sortedSales = sales
+  // 전표 그룹핑 함수: 같은 날짜 + 같은 고객으로 그룹핑
+  const groupSalesBySlip = useMemo(() => {
+    if (!sales || sales.length === 0) return []
+
+    // 날짜를 YYYY-MM-DD 형식으로 정규화하는 함수
+    const normalizeDate = (dateString) => {
+      if (!dateString) return ''
+      // ISO 형식이면 날짜 부분만 추출
+      if (typeof dateString === 'string' && dateString.includes('T')) {
+        return dateString.split('T')[0]
+      }
+      // 이미 YYYY-MM-DD 형식이면 그대로 반환
+      if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+        return dateString.substring(0, 10)
+      }
+      return dateString
+    }
+
+    // 그룹핑 맵 생성: 키는 "날짜|고객ID"
+    const groupedMap = {}
+    
+    sales.forEach((sale) => {
+      const dateKey = normalizeDate(sale.date || sale.sale_date)
+      const clientKey = sale.clientId || sale.client_id || 'unknown'
+      const groupKey = `${dateKey}|${clientKey}`
+
+      if (!groupedMap[groupKey]) {
+        groupedMap[groupKey] = []
+      }
+      groupedMap[groupKey].push(sale)
+    })
+
+    // 그룹을 배열로 변환하고 집계
+    const groupedSales = Object.values(groupedMap).map((group) => {
+      // 그룹 내 첫 번째 항목 (기준 항목)
+      const firstSale = group[0]
+      
+      // 총 매출액 합계
+      const totalAmount = group.reduce((sum, sale) => {
+        return sum + (sale.totalAmount || sale.total_amount || 0)
+      }, 0)
+
+      // 전체 품목 개수 합계
+      const itemCount = group.reduce((sum, sale) => {
+        return sum + (sale.itemCount || sale.items?.length || 1)
+      }, 0)
+
+      // 첫 번째 품목 이름
+      const firstItemName = firstSale.displayItemName || 
+                           firstSale.items?.[0]?.item_name || 
+                           firstSale.items?.[0]?.productName || 
+                           '품목 없음'
+
+      // 표시할 품목명: "품목명 외 N건" 형식
+      const displayItem = itemCount > 1 
+        ? `${firstItemName} 외 ${itemCount - 1}건`
+        : firstItemName
+
+      // 비고: 첫 번째 항목의 비고 사용 (여러 개면 첫 번째 것만)
+      const notes = firstSale.notes || ''
+
+      return {
+        id: firstSale.id, // 첫 번째 항목의 ID를 키로 사용
+        date: normalizeDate(firstSale.date || firstSale.sale_date),
+        clientId: firstSale.clientId || firstSale.client_id,
+        clientName: firstSale.clientName || '알 수 없음',
+        totalAmount,
+        itemCount,
+        displayItem,
+        displayItemName: firstItemName, // 원본 품목명 (표시용)
+        notes,
+        // 그룹 내 모든 원본 sale 데이터 (수정/삭제 시 필요)
+        originalSales: group,
+      }
+    })
+
+    // 날짜 내림차순 정렬
+    return groupedSales.sort((a, b) => {
+      return new Date(b.date) - new Date(a.date)
+    })
+  }, [sales])
+
+  // 그룹핑된 데이터 사용
+  const sortedSales = groupSalesBySlip
 
   const handleExport = () => {
-    // TODO: sales_slips 뷰 데이터를 엑셀로 내보내기 (필요시 구현)
     exportSalesToExcel(sales)
   }
 
@@ -151,12 +236,12 @@ const Sales = () => {
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap">
                       <div className="text-sm font-semibold text-gray-900">
-                        {slip.customerName || '-'}
+                        {slip.clientName || '-'}
                       </div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap">
                       <div className="text-sm text-gray-600">
-                        {slip.slipTitle || '-'}
+                        {slip.displayItem || slip.displayItemName || '-'}
                       </div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500">
@@ -172,7 +257,7 @@ const Sales = () => {
                       {formatKoreanCurrency(slip.totalAmount || 0)}
                     </td>
                     <td className="px-6 py-5 text-sm text-gray-500">
-                      <div className="max-w-xs truncate">-</div>
+                      <div className="max-w-xs truncate">{slip.notes || '-'}</div>
                     </td>
                     <td className="px-6 py-5 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-3">
@@ -242,12 +327,12 @@ const Sales = () => {
                   <div className="space-y-1.5 text-sm text-gray-600">
                     <div className="flex items-start space-x-2">
                       <span className="font-medium whitespace-nowrap">거래처:</span>
-                      <span className="break-words flex-1">{slip.customerName || '-'}</span>
+                      <span className="break-words flex-1">{slip.clientName || '-'}</span>
                     </div>
                     <div className="flex items-start space-x-2">
                       <span className="font-medium whitespace-nowrap">품목:</span>
                       <span className="break-words flex-1">
-                        {slip.slipTitle || '-'}
+                        {slip.displayItem || slip.displayItemName || '-'}
                       </span>
                       {slip.itemCount > 1 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 whitespace-nowrap">
@@ -255,6 +340,11 @@ const Sales = () => {
                         </span>
                       )}
                     </div>
+                    {slip.notes && (
+                      <div className="mt-2 pt-2 border-t border-gray-100 text-sm text-gray-500 break-words">
+                        {slip.notes}
+                      </div>
+                    )}
                   </div>
                 </div>
               </SwipeableListItem>
