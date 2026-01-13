@@ -3,50 +3,159 @@ import { Edit, Download, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
+import EditSaleModal from '../components/EditSaleModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import Pagination from '../components/common/Pagination'
 import { exportSalesToExcel } from '../utils/excelExport'
-import { showError } from '../utils/alert'
+import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { formatKoreanCurrency } from '../utils/formatters'
 
 const PAGE_SIZE = 15
 
 const Sales = () => {
   // ===== 모든 Hooks를 최상단에 선언 =====
-  const { clients } = useData()
+  const { clients, deleteSale } = useData()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [editingSaleGroup, setEditingSaleGroup] = useState(null)
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  // 데이터 페칭 함수 (sales 테이블에서 가져오기)
+  // 데이터 페칭 함수 (sales 테이블에서 가져오기 - 관계형 데이터 포함)
   const fetchData = async () => {
     try {
       setLoading(true)
       const from = (page - 1) * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
 
-      const { data, error, count } = await supabase
+      // Supabase 관계형 쿼리: sales_items와 products JOIN
+      // sales_items 테이블이 있다면 그것을 사용, 없다면 items JSON 배열의 product_id로 products 조회
+      let query = supabase
         .from('sales')
-        .select('*', { count: 'exact' })
+        .select(`
+          *,
+          sales_items (
+            *,
+            products (
+              name
+            )
+          )
+        `, { count: 'exact' })
         .order('sale_date', { ascending: false })
         .range(from, to)
 
-      if (error) throw error
+      const { data, error, count } = await query
 
-      // sales 테이블 데이터 정규화 및 클라이언트 정보 매핑
+      if (error) {
+        // sales_items 테이블이 없을 수 있으므로, 일반 쿼리로 재시도
+        console.warn('관계형 쿼리 실패, 일반 쿼리로 재시도:', error)
+        const { data: fallbackData, error: fallbackError, count: fallbackCount } = await supabase
+          .from('sales')
+          .select('*', { count: 'exact' })
+          .order('sale_date', { ascending: false })
+          .range(from, to)
+
+        if (fallbackError) throw fallbackError
+
+        // items JSON 배열의 product_id로 products 조회
+        const saleIds = (fallbackData || []).map(s => s.id)
+        const allProductIds = []
+        const saleProductMap = {}
+
+        fallbackData.forEach(sale => {
+          const items = sale.items || []
+          items.forEach(item => {
+            if (item.product_id || item.productId) {
+              const productId = item.product_id || item.productId
+              if (!allProductIds.includes(productId)) {
+                allProductIds.push(productId)
+              }
+              if (!saleProductMap[sale.id]) {
+                saleProductMap[sale.id] = []
+              }
+              saleProductMap[sale.id].push({ item, productId })
+            }
+          })
+        })
+
+        // products 테이블에서 품목명 조회
+        let productsMap = {}
+        if (allProductIds.length > 0) {
+          const { data: productsData } = await supabase
+            .from('products')
+            .select('id, name')
+            .in('id', allProductIds)
+
+          productsMap = (productsData || []).reduce((acc, p) => {
+            acc[p.id] = p.name
+            return acc
+          }, {})
+        }
+
+        // 데이터 정규화
+        const normalizedSales = (fallbackData || []).map(sale => {
+          const client = clients?.find(c => c.id === sale.client_id)
+          const items = sale.items || []
+          
+          // items 배열의 각 항목에 품목명 매핑
+          const mappedItems = items.map(item => {
+            const productId = item.product_id || item.productId
+            const productName = productId ? productsMap[productId] : null
+            return {
+              ...item,
+              item_name: item.item_name || productName || item.productName || '',
+              productName: productName || item.productName || item.item_name || '',
+            }
+          })
+
+          return {
+            ...sale,
+            id: sale.id, // Primary Key 명시적으로 포함
+            date: sale.sale_date || sale.date,
+            clientId: sale.client_id,
+            clientName: client?.company || '알 수 없음',
+            totalAmount: sale.total_amount || sale.totalAmount || 0,
+            items: mappedItems,
+            displayItemName: mappedItems[0]?.item_name || mappedItems[0]?.productName || '',
+            itemCount: mappedItems.length || 1,
+          }
+        })
+
+        setSales(normalizedSales)
+        setTotalCount(fallbackCount || 0)
+        return
+      }
+
+      // 관계형 쿼리 성공 시 데이터 정규화
       const normalizedSales = (data || []).map(sale => {
         const client = clients?.find(c => c.id === sale.client_id)
+        const salesItems = sale.sales_items || []
+        
+        // sales_items에서 품목명 추출
+        const mappedItems = salesItems.map(si => {
+          const productName = si.products?.name || ''
+          return {
+            ...si,
+            item_name: si.item_name || productName || '',
+            productName: productName || si.item_name || '',
+          }
+        })
+
+        // items JSON 배열이 있다면 그것도 사용 (fallback)
+        const jsonItems = sale.items || []
+        const allItems = mappedItems.length > 0 ? mappedItems : jsonItems
+
         return {
           ...sale,
+          id: sale.id, // Primary Key 명시적으로 포함
           date: sale.sale_date || sale.date,
           clientId: sale.client_id,
           clientName: client?.company || '알 수 없음',
           totalAmount: sale.total_amount || sale.totalAmount || 0,
-          items: sale.items || [],
-          displayItemName: sale.items?.[0]?.item_name || sale.items?.[0]?.productName || '',
-          itemCount: sale.items?.length || 1,
+          items: allItems,
+          displayItemName: allItems[0]?.item_name || allItems[0]?.productName || '',
+          itemCount: allItems.length || 1,
         }
       })
 
@@ -164,13 +273,55 @@ const Sales = () => {
     exportSalesToExcel(sales)
   }
 
-  // 상세 보기 알림 (그룹핑된 데이터이므로 수정/삭제는 추후 구현)
-  const handleEdit = () => {
-    showError('상세 보기 기능은 곧 제공될 예정입니다.')
+  // 수정 핸들러 (그룹핑된 전표의 첫 번째 sale을 기준으로 수정)
+  const handleEdit = (slip) => {
+    if (slip && slip.originalSales && slip.originalSales.length > 0) {
+      // 그룹 내 첫 번째 sale을 기준으로 수정 모달 열기
+      setEditingSaleGroup(slip.originalSales[0])
+    } else if (slip && slip.id) {
+      // originalSales가 없으면 slip 자체를 사용
+      setEditingSaleGroup(slip)
+    }
   }
 
-  const handleDelete = () => {
-    showError('상세 보기 기능은 곧 제공될 예정입니다.')
+  // 삭제 핸들러
+  const handleDelete = async (slip) => {
+    if (!slip || !slip.id) {
+      showError('삭제할 매출 데이터를 찾을 수 없습니다.')
+      return
+    }
+
+    const confirmed = await showConfirm(
+      '이 매출 전표가 영구적으로 삭제됩니다.',
+      '정말 삭제하시겠습니까?',
+      '삭제',
+      '취소'
+    )
+
+    if (confirmed) {
+      try {
+        // 그룹 내 모든 sale 삭제
+        if (slip.originalSales && slip.originalSales.length > 0) {
+          // 그룹 내 모든 sale의 id로 삭제
+          for (const sale of slip.originalSales) {
+            if (sale.id) {
+              await deleteSale(sale.id)
+            }
+          }
+        } else {
+          // originalSales가 없으면 slip의 id로 삭제
+          await deleteSale(slip.id)
+        }
+
+        await showSuccess('매출 전표가 삭제되었습니다.')
+        
+        // 삭제 후 데이터 새로고침
+        fetchData()
+      } catch (error) {
+        console.error('매출 삭제 오류:', error)
+        await showError(error.message || '삭제 중 오류가 발생했습니다.')
+      }
+    }
   }
 
   return (
@@ -265,21 +416,17 @@ const Sales = () => {
                     <td className="px-6 py-5 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-3">
                         <button
-                          onClick={handleEdit}
-                          className="text-gray-400 hover:text-gray-500 font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px] cursor-not-allowed"
+                          onClick={() => handleEdit(slip)}
+                          className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
                           style={{ WebkitTapHighlightColor: 'transparent' }}
-                          disabled
-                          title="상세 보기 기능은 곧 제공될 예정입니다"
                         >
                           <Edit className="w-4 h-4" />
                           <span>수정</span>
                         </button>
                         <button
-                          onClick={handleDelete}
-                          className="text-gray-400 hover:text-gray-500 font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px] cursor-not-allowed"
+                          onClick={() => handleDelete(slip)}
+                          className="text-red-500 hover:text-red-600 font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
                           style={{ WebkitTapHighlightColor: 'transparent' }}
-                          disabled
-                          title="상세 보기 기능은 곧 제공될 예정입니다"
                         >
                           <Trash2 className="w-4 h-4" />
                           <span>삭제</span>
@@ -314,9 +461,9 @@ const Sales = () => {
             sortedSales.map((slip) => (
               <SwipeableListItem
                 key={slip.id}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                enabled={false}
+                onEdit={() => handleEdit(slip)}
+                onDelete={() => handleDelete(slip)}
+                enabled={true}
               >
                 <div className="p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation min-h-[44px]">
                   <div className="flex items-start justify-between mb-2">
@@ -371,6 +518,11 @@ const Sales = () => {
       <AddSaleModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+      />
+      <EditSaleModal
+        isOpen={editingSaleGroup !== null}
+        onClose={() => setEditingSaleGroup(null)}
+        saleGroup={editingSaleGroup}
       />
     </div>
   )
