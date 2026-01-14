@@ -1,27 +1,21 @@
-import React, { useState } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import React, { useState, useEffect, useMemo } from 'react'
+import { LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
+import { supabase } from '../lib/supabase'
 import MetricCard from '../components/MetricCard'
 import EditActivityModal from '../components/EditActivityModal'
 import SalesCalendar from '../components/SalesCalendar'
-import AddIssueModal from '../components/AddIssueModal'
-import EditIssueModal from '../components/EditIssueModal'
 import AppInstallGuide from '../components/AppInstallGuide'
-import { Plus, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
-import { showSuccess, showError } from '../utils/alert'
 import { formatDate, formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
 const Dashboard = () => {
-  const { activities, clients, getStats, getWeeklySalesData, issues, updateIssue, loading } = useData()
+  // ===== 모든 Hooks를 최상단에 선언 =====
+  const { activities, clients, getStats, getWeeklySalesData, loading } = useData()
   const navigate = useNavigate()
   const [editingActivityId, setEditingActivityId] = useState(null)
-  const [expandedIssueId, setExpandedIssueId] = useState(null)
-  const [editingIssueId, setEditingIssueId] = useState(null)
-  const [isAddIssueModalOpen, setIsAddIssueModalOpen] = useState(false)
-  const [editingIssueTitle, setEditingIssueTitle] = useState('')
-  const [editingIssueContent, setEditingIssueContent] = useState('')
+  const [upcomingEvents, setUpcomingEvents] = useState([])
   
   if (loading) {
     return (
@@ -52,14 +46,59 @@ const Dashboard = () => {
     })
     .slice(0, 5)
 
-  // 오늘의 주요 일정 (오늘 날짜의 활동)
-  const today = new Date().toISOString().split('T')[0]
-  const todayActivities = activities
-    .filter((activity) => {
-      const activityDate = formatDate(activity.activity_date || activity.date || activity.created_at)
-      return activityDate === today
-    })
-    .slice(0, 5)
+  // Upcoming Events 데이터 페칭 (No JOIN 규칙 준수)
+  // 영업 활동의 다음 일정(next_action_date)이 곧 Upcoming Event가 됩니다.
+  useEffect(() => {
+    const fetchUpcomingEvents = async () => {
+      try {
+        // Step 1: activities 테이블에서 next_action_date가 있는 데이터만 조회
+        const { data: activitiesData, error: activitiesError } = await supabase
+          .from('activities')
+          .select('*')
+          .not('next_action_date', 'is', null)
+          .order('next_action_date', { ascending: true })
+
+        if (activitiesError) throw activitiesError
+
+        if (!activitiesData || activitiesData.length === 0) {
+          setUpcomingEvents([])
+          return
+        }
+
+        // Step 2: 필요한 client_id들만 모아서 clients 테이블 별도 조회
+        const clientIds = [...new Set(activitiesData.map(a => a.client_id).filter(Boolean))]
+        
+        let clientsMap = {}
+        if (clientIds.length > 0) {
+          const { data: clientsData, error: clientsError } = await supabase
+            .from('clients')
+            .select('id, company')
+            .in('id', clientIds)
+
+          if (!clientsError && clientsData) {
+            clientsMap = clientsData.reduce((acc, client) => {
+              acc[client.id] = client.company
+              return acc
+            }, {})
+          }
+        }
+
+        // Step 3: 두 데이터를 병합하여 Upcoming Events 생성
+        const mergedEvents = activitiesData.map(activity => ({
+          ...activity,
+          clientName: clientsMap[activity.client_id] || '알 수 없음',
+          scheduleDate: activity.next_action_date
+        }))
+
+        setUpcomingEvents(mergedEvents)
+      } catch (error) {
+        console.error('Upcoming Events 조회 오류:', error)
+        setUpcomingEvents([])
+      }
+    }
+
+    fetchUpcomingEvents()
+  }, [])
 
   return (
     <div className="space-y-4 pb-20 md:pb-0">
@@ -158,7 +197,7 @@ const Dashboard = () => {
                       tick={{ fill: '#6b7280', fontSize: 12 }}
                       tickFormatter={(value) => formatCurrency(value * 10000)}
                       width={70}
-                      domain={['dataMin - 1', 'auto']}
+                      domain={[0, 'auto']}
                     />
                     <Tooltip
                       contentStyle={{
@@ -172,6 +211,13 @@ const Dashboard = () => {
                       labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                     />
                     <Legend wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }} />
+                    <Area
+                      type="monotone"
+                      dataKey="매출"
+                      fill="#f3f4f6"
+                      fillOpacity={0.3}
+                      stroke="none"
+                    />
                     <Line
                       type="monotone"
                       dataKey="매출"
@@ -191,265 +237,53 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* 오른쪽 좁은 영역: 오늘의 주요 일정 */}
+          {/* 오른쪽 좁은 영역: Upcoming Events (다음 일정) */}
           <div className="lg:col-span-1 card p-4 md:p-5">
             <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
               Upcoming Events
             </h3>
             <div className="space-y-2">
-              {todayActivities.length > 0 ? (
-                todayActivities.map((activity) => (
+              {upcomingEvents.length > 0 ? (
+                upcomingEvents.slice(0, 5).map((event) => (
                   <div
-                    key={activity.id}
-                    onClick={() => setEditingActivityId(activity.id)}
+                    key={event.id}
+                    onClick={() => setEditingActivityId(event.id)}
                     className="p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50 transition-colors"
                   >
-                    <div className="text-xs font-medium text-gray-900 truncate">
-                      {formatActivityTitle(activity.clientName, activity.description)}
+                    <div className="text-xs font-semibold text-gray-700 mb-1">
+                      {formatDate(event.scheduleDate || event.next_action_date)}
                     </div>
-                    {activity.type && (
+                    <div className="text-xs font-medium text-gray-900 truncate mb-1">
+                      {event.clientName}
+                    </div>
+                    {event.next_action_detail && (
+                      <div className="text-xs text-gray-600 truncate">
+                        {event.next_action_detail}
+                      </div>
+                    )}
+                    {event.type && (
                       <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-xs font-semibold ${
-                        activity.type === '미팅' ? 'bg-blue-50 text-blue-700' :
-                        activity.type === '전화' ? 'bg-emerald-50 text-emerald-700' :
-                        activity.type === '계약' ? 'bg-purple-50 text-purple-700' :
-                        activity.type === '견적' ? 'bg-amber-50 text-amber-700' :
+                        event.type === '미팅' ? 'bg-blue-50 text-blue-700' :
+                        event.type === '전화' ? 'bg-emerald-50 text-emerald-700' :
+                        event.type === '계약' ? 'bg-purple-50 text-purple-700' :
+                        event.type === '견적' ? 'bg-amber-50 text-amber-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
-                        {activity.type}
+                        {event.type}
                       </span>
                     )}
                   </div>
                 ))
               ) : (
                 <div className="text-center py-4 text-gray-500 text-xs">
-                  오늘 일정이 없습니다.
+                  예정된 일정이 없습니다.
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* 네 번째 행: 최근 이슈 */}
-        <div className="card p-4 md:p-5">
-          <div className="flex items-center justify-between mb-4 md:mb-5">
-            <h3 className="text-base md:text-lg font-bold text-gray-900 flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-purple-600" />
-              <span>Recent Issues</span>
-            </h3>
-            <button
-              onClick={() => setIsAddIssueModalOpen(true)}
-              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 flex items-center space-x-1 text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add</span>
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {issues && issues.filter(issue => issue.status !== '완료').length > 0 ? (
-              issues
-                .filter(issue => issue.status !== '완료')
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                .slice(0, 10)
-                .map((issue) => {
-                  const isExpanded = expandedIssueId === issue.id
-                  const isEditing = editingIssueId === issue.id
-                  
-                  const baseDate = issue.date || issue.created_at
-                  const daysDiff = baseDate 
-                    ? Math.floor((new Date() - new Date(baseDate)) / (1000 * 60 * 60 * 24))
-                    : 0
-                  
-                  let bgColor = 'bg-white border-gray-200'
-                  if (daysDiff >= 14) {
-                    bgColor = 'bg-red-50 border-red-200'
-                  } else if (daysDiff >= 7) {
-                    bgColor = 'bg-orange-50 border-orange-200'
-                  } else if (issue.status === '진행') {
-                    bgColor = 'bg-emerald-50 border-emerald-200'
-                  }
-
-                  const statusColor = issue.status === '완료'
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : issue.status === '진행'
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'bg-gray-50 text-gray-700'
-
-                  return (
-                    <div
-                      key={issue.id}
-                      className={`border rounded-lg transition-all duration-200 ${bgColor} ${isExpanded ? 'shadow-md' : ''}`}
-                    >
-                      {/* 제목 클릭 영역 */}
-                      <button
-                        onClick={() => {
-                          if (!isEditing) {
-                            setExpandedIssueId(isExpanded ? null : issue.id)
-                            if (!isExpanded) {
-                              setEditingIssueTitle(issue.title || '')
-                              setEditingIssueContent(issue.content || '')
-                            }
-                          }
-                        }}
-                        className="w-full p-4 flex items-center justify-between gap-3 hover:bg-white/50 transition-colors rounded-lg"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <span className={`px-2 py-1 rounded text-xs font-semibold shrink-0 ${statusColor}`}>
-                            {issue.status || '등록'}
-                          </span>
-                          <span className="text-sm font-medium text-gray-900 text-left truncate">
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editingIssueTitle}
-                                onChange={(e) => setEditingIssueTitle(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                autoFocus
-                              />
-                            ) : (
-                              issue.title
-                            )}
-                          </span>
-                          {daysDiff > 0 && !isExpanded && (
-                            <span className="text-xs text-gray-500 shrink-0">
-                              ({daysDiff}일 경과)
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-gray-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-gray-400" />
-                          )}
-                        </div>
-                      </button>
-
-                      {/* 아코디언 상세 내용 */}
-                      {isExpanded && (
-                        <div className="px-4 pb-4 pt-0 border-t border-gray-200/50 mt-2 animate-in slide-in-from-top-2 duration-200">
-                          <div className="pt-4 space-y-4">
-                            {/* 내용 편집 */}
-                            {isEditing ? (
-                              <div className="space-y-3">
-                                <div>
-                                  <label className="block text-xs text-gray-500 mb-1">제목</label>
-                                  <input
-                                    type="text"
-                                    value={editingIssueTitle}
-                                    onChange={(e) => setEditingIssueTitle(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-gray-500 mb-1">내용</label>
-                                  <textarea
-                                    value={editingIssueContent}
-                                    onChange={(e) => setEditingIssueContent(e.target.value)}
-                                    rows={4}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await updateIssue(issue.id, {
-                                          title: editingIssueTitle,
-                                          content: editingIssueContent,
-                                          updated_at: new Date().toISOString()
-                                        })
-                                        setEditingIssueId(null)
-                                        await showSuccess('이슈가 수정되었습니다.')
-                                      } catch (error) {
-                                        console.error('이슈 수정 오류:', error)
-                                        await showError('이슈 수정 중 오류가 발생했습니다.')
-                                      }
-                                    }}
-                                    className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
-                                  >
-                                    저장
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setEditingIssueId(null)
-                                      setEditingIssueTitle(issue.title || '')
-                                      setEditingIssueContent(issue.content || '')
-                                    }}
-                                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors"
-                                  >
-                                    취소
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                {issue.content && (
-                                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                                    {issue.content}
-                                  </p>
-                                )}
-                                {issue.target_date && (
-                                  <p className="text-xs text-gray-500">
-                                    목표일: {new Date(issue.target_date).toLocaleDateString('ko-KR')}
-                                  </p>
-                                )}
-                                <p className="text-xs text-gray-400">
-                                  등록일: {new Date(issue.created_at || issue.date).toLocaleDateString('ko-KR')}
-                                </p>
-
-                                <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
-                                  <select
-                                    value={issue.status}
-                                    onChange={async (e) => {
-                                      try {
-                                        await updateIssue(issue.id, {
-                                          status: e.target.value,
-                                          updated_at: new Date().toISOString()
-                                        })
-                                        if (e.target.value === '완료') {
-                                          setExpandedIssueId(null)
-                                        }
-                                      } catch (error) {
-                                        console.error('상태 변경 오류:', error)
-                                        await showError('상태 변경 중 오류가 발생했습니다.')
-                                      }
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-0 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer ${statusColor}`}
-                                  >
-                                    <option value="등록">등록</option>
-                                    <option value="진행">진행</option>
-                                    <option value="완료">완료</option>
-                                  </select>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setEditingIssueId(issue.id)
-                                    }}
-                                    className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-colors"
-                                  >
-                                    수정
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-            ) : (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                등록된 이슈가 없습니다.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 다섯 번째 행: 최근 활동 내역 */}
+        {/* 네 번째 행: 최근 활동 내역 */}
         <div className="card p-4 md:p-5">
           <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4 md:mb-5">
             Recent Activities
@@ -524,15 +358,6 @@ const Dashboard = () => {
         isOpen={editingActivityId !== null}
         onClose={() => setEditingActivityId(null)}
         activityId={editingActivityId}
-      />
-      <AddIssueModal
-        isOpen={isAddIssueModalOpen}
-        onClose={() => setIsAddIssueModalOpen(false)}
-      />
-      <EditIssueModal
-        isOpen={editingIssueId !== null && editingIssueId !== expandedIssueId}
-        onClose={() => setEditingIssueId(null)}
-        issueId={editingIssueId}
       />
 
     </div>
