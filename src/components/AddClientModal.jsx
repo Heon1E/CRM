@@ -15,8 +15,12 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
     phone: '',
     email: '',
     status: '신규',
+    sales_rep: '', // Sales Rep 필드 추가
     contract_prices: [],
   })
+
+  // Sales Rep 옵션
+  const SALES_REP_OPTIONS = ['박민철', '송원기', '이헌일']
 
   // 담당자 목록 (동적 배열)
   const [contacts, setContacts] = useState([
@@ -36,6 +40,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         phone: String(initialData.phone || '').trim(),
         email: String(initialData.email || '').trim(),
         status: initialData.status || '신규',
+        sales_rep: initialData.sales_rep || '',
         contract_prices: Array.isArray(initialData.contract_prices) ? initialData.contract_prices : [],
       })
       
@@ -119,6 +124,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
       const clientData = {
         company: formData.company || '',
         status: formData.status || '신규',
+        sales_rep: formData.sales_rep || null, // Sales Rep 필드 추가
         contract_prices: Array.isArray(formData.contract_prices) ? formData.contract_prices : [],
         contacts: validContacts, // 담당자 목록 전달 (별도 처리)
       }
@@ -148,17 +154,36 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="고객 추가">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            회사명 <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={formData.company}
-            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-            className="input-field"
-            required
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              회사명 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.company}
+              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+              className="input-field"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              담당자 (Sales Rep)
+            </label>
+            <select
+              value={formData.sales_rep || ''}
+              onChange={(e) => setFormData({ ...formData, sales_rep: e.target.value })}
+              className="input-field"
+            >
+              <option value="">선택 안 함</option>
+              {SALES_REP_OPTIONS.map((rep) => (
+                <option key={rep} value={rep}>
+                  {rep}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* 담당자 관리 섹션 */}

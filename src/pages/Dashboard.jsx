@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
+import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import MetricCard from '../components/MetricCard'
 import EditActivityModal from '../components/EditActivityModal'
@@ -12,10 +13,52 @@ import { formatDate, formatCurrency, formatKoreanCurrency } from '../utils/forma
 
 const Dashboard = () => {
   // ===== 모든 Hooks를 최상단에 선언 =====
-  const { activities, clients, getStats, getWeeklySalesData, loading } = useData()
+  const { activities, clients, getStats, getWeeklySalesData, loading, sales } = useData()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [editingActivityId, setEditingActivityId] = useState(null)
   const [upcomingEvents, setUpcomingEvents] = useState([])
+  const [myAccounts, setMyAccounts] = useState([])
+  const [myMonthlySales, setMyMonthlySales] = useState(0)
+  const [myWeeklySalesData, setMyWeeklySalesData] = useState([])
+
+  // Sales Rep 옵션
+  const SALES_REP_OPTIONS = ['박민철', '송원기', '이헌일']
+
+  // 사용자 이름 매핑 (영어 -> 한글)
+  const getUserSalesRep = useMemo(() => {
+    if (!user) return null
+
+    // 사용자 이름 추출 (user_metadata.full_name 또는 email에서)
+    const userName = user.user_metadata?.full_name || user.email || ''
+    
+    // 영어 이름 -> 한글 이름 매핑
+    const nameMapping = {
+      'Heonil Lee': '이헌일',
+      'heonil lee': '이헌일',
+      'Heonil': '이헌일',
+      'heonil': '이헌일',
+      // 필요시 추가 매핑
+    }
+
+    // 매핑 확인
+    if (nameMapping[userName]) {
+      return nameMapping[userName]
+    }
+
+    // 직접 매칭 (한글 이름이 이미 있는 경우)
+    if (SALES_REP_OPTIONS.includes(userName)) {
+      return userName
+    }
+
+    // 이메일에서 이름 추출 시도 (예: heonil@example.com -> 이헌일)
+    const emailName = user.email?.split('@')[0]?.toLowerCase()
+    if (emailName && nameMapping[emailName]) {
+      return nameMapping[emailName]
+    }
+
+    return null
+  }, [user])
   
   if (loading) {
     return (
@@ -30,6 +73,106 @@ const Dashboard = () => {
 
   // 진행 중 영업 건수
   const ongoingActivitiesCount = activities.filter((a) => a.status === '진행중').length
+
+  // My Accounts 및 My Monthly Sales 데이터 페칭 (No JOIN 규칙 준수)
+  useEffect(() => {
+    const fetchMyData = async () => {
+      if (!getUserSalesRep) {
+        setMyAccounts([])
+        setMyMonthlySales(0)
+        setMyWeeklySalesData([])
+        return
+      }
+
+      try {
+        // Step 1: clients 테이블에서 sales_rep가 현재 사용자와 일치하는 클라이언트 조회
+        const { data: myClientsData, error: clientsError } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('sales_rep', getUserSalesRep)
+
+        if (clientsError) throw clientsError
+
+        const myClientIds = (myClientsData || []).map(c => c.id)
+        setMyAccounts(myClientIds)
+
+        if (myClientIds.length === 0) {
+          setMyMonthlySales(0)
+          setMyWeeklySalesData([])
+          return
+        }
+
+        // Step 2: 이번 달 sales 데이터 조회
+        const now = new Date()
+        const currentYear = now.getFullYear()
+        const currentMonth = now.getMonth() + 1
+        const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
+        const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`
+
+        const { data: mySalesData, error: salesError } = await supabase
+          .from('sales')
+          .select('*')
+          .in('client_id', myClientIds)
+          .gte('sale_date', startDate)
+          .lte('sale_date', endDate)
+
+        if (salesError) throw salesError
+
+        // 이번 달 매출 합계 계산
+        const monthlyTotal = (mySalesData || []).reduce((sum, sale) => {
+          return sum + (sale.total_amount || 0)
+        }, 0)
+        setMyMonthlySales(monthlyTotal)
+
+        // 주간 매출 데이터 계산 (My Sales Trend용)
+        const weeklyData = getWeeklySalesDataForClients(mySalesData || [])
+        setMyWeeklySalesData(weeklyData)
+      } catch (error) {
+        console.error('My Data 조회 오류:', error)
+        setMyAccounts([])
+        setMyMonthlySales(0)
+        setMyWeeklySalesData([])
+      }
+    }
+
+    fetchMyData()
+  }, [getUserSalesRep])
+
+  // 주간 매출 데이터 계산 헬퍼 함수 (특정 클라이언트들용)
+  const getWeeklySalesDataForClients = (salesData) => {
+    if (!salesData || salesData.length === 0) return []
+
+    const now = new Date()
+    const weeks = []
+    
+    // 최근 8주 데이터 생성
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - (i * 7))
+      weekStart.setHours(0, 0, 0, 0)
+      
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6)
+      weekEnd.setHours(23, 59, 59, 999)
+
+      const weekSales = salesData.filter(sale => {
+        const saleDate = new Date(sale.sale_date || sale.date)
+        return saleDate >= weekStart && saleDate <= weekEnd
+      })
+
+      const weekTotal = weekSales.reduce((sum, sale) => {
+        return sum + (sale.total_amount || 0)
+      }, 0)
+
+      const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`
+      weeks.push({
+        week: weekLabel,
+        매출: Math.round(weekTotal / 10000) // 만원 단위로 변환
+      })
+    }
+
+    return weeks
+  }
 
   // 진행 중 영업 클릭 핸들러
   const handleOngoingClick = () => {
@@ -114,16 +257,36 @@ const Dashboard = () => {
 
       {/* 새로운 그리드 레이아웃 */}
       <div className="grid grid-cols-1 gap-4">
-        {/* 첫 번째 행: 요약 카드 3개 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 첫 번째 행: 요약 카드 */}
+        <div className={`grid grid-cols-1 md:grid-cols-3 ${getUserSalesRep ? 'lg:grid-cols-5' : ''} gap-4`}>
           <MetricCard
-            title="총 고객"
+            title="총 거래처"
             value={`${stats.totalClients}명`}
             icon="👥"
             trend="up"
             trendValue="2명"
             bgColor="bg-slate-200"
           />
+          {getUserSalesRep && (
+            <>
+              <MetricCard
+                title="담당 거래처"
+                value={`${myAccounts.length}명`}
+                icon="👤"
+                trend="up"
+                trendValue=""
+                bgColor="bg-blue-100"
+              />
+              <MetricCard
+                title="담당 거래처 이번달 매출"
+                value={formatKoreanCurrency(myMonthlySales || 0)}
+                icon="💰"
+                trend="up"
+                trendValue=""
+                bgColor="bg-indigo-100"
+              />
+            </>
+          )}
           <MetricCard
             title="이번 달 매출"
             value={formatKoreanCurrency(stats.thisMonthSales || 0)}
@@ -171,10 +334,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* 세 번째 행: 그래프(3) + 일정 리스트(1) */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* 왼쪽 넓은 영역: 매출 추이 그래프 (높이 절반) */}
-          <div className="lg:col-span-3 card p-4 md:p-5">
+        {/* 세 번째 행: 그래프(2) + 일정 리스트(1) */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* 왼쪽: Revenue Trend (전체 매출 추이) */}
+          <div className="lg:col-span-2 card p-4 md:p-5">
             <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
               Revenue Trend
             </h3>
@@ -237,8 +400,74 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* 오른쪽 좁은 영역: Upcoming Events (다음 일정) */}
-          <div className="lg:col-span-1 card p-4 md:p-5">
+          {/* 중앙: My Sales Trend (담당 거래처 매출 추이) */}
+          {getUserSalesRep && (
+            <div className="lg:col-span-2 card p-4 md:p-5">
+              <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
+                My Sales Trend
+              </h3>
+              {myWeeklySalesData.length > 0 ? (
+                <div className="w-full h-64 md:h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={myWeeklySalesData} margin={{ top: 10, right: 20, left: 10, bottom: 50 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="week"
+                        stroke="#6b7280"
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
+                        interval={0}
+                      />
+                      <YAxis
+                        stroke="#6b7280"
+                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                        tickFormatter={(value) => formatCurrency(value * 10000)}
+                        width={70}
+                        domain={[0, 'auto']}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          padding: '8px 12px',
+                        }}
+                        formatter={(value) => [formatCurrency(Number(value) * 10000), '매출']}
+                        labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }} />
+                      <Area
+                        type="monotone"
+                        dataKey="매출"
+                        fill="#dbeafe"
+                        fillOpacity={0.3}
+                        stroke="none"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="매출"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        dot={{ fill: '#3b82f6', r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name="매출"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-16 md:h-21 flex items-center justify-center text-text-secondary text-sm md:text-base">
+                  담당 거래처 매출 데이터가 없습니다.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 오른쪽: Upcoming Events (다음 일정) */}
+          <div className={`card p-4 md:p-5 ${getUserSalesRep ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
             <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
               Upcoming Events
             </h3>

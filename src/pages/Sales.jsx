@@ -181,11 +181,12 @@ const Sales = () => {
     try {
       setLoading(true)
       
-      // 모든 sales 레코드 삭제
+      // 모든 sales 레코드 삭제 (Supabase는 필터가 필요하므로 모든 레코드를 매칭하는 필터 사용)
+      // 모든 레코드를 삭제하기 위해 created_at이 1970년 이후인 모든 레코드 삭제
       const { error } = await supabase
         .from('sales')
         .delete()
-        .neq('id', 0) // 모든 레코드 삭제 (id가 0이 아닌 모든 것)
+        .gte('created_at', '1970-01-01') // 모든 레코드 삭제
 
       if (error) throw error
 
