@@ -59,20 +59,42 @@ const Dashboard = () => {
 
     return null
   }, [user])
-  
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
-      </div>
-    )
-  }
-  
-  const stats = getStats()
-  const weeklySalesData = getWeeklySalesData()
 
-  // 진행 중 영업 건수
-  const ongoingActivitiesCount = activities.filter((a) => a.status === '진행중').length
+  // 주간 매출 데이터 계산 헬퍼 함수 (특정 클라이언트들용) - Hook 외부로 이동
+  const getWeeklySalesDataForClients = (salesData) => {
+    if (!salesData || salesData.length === 0) return []
+
+    const now = new Date()
+    const weeks = []
+    
+    // 최근 8주 데이터 생성
+    for (let i = 7; i >= 0; i--) {
+      const weekStart = new Date(now)
+      weekStart.setDate(now.getDate() - (i * 7))
+      weekStart.setHours(0, 0, 0, 0)
+      
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6)
+      weekEnd.setHours(23, 59, 59, 999)
+
+      const weekSales = salesData.filter(sale => {
+        const saleDate = new Date(sale.sale_date || sale.date)
+        return saleDate >= weekStart && saleDate <= weekEnd
+      })
+
+      const weekTotal = weekSales.reduce((sum, sale) => {
+        return sum + (sale.total_amount || 0)
+      }, 0)
+
+      const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`
+      weeks.push({
+        week: weekLabel,
+        매출: Math.round(weekTotal / 10000) // 만원 단위로 변환
+      })
+    }
+
+    return weeks
+  }
 
   // My Accounts 및 My Monthly Sales 데이터 페칭 (No JOIN 규칙 준수)
   useEffect(() => {
@@ -138,57 +160,6 @@ const Dashboard = () => {
     fetchMyData()
   }, [getUserSalesRep])
 
-  // 주간 매출 데이터 계산 헬퍼 함수 (특정 클라이언트들용)
-  const getWeeklySalesDataForClients = (salesData) => {
-    if (!salesData || salesData.length === 0) return []
-
-    const now = new Date()
-    const weeks = []
-    
-    // 최근 8주 데이터 생성
-    for (let i = 7; i >= 0; i--) {
-      const weekStart = new Date(now)
-      weekStart.setDate(now.getDate() - (i * 7))
-      weekStart.setHours(0, 0, 0, 0)
-      
-      const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekStart.getDate() + 6)
-      weekEnd.setHours(23, 59, 59, 999)
-
-      const weekSales = salesData.filter(sale => {
-        const saleDate = new Date(sale.sale_date || sale.date)
-        return saleDate >= weekStart && saleDate <= weekEnd
-      })
-
-      const weekTotal = weekSales.reduce((sum, sale) => {
-        return sum + (sale.total_amount || 0)
-      }, 0)
-
-      const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`
-      weeks.push({
-        week: weekLabel,
-        매출: Math.round(weekTotal / 10000) // 만원 단위로 변환
-      })
-    }
-
-    return weeks
-  }
-
-  // 진행 중 영업 클릭 핸들러
-  const handleOngoingClick = () => {
-    navigate('/activities?status=진행중')
-  }
-
-
-  // 최근 활동 (최신 5개)
-  const recentActivities = activities
-    .sort((a, b) => {
-      const dateA = new Date(a.activity_date || a.date || a.created_at)
-      const dateB = new Date(b.activity_date || b.date || b.created_at)
-      return dateB - dateA
-    })
-    .slice(0, 5)
-
   // Upcoming Events 데이터 페칭 (No JOIN 규칙 준수)
   // 영업 활동의 다음 일정(next_action_date)이 곧 Upcoming Event가 됩니다.
   useEffect(() => {
@@ -242,6 +213,36 @@ const Dashboard = () => {
 
     fetchUpcomingEvents()
   }, [])
+
+  // ===== 모든 Hooks 선언이 끝난 후에 조건부 return 배치 =====
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-gray-500">데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
+  // ===== 일반 함수 및 계산된 값들은 조건부 return 이후에 정의 =====
+  const stats = getStats()
+  const weeklySalesData = getWeeklySalesData()
+
+  // 진행 중 영업 건수
+  const ongoingActivitiesCount = activities.filter((a) => a.status === '진행중').length
+
+  // 진행 중 영업 클릭 핸들러
+  const handleOngoingClick = () => {
+    navigate('/activities?status=진행중')
+  }
+
+  // 최근 활동 (최신 5개)
+  const recentActivities = activities
+    .sort((a, b) => {
+      const dateA = new Date(a.activity_date || a.date || a.created_at)
+      const dateB = new Date(b.activity_date || b.date || b.created_at)
+      return dateB - dateA
+    })
+    .slice(0, 5)
 
   return (
     <div className="space-y-4 pb-20 md:pb-0">
