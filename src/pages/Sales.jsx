@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Edit, Download, Plus } from 'lucide-react'
+import { Edit, Download, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
