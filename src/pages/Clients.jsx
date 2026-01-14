@@ -9,7 +9,6 @@ import BusinessCardScannerModal from '../components/BusinessCardScannerModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import Pagination from '../components/common/Pagination'
 import { exportClientsToExcel } from '../utils/excelExport'
-import { useDebounce } from '../hooks/useDebounce'
 import { showConfirm, showError, showSuccess } from '../utils/alert'
 import { formatCurrency } from '../utils/formatters'
 
@@ -19,34 +18,26 @@ const Clients = () => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { sales, activities, deleteClient } = useData()
   const [searchTerm, setSearchTerm] = useState('')
-  const debouncedSearchTerm = useDebounce(searchTerm, 150) // 검색 디바운스 (150ms)
   const [editingClientId, setEditingClientId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false)
   const [scannedClientData, setScannedClientData] = useState(null) // 명함 스캔 데이터
-  const [clients, setClients] = useState([])
+  const [allClients, setAllClients] = useState([]) // 전체 클라이언트 데이터 (Master Data)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  // 데이터 페칭 함수
+  // 데이터 페칭 함수 (검색 로직 제거, 항상 모든 데이터 가져오기)
   const fetchData = async () => {
     try {
       setLoading(true)
       
-      // 검색어가 있으면 회사명으로만 검색 (서버 사이드)
-      // 1000-row limit 제거: .range(0, 99999) 추가
-      let query = supabase
+      // 모든 클라이언트 데이터 가져오기 (검색 필터링 없음)
+      const { data, error } = await supabase
         .from('clients')
-        .select('*', { count: 'exact' })
+        .select('*')
         .order('company')
         .range(0, 99999) // 1000-row limit 제거
-
-      if (debouncedSearchTerm.trim()) {
-        query = query.ilike('company', `%${debouncedSearchTerm}%`)
-      }
-
-      const { data, error, count } = await query
 
       if (error) throw error
 
@@ -66,7 +57,7 @@ const Clients = () => {
       }, {})
 
       // 클라이언트 데이터에 담당자 정보 매핑
-      let clientsData = (data || []).map(client => {
+      const clientsData = (data || []).map(client => {
         const contacts = contactsByClient[client.id] || []
         const primary = contacts.find(c => c.is_primary) || contacts[0]
         return {
@@ -79,21 +70,8 @@ const Clients = () => {
         }
       })
 
-      // 담당자명으로 필터링 (클라이언트 사이드)
-      if (debouncedSearchTerm.trim()) {
-        const searchLower = debouncedSearchTerm.toLowerCase()
-        clientsData = clientsData.filter(client => 
-          (client.contact_person || '').toLowerCase().includes(searchLower)
-        )
-      }
-
-      // 페이지네이션 적용 (클라이언트 사이드)
-      const from = (page - 1) * PAGE_SIZE
-      const to = from + PAGE_SIZE
-      const paginatedData = clientsData.slice(from, to)
-
-      setClients(paginatedData)
-      setTotalCount(clientsData.length)
+      // 전체 데이터 저장 (Master Data)
+      setAllClients(clientsData)
     } catch (error) {
       console.error('거래처 데이터 로드 오류:', error)
       showError('거래처 데이터를 불러오는 중 오류가 발생했습니다.')
@@ -102,20 +80,59 @@ const Clients = () => {
     }
   }
 
-  // 페이지 또는 검색어 변경 시 데이터 다시 로드
+  // 페이지 변경 시에만 데이터 다시 로드 (검색어는 클라이언트 사이드 필터링)
   useEffect(() => {
-    // 검색어가 변경되면 첫 페이지로 리셋
-    if (debouncedSearchTerm !== searchTerm) {
-      setPage(1)
-    }
     fetchData()
-  }, [page, debouncedSearchTerm])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 초기 로드만 수행
 
-  // 회사명 기준으로 그룹핑 (Hook 선언 후에 수행)
+  // 검색어 변경 시 첫 페이지로 리셋
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm])
+
+  // 클라이언트 사이드 필터링 (useMemo로 최적화)
+  const filteredClients = useMemo(() => {
+    if (!allClients || allClients.length === 0) return []
+    
+    // 검색어가 없으면 모든 클라이언트 반환
+    if (!searchTerm || !searchTerm.trim()) {
+      return allClients
+    }
+
+    // 검색어를 소문자로 변환
+    const searchLower = searchTerm.toLowerCase().trim()
+
+    // 다음 필드에서 case-insensitive 검색
+    return allClients.filter(client => {
+      const company = (client.company || '').toLowerCase()
+      const contactPerson = (client.contact_person || '').toLowerCase()
+      const salesRep = (client.sales_rep || '').toLowerCase()
+      
+      // 하나라도 매칭되면 포함
+      return company.includes(searchLower) ||
+             contactPerson.includes(searchLower) ||
+             salesRep.includes(searchLower)
+    })
+  }, [allClients, searchTerm]) // debouncedSearchTerm 대신 searchTerm 사용 (즉시 반응)
+
+  // 페이지네이션 적용 (필터링된 데이터 기준)
+  const paginatedClients = useMemo(() => {
+    const from = (page - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE
+    return filteredClients.slice(from, to)
+  }, [filteredClients, page])
+
+  // totalCount 업데이트 (필터링된 데이터 기준)
+  useEffect(() => {
+    setTotalCount(filteredClients.length)
+  }, [filteredClients])
+
+  // 회사명 기준으로 그룹핑 (페이지네이션된 데이터 기준)
   const groupedClients = useMemo(() => {
-    if (!clients || !Array.isArray(clients)) return {}
+    if (!paginatedClients || !Array.isArray(paginatedClients)) return {}
 
-    return clients.reduce((acc, client) => {
+    return paginatedClients.reduce((acc, client) => {
       const company = client.company || '기타'
       if (!acc[company]) {
         acc[company] = []
@@ -123,36 +140,10 @@ const Clients = () => {
       acc[company].push(client)
       return acc
     }, {})
-  }, [clients])
+  }, [paginatedClients])
 
-  // 검색 필터링된 그룹핑 데이터 (디바운스된 검색어 사용으로 최적화)
-  const filteredGroupedClients = useMemo(() => {
-    if (!debouncedSearchTerm.trim()) return groupedClients
-
-    const searchLower = debouncedSearchTerm.toLowerCase()
-    const filtered = {}
-    
-    // 검색 최적화: 객체 순회를 최소화하고 조기 종료 사용
-    for (const company of Object.keys(groupedClients)) {
-      const companyClients = groupedClients[company]
-      const companyLower = company.toLowerCase()
-      
-      // 회사명 검색이 빠르므로 먼저 체크
-      if (companyLower.includes(searchLower)) {
-        filtered[company] = companyClients
-        continue
-      }
-      
-      // 담당자명 검색 (필요한 경우에만)
-      const matches = companyClients.filter(
-        (client) => (client.contact_person || '').toLowerCase().includes(searchLower)
-      )
-      if (matches.length > 0) {
-        filtered[company] = matches
-      }
-    }
-    return filtered
-  }, [groupedClients, debouncedSearchTerm])
+  // 검색 필터링은 이미 filteredClients에서 처리되므로 groupedClients를 그대로 사용
+  const filteredGroupedClients = groupedClients
 
   // 표시할 그룹 (총 매출액 기준 내림차순 정렬)
   const visibleGroupedClients = useMemo(() => {
