@@ -27,6 +27,88 @@ const Clients = () => {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
+  // ===== 헬퍼 함수들을 최상단에 정의 (useMemo에서 사용되므로 필수) =====
+  // 고객별 최근 주문일 계산 (sales 데이터에서 집계)
+  const getLastOrderDate = (clientId) => {
+    if (!sales || !Array.isArray(sales)) return null
+
+    const clientSales = sales.filter((sale) => sale.clientId === clientId)
+    if (clientSales.length === 0) return null
+
+    // 가장 최근 날짜 찾기
+    const dates = clientSales
+      .map((sale) => sale.sale_date || sale.date)
+      .filter((date) => date)
+      .sort((a, b) => new Date(b) - new Date(a))
+
+    return dates.length > 0 ? dates[0] : null
+  }
+
+  // 고객별 최근 컨택일 계산 (activities 데이터에서 집계)
+  const getLastContactDate = (clientId) => {
+    if (!activities || !Array.isArray(activities)) return null
+
+    const clientActivities = activities.filter((activity) => {
+      const activityClientId = activity.clientId || activity.client_id
+      return activityClientId === clientId
+    })
+    if (clientActivities.length === 0) return null
+
+    // 가장 최근 날짜 찾기
+    const dates = clientActivities
+      .map((activity) => activity.activity_date || activity.date || activity.created_at)
+      .filter((date) => date)
+      .sort((a, b) => new Date(b) - new Date(a))
+
+    return dates.length > 0 ? dates[0] : null
+  }
+
+  // 고객별 올해 누적 주문 금액 계산 (sales 데이터에서 집계)
+  const getThisYearOrderAmount = (clientId) => {
+    if (!sales || !Array.isArray(sales)) return 0
+
+    const currentYear = new Date().getFullYear()
+    const clientSales = sales.filter((sale) => {
+      if (sale.clientId !== clientId) return false
+
+      const saleDate = sale.sale_date || sale.date
+      if (!saleDate) return false
+
+      const saleYear = new Date(saleDate).getFullYear()
+      return saleYear === currentYear
+    })
+
+    return clientSales.reduce((sum, sale) => {
+      return sum + (sale.totalAmount || 0)
+    }, 0)
+  }
+
+  // 회사별 통계 계산
+  const getCompanyStats = (companyClients) => {
+    // 모든 담당자의 주문일 중 가장 최근 것
+    const allOrderDates = companyClients
+      .map((client) => getLastOrderDate(client.id))
+      .filter((date) => date)
+      .sort((a, b) => new Date(b) - new Date(a))
+
+    // 모든 담당자의 컨택일 중 가장 최근 것
+    const allContactDates = companyClients
+      .map((client) => getLastContactDate(client.id))
+      .filter((date) => date)
+      .sort((a, b) => new Date(b) - new Date(a))
+
+    // 모든 담당자의 올해 주문 금액 합산
+    const totalAmount = companyClients.reduce((sum, client) => {
+      return sum + getThisYearOrderAmount(client.id)
+    }, 0)
+
+    return {
+      lastOrder: allOrderDates.length > 0 ? allOrderDates[0] : null,
+      lastContact: allContactDates.length > 0 ? allContactDates[0] : null,
+      totalAmount: totalAmount,
+    }
+  }
+
   // 데이터 페칭 함수 (검색 로직 제거, 항상 모든 데이터 가져오기)
   const fetchData = async () => {
     try {
@@ -41,12 +123,11 @@ const Clients = () => {
 
       if (error) throw error
 
-      // 담당자 정보 조회 (1000-row limit 제거)
-      const clientIds = (data || []).map(c => c.id)
+      // 담당자 정보 조회 (HTTP 400 방지: 모든 contacts를 가져와서 클라이언트 사이드에서 병합)
+      // .in() 필터를 사용하지 않고 모든 contacts를 가져옴 (URL 길이 제한 회피)
       const { data: contactsData } = await supabase
         .from('client_contacts')
         .select('*')
-        .in('client_id', clientIds.length > 0 ? clientIds : [null])
         .order('is_primary', { ascending: false })
         .range(0, 99999) // 1000-row limit 제거
 
@@ -176,87 +257,6 @@ const Clients = () => {
         return 'bg-gray-100 text-gray-600'
       default:
         return 'bg-gray-100 text-gray-600'
-    }
-  }
-
-  // 고객별 최근 주문일 계산 (sales 데이터에서 집계)
-  const getLastOrderDate = (clientId) => {
-    if (!sales || !Array.isArray(sales)) return null
-
-    const clientSales = sales.filter((sale) => sale.clientId === clientId)
-    if (clientSales.length === 0) return null
-
-    // 가장 최근 날짜 찾기
-    const dates = clientSales
-      .map((sale) => sale.sale_date || sale.date)
-      .filter((date) => date)
-      .sort((a, b) => new Date(b) - new Date(a))
-
-    return dates.length > 0 ? dates[0] : null
-  }
-
-  // 고객별 최근 컨택일 계산 (activities 데이터에서 집계)
-  const getLastContactDate = (clientId) => {
-    if (!activities || !Array.isArray(activities)) return null
-
-    const clientActivities = activities.filter((activity) => {
-      const activityClientId = activity.clientId || activity.client_id
-      return activityClientId === clientId
-    })
-    if (clientActivities.length === 0) return null
-
-    // 가장 최근 날짜 찾기
-    const dates = clientActivities
-      .map((activity) => activity.activity_date || activity.date || activity.created_at)
-      .filter((date) => date)
-      .sort((a, b) => new Date(b) - new Date(a))
-
-    return dates.length > 0 ? dates[0] : null
-  }
-
-  // 고객별 올해 누적 주문 금액 계산 (sales 데이터에서 집계)
-  const getThisYearOrderAmount = (clientId) => {
-    if (!sales || !Array.isArray(sales)) return 0
-
-    const currentYear = new Date().getFullYear()
-    const clientSales = sales.filter((sale) => {
-      if (sale.clientId !== clientId) return false
-
-      const saleDate = sale.sale_date || sale.date
-      if (!saleDate) return false
-
-      const saleYear = new Date(saleDate).getFullYear()
-      return saleYear === currentYear
-    })
-
-    return clientSales.reduce((sum, sale) => {
-      return sum + (sale.totalAmount || 0)
-    }, 0)
-  }
-
-  // 회사별 통계 계산
-  const getCompanyStats = (companyClients) => {
-    // 모든 담당자의 주문일 중 가장 최근 것
-    const allOrderDates = companyClients
-      .map((client) => getLastOrderDate(client.id))
-      .filter((date) => date)
-      .sort((a, b) => new Date(b) - new Date(a))
-
-    // 모든 담당자의 컨택일 중 가장 최근 것
-    const allContactDates = companyClients
-      .map((client) => getLastContactDate(client.id))
-      .filter((date) => date)
-      .sort((a, b) => new Date(b) - new Date(a))
-
-    // 모든 담당자의 올해 주문 금액 합산
-    const totalAmount = companyClients.reduce((sum, client) => {
-      return sum + getThisYearOrderAmount(client.id)
-    }, 0)
-
-    return {
-      lastOrder: allOrderDates.length > 0 ? allOrderDates[0] : null,
-      lastContact: allContactDates.length > 0 ? allContactDates[0] : null,
-      totalAmount: totalAmount,
     }
   }
 
