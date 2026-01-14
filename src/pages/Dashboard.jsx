@@ -269,24 +269,14 @@ const Dashboard = () => {
             bgColor="bg-slate-200"
           />
           {getUserSalesRep && (
-            <>
-              <MetricCard
-                title="담당 거래처"
-                value={`${myAccounts.length}명`}
-                icon="👤"
-                trend="up"
-                trendValue=""
-                bgColor="bg-blue-100"
-              />
-              <MetricCard
-                title="담당 거래처 이번달 매출"
-                value={formatKoreanCurrency(myMonthlySales || 0)}
-                icon="💰"
-                trend="up"
-                trendValue=""
-                bgColor="bg-indigo-100"
-              />
-            </>
+            <MetricCard
+              title="담당 거래처"
+              value={`${myAccounts.length}명`}
+              icon="👤"
+              trend="up"
+              trendValue=""
+              bgColor="bg-blue-100"
+            />
           )}
           <MetricCard
             title="이번 달 매출"
@@ -296,6 +286,16 @@ const Dashboard = () => {
             trendValue={`${Math.abs(stats.salesGrowthRate).toFixed(1)}%`}
             bgColor="bg-teal-100"
           />
+          {getUserSalesRep && (
+            <MetricCard
+              title="담당 거래처 이번달 매출"
+              value={formatKoreanCurrency(myMonthlySales || 0)}
+              icon="💰"
+              trend="up"
+              trendValue=""
+              bgColor="bg-indigo-100"
+            />
+          )}
           <MetricCard
             title="진행 중 영업"
             value={`${ongoingActivitiesCount}건`}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Edit, Download, Plus, Trash2 } from 'lucide-react'
+import { Edit, Download, Plus } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
@@ -172,37 +172,6 @@ const Sales = () => {
     exportSalesToExcel(sales)
   }
 
-  // Delete All 핸들러
-  const handleDeleteAll = async () => {
-    const confirmed = window.confirm('Are you sure you want to delete ALL sales data? This cannot be undone.')
-    
-    if (!confirmed) return
-
-    try {
-      setLoading(true)
-      
-      // 모든 sales 레코드 삭제 (Supabase는 필터가 필요하므로 모든 레코드를 매칭하는 필터 사용)
-      // 모든 레코드를 삭제하기 위해 created_at이 1970년 이후인 모든 레코드 삭제
-      const { error } = await supabase
-        .from('sales')
-        .delete()
-        .gte('created_at', '1970-01-01') // 모든 레코드 삭제
-
-      if (error) throw error
-
-      await showSuccess('모든 매출 데이터가 삭제되었습니다.')
-      
-      // 리스트 즉시 새로고침
-      setPage(1)
-      await fetchData()
-    } catch (error) {
-      console.error('전체 삭제 오류:', error)
-      await showError('전체 삭제 중 오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // 수정 핸들러 (그룹핑된 전표의 첫 번째 sale을 기준으로 수정)
   const handleEdit = async (slip) => {
     if (!slip || !slip.id) {
@@ -325,15 +294,7 @@ const Sales = () => {
             <Download className="w-4 h-4" />
             <span>DB Download</span>
           </button>
-          <SalesExcelUpload />
-          <button
-            onClick={handleDeleteAll}
-            className="btn-danger flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-700 text-white"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            <Trash2 className="w-4 h-4" />
-            <span>Delete All</span>
-          </button>
+          <SalesExcelUpload onRefresh={fetchData} />
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"

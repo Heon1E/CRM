@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react'
-import { Upload, Download, Loader2 } from 'lucide-react'
+import { Upload, Download, Loader2, Trash2 } from 'lucide-react'
 import { downloadSaleTemplate, parseSaleExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import { showSuccess, showError, showWarning } from '../utils/alert'
 
-const SalesExcelUpload = () => {
+const SalesExcelUpload = ({ onRefresh }) => {
   const { clients, addSale } = useData()
   const [isUploading, setIsUploading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const fileInputRef = useRef(null)
 
   // 양식 다운로드
@@ -193,6 +194,37 @@ const SalesExcelUpload = () => {
     }
   }
 
+  // Delete All 핸들러
+  const handleDeleteAll = async () => {
+    const confirmed = window.confirm('Are you sure you want to delete ALL sales data? This cannot be undone.')
+    
+    if (!confirmed) return
+
+    try {
+      setIsDeleting(true)
+      
+      // 모든 sales 레코드 삭제
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .gte('created_at', '1970-01-01') // 모든 레코드 삭제
+
+      if (error) throw error
+
+      await showSuccess('모든 매출 데이터가 삭제되었습니다.')
+      
+      // 리스트 즉시 새로고침 (부모 컴포넌트의 fetchData 호출)
+      if (onRefresh) {
+        await onRefresh()
+      }
+    } catch (error) {
+      console.error('전체 삭제 오류:', error)
+      await showError('전체 삭제 중 오류가 발생했습니다.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="flex items-center space-x-3">
       <button
@@ -231,6 +263,29 @@ const SalesExcelUpload = () => {
           )}
         </label>
       </div>
+      {/* Delete All 버튼 (위험 구역) */}
+      <button
+        onClick={handleDeleteAll}
+        disabled={isDeleting || isUploading}
+        className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold shadow-sm transition-all duration-200 ${
+          isDeleting || isUploading
+            ? 'opacity-50 cursor-not-allowed bg-gray-400 text-white'
+            : 'bg-red-600 hover:bg-red-700 text-white'
+        }`}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+      >
+        {isDeleting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>삭제 중...</span>
+          </>
+        ) : (
+          <>
+            <Trash2 className="w-4 h-4" />
+            <span>Delete All</span>
+          </>
+        )}
+      </button>
     </div>
   )
 }
