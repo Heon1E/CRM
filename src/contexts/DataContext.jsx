@@ -363,12 +363,12 @@ export const DataProvider = ({ children }) => {
       setLoading(true)
       try {
         const [pRes, cRes, aRes, sRes, iRes, ctRes] = await Promise.all([
-          supabase.from('products').select('*').order('name'),
-          supabase.from('clients').select('*').order('company'),
-          supabase.from('activities').select('*').order('activity_date', { ascending: false }),
-          supabase.from('sales').select('*').order('sale_date', { ascending: false }),
-          supabase.from('issues').select('*').order('created_at', { ascending: false }),
-          supabase.from('client_contacts').select('*').order('is_primary', { ascending: false })
+          supabase.from('products').select('*').order('name').range(0, 99999),
+          supabase.from('clients').select('*').order('company').range(0, 99999),
+          supabase.from('activities').select('*').order('activity_date', { ascending: false }).range(0, 99999),
+          supabase.from('sales').select('*').order('sale_date', { ascending: false }).range(0, 99999),
+          supabase.from('issues').select('*').order('created_at', { ascending: false }).range(0, 99999),
+          supabase.from('client_contacts').select('*').order('is_primary', { ascending: false }).range(0, 99999)
         ])
         const contactsByClient = (ctRes.data || []).reduce((acc, c) => {
           if (!acc[c.client_id]) acc[c.client_id] = []

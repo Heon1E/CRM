@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Edit, Download, Users, Camera } from 'lucide-react'
+import { Search, Edit, Download, Users, Camera, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import EditClientModal from '../components/EditClientModal'
@@ -10,7 +10,7 @@ import SwipeableListItem from '../components/SwipeableListItem'
 import Pagination from '../components/common/Pagination'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { useDebounce } from '../hooks/useDebounce'
-import { showConfirm, showError } from '../utils/alert'
+import { showConfirm, showError, showSuccess } from '../utils/alert'
 import { formatCurrency } from '../utils/formatters'
 
 const PAGE_SIZE = 15
@@ -35,10 +35,12 @@ const Clients = () => {
       setLoading(true)
       
       // 검색어가 있으면 회사명으로만 검색 (서버 사이드)
+      // 1000-row limit 제거: .range(0, 99999) 추가
       let query = supabase
         .from('clients')
         .select('*', { count: 'exact' })
         .order('company')
+        .range(0, 99999) // 1000-row limit 제거
 
       if (debouncedSearchTerm.trim()) {
         query = query.ilike('company', `%${debouncedSearchTerm}%`)
@@ -48,13 +50,14 @@ const Clients = () => {
 
       if (error) throw error
 
-      // 담당자 정보 조회
+      // 담당자 정보 조회 (1000-row limit 제거)
       const clientIds = (data || []).map(c => c.id)
       const { data: contactsData } = await supabase
         .from('client_contacts')
         .select('*')
         .in('client_id', clientIds.length > 0 ? clientIds : [null])
         .order('is_primary', { ascending: false })
+        .range(0, 99999) // 1000-row limit 제거
 
       const contactsByClient = (contactsData || []).reduce((acc, c) => {
         if (!acc[c.client_id]) acc[c.client_id] = []
@@ -266,6 +269,38 @@ const Clients = () => {
     exportClientsToExcel(flatClients)
   }
 
+  // Delete All Clients 핸들러
+  const handleDeleteAll = async () => {
+    const confirmed = window.confirm(
+      '정말로 모든 거래처 데이터를 삭제하시겠습니까? (연관된 매출 데이터가 있다면 오류가 발생할 수 있습니다.)'
+    )
+    
+    if (!confirmed) return
+
+    try {
+      setLoading(true)
+      
+      // 모든 clients 레코드 삭제
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .neq('id', 0) // 모든 레코드 삭제 (id가 0이 아닌 모든 레코드)
+
+      if (error) throw error
+
+      await showSuccess('모든 거래처 데이터가 삭제되었습니다.')
+      
+      // 리스트 즉시 새로고침
+      setPage(1)
+      await fetchData()
+    } catch (error) {
+      console.error('전체 삭제 오류:', error)
+      await showError('전체 삭제 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Guard Clause: loading 상태는 모든 Hook 선언 후에 처리
   if (loading) {
     return (
@@ -292,6 +327,15 @@ const Clients = () => {
           >
             <Download className="w-4 h-4" />
             <span>DB Download</span>
+          </button>
+          <button
+            onClick={handleDeleteAll}
+            className="btn-danger flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-700 text-white"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+            disabled={loading}
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete All</span>
           </button>
           <button
             onClick={() => setIsScannerModalOpen(true)}
