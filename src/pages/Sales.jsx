@@ -4,6 +4,7 @@ import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
 import EditSaleModal from '../components/EditSaleModal'
+import SalesExcelUpload from '../components/SalesExcelUpload'
 import SwipeableListItem from '../components/SwipeableListItem'
 import Pagination from '../components/common/Pagination'
 import { exportSalesToExcel } from '../utils/excelExport'
@@ -171,6 +172,36 @@ const Sales = () => {
     exportSalesToExcel(sales)
   }
 
+  // Delete All 핸들러
+  const handleDeleteAll = async () => {
+    const confirmed = window.confirm('Are you sure you want to delete ALL sales data? This cannot be undone.')
+    
+    if (!confirmed) return
+
+    try {
+      setLoading(true)
+      
+      // 모든 sales 레코드 삭제
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .neq('id', 0) // 모든 레코드 삭제 (id가 0이 아닌 모든 것)
+
+      if (error) throw error
+
+      await showSuccess('모든 매출 데이터가 삭제되었습니다.')
+      
+      // 리스트 즉시 새로고침
+      setPage(1)
+      await fetchData()
+    } catch (error) {
+      console.error('전체 삭제 오류:', error)
+      await showError('전체 삭제 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // 수정 핸들러 (그룹핑된 전표의 첫 번째 sale을 기준으로 수정)
   const handleEdit = async (slip) => {
     if (!slip || !slip.id) {
@@ -284,7 +315,7 @@ const Sales = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">매출 관리</h1>
           <p className="text-text-secondary mt-1.5 text-sm md:text-base">총 {totalCount}건의 매출 전표</p>
         </div>
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
+        <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-2">
           <button
             onClick={handleExport}
             className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
@@ -292,6 +323,15 @@ const Sales = () => {
           >
             <Download className="w-4 h-4" />
             <span>DB Download</span>
+          </button>
+          <SalesExcelUpload />
+          <button
+            onClick={handleDeleteAll}
+            className="btn-danger flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-700 text-white"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete All</span>
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}

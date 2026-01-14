@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import { Upload, Download, Loader2 } from 'lucide-react'
 import { downloadSaleTemplate, parseSaleExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'
+import { supabase } from '../lib/supabase'
 import { showSuccess, showError, showWarning } from '../utils/alert'
 
 const SalesExcelUpload = () => {
@@ -14,7 +15,7 @@ const SalesExcelUpload = () => {
     downloadSaleTemplate()
   }
 
-  // 엑셀 업로드 처리
+  // 엑셀 업로드 처리 (Smart Bulk Upload with Consumption Logic)
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -28,19 +29,21 @@ const SalesExcelUpload = () => {
     setIsUploading(true)
 
     try {
-      // 엑셀 파일 파싱
+      // Step 1: 엑셀 파일 파싱
       const salesData = await parseSaleExcel(file)
 
-      // 거래처명과 판매일이 있는 데이터만 등록 (없으면 이미 필터링됨)
-      // salesData.length === 0 체크는 제거 (데이터가 없어도 빈 배열 반환)
+      if (!salesData || salesData.length === 0) {
+        await showWarning('엑셀 파일에 유효한 데이터가 없습니다.')
+        setIsUploading(false)
+        return
+      }
 
-      // 거래처명으로 clientId 찾기 및 중복 체크
-      const salesToInsert = []
+      // 거래처명으로 clientId 찾기 및 유효성 검사
+      const validatedSales = []
       const errors = []
-      const skipped = []
 
       for (const sale of salesData) {
-        // 거래처명이 없으면 건너뛰기 (에러 대신 무시)
+        // 거래처명이 없으면 건너뛰기
         if (!sale.clientName || sale.clientName.trim() === '') {
           continue
         }
@@ -51,14 +54,17 @@ const SalesExcelUpload = () => {
           continue
         }
 
-        // 중복 체크: 거래처명과 판매날짜가 모두 일치하는 데이터가 이미 있는지 확인
-        // 이 체크는 addSale 함수 내부에서도 수행되지만, 사용자에게 미리 알려주기 위해 여기서도 수행
-        salesToInsert.push({
+        // 총액 계산
+        const totalAmount = (sale.quantity || 0) * (sale.unitPrice || 0)
+
+        validatedSales.push({
           clientId: client.id,
+          clientName: sale.clientName,
           sale_date: sale.sale_date,
           item_name: sale.item_name,
           quantity: sale.quantity,
           unitPrice: sale.unitPrice,
+          totalAmount: totalAmount,
           notes: sale.notes,
         })
       }
@@ -67,49 +73,112 @@ const SalesExcelUpload = () => {
         await showWarning(`일부 데이터를 등록하지 못했습니다:\n${errors.join('\n')}`)
       }
 
-      if (salesToInsert.length === 0) {
+      if (validatedSales.length === 0) {
         setIsUploading(false)
         return
       }
 
-      // 날짜별로 그룹화하여 addSale 함수 형식에 맞게 변환
-      const groupedByDate = {}
-      salesToInsert.forEach((sale) => {
-        const dateKey = sale.sale_date
-        if (!groupedByDate[dateKey]) {
-          groupedByDate[dateKey] = []
-        }
-        groupedByDate[dateKey].push({
-          clientId: sale.clientId,
-          sale_date: sale.sale_date,
-          item_name: sale.item_name,
-          quantity: sale.quantity,
-          unitPrice: sale.unitPrice,
-          totalAmount: sale.quantity * sale.unitPrice,
-          notes: sale.notes,
-        })
-      })
+      // Step 2: 엑셀 파일에 있는 날짜들 추출
+      const excelDates = [...new Set(validatedSales.map(s => s.sale_date).filter(Boolean))]
+      
+      if (excelDates.length === 0) {
+        await showWarning('유효한 날짜가 없습니다.')
+        setIsUploading(false)
+        return
+      }
 
-      // 각 날짜별로 addSale 호출
-      let successCount = 0
-      for (const dateKey of Object.keys(groupedByDate)) {
-        try {
-          await addSale({
-            rows: groupedByDate[dateKey],
+      // Step 2: Supabase에서 해당 날짜들의 모든 기존 sales 데이터 조회 (No JOIN)
+      const { data: existingSales, error: fetchError } = await supabase
+        .from('sales')
+        .select('*')
+        .in('sale_date', excelDates)
+
+      if (fetchError) {
+        console.error('기존 매출 데이터 조회 오류:', fetchError)
+        await showError('기존 매출 데이터를 불러오는 중 오류가 발생했습니다.')
+        setIsUploading(false)
+        return
+      }
+
+      // Step 3: Matching & Consuming Logic
+      // 기존 DB 레코드 풀 생성 (사용 여부 추적)
+      const dbRecordsPool = (existingSales || []).map(record => ({
+        ...record,
+        used: false, // 매칭 여부 플래그
+        matchKey: `${record.sale_date}|${record.client_id}|${record.total_amount || 0}` // 매칭 키
+      }))
+
+      const salesToInsert = []
+      let duplicateCount = 0
+
+      // 각 Excel 행에 대해 매칭 시도
+      for (const excelSale of validatedSales) {
+        const matchKey = `${excelSale.sale_date}|${excelSale.clientId}|${excelSale.totalAmount || 0}`
+        
+        // 사용되지 않은 정확한 매칭 찾기
+        const matchedRecord = dbRecordsPool.find(
+          record => !record.used && record.matchKey === matchKey
+        )
+
+        if (matchedRecord) {
+          // 매칭 발견: DB 레코드를 "사용됨"으로 표시하고 Excel 행은 스킵
+          matchedRecord.used = true
+          duplicateCount++
+        } else {
+          // 매칭 없음: 새로운 레코드로 추가
+          salesToInsert.push(excelSale)
+        }
+      }
+
+      // Step 4: 새로운 레코드만 삽입
+      let insertedCount = 0
+      const insertErrors = []
+
+      if (salesToInsert.length > 0) {
+        // 날짜별로 그룹화하여 addSale 함수 형식에 맞게 변환
+        const groupedByDate = {}
+        salesToInsert.forEach((sale) => {
+          const dateKey = sale.sale_date
+          if (!groupedByDate[dateKey]) {
+            groupedByDate[dateKey] = []
+          }
+          groupedByDate[dateKey].push({
+            clientId: sale.clientId,
+            sale_date: sale.sale_date,
+            item_name: sale.item_name,
+            quantity: sale.quantity,
+            unitPrice: sale.unitPrice,
+            totalAmount: sale.totalAmount,
+            notes: sale.notes,
           })
-          successCount += groupedByDate[dateKey].length
-        } catch (error) {
-          console.error(`매출 등록 오류 (${dateKey}):`, error)
-          errors.push(`${dateKey} 날짜의 매출 등록 중 오류: ${error.message || '알 수 없는 오류'}`)
+        })
+
+        // 각 날짜별로 addSale 호출
+        for (const dateKey of Object.keys(groupedByDate)) {
+          try {
+            await addSale({
+              rows: groupedByDate[dateKey],
+            })
+            insertedCount += groupedByDate[dateKey].length
+          } catch (error) {
+            console.error(`매출 등록 오류 (${dateKey}):`, error)
+            insertErrors.push(`${dateKey} 날짜의 매출 등록 중 오류: ${error.message || '알 수 없는 오류'}`)
+          }
         }
       }
 
-      if (successCount > 0) {
-        await showSuccess(`${successCount}개의 매출이 일괄 등록되었습니다.`)
+      // Step 5: 결과 알림
+      const totalRows = validatedSales.length
+      const resultMessage = `Total ${totalRows} rows: ${insertedCount} inserted, ${duplicateCount} duplicates skipped.`
+      
+      if (insertedCount > 0) {
+        await showSuccess(resultMessage)
+      } else if (duplicateCount > 0) {
+        await showWarning(resultMessage)
       }
 
-      if (errors.length > 0) {
-        await showError(`일부 매출 등록에 실패했습니다:\n${errors.join('\n')}`)
+      if (insertErrors.length > 0) {
+        await showError(`일부 매출 등록에 실패했습니다:\n${insertErrors.join('\n')}`)
       }
 
       // 파일 입력 초기화
