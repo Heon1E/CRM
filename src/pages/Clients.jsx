@@ -154,8 +154,25 @@ const Clients = () => {
     return filtered
   }, [groupedClients, debouncedSearchTerm])
 
-  // 표시할 그룹 (페이지네이션된 데이터)
-  const visibleGroupedClients = filteredGroupedClients
+  // 표시할 그룹 (총 매출액 기준 내림차순 정렬)
+  const visibleGroupedClients = useMemo(() => {
+    const groups = Object.keys(filteredGroupedClients)
+    
+    // 각 그룹의 총 매출액을 계산하여 정렬
+    const sortedGroups = groups.sort((a, b) => {
+      const groupA = filteredGroupedClients[a]
+      const groupB = filteredGroupedClients[b]
+      const statsA = getCompanyStats(groupA)
+      const statsB = getCompanyStats(groupB)
+      return (statsB.totalAmount || 0) - (statsA.totalAmount || 0) // 내림차순
+    })
+    
+    // 정렬된 순서대로 객체 재구성
+    return sortedGroups.reduce((acc, company) => {
+      acc[company] = filteredGroupedClients[company]
+      return acc
+    }, {})
+  }, [filteredGroupedClients, sales]) // sales 의존성 추가 (getCompanyStats가 sales를 사용)
 
   // 상태 색상 함수 (매출, 신규, 단절 통일)
   const getStatusColor = (status) => {

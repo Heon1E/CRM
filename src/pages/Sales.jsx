@@ -23,25 +23,67 @@ const Sales = () => {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  // 데이터 페칭 함수 (sales 테이블에서 가져오기)
+  // 데이터 페칭 함수 (Split Fetching: sales + sales_items 병합)
   const fetchData = async () => {
     try {
       setLoading(true)
       const from = (page - 1) * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
 
-      const { data, error, count } = await supabase
+      // Step 1: sales 테이블에서 기본 정보 조회
+      const { data: salesData, error: salesError, count } = await supabase
         .from('sales')
         .select('*', { count: 'exact' })
         .order('sale_date', { ascending: false })
         .range(from, to)
 
-      if (error) throw error
+      if (salesError) throw salesError
 
-      // 데이터 정규화: sales 테이블의 item_name 컬럼을 직접 사용
-      const normalizedSales = (data || []).map(sale => {
+      if (!salesData || salesData.length === 0) {
+        setSales([])
+        setTotalCount(count || 0)
+        return
+      }
+
+      // Step 2: 모든 sale ID 추출
+      const saleIds = salesData.map(sale => sale.id).filter(Boolean)
+
+      // Step 3: sales_items 테이블에서 해당 sale_id들로 품목 목록 조회
+      let allItems = []
+      if (saleIds.length > 0) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('sales_items')
+          .select('*')
+          .in('sale_id', saleIds)
+
+        if (itemsError) {
+          console.warn('[Sales.jsx] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
+        } else {
+          allItems = itemsData || []
+        }
+      }
+
+      // Step 4: JavaScript에서 각 sale에 items 병합 및 데이터 정규화
+      const normalizedSales = salesData.map(sale => {
         const client = clients?.find(c => c.id === sale.client_id)
-        const items = sale.items || []
+        
+        // CRITICAL: sales_items에서 해당 sale_id와 일치하는 items 필터링
+        const mergedItems = allItems.filter(item => item.sale_id === sale.id)
+        
+        // 우선순위: sales_items > items JSON 배열
+        const finalItems = mergedItems.length > 0 
+          ? mergedItems 
+          : (sale.items || [])
+
+        // Step 5: total_amount가 0이면 items에서 재계산
+        let calculatedTotal = sale.total_amount || sale.totalAmount || 0
+        if (calculatedTotal === 0 && finalItems.length > 0) {
+          calculatedTotal = finalItems.reduce((sum, item) => {
+            const quantity = item.quantity || item.quantity || 0
+            const unitPrice = item.unit_price || item.unitPrice || 0
+            return sum + (quantity * unitPrice)
+          }, 0)
+        }
 
         return {
           ...sale,
@@ -49,11 +91,11 @@ const Sales = () => {
           date: sale.sale_date || sale.date,
           clientId: sale.client_id,
           clientName: client?.company || '알 수 없음',
-          totalAmount: sale.total_amount || sale.totalAmount || 0,
-          items: items,
+          totalAmount: calculatedTotal, // 재계산된 금액 사용
+          items: finalItems, // 병합된 items 배열
           // sales 테이블의 item_name 컬럼을 직접 사용 (우선순위 1)
-          displayItemName: sale.item_name || items[0]?.item_name || items[0]?.productName || '',
-          itemCount: items.length || 1,
+          displayItemName: sale.item_name || finalItems[0]?.item_name || finalItems[0]?.productName || '',
+          itemCount: finalItems.length || 1,
         }
       })
 
@@ -67,10 +109,11 @@ const Sales = () => {
     }
   }
 
-  // 페이지 변경 시 데이터 다시 로드
+  // 페이지 변경 시 데이터 다시 로드 (clients 의존성 제거로 깜빡임 방지)
   useEffect(() => {
     fetchData()
-  }, [page, clients])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]) // clients는 fetchData 내부에서 사용하므로 의존성에서 제외
 
   // 전표 그룹핑 함수: 같은 날짜 + 같은 고객으로 그룹핑
   const groupSalesBySlip = useMemo(() => {
