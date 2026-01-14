@@ -23,14 +23,14 @@ const Sales = () => {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  // 데이터 페칭 함수 (Split Fetching: sales + sales_items 병합)
+  // 데이터 페칭 함수 (Split Fetching: sales + sales_items 병합, HTTP 400 방지)
   const fetchData = async () => {
     try {
       setLoading(true)
       const from = (page - 1) * PAGE_SIZE
       const to = from + PAGE_SIZE - 1
 
-      // Step 1: sales 테이블에서 기본 정보 조회
+      // Step 1: sales 테이블에서 기본 정보 조회 (페이지네이션 적용)
       const { data: salesData, error: salesError, count } = await supabase
         .from('sales')
         .select('*', { count: 'exact' })
@@ -45,29 +45,29 @@ const Sales = () => {
         return
       }
 
-      // Step 2: 모든 sale ID 추출
-      const saleIds = salesData.map(sale => sale.id).filter(Boolean)
-
-      // Step 3: sales_items 테이블에서 해당 sale_id들로 품목 목록 조회
+      // Step 2: sales_items 테이블에서 전체 데이터 조회 (HTTP 400 방지: .in() 필터 제거)
+      // 모든 sales_items를 가져와서 클라이언트 사이드에서 필터링
       let allItems = []
-      if (saleIds.length > 0) {
+      try {
         const { data: itemsData, error: itemsError } = await supabase
           .from('sales_items')
           .select('*')
-          .in('sale_id', saleIds)
+          .range(0, 99999) // 1000-row limit 제거
 
         if (itemsError) {
           console.warn('[Sales.jsx] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
         } else {
           allItems = itemsData || []
         }
+      } catch (error) {
+        console.warn('[Sales.jsx] sales_items 조회 중 오류 (무시하고 계속):', error)
       }
 
-      // Step 4: JavaScript에서 각 sale에 items 병합 및 데이터 정규화
+      // Step 3: JavaScript에서 각 sale에 items 병합 및 데이터 정규화
       const normalizedSales = salesData.map(sale => {
         const client = clients?.find(c => c.id === sale.client_id)
         
-        // CRITICAL: sales_items에서 해당 sale_id와 일치하는 items 필터링
+        // CRITICAL: sales_items에서 해당 sale_id와 일치하는 items 필터링 (클라이언트 사이드)
         const mergedItems = allItems.filter(item => item.sale_id === sale.id)
         
         // 우선순위: sales_items > items JSON 배열
@@ -75,12 +75,12 @@ const Sales = () => {
           ? mergedItems 
           : (sale.items || [])
 
-        // Step 5: total_amount가 0이면 items에서 재계산
+        // Step 4: total_amount가 0이면 items에서 재계산
         let calculatedTotal = sale.total_amount || sale.totalAmount || 0
         if (calculatedTotal === 0 && finalItems.length > 0) {
           calculatedTotal = finalItems.reduce((sum, item) => {
-            const quantity = item.quantity || item.quantity || 0
-            const unitPrice = item.unit_price || item.unitPrice || 0
+            const quantity = Number(item.quantity) || 0
+            const unitPrice = Number(item.unit_price || item.unitPrice) || 0
             return sum + (quantity * unitPrice)
           }, 0)
         }

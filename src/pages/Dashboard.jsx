@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [myAccounts, setMyAccounts] = useState([])
   const [myMonthlySales, setMyMonthlySales] = useState(0)
   const [myWeeklySalesData, setMyWeeklySalesData] = useState([])
+  const [totalClientsCount, setTotalClientsCount] = useState(0) // 실제 총 거래처 개수
 
   // Sales Rep 옵션
   const SALES_REP_OPTIONS = ['박민철', '송원기', '이헌일']
@@ -96,6 +97,26 @@ const Dashboard = () => {
     return weeks
   }
 
+  // 실제 총 거래처 개수 조회 (head: true로 실제 총 개수 가져오기)
+  useEffect(() => {
+    const fetchTotalClientsCount = async () => {
+      try {
+        const { count, error } = await supabase
+          .from('clients')
+          .select('*', { count: 'exact', head: true })
+        
+        if (error) throw error
+        setTotalClientsCount(count || 0)
+      } catch (error) {
+        console.error('총 거래처 개수 조회 오류:', error)
+        // 에러 발생 시 DataContext의 clients.length 사용 (fallback)
+        setTotalClientsCount(clients.length)
+      }
+    }
+    
+    fetchTotalClientsCount()
+  }, [clients.length]) // clients.length가 변경되면 재조회 (fallback용)
+
   // My Accounts 및 My Monthly Sales 데이터 페칭 (No JOIN 규칙 준수)
   useEffect(() => {
     const fetchMyData = async () => {
@@ -107,11 +128,12 @@ const Dashboard = () => {
       }
 
       try {
-        // Step 1: clients 테이블에서 sales_rep가 현재 사용자와 일치하는 클라이언트 조회
+        // Step 1: clients 테이블에서 sales_rep가 현재 사용자와 일치하는 클라이언트 조회 (1000-row limit 제거)
         const { data: myClientsData, error: clientsError } = await supabase
           .from('clients')
           .select('id')
           .eq('sales_rep', getUserSalesRep)
+          .range(0, 99999) // 1000-row limit 제거
 
         if (clientsError) throw clientsError
 
@@ -124,19 +146,27 @@ const Dashboard = () => {
           return
         }
 
-        // Step 2: 이번 달 sales 데이터 조회
+        // Step 2: 이번 달 sales 데이터 조회 (1000-row limit 제거, HTTP 400 방지: .in() 대신 전체 가져오기)
         const now = new Date()
         const currentYear = now.getFullYear()
         const currentMonth = now.getMonth() + 1
         const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
         const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`
 
-        const { data: mySalesData, error: salesError } = await supabase
+        // HTTP 400 방지: 모든 sales를 가져와서 클라이언트 사이드에서 필터링
+        const { data: allSalesData, error: salesError } = await supabase
           .from('sales')
           .select('*')
-          .in('client_id', myClientIds)
           .gte('sale_date', startDate)
           .lte('sale_date', endDate)
+          .range(0, 99999) // 1000-row limit 제거
+
+        if (salesError) throw salesError
+
+        // 클라이언트 사이드에서 필터링 (HTTP 400 방지)
+        const mySalesData = (allSalesData || []).filter(sale => 
+          myClientIds.includes(sale.client_id)
+        )
 
         if (salesError) throw salesError
 
@@ -165,12 +195,13 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchUpcomingEvents = async () => {
       try {
-        // Step 1: activities 테이블에서 next_action_date가 있는 데이터만 조회
+        // Step 1: activities 테이블에서 next_action_date가 있는 데이터만 조회 (1000-row limit 제거)
         const { data: activitiesData, error: activitiesError } = await supabase
           .from('activities')
           .select('*')
           .not('next_action_date', 'is', null)
           .order('next_action_date', { ascending: true })
+          .range(0, 99999) // 1000-row limit 제거
 
         if (activitiesError) throw activitiesError
 
@@ -179,18 +210,21 @@ const Dashboard = () => {
           return
         }
 
-        // Step 2: 필요한 client_id들만 모아서 clients 테이블 별도 조회
+        // Step 2: 필요한 client_id들만 모아서 clients 테이블 별도 조회 (HTTP 400 방지: 전체 가져오기)
         const clientIds = [...new Set(activitiesData.map(a => a.client_id).filter(Boolean))]
         
         let clientsMap = {}
         if (clientIds.length > 0) {
-          const { data: clientsData, error: clientsError } = await supabase
+          // HTTP 400 방지: 모든 clients를 가져와서 클라이언트 사이드에서 필터링
+          const { data: allClientsData, error: clientsError } = await supabase
             .from('clients')
             .select('id, company')
-            .in('id', clientIds)
+            .range(0, 99999) // 1000-row limit 제거
 
-          if (!clientsError && clientsData) {
-            clientsMap = clientsData.reduce((acc, client) => {
+          if (!clientsError && allClientsData) {
+            // 클라이언트 사이드에서 필요한 client_id만 필터링
+            const filteredClients = allClientsData.filter(c => clientIds.includes(c.id))
+            clientsMap = filteredClients.reduce((acc, client) => {
               acc[client.id] = client.company
               return acc
             }, {})
@@ -262,7 +296,7 @@ const Dashboard = () => {
         <div className={`grid grid-cols-1 md:grid-cols-3 ${getUserSalesRep ? 'lg:grid-cols-5' : ''} gap-4`}>
           <MetricCard
             title="총 거래처"
-            value={`${stats.totalClients}명`}
+            value={`${totalClientsCount || stats.totalClients}명`}
             icon="👥"
             trend="up"
             trendValue="2명"
