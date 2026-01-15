@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import {
   ArrowLeft,
@@ -15,29 +16,126 @@ import {
   Minus,
 } from 'lucide-react'
 import { formatCurrency } from '../utils/formatters'
+import { showError } from '../utils/alert'
 
 const ClientDetail = () => {
   // 모든 Hook 선언을 최상단에 배치
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { clients, sales, activities, loading } = useData()
+  const [fallbackClient, setFallbackClient] = useState(null)
+  const [isFetchingClient, setIsFetchingClient] = useState(false)
+
+  const normalizeCompany = (name) => {
+    if (!name) return ''
+    return name
+      .toString()
+      .replace(/\u200B|\uFEFF/g, '')
+      .replace(/\u00A0/g, ' ')
+      .replace(/[（]/g, '(')
+      .replace(/[）]/g, ')')
+      .replace(/㈜/g, '(주)')
+      .replace(/주식회사|유한회사|합자회사|합명회사|유한|㈜|\(주\)|\(유\)/g, '')
+      .replace(/[\s\(\)\[\]\{\}\-_.·]/g, '')
+      .toLowerCase()
+      .trim()
+  }
+
+  const companyParam = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('company') || ''
+  }, [location.search])
 
   // 현재 선택된 고객 정보
   const currentClient = useMemo(() => {
     if (!clients || !Array.isArray(clients)) return null
-    return clients.find((c) => c.id === id)
-  }, [clients, id])
+    const directMatch = clients.find((c) => String(c.id) === String(id))
+    if (directMatch) return directMatch
+    if (!companyParam) return null
+    const target = normalizeCompany(companyParam)
+    return clients.find((c) => normalizeCompany(c.company) === target) || null
+  }, [clients, id, companyParam])
+
+  useEffect(() => {
+    const fetchFallbackClient = async () => {
+      if (loading || currentClient || !id) return
+      setIsFetchingClient(true)
+      try {
+        let clientData = null
+
+        const { data: directData, error: directError } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle()
+
+        if (directError) throw directError
+        clientData = directData
+
+        if (!clientData && companyParam) {
+          const { data: companyData, error: companyError } = await supabase
+            .from('clients')
+            .select('*')
+            .ilike('company', companyParam)
+            .limit(1)
+
+          if (companyError) throw companyError
+          clientData = (companyData || [])[0] || null
+        }
+
+        if (!clientData) {
+          setFallbackClient(null)
+          return
+        }
+
+        const { data: contactsData, error: contactsError } = await supabase
+          .from('client_contacts')
+          .select('*')
+          .eq('client_id', clientData.id)
+          .order('is_primary', { ascending: false })
+
+        if (contactsError) throw contactsError
+
+        const contacts = contactsData || []
+        const primary = contacts.find((c) => c.is_primary) || contacts[0]
+
+        setFallbackClient({
+          ...clientData,
+          lastOrder: clientData.last_order,
+          orderAmount: clientData.order_amount,
+          contact_person: primary?.name || '',
+          phone: primary?.phone || '',
+          email: primary?.email || '',
+        })
+      } catch (error) {
+        console.error('고객 상세 정보 조회 오류:', error)
+        await showError('고객 정보를 불러오는 중 오류가 발생했습니다.')
+      } finally {
+        setIsFetchingClient(false)
+      }
+    }
+
+    fetchFallbackClient()
+  }, [loading, currentClient, id, companyParam])
+
+  const resolvedClient = currentClient || fallbackClient
 
   // 같은 회사명을 가진 모든 고객 데이터
   const companyClients = useMemo(() => {
-    if (!currentClient || !clients || !Array.isArray(clients)) return []
-    const companyName = currentClient.company
+    if (!resolvedClient) return []
+    if (currentClient && clients && Array.isArray(clients)) {
+      const companyName = currentClient.company
+      if (!companyName) return [currentClient]
+      return clients.filter((c) => c.company === companyName)
+    }
+    const companyName = resolvedClient.company
     if (!companyName) return [currentClient]
-    return clients.filter((c) => c.company === companyName)
-  }, [currentClient, clients])
+    return [resolvedClient]
+  }, [currentClient, clients, resolvedClient])
 
   // 대표 담당자 (첫 번째)
-  const primaryContact = companyClients[0] || currentClient
+  const primaryContact = companyClients[0] || resolvedClient
 
   // 이 회사의 모든 매출 내역
   const companySales = useMemo(() => {
@@ -46,8 +144,10 @@ const ClientDetail = () => {
     if (!companyName) return []
 
     // 모든 담당자의 ID를 가져와서 매출 필터링
-    const companyClientIds = companyClients.map((c) => c.id)
-    return sales.filter((sale) => companyClientIds.includes(sale.clientId))
+    const companyClientIds = companyClients.map((c) => String(c.id))
+    return sales.filter((sale) =>
+      companyClientIds.includes(String(sale.clientId || sale.client_id))
+    )
   }, [sales, companyClients, primaryContact])
 
   // 이 회사의 모든 활동 내역
@@ -57,9 +157,9 @@ const ClientDetail = () => {
     if (!companyName) return []
 
     // 모든 담당자의 ID를 가져와서 활동 필터링
-    const companyClientIds = companyClients.map((c) => c.id)
+    const companyClientIds = companyClients.map((c) => String(c.id))
     return activities.filter((activity) =>
-      companyClientIds.includes(activity.clientId)
+      companyClientIds.includes(String(activity.clientId || activity.client_id))
     )
   }, [activities, companyClients, primaryContact])
 
@@ -183,7 +283,7 @@ const ClientDetail = () => {
   }, [companySales])
 
   // Guard Clause: loading 상태는 모든 Hook 선언 후에 처리
-  if (loading) {
+  if (loading || isFetchingClient) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-text-secondary">데이터를 불러오는 중...</div>
@@ -192,7 +292,7 @@ const ClientDetail = () => {
   }
 
   // Guard Clause: 고객 정보가 없으면
-  if (!currentClient) {
+  if (!resolvedClient) {
     return (
       <div className="flex flex-col items-center justify-center h-screen space-y-4">
         <p className="text-text-secondary">고객 정보를 찾을 수 없습니다.</p>

@@ -279,6 +279,30 @@ export const parseSaleExcel = (file) => {
         // UTF-8로 한글 컬럼명 정확히 읽기
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' })
 
+        const parseExcelNumber = (value, options = {}) => {
+          const { unit = 1 } = options
+          if (value === null || value === undefined || value === '') return 0
+          if (typeof value === 'number') return value
+
+          let text = value.toString().trim()
+          if (!text) return 0
+
+          let multiplier = 1
+          if (text.includes('만원')) {
+            multiplier = 10000
+            text = text.replace(/만원/g, '')
+          } else if (text.includes('만')) {
+            multiplier = 10000
+            text = text.replace(/만/g, '')
+          }
+
+          text = text.replace(/[,\s]/g, '')
+          text = text.replace(/[^\d.-]/g, '')
+          const parsed = parseFloat(text)
+          if (Number.isNaN(parsed)) return 0
+          return parsed * multiplier * unit
+        }
+
         // 데이터 변환 및 검증
         const salesData = []
         
@@ -288,9 +312,12 @@ export const parseSaleExcel = (file) => {
           const clientName = ((row['거래처'] || row['거래처명'] || row['회사명'] || row['client'] || row['clientName'] || row['Client'] || row['CLIENT'] || row['Company'] || row['COMPANY'] || '') || '').toString().trim()
           const itemName = ((row['품목명'] || row['제품명'] || row['item'] || row['item_name'] || row['product_name'] || row['Item'] || row['ITEM'] || row['Product'] || row['PRODUCT'] || '') || '').toString().trim()
           const quantityValue = row['수량'] || row['quantity'] || row['Quantity'] || row['QUANTITY'] || 0
-          const quantity = typeof quantityValue === 'number' ? quantityValue : (quantityValue ? parseFloat(quantityValue) : 1) || 1
-          const unitPriceValue = row['단가'] || row['unit_price'] || row['price'] || row['Price'] || row['PRICE'] || row['UnitPrice'] || row['UNIT_PRICE'] || 0
-          const unitPrice = typeof unitPriceValue === 'number' ? unitPriceValue : (unitPriceValue ? parseFloat(unitPriceValue) : 0) || 0
+          const quantity = parseExcelNumber(quantityValue) || 1
+          const unitPriceManValue = row['단가(만원)'] || row['단가(만)'] || row['단가_만원'] || row['단가_만'] || ''
+          const unitPriceValue = row['단가(원)'] || row['단가'] || row['unit_price'] || row['price'] || row['Price'] || row['PRICE'] || row['UnitPrice'] || row['UNIT_PRICE'] || 0
+          const unitPrice = unitPriceManValue !== '' && unitPriceManValue !== null && unitPriceManValue !== undefined
+            ? parseExcelNumber(unitPriceManValue, { unit: 10000 })
+            : parseExcelNumber(unitPriceValue)
           const notes = ((row['비고'] || row['notes'] || row['메모'] || row['Notes'] || row['NOTES'] || row['Memo'] || row['MEMO'] || '') || '').toString().trim()
 
           // 필수 필드 검증: 거래처명과 매출일만 필수 (품목명, 비고는 선택사항)

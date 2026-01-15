@@ -10,7 +10,7 @@ import SwipeableListItem from '../components/SwipeableListItem'
 import Pagination from '../components/common/Pagination'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { showConfirm, showError, showSuccess } from '../utils/alert'
-import { formatCurrency } from '../utils/formatters'
+import { formatKoreanCurrency } from '../utils/formatters'
 
 const PAGE_SIZE = 15
 
@@ -26,6 +26,7 @@ const Clients = () => {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [lastYearRevenueMap, setLastYearRevenueMap] = useState({})
 
   // ===== 헬퍼 함수들을 최상단에 정의 (useMemo에서 사용되므로 필수) =====
   // 고객별 최근 주문일 계산 (sales 데이터에서 집계)
@@ -63,24 +64,38 @@ const Clients = () => {
     return dates.length > 0 ? dates[0] : null
   }
 
-  // 고객별 올해 누적 주문 금액 계산 (sales 데이터에서 집계)
-  const getThisYearOrderAmount = (clientId) => {
-    if (!sales || !Array.isArray(sales)) return 0
+  // 고객별 최근 1년 매출액 계산 (sales 데이터에서 집계)
+  const getSaleDateForRange = (sale) => {
+    const raw = sale.sale_date || sale.date || sale.created_at
+    if (!raw) return null
+    const parsed = new Date(raw)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed
+  }
 
-    const currentYear = new Date().getFullYear()
-    const clientSales = sales.filter((sale) => {
-      if (sale.clientId !== clientId) return false
+  const getSaleAmount = (sale) => {
+    const directAmount = sale.total_amount ?? sale.totalAmount
+    if (directAmount !== undefined && directAmount !== null) {
+      return Number(directAmount) || 0
+    }
 
-      const saleDate = sale.sale_date || sale.date
-      if (!saleDate) return false
+    if (Array.isArray(sale.items) && sale.items.length > 0) {
+      return sale.items.reduce((sum, item) => {
+        const itemAmount = item.total_amount ?? item.totalAmount
+        if (itemAmount !== undefined && itemAmount !== null) {
+          return sum + (Number(itemAmount) || 0)
+        }
+        const qty = Number(item.quantity || 0)
+        const price = Number(item.unit_price ?? item.unitPrice ?? 0)
+        return sum + qty * price
+      }, 0)
+    }
 
-      const saleYear = new Date(saleDate).getFullYear()
-      return saleYear === currentYear
-    })
+    return 0
+  }
 
-    return clientSales.reduce((sum, sale) => {
-      return sum + (sale.totalAmount || 0)
-    }, 0)
+  const getLastYearRevenueAmount = (clientId) => {
+    return Number(lastYearRevenueMap[String(clientId)] || 0)
   }
 
   // 회사별 통계 계산
@@ -97,9 +112,9 @@ const Clients = () => {
       .filter((date) => date)
       .sort((a, b) => new Date(b) - new Date(a))
 
-    // 모든 담당자의 올해 주문 금액 합산
+    // 모든 담당자의 최근 1년 매출액 합산
     const totalAmount = companyClients.reduce((sum, client) => {
-      return sum + getThisYearOrderAmount(client.id)
+      return sum + getLastYearRevenueAmount(client.id)
     }, 0)
 
     return {
@@ -110,26 +125,41 @@ const Clients = () => {
   }
 
   // 데이터 페칭 함수 (검색 로직 제거, 항상 모든 데이터 가져오기)
+  const fetchAllRows = async (buildQuery, pageSize = 1000) => {
+    let from = 0
+    let results = []
+
+    while (true) {
+      const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+      if (error) throw error
+      results = results.concat(data || [])
+      if (!data || data.length < pageSize) break
+      from += pageSize
+    }
+
+    return results
+  }
+
   const fetchData = async () => {
     try {
       setLoading(true)
       
       // 모든 클라이언트 데이터 가져오기 (검색 필터링 없음)
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .order('company')
-        .range(0, 99999) // 1000-row limit 제거
-
-      if (error) throw error
+      const data = await fetchAllRows(() =>
+        supabase
+          .from('clients')
+          .select('*')
+          .order('company')
+      )
 
       // 담당자 정보 조회 (HTTP 400 방지: 모든 contacts를 가져와서 클라이언트 사이드에서 병합)
       // .in() 필터를 사용하지 않고 모든 contacts를 가져옴 (URL 길이 제한 회피)
-      const { data: contactsData } = await supabase
-        .from('client_contacts')
-        .select('*')
-        .order('is_primary', { ascending: false })
-        .range(0, 99999) // 1000-row limit 제거
+      const contactsData = await fetchAllRows(() =>
+        supabase
+          .from('client_contacts')
+          .select('*')
+          .order('is_primary', { ascending: false })
+      )
 
       const contactsByClient = (contactsData || []).reduce((acc, c) => {
         if (!acc[c.client_id]) acc[c.client_id] = []
@@ -150,6 +180,29 @@ const Clients = () => {
           email: primary?.email || ''
         }
       })
+
+      // 작년 매출액 집계 (DB 기준)
+      const lastYear = new Date().getFullYear() - 1
+      const startDate = `${lastYear}-01-01`
+      const endDate = `${lastYear}-12-31`
+      const salesData = await fetchAllRows(() =>
+        supabase
+          .from('sales')
+          .select('client_id, total_amount, quantity, unit_price')
+          .gte('sale_date', startDate)
+          .lte('sale_date', endDate)
+      )
+
+      const revenueMap = (salesData || []).reduce((acc, row) => {
+        const key = String(row.client_id)
+        const amount = row.total_amount !== null && row.total_amount !== undefined
+          ? Number(row.total_amount)
+          : Number(row.quantity || 0) * Number(row.unit_price || 0)
+        acc[key] = (acc[key] || 0) + (Number(amount) || 0)
+        return acc
+      }, {})
+
+      setLastYearRevenueMap(revenueMap)
 
       // 전체 데이터 저장 (Master Data)
       setAllClients(clientsData)
@@ -197,20 +250,58 @@ const Clients = () => {
     })
   }, [allClients, searchTerm]) // debouncedSearchTerm 대신 searchTerm 사용 (즉시 반응)
 
-  // 페이지네이션 적용 (필터링된 데이터 기준)
-  const paginatedClients = useMemo(() => {
-    const from = (page - 1) * PAGE_SIZE
-    const to = from + PAGE_SIZE
-    return filteredClients.slice(from, to)
-  }, [filteredClients, page])
-
   // totalCount 업데이트 (필터링된 데이터 기준)
   useEffect(() => {
     setTotalCount(filteredClients.length)
   }, [filteredClients])
 
-  // 회사명 기준으로 그룹핑 (페이지네이션된 데이터 기준)
+  // 회사명 기준으로 그룹핑 (필터링된 데이터 전체 기준)
   const groupedClients = useMemo(() => {
+    if (!filteredClients || !Array.isArray(filteredClients)) return {}
+
+    return filteredClients.reduce((acc, client) => {
+      const company = client.company || '기타'
+      if (!acc[company]) {
+        acc[company] = []
+      }
+      acc[company].push(client)
+      return acc
+    }, {})
+  }, [filteredClients])
+
+  // 검색 필터링은 이미 filteredClients에서 처리되므로 groupedClients를 그대로 사용
+  const filteredGroupedClients = groupedClients
+
+  // 표시할 그룹 (총 매출액 기준 내림차순 정렬)
+  const sortedCompanies = useMemo(() => {
+    const groups = Object.keys(filteredGroupedClients)
+    
+    // 각 그룹의 총 매출액을 계산하여 정렬
+    const sortedGroups = groups.sort((a, b) => {
+      const groupA = filteredGroupedClients[a]
+      const groupB = filteredGroupedClients[b]
+      const statsA = getCompanyStats(groupA)
+      const statsB = getCompanyStats(groupB)
+      return (statsB.totalAmount || 0) - (statsA.totalAmount || 0) // 내림차순
+    })
+    
+    return sortedGroups
+  }, [filteredGroupedClients, sales]) // sales 의존성 추가 (getCompanyStats가 sales를 사용)
+
+  // 정렬된 그룹 순서를 유지한 전체 리스트 생성
+  const orderedClients = useMemo(() => {
+    return sortedCompanies.flatMap((company) => filteredGroupedClients[company])
+  }, [sortedCompanies, filteredGroupedClients])
+
+  // 페이지네이션 적용 (정렬된 데이터 기준)
+  const paginatedClients = useMemo(() => {
+    const from = (page - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE
+    return orderedClients.slice(from, to)
+  }, [orderedClients, page])
+
+  // 페이지네이션된 데이터로 그룹핑 (표시용)
+  const paginatedGroupedClients = useMemo(() => {
     if (!paginatedClients || !Array.isArray(paginatedClients)) return {}
 
     return paginatedClients.reduce((acc, client) => {
@@ -223,28 +314,15 @@ const Clients = () => {
     }, {})
   }, [paginatedClients])
 
-  // 검색 필터링은 이미 filteredClients에서 처리되므로 groupedClients를 그대로 사용
-  const filteredGroupedClients = groupedClients
-
-  // 표시할 그룹 (총 매출액 기준 내림차순 정렬)
+  // 표시할 그룹 (정렬된 순서 + 페이지네이션 반영)
   const visibleGroupedClients = useMemo(() => {
-    const groups = Object.keys(filteredGroupedClients)
-    
-    // 각 그룹의 총 매출액을 계산하여 정렬
-    const sortedGroups = groups.sort((a, b) => {
-      const groupA = filteredGroupedClients[a]
-      const groupB = filteredGroupedClients[b]
-      const statsA = getCompanyStats(groupA)
-      const statsB = getCompanyStats(groupB)
-      return (statsB.totalAmount || 0) - (statsA.totalAmount || 0) // 내림차순
-    })
-    
-    // 정렬된 순서대로 객체 재구성
-    return sortedGroups.reduce((acc, company) => {
-      acc[company] = filteredGroupedClients[company]
+    return sortedCompanies.reduce((acc, company) => {
+      if (paginatedGroupedClients[company]) {
+        acc[company] = paginatedGroupedClients[company]
+      }
       return acc
     }, {})
-  }, [filteredGroupedClients, sales]) // sales 의존성 추가 (getCompanyStats가 sales를 사용)
+  }, [sortedCompanies, paginatedGroupedClients])
 
   // 상태 색상 함수 (매출, 신규, 단절 통일)
   const getStatusColor = (status) => {
@@ -288,13 +366,35 @@ const Clients = () => {
     try {
       setLoading(true)
       
+      // 외래 키 제약조건으로 인한 오류 방지: 관련 테이블부터 삭제
+      const { error: contactsError } = await supabase
+        .from('client_contacts')
+        .delete()
+        .neq('id', 0)
+
+      if (contactsError) throw contactsError
+
+      const { error: activitiesError } = await supabase
+        .from('activities')
+        .delete()
+        .neq('id', 0)
+
+      if (activitiesError) throw activitiesError
+
+      const { error: salesError } = await supabase
+        .from('sales')
+        .delete()
+        .neq('id', 0)
+
+      if (salesError) throw salesError
+
       // 모든 clients 레코드 삭제
-      const { error } = await supabase
+      const { error: clientsError } = await supabase
         .from('clients')
         .delete()
         .neq('id', 0) // 모든 레코드 삭제 (id가 0이 아닌 모든 레코드)
 
-      if (error) throw error
+      if (clientsError) throw clientsError
 
       await showSuccess('모든 거래처 데이터가 삭제되었습니다.')
       
@@ -410,7 +510,7 @@ const Clients = () => {
                   Recent Contact Date
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                  누적 주문 금액 (올해)
+                  작년 매출액
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
                   작업
@@ -433,7 +533,7 @@ const Clients = () => {
                     <tr key={company} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-5">
                         <Link
-                          to={`/clients/${primaryContact?.id}`}
+                          to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
                           className="text-sm font-semibold text-text-primary hover:text-brand-blue transition-colors cursor-pointer"
                         >
                           {company}
@@ -483,7 +583,7 @@ const Clients = () => {
                       <td className="px-6 py-5 whitespace-nowrap text-sm font-semibold text-text-primary">
                         {stats.totalAmount === 0
                           ? '0원'
-                          : formatCurrency(stats.totalAmount || 0)}
+                          : formatKoreanCurrency(stats.totalAmount || 0)}
                       </td>
                       <td className="px-6 py-5 whitespace-nowrap text-sm">
                         <button
@@ -556,7 +656,7 @@ const Clients = () => {
                   enabled={true}
                 >
                   <Link
-                    to={`/clients/${primaryContact?.id}`}
+                    to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
                     className="block p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation"
                     style={{ WebkitTapHighlightColor: 'transparent' }}
                   >
@@ -608,7 +708,7 @@ const Clients = () => {
                         <span className="text-xs font-semibold text-text-primary">
                           {stats.totalAmount === 0
                             ? '0원'
-                            : formatCurrency(stats.totalAmount || 0)}
+                            : formatKoreanCurrency(stats.totalAmount || 0)}
                         </span>
                       </div>
                     </div>

@@ -257,9 +257,19 @@ const Sales = () => {
         const client = clients?.find(c => c.id === saleData.client_id)
         
         // Step 3: 두 데이터 합치기 (우선순위: sales_items > items JSON 배열)
-        const itemsArray = itemsData && itemsData.length > 0 
-          ? itemsData 
-          : (saleData.items || [])
+      let itemsArray = itemsData && itemsData.length > 0 
+        ? itemsData 
+        : (saleData.items || [])
+
+      if ((!itemsArray || itemsArray.length === 0) && slip.originalSales && slip.originalSales.length > 0) {
+        // sales 테이블 행 기반 데이터가 있는 경우, 그룹의 원본 행을 품목 리스트로 사용
+        itemsArray = slip.originalSales.map((sale) => ({
+          id: sale.id,
+          item_name: sale.item_name || sale.displayItemName || '',
+          quantity: sale.quantity || 1,
+          unit_price: sale.unit_price || sale.unitPrice || 0
+        }))
+      }
         
         // 상세 데이터를 모달에 전달
         const detailedSale = {

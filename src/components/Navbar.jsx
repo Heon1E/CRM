@@ -131,14 +131,14 @@ const Navbar = () => {
       // 알림: 백업 시작
       alert('데이터 백업을 시작합니다...')
 
-      // Supabase에서 모든 테이블 데이터 가져오기
+      // Supabase에서 모든 테이블 데이터 가져오기 (1000-row limit 제거)
       const [productsResult, clientsResult, activitiesResult, salesResult, issuesResult, settingsResult] = await Promise.all([
-        supabase.from('products').select('*'),
-        supabase.from('clients').select('*'),
-        supabase.from('activities').select('*'),
-        supabase.from('sales').select('*'),
-        supabase.from('issues').select('*'),
-        supabase.from('settings').select('*').eq('user_id', user.id)
+        supabase.from('products').select('*').range(0, 99999),
+        supabase.from('clients').select('*').range(0, 99999),
+        supabase.from('activities').select('*').range(0, 99999),
+        supabase.from('sales').select('*').range(0, 99999),
+        supabase.from('issues').select('*').range(0, 99999),
+        supabase.from('settings').select('*').eq('user_id', user.id).range(0, 99999)
       ])
 
       // 에러 확인

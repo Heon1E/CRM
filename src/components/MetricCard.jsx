@@ -12,16 +12,20 @@ const MetricCard = ({ title, value, icon, trend, trendValue, onClick, clickable,
   return (
     <div
       onClick={clickable && onClick ? onClick : undefined}
-      className={`card card-hover p-3 md:p-5 lg:p-6 w-full ${bgColorClass} ${
+      className={`card w-full ${bgColorClass} ${
         clickable && onClick ? 'cursor-pointer hover:border-brand-blue' : ''
       }`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between p-4 md:p-5">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-text-secondary mb-1 md:mb-2">{title}</p>
-          <p className="text-xl md:text-2xl lg:text-3xl font-bold text-text-primary break-words mb-1 md:mb-2">{value}</p>
+          <p className="text-[11px] md:text-xs font-medium text-text-secondary uppercase tracking-wide mb-1">
+            {title}
+          </p>
+          <p className="text-2xl md:text-3xl font-semibold text-text-primary break-words">
+            {value}
+          </p>
           {trend && trendValue && (
-            <div className="flex items-center mt-2 md:mt-3 flex-wrap">
+            <div className="flex items-center mt-2 flex-wrap">
               <span className={`text-xs font-semibold ${trend === 'up' ? 'text-brand-green' : 'text-red-500'}`}>
                 {trend === 'up' ? '↑' : '↓'} {trendValue}
               </span>
@@ -29,8 +33,8 @@ const MetricCard = ({ title, value, icon, trend, trendValue, onClick, clickable,
             </div>
           )}
         </div>
-        <div className="w-10 h-10 md:w-12 md:h-12 lg:w-16 lg:h-16 bg-blue-50 rounded-card flex items-center justify-center flex-shrink-0 ml-2 md:ml-4">
-          <span className="text-xl md:text-2xl lg:text-3xl">{icon || '📊'}</span>
+        <div className="w-9 h-9 md:w-10 md:h-10 bg-indigo-50 rounded-full flex items-center justify-center flex-shrink-0 ml-3">
+          <span className="text-lg md:text-xl">{icon || '📊'}</span>
         </div>
       </div>
     </div>

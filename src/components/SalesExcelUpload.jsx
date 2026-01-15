@@ -8,12 +8,61 @@ import { showSuccess, showError, showWarning } from '../utils/alert'
 const SalesExcelUpload = ({ onRefresh }) => {
   const { clients, addSale } = useData()
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, stage: '' })
   const [isDeleting, setIsDeleting] = useState(false)
   const fileInputRef = useRef(null)
 
   // 양식 다운로드
   const handleDownloadTemplate = () => {
     downloadSaleTemplate()
+  }
+
+  const normalizeKey = (name, { removeCorp = false, removePunct = false } = {}) => {
+    if (!name) return ''
+    let text = name
+      .toString()
+      .replace(/\u200B|\uFEFF/g, '') // zero-width chars
+      .replace(/\u00A0/g, ' ') // nbsp
+      .replace(/[（]/g, '(')
+      .replace(/[）]/g, ')')
+      .replace(/㈜/g, '(주)')
+      .trim()
+
+    if (removeCorp) {
+      text = text.replace(/주식회사|유한회사|합자회사|합명회사|유한|㈜|\(주\)|\(유\)/g, '')
+    }
+
+    if (removePunct) {
+      text = text.replace(/[\s\(\)\[\]\{\}\-_.·]/g, '')
+    } else {
+      text = text.replace(/\s+/g, '')
+    }
+
+    return text.toLowerCase()
+  }
+
+  const buildClientKeys = (name) => {
+    const keys = new Set()
+    keys.add(normalizeKey(name))
+    keys.add(normalizeKey(name, { removeCorp: true }))
+    keys.add(normalizeKey(name, { removePunct: true }))
+    keys.add(normalizeKey(name, { removeCorp: true, removePunct: true }))
+    return Array.from(keys).filter(Boolean)
+  }
+
+  const fetchAllRows = async (buildQuery, pageSize = 1000) => {
+    let from = 0
+    let results = []
+
+    while (true) {
+      const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+      if (error) throw error
+      results = results.concat(data || [])
+      if (!data || data.length < pageSize) break
+      from += pageSize
+    }
+
+    return results
   }
 
   // 엑셀 업로드 처리 (Smart Bulk Upload with Consumption Logic)
@@ -28,6 +77,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
     }
 
     setIsUploading(true)
+    setUploadProgress({ current: 0, total: 0, stage: '파일 파싱 중' })
 
     try {
       // Step 1: 엑셀 파일 파싱
@@ -40,16 +90,35 @@ const SalesExcelUpload = ({ onRefresh }) => {
       }
 
       // 거래처명으로 clientId 찾기 및 유효성 검사
+      setUploadProgress({ current: 0, total: 0, stage: '거래처 목록 불러오는 중' })
       const validatedSales = []
       const errors = []
 
+      const fetchedClients = await fetchAllRows(() =>
+        supabase
+          .from('clients')
+          .select('id, company')
+          .order('company')
+      )
+
+      const clientMap = new Map()
+      ;(fetchedClients || []).forEach((c) => {
+        buildClientKeys(c.company).forEach((key) => {
+          if (!clientMap.has(key)) clientMap.set(key, c)
+        })
+      })
+
+      setUploadProgress({ current: 0, total: salesData.length, stage: '거래처 매칭 중' })
+
+      let processedCount = 0
       for (const sale of salesData) {
         // 거래처명이 없으면 건너뛰기
         if (!sale.clientName || sale.clientName.trim() === '') {
           continue
         }
         
-        const client = clients.find((c) => c.company === sale.clientName)
+        const clientKeys = buildClientKeys(sale.clientName)
+        const client = clientKeys.map((key) => clientMap.get(key)).find(Boolean)
         if (!client) {
           errors.push(`${sale.rowIndex || '알 수 없음'}번째 행: 거래처 "${sale.clientName}"를 찾을 수 없습니다.`)
           continue
@@ -68,6 +137,14 @@ const SalesExcelUpload = ({ onRefresh }) => {
           totalAmount: totalAmount,
           notes: sale.notes,
         })
+        processedCount += 1
+        if (processedCount % 200 === 0 || processedCount === salesData.length) {
+          setUploadProgress((prev) => ({
+            ...prev,
+            current: processedCount,
+            total: salesData.length
+          }))
+        }
       }
 
       if (errors.length > 0) {
@@ -89,19 +166,24 @@ const SalesExcelUpload = ({ onRefresh }) => {
       }
 
       // Step 2: Supabase에서 해당 날짜들의 모든 기존 sales 데이터 조회 (No JOIN)
-      const { data: existingSales, error: fetchError } = await supabase
-        .from('sales')
-        .select('*')
-        .in('sale_date', excelDates)
-
-      if (fetchError) {
-        console.error('기존 매출 데이터 조회 오류:', fetchError)
+      setUploadProgress({ current: 0, total: excelDates.length, stage: '기존 매출 조회 중' })
+      let existingSales = []
+      try {
+        existingSales = await fetchAllRows(() =>
+          supabase
+            .from('sales')
+            .select('*')
+            .in('sale_date', excelDates)
+        )
+      } catch (error) {
+        console.error('기존 매출 데이터 조회 오류:', error)
         await showError('기존 매출 데이터를 불러오는 중 오류가 발생했습니다.')
         setIsUploading(false)
         return
       }
 
       // Step 3: Matching & Consuming Logic
+      setUploadProgress({ current: 0, total: validatedSales.length, stage: '중복 확인 중' })
       // 기존 DB 레코드 풀 생성 (사용 여부 추적)
       const dbRecordsPool = (existingSales || []).map(record => ({
         ...record,
@@ -113,6 +195,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       let duplicateCount = 0
 
       // 각 Excel 행에 대해 매칭 시도
+      let dedupeCount = 0
       for (const excelSale of validatedSales) {
         const matchKey = `${excelSale.sale_date}|${excelSale.clientId}|${excelSale.totalAmount || 0}`
         
@@ -129,6 +212,14 @@ const SalesExcelUpload = ({ onRefresh }) => {
           // 매칭 없음: 새로운 레코드로 추가
           salesToInsert.push(excelSale)
         }
+        dedupeCount += 1
+        if (dedupeCount % 200 === 0 || dedupeCount === validatedSales.length) {
+          setUploadProgress((prev) => ({
+            ...prev,
+            current: dedupeCount,
+            total: validatedSales.length
+          }))
+        }
       }
 
       // Step 4: 새로운 레코드만 삽입
@@ -136,6 +227,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       const insertErrors = []
 
       if (salesToInsert.length > 0) {
+        setUploadProgress({ current: 0, total: salesToInsert.length, stage: '매출 등록 중' })
         // 날짜별로 그룹화하여 addSale 함수 형식에 맞게 변환
         const groupedByDate = {}
         salesToInsert.forEach((sale) => {
@@ -155,12 +247,20 @@ const SalesExcelUpload = ({ onRefresh }) => {
         })
 
         // 각 날짜별로 addSale 호출
+        let insertedSoFar = 0
+        const totalToInsert = salesToInsert.length
         for (const dateKey of Object.keys(groupedByDate)) {
           try {
-            await addSale({
+            const result = await addSale({
               rows: groupedByDate[dateKey],
             })
             insertedCount += groupedByDate[dateKey].length
+            insertedSoFar += result?.inserted || groupedByDate[dateKey].length
+            setUploadProgress((prev) => ({
+              ...prev,
+              current: Math.min(insertedSoFar, totalToInsert),
+              total: totalToInsert
+            }))
           } catch (error) {
             console.error(`매출 등록 오류 (${dateKey}):`, error)
             insertErrors.push(`${dateKey} 날짜의 매출 등록 중 오류: ${error.message || '알 수 없는 오류'}`)
@@ -191,6 +291,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       await showError(`엑셀 업로드 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`)
     } finally {
       setIsUploading(false)
+      setUploadProgress({ current: 0, total: 0, stage: '' })
     }
   }
 
@@ -263,6 +364,24 @@ const SalesExcelUpload = ({ onRefresh }) => {
           )}
         </label>
       </div>
+      {isUploading && uploadProgress.stage && (
+        <div className="flex items-center space-x-3 min-w-[220px]">
+          <div className="flex-1">
+            <p className="text-xs text-text-secondary mb-1">{uploadProgress.stage}</p>
+            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-2 bg-indigo-500 transition-all"
+                style={{
+                  width: `${uploadProgress.total > 0 ? Math.min(100, Math.round((uploadProgress.current / uploadProgress.total) * 100)) : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+          <span className="text-xs text-text-secondary whitespace-nowrap">
+            {uploadProgress.total > 0 ? `${uploadProgress.current}/${uploadProgress.total}` : ''}
+          </span>
+        </div>
+      )}
       {/* Delete All 버튼 (위험 구역) */}
       <button
         onClick={handleDeleteAll}

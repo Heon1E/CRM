@@ -1,4 +1,5 @@
-/* 1. 프리텐다드 웹폰트 CDN 불러오기 (가장 상단에 위치해야 함) */
+/* 1. Typography: Inter + Pretendard fallback */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 
 @tailwind base;
@@ -25,8 +26,8 @@ article, aside, canvas, details, embed,
 figure, figcaption, footer, header, hgroup,
 menu, nav, output, ruby, section, summary,
 time, mark, audio, video, button, input, select, textarea {
-  /* 1. 폰트 패밀리: 프리텐다드 최우선 적용 */
-  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif !important;
+  /* 1. 폰트 패밀리 */
+  font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif !important;
   
   /* 2. ★핵심★: 숫자를 고정폭(Monospace)처럼 가지런히 배열 */
   font-variant-numeric: tabular-nums !important;
@@ -51,8 +52,8 @@ body {
 @layer base {
   body {
     margin: 0;
-    background-color: #F3F4F6; /* 배경색 유지 */
-    color: #1F2937; /* 글자색 유지 */
+    background-color: #F7F7F8;
+    color: #111827;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
@@ -60,29 +61,37 @@ body {
 
 @layer components {
   /* =========================================
-     [UI 구조: 모던 인더스트리얼 스타일 유지]
+     Linear-inspired UI primitives
      ========================================= */
   .card, .bg-white, .shadow-sm, .rounded-lg, [class*="bg-white"], .rbc-month-view {
-    box-shadow: none !important;
-    border: 1px solid #D1D5DB !important;
-    border-radius: 4px !important;
+    box-shadow: 0 1px 2px rgba(17,24,39,0.04) !important;
+    border: 1px solid #E5E7EB !important;
+    border-radius: 10px !important;
   }
   .card:not([class*="bg-"]), .bg-white:not([class*="bg-"]) { background-color: #FFFFFF; }
 
   .btn, button, [role="button"] {
-    border-radius: 4px !important; box-shadow: none !important;
-    font-weight: 500 !important; transition: all 0.2s; min-height: 44px;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+    transition: all 0.15s ease;
+    min-height: 40px;
   }
-  .btn-primary { @apply text-white bg-blue-600 hover:bg-blue-700; border: 1px solid transparent !important; }
-  .btn-secondary { @apply bg-white text-gray-700 hover:bg-gray-50; border: 1px solid #D1D5DB !important; }
+  .btn-primary { @apply text-white bg-indigo-500 hover:bg-indigo-600; border: 1px solid transparent !important; }
+  .btn-secondary { @apply bg-white text-gray-700 hover:bg-gray-50; border: 1px solid #E5E7EB !important; }
   .btn-success { @apply text-white bg-green-600 hover:bg-green-700; border: 1px solid transparent !important; }
 
   input, select, textarea, .input-field {
-    @apply bg-white rounded; border: 1px solid #D1D5DB !important;
-    border-radius: 4px !important; box-shadow: none !important; padding: 0.5rem 0.75rem;
+    @apply bg-white rounded;
+    border: 1px solid #E5E7EB !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    padding: 0.5rem 0.75rem;
   }
   input:focus, select:focus, textarea:focus {
-    outline: none; border-color: #2563EB !important; box-shadow: 0 0 0 1px #2563EB !important;
+    outline: none;
+    border-color: #6366F1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.18) !important;
   }
 
   table, th, td { border-color: #E5E7EB !important; }

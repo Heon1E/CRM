@@ -480,22 +480,23 @@ export const DataProvider = ({ children }) => {
 
   const addSale = useCallback(async (s) => {
     const uid = await getValidUserId(user)
-    
+    const BATCH_SIZE = 1000
+
     // 중복 체크: 거래처명과 판매날짜가 모두 일치하는 데이터가 이미 있는지 확인
     const rowsToInsert = []
     const skippedRows = []
-    
+
     for (const r of s.rows) {
       const clientId = r.clientId || r.client_id
       const saleDate = r.sale_date || r.saleDate
-      
+
       // 기존 sales 데이터에서 중복 확인 (그룹화된 데이터를 평탄화하여 확인)
       const existingSale = sales.find(sale => {
         const saleClientId = sale.client_id || sale.clientId
         const saleDateStr = sale.sale_date || sale.date
         return saleClientId === clientId && saleDateStr === saleDate
       })
-      
+
       if (existingSale) {
         skippedRows.push({
           clientId: clientId,
@@ -504,20 +505,20 @@ export const DataProvider = ({ children }) => {
         })
         continue
       }
-      
+
       rowsToInsert.push(r)
     }
-    
+
     // 건너뛴 항목이 있으면 로그 출력
     if (skippedRows.length > 0) {
       console.log(`건너뛴 매출 데이터: ${skippedRows.length}건`)
     }
-    
+
     // 등록할 데이터가 없으면 조기 종료
     if (rowsToInsert.length === 0) {
       return { skipped: skippedRows.length }
     }
-    
+
     // DB 컬럼명(snake_case)으로 변환 및 필드 정제 (PGRST204 에러 방지)
     const rows = rowsToInsert.map(r => {
       const row = {
@@ -530,12 +531,12 @@ export const DataProvider = ({ children }) => {
         notes: r.notes || '', // 비고가 없어도 등록 가능
         created_by: uid
       }
-      
+
       // 빈 문자열 날짜 필드를 null로 변환
       if (!row.sale_date || row.sale_date === '') {
         row.sale_date = null
       }
-      
+
       // DB에 없는 필드 제거 (임시 필드 및 camelCase 필드) - PGRST204 에러 방지
       delete row.clientId
       delete row.totalAmount
@@ -545,22 +546,30 @@ export const DataProvider = ({ children }) => {
       delete row.rowIndex // 엑셀 파싱 시 추가된 임시 필드 제거
       delete row.clientName // 엑셀 파싱 시 사용된 임시 필드 제거
       delete row.price // DB에 없는 필드 (unit_price 사용)
-      
+
       return row
     })
-    
+
     // 디버깅: DB에 전송될 데이터 확인
     console.log('[addSale] sales 테이블에 저장될 데이터:', rows)
     console.log('[addSale] 전송될 데이터의 키 목록:', rows.map(r => Object.keys(r)))
-    
-    const { data, error } = await supabase.from('sales').insert(rows).select()
-    if (error) throw error
-    
+
+    let insertedTotal = 0
+    const insertedData = []
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE)
+      const { data, error } = await supabase.from('sales').insert(batch).select()
+      if (error) throw error
+      insertedTotal += batch.length
+      if (data && data.length > 0) insertedData.push(...data)
+    }
+
     // 새로 추가된 데이터를 기존 데이터와 합쳐서 그룹화
     setSales(prev => {
       // 새로 추가된 데이터 정규화
-      const newSales = data.map(d => ({ ...d, totalAmount: d.total_amount, clientId: d.client_id, date: d.sale_date }))
-      
+      const newSales = insertedData.map(d => ({ ...d, totalAmount: d.total_amount, clientId: d.client_id, date: d.sale_date }))
+
       // 기존 데이터가 그룹화되어 있으므로, items 배열을 평탄화해야 함
       const flattenedPrev = prev.flatMap(group => {
         // 그룹에 items 배열이 있으면 각 항목을 개별 행으로 반환
@@ -590,14 +599,14 @@ export const DataProvider = ({ children }) => {
           created_at: group.created_at
         }]
       })
-      
+
       // 기존 데이터(평탄화)와 새 데이터 합치기
       const allSales = [...flattenedPrev, ...newSales]
       // 전체 데이터를 다시 그룹화 (새로 추가된 데이터가 기존 그룹과 합쳐질 수 있음)
       return processGroupedSales(allSales)
     })
-    
-    return { inserted: rows.length, skipped: skippedRows.length }
+
+    return { inserted: insertedTotal, skipped: skippedRows.length }
   }, [user, processGroupedSales, sales])
 
   // 매출 수정 (그룹 내 모든 항목 업데이트)

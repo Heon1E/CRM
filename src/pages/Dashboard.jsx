@@ -279,11 +279,12 @@ const Dashboard = () => {
     .slice(0, 5)
 
   return (
-    <div className="space-y-4 pb-20 md:pb-0">
+    <div className="space-y-6 md:space-y-8 pb-20 md:pb-0">
       {/* 상단 헤더 영역 */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold text-text-primary">Dashboard</h1>
+          <p className="text-xs md:text-sm text-text-secondary mb-1">Overview</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-text-primary">Dashboard</h1>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto justify-end md:hidden">
           <AppInstallGuide />
@@ -291,16 +292,16 @@ const Dashboard = () => {
       </div>
 
       {/* 새로운 그리드 레이아웃 */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-6 md:gap-8">
         {/* 첫 번째 행: 요약 카드 */}
-        <div className={`grid grid-cols-1 md:grid-cols-3 ${getUserSalesRep ? 'lg:grid-cols-5' : ''} gap-4`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 ${getUserSalesRep ? 'lg:grid-cols-5' : ''} gap-4`}>
           <MetricCard
             title="총 거래처"
             value={`${totalClientsCount || stats.totalClients}명`}
             icon="👥"
             trend="up"
             trendValue="2명"
-            bgColor="bg-slate-200"
+            bgColor="bg-white"
           />
           {getUserSalesRep && (
             <MetricCard
@@ -318,7 +319,7 @@ const Dashboard = () => {
             icon="💰"
             trend={stats.salesGrowthRate >= 0 ? 'up' : 'down'}
             trendValue={`${Math.abs(stats.salesGrowthRate).toFixed(1)}%`}
-            bgColor="bg-teal-100"
+            bgColor="bg-white"
           />
           {getUserSalesRep && (
             <MetricCard
@@ -327,7 +328,7 @@ const Dashboard = () => {
               icon="💰"
               trend="up"
               trendValue=""
-              bgColor="bg-indigo-100"
+              bgColor="bg-white"
             />
           )}
           <MetricCard
@@ -338,44 +339,52 @@ const Dashboard = () => {
             trendValue="1건"
             onClick={handleOngoingClick}
             clickable
-            bgColor="bg-amber-100"
+            bgColor="bg-white"
           />
         </div>
 
         {/* 두 번째 행: KPI 현황 (신규 추가) */}
-        <div className="card p-4 md:p-5">
-          <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">KPI Status</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card p-5 md:p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-text-secondary">KPI</p>
+              <h3 className="text-base md:text-lg font-semibold text-text-primary">KPI Status</h3>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* 매출 목표 달성률 */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700">매출 목표 달성률</span>
-                <span className="text-sm font-bold text-gray-900">75%</span>
+                <span className="text-sm font-semibold text-gray-900">75%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '75%' }}></div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '75%' }}></div>
               </div>
             </div>
             {/* 신규 고객 목표 달성률 */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-700">신규 고객 목표 달성률</span>
-                <span className="text-sm font-bold text-gray-900">60%</span>
+                <span className="text-sm font-semibold text-gray-900">60%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div className="bg-teal-600 h-2.5 rounded-full" style={{ width: '60%' }}></div>
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '60%' }}></div>
               </div>
             </div>
           </div>
         </div>
 
         {/* 세 번째 행: 그래프(2) + 일정 리스트(1) */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* 왼쪽: Revenue Trend (전체 매출 추이) */}
-          <div className="lg:col-span-2 card p-4 md:p-5">
-            <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
-              Revenue Trend
-            </h3>
+          <div className="lg:col-span-2 card p-5 md:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-text-secondary">Revenue</p>
+                <h3 className="text-base md:text-lg font-semibold text-text-primary">Revenue Trend</h3>
+              </div>
+            </div>
             {weeklySalesData.length > 0 ? (
               <div className="w-full h-64 md:h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -383,16 +392,16 @@ const Dashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
                       dataKey="week"
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 11 }}
+                      stroke="#9ca3af"
+                      tick={{ fill: '#9ca3af', fontSize: 11 }}
                       angle={-45}
                       textAnchor="end"
                       height={70}
                       interval={0}
                     />
                     <YAxis
-                      stroke="#6b7280"
-                      tick={{ fill: '#6b7280', fontSize: 12 }}
+                      stroke="#9ca3af"
+                      tick={{ fill: '#9ca3af', fontSize: 12 }}
                       tickFormatter={(value) => formatCurrency(value * 10000)}
                       width={70}
                       domain={[0, 'auto']}
@@ -408,21 +417,21 @@ const Dashboard = () => {
                       formatter={(value) => [formatCurrency(Number(value) * 10000), '매출']}
                       labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }} />
+                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
                     <Area
                       type="monotone"
                       dataKey="매출"
-                      fill="#f3f4f6"
-                      fillOpacity={0.3}
+                      fill="#EEF2FF"
+                      fillOpacity={0.6}
                       stroke="none"
                     />
                     <Line
                       type="monotone"
                       dataKey="매출"
-                      stroke="#317AE2"
+                      stroke="#6366F1"
                       strokeWidth={2}
-                      dot={{ fill: '#317AE2', r: 4 }}
-                      activeDot={{ r: 6 }}
+                      dot={{ fill: '#6366F1', r: 3 }}
+                      activeDot={{ r: 5 }}
                       name="매출"
                     />
                   </LineChart>
@@ -437,10 +446,13 @@ const Dashboard = () => {
 
           {/* 중앙: My Sales Trend (담당 거래처 매출 추이) */}
           {getUserSalesRep && (
-            <div className="lg:col-span-2 card p-4 md:p-5">
-              <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
-                My Sales Trend
-              </h3>
+            <div className="lg:col-span-2 card p-5 md:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-text-secondary">My Revenue</p>
+                  <h3 className="text-base md:text-lg font-semibold text-text-primary">My Sales Trend</h3>
+                </div>
+              </div>
               {myWeeklySalesData.length > 0 ? (
                 <div className="w-full h-64 md:h-80">
                   <ResponsiveContainer width="100%" height="100%">
@@ -448,16 +460,16 @@ const Dashboard = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis
                         dataKey="week"
-                        stroke="#6b7280"
-                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                        stroke="#9ca3af"
+                        tick={{ fill: '#9ca3af', fontSize: 11 }}
                         angle={-45}
                         textAnchor="end"
                         height={70}
                         interval={0}
                       />
                       <YAxis
-                        stroke="#6b7280"
-                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                        stroke="#9ca3af"
+                        tick={{ fill: '#9ca3af', fontSize: 12 }}
                         tickFormatter={(value) => formatCurrency(value * 10000)}
                         width={70}
                         domain={[0, 'auto']}
@@ -473,21 +485,21 @@ const Dashboard = () => {
                         formatter={(value) => [formatCurrency(Number(value) * 10000), '매출']}
                         labelStyle={{ fontWeight: 'bold', marginBottom: '4px' }}
                       />
-                      <Legend wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }} />
+                      <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
                       <Area
                         type="monotone"
                         dataKey="매출"
-                        fill="#dbeafe"
-                        fillOpacity={0.3}
+                        fill="#EEF2FF"
+                        fillOpacity={0.6}
                         stroke="none"
                       />
                       <Line
                         type="monotone"
                         dataKey="매출"
-                        stroke="#3b82f6"
+                        stroke="#6366F1"
                         strokeWidth={2}
-                        dot={{ fill: '#3b82f6', r: 4 }}
-                        activeDot={{ r: 6 }}
+                        dot={{ fill: '#6366F1', r: 3 }}
+                        activeDot={{ r: 5 }}
                         name="매출"
                       />
                     </LineChart>
@@ -502,17 +514,20 @@ const Dashboard = () => {
           )}
 
           {/* 오른쪽: Upcoming Events (다음 일정) */}
-          <div className={`card p-4 md:p-5 ${getUserSalesRep ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
-            <h3 className="text-base md:text-lg font-bold text-text-primary mb-4">
-              Upcoming Events
-            </h3>
+          <div className={`card p-5 md:p-6 ${getUserSalesRep ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-text-secondary">Schedule</p>
+                <h3 className="text-base md:text-lg font-semibold text-text-primary">Upcoming Events</h3>
+              </div>
+            </div>
             <div className="space-y-2">
               {upcomingEvents.length > 0 ? (
                 upcomingEvents.slice(0, 5).map((event) => (
                   <div
                     key={event.id}
                     onClick={() => setEditingActivityId(event.id)}
-                    className="p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                   >
                     <div className="text-xs font-semibold text-gray-700 mb-1">
                       {formatDate(event.scheduleDate || event.next_action_date)}
@@ -548,20 +563,23 @@ const Dashboard = () => {
         </div>
 
         {/* 네 번째 행: 최근 활동 내역 */}
-        <div className="card p-4 md:p-5">
-          <h3 className="text-base md:text-lg font-bold text-gray-900 mb-4 md:mb-5">
-            Recent Activities
-          </h3>
+        <div className="card p-5 md:p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-text-secondary">Activity</p>
+              <h3 className="text-base md:text-lg font-semibold text-gray-900">Recent Activities</h3>
+            </div>
+          </div>
           <div className="space-y-3 md:space-y-4">
             {recentActivities.length > 0 ? (
               recentActivities.map((activity) => (
                 <div
                   key={activity.id}
                   onClick={() => setEditingActivityId(activity.id)}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 md:p-5 border border-gray-100 rounded-xl hover:bg-gray-50 hover:border-gray-200 transition-all duration-200 gap-3 cursor-pointer"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 md:p-5 border border-gray-100 rounded-lg hover:bg-gray-50 hover:border-gray-200 transition-all duration-200 gap-3 cursor-pointer"
                 >
                   <div className="flex items-center space-x-3 md:space-x-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center flex-shrink-0">
                       <span className="text-brand-blue font-semibold text-sm md:text-base">
                         {activity.user ? activity.user.charAt(0) : '?'}
                       </span>
