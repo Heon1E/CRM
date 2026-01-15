@@ -10,18 +10,29 @@ if ('serviceWorker' in navigator) {
       .register('/service-worker.js')
       .then((registration) => {
         console.log('Service Worker 등록 성공:', registration.scope)
-        
-        // 서비스 워커 업데이트 확인
+
+        // 즉시 업데이트 체크
+        registration.update()
+
+        // 대기 중인 워커가 있으면 즉시 활성화 시도
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+        }
+
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // 새 버전이 설치되었을 때 사용자에게 알림 (선택사항)
-                console.log('새 버전이 사용 가능합니다. 페이지를 새로고침하세요.')
+                newWorker.postMessage({ type: 'SKIP_WAITING' })
               }
             })
           }
+        })
+
+        // 새 워커가 활성화되면 자동 새로고침
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload()
         })
       })
       .catch((error) => {

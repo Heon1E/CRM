@@ -1,13 +1,10 @@
 // Xavian CRM - Service Worker
 // 오프라인 지원 및 캐싱을 위한 기본 서비스 워커
 
-const CACHE_NAME = 'xavian-crm-v1'
+const CACHE_NAME = 'xavian-crm-v2'
 const urlsToCache = [
   '/',
-  '/index.html',
-  '/src/main.jsx',
-  '/src/App.jsx',
-  '/src/index.css'
+  '/index.html'
 ]
 
 // 설치 이벤트: 캐시 생성 및 리소스 캐싱
