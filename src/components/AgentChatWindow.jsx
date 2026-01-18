@@ -47,36 +47,51 @@ const AgentChatWindow = () => {
         }))
 
       let assistantText = ''
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY
 
-      // 로컬 개발 환경: 직접 Claude API 호출
+      // 로컬 개발 환경: 직접 Gemini API 호출
       if (import.meta.env.DEV && apiKey) {
-        console.log('🔧 Development mode: Calling Claude API directly')
+        console.log('🔧 Development mode: Calling Gemini API directly')
         
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 4096,
-            messages: conversationHistory,
-            system: `당신은 프론트엔드 개발 전문가입니다. React, Supabase, Tailwind CSS를 사용하는 CRM 프로젝트를 돕고 있습니다.
+        const systemPrompt = `당신은 프론트엔드 개발 전문가입니다. React, Supabase, Tailwind CSS를 사용하는 CRM 프로젝트를 돕고 있습니다.
 사용자의 요청을 분석하고, 구체적인 코드 수정 방안을 제시하세요.
 항상 한국어로 답변하며, 명확하고 실행 가능한 지침을 제공하세요.`
-          })
-        })
+
+        // Gemini 포맷으로 변환
+        const contents = conversationHistory.map((msg, idx) => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.content }]
+        }))
+
+        // 시스템 프롬프트를 첫 번째 user 메시지에 추가
+        if (contents.length > 0) {
+          contents[0].parts[0].text = `${systemPrompt}\n\n${contents[0].parts[0].text}`
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: contents,
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 4096,
+              }
+            })
+          }
+        )
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error?.message || `Claude API 오류: ${response.status}`)
+          throw new Error(errorData.error?.message || `Gemini API 오류: ${response.status}`)
         }
 
         const data = await response.json()
-        assistantText = data.content?.[0]?.text || '응답을 생성할 수 없습니다.'
+        assistantText = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성할 수 없습니다.'
       } 
       // 프로덕션 환경: Serverless Function 사용
       else {
@@ -118,7 +133,7 @@ const AgentChatWindow = () => {
       const errorResponse = {
         id: messages.length + 2,
         type: 'agent',
-        content: `⚠️ 오류가 발생했습니다: ${error.message}\n\n**해결 방법:**\n1. 프로젝트 루트에 .env 파일을 생성하세요\n2. 다음 내용을 추가하세요:\n   VITE_ANTHROPIC_API_KEY=sk-ant-api03-your-key-here\n3. 개발 서버를 재시작하세요 (npm run dev)\n\nAPI 키는 https://console.anthropic.com/ 에서 발급받을 수 있습니다.`,
+        content: `⚠️ 오류가 발생했습니다: ${error.message}\n\n**해결 방법:**\n1. 프로젝트 루트에 .env 파일을 생성하세요\n2. 다음 내용을 추가하세요:\n   VITE_GEMINI_API_KEY=your-gemini-api-key-here\n3. 개발 서버를 재시작하세요 (npm run dev)\n\nAPI 키는 https://aistudio.google.com/app/apikey 에서 발급받을 수 있습니다.`,
         timestamp: new Date()
       }
 

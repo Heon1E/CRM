@@ -2,11 +2,10 @@
 
 ## 1단계: API 키 발급 (2분 소요)
 
-1. [Anthropic Console](https://console.anthropic.com/) 접속
-2. 가입 또는 로그인
-3. **API Keys** 메뉴 클릭
-4. **Create Key** 버튼 클릭
-5. 생성된 키를 복사 (예: `sk-ant-api03-...`)
+1. [Google AI Studio](https://aistudio.google.com/app/apikey) 접속
+2. Google 계정으로 로그인
+3. **Get API key** 또는 **Create API key** 버튼 클릭
+4. 생성된 키를 복사 (예: `AIzaSy...`)
 
 ---
 
@@ -21,20 +20,20 @@
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJxxx...
 
-# Claude AI 설정 (새로 추가)
-VITE_ANTHROPIC_API_KEY=sk-ant-api03-여기에-실제키-붙여넣기
+# Gemini AI 설정 (새로 추가)
+VITE_GEMINI_API_KEY=AIzaSy여기에-실제키-붙여넣기
 ```
 
 ### 방법 B: 시스템 환경 변수 설정
 
 **Windows (PowerShell):**
 ```powershell
-$env:VITE_ANTHROPIC_API_KEY="sk-ant-api03-여기에-실제키"
+$env:VITE_GEMINI_API_KEY="AIzaSy여기에-실제키"
 ```
 
 **Mac/Linux (Terminal):**
 ```bash
-export VITE_ANTHROPIC_API_KEY="sk-ant-api03-여기에-실제키"
+export VITE_GEMINI_API_KEY="AIzaSy여기에-실제키"
 ```
 
 ---
@@ -70,14 +69,14 @@ npm run dev
 ### "환경변수가 설정되어 있지 않습니다" 오류
 **해결:**
 1. `.env` 파일이 **프로젝트 루트**에 있는지 확인
-2. 파일 내용에 `VITE_ANTHROPIC_API_KEY=...` 있는지 확인
+2. 파일 내용에 `VITE_GEMINI_API_KEY=...` 있는지 확인
 3. **개발 서버를 재시작**했는지 확인 (중요!)
 
 ### API 키가 작동하지 않음
 **확인사항:**
-1. API 키가 `sk-ant-api03-`로 시작하는지 확인
-2. [Anthropic Console](https://console.anthropic.com/)에서 키가 활성화되어 있는지 확인
-3. 계정에 크레딧이 충분한지 확인
+1. API 키가 `AIzaSy`로 시작하는지 확인
+2. [Google AI Studio](https://aistudio.google.com/app/apikey)에서 키가 활성화되어 있는지 확인
+3. API 사용량 제한을 초과하지 않았는지 확인
 
 ---
 
