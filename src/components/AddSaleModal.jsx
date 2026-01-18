@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+﻿import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'
@@ -355,7 +355,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              거래처 <span className="text-red-500">*</span>
+              거래처 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.clientId}
@@ -374,7 +374,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
 
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              날짜 <span className="text-red-500">*</span>
+              날짜 <span className="text-red-400">*</span>
             </label>
             <input
               type="date"
@@ -390,7 +390,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
         <div>
           <div className="flex justify-between items-center mb-3">
             <label className="block text-sm font-semibold text-gray-700">
-              품목 <span className="text-red-500">*</span>
+              품목 <span className="text-red-400">*</span>
             </label>
             <button
               type="button"
@@ -414,7 +414,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors duration-200"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-1 rounded transition-colors duration-200"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -535,3 +535,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
 }
 
 export default AddSaleModal
+
+
+
+

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+﻿import React, { useState, useMemo, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Users, Activity, Settings, DollarSign, LogOut, User, TrendingUp, Cloud, Bell } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -249,11 +249,11 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-white border-b border-border-light z-50" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-      <div className="flex items-center justify-between h-16 px-2 md:px-6 relative">
+    <nav className="fixed top-0 left-0 right-0 bg-[#0f172a]/90 backdrop-blur-md border-b border-blue-900/50 z-50">
+      <div className="flex items-center justify-between h-14 md:h-16 px-2 md:px-6 relative">
         {/* PC: Logo (왼쪽), 모바일: 숨김 */}
         <div className="hidden md:flex items-center space-x-4 flex-shrink-0">
-          <h1 className="text-xl font-bold text-brand-blue">{appTitle}</h1>
+          <h1 className="text-xl font-bold text-white">{appTitle}</h1>
         </div>
 
         {/* Menu Items - PC에서만 표시 (모바일에서는 하단 탭바 사용) */}
@@ -267,20 +267,21 @@ const Navbar = () => {
                   key={item.path}
                   to={item.path}
                   className={`
-                    relative flex items-center space-x-1 md:space-x-2 px-2 md:px-3 lg:px-4 py-2 rounded-button transition-all whitespace-nowrap touch-manipulation
+                    group relative flex items-center space-x-1 md:space-x-2 px-2 md:px-3 lg:px-4 py-1.5 rounded-md transition-all whitespace-nowrap touch-manipulation
                     ${
                       isActive
-                        ? 'bg-blue-50 text-brand-blue font-semibold'
-                        : 'text-text-body hover:bg-gray-50 hover:text-text-primary'
+                        ? 'bg-zinc-800 text-white font-semibold'
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
                     }
                   `}
                   style={{ minHeight: '44px', WebkitTapHighlightColor: 'transparent' }}
                 >
-                  <Icon className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${isActive ? 'text-brand-blue' : 'text-text-secondary'}`} />
+                  <Icon
+                    className={`w-4 h-4 md:w-5 md:h-5 flex-shrink-0 ${
+                      isActive ? 'text-white' : 'text-gray-300 group-hover:text-white'
+                    }`}
+                  />
                   <span className="text-xs md:text-sm lg:text-base">{item.label}</span>
-                  {isActive && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-blue rounded-t"></div>
-                  )}
                 </Link>
               )
             })}
@@ -289,7 +290,7 @@ const Navbar = () => {
         
         {/* 모바일: 앱 타이틀만 중앙에 표시 (단일 제목, User Section과 겹치지 않도록) */}
         <div className="md:hidden absolute left-0 right-0 z-0 pointer-events-none flex justify-center items-center">
-          <h1 className="text-base md:text-lg font-bold text-brand-blue text-center whitespace-nowrap max-w-[calc(100%-8rem)] truncate">{appTitle}</h1>
+          <h1 className="text-base md:text-lg font-semibold text-white text-center whitespace-nowrap max-w-[calc(100%-8rem)] truncate">{appTitle}</h1>
         </div>
 
         {/* User Section (오른쪽 고정, 모바일에서는 아이콘만 표시하여 공간 절약) */}
@@ -299,7 +300,7 @@ const Navbar = () => {
             <button
               onClick={handleGoogleLogin}
               disabled={isLoggingIn}
-              className="flex items-center space-x-2 px-3 md:px-4 py-2 bg-white border border-border-input rounded-button shadow-sm text-text-primary hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-2 px-3 md:px-4 py-2 bg-[#1E1E1E]/70 border border-white/10 rounded-button text-white hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -330,7 +331,7 @@ const Navbar = () => {
               <button
                 onClick={handleBackup}
                 disabled={isBackingUp}
-                className="flex items-center justify-center px-2 py-2 md:px-3 md:space-x-2 text-text-body hover:bg-gray-50 hover:text-text-primary rounded-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px] min-w-[44px]"
+                className="flex items-center justify-center px-2 py-2 md:px-3 md:space-x-2 text-gray-300 hover:bg-white/5 hover:text-white rounded-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px] min-w-[44px]"
                 title="데이터 백업"
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
@@ -342,14 +343,14 @@ const Navbar = () => {
 
               {/* PC: 사용자 정보 표시 */}
               <div className="hidden md:flex items-center space-x-2">
-                <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-brand-blue" />
+                <div className="w-8 h-8 bg-white/5 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-gray-300" />
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold text-text-primary">
+                  <p className="text-xs font-semibold text-white">
                     {user.user_metadata?.full_name || user.email?.split('@')[0] || '사용자'}
                   </p>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-gray-300">
                     {user.email || ''}
                   </p>
                 </div>
@@ -358,7 +359,7 @@ const Navbar = () => {
               {/* 로그아웃 버튼 (모바일에서는 아이콘만) */}
               <button
                 onClick={handleLogout}
-                className="flex items-center justify-center px-2 py-2 md:px-3 md:space-x-2 text-text-body hover:bg-gray-50 hover:text-text-primary rounded-button transition-colors touch-manipulation min-h-[44px] min-w-[44px]"
+                className="flex items-center justify-center px-2 py-2 md:px-3 md:space-x-2 text-gray-300 hover:bg-white/5 hover:text-white rounded-button transition-colors touch-manipulation min-h-[44px] min-w-[44px]"
                 title="로그아웃"
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
@@ -374,4 +375,7 @@ const Navbar = () => {
 }
 
 export default Navbar
+
+
+
 

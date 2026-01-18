@@ -1,4 +1,4 @@
-import { openDB } from 'idb'
+﻿import { openDB } from 'idb'
 
 const QUEUE_DB_NAME = 'XavianCRM_SyncQueue'
 const QUEUE_DB_VERSION = 1
@@ -220,3 +220,4 @@ export const cleanupCompletedOperations = async () => {
     return false
   }
 }
+

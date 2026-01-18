@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+﻿import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Camera, Image, Sparkles, Loader2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'
@@ -129,36 +129,36 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 z-40 bg-gray-900 bg-opacity-50" onClick={handleClose} />
-        <div className="relative z-50 inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
-          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200">
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md" onClick={handleClose} />
+        <div className="relative z-50 inline-block align-bottom bg-[#1E1E1E] border border-gray-800 rounded-card text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
+          <div className="flex items-center justify-between px-4 py-4 md:px-6 md:py-5 border-b border-gray-800">
             <div className="flex items-center space-x-2">
-              <Sparkles className="w-5 h-5 text-purple-600" />
-              <h3 className="text-lg font-bold text-gray-900">명함 스캔 (AI)</h3>
+              <Sparkles className="w-5 h-5 text-gray-300" />
+              <h3 className="text-lg font-semibold text-white">명함 스캔 (AI)</h3>
             </div>
-            <button onClick={handleClose} disabled={isAnalyzing} className="text-gray-400 p-1"><X className="w-5 h-5" /></button>
+            <button onClick={handleClose} disabled={isAnalyzing} className="text-gray-300 p-1 hover:text-white"><X className="w-5 h-5" /></button>
           </div>
-          <div className="px-6 py-5">
+          <div className="px-4 py-4 md:px-6 md:py-5">
             {!imageSrc ? (
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => cameraInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl hover:bg-blue-50 min-h-[200px]">
-                  <Camera className="w-12 h-12 text-gray-400 mb-3" /><span className="text-sm font-medium">카메라 촬영</span>
+                <button onClick={() => cameraInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-800 rounded-xl hover:bg-white/5 min-h-[200px]">
+                  <Camera className="w-12 h-12 text-gray-300 mb-3" /><span className="text-sm font-medium text-gray-300">카메라 촬영</span>
                 </button>
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-xl hover:bg-blue-50 min-h-[200px]">
-                  <Image className="w-12 h-12 text-gray-400 mb-3" /><span className="text-sm font-medium">갤러리 선택</span>
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-800 rounded-xl hover:bg-white/5 min-h-[200px]">
+                  <Image className="w-12 h-12 text-gray-300 mb-3" /><span className="text-sm font-medium text-gray-300">갤러리 선택</span>
                 </button>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
                 <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} className="hidden" />
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="relative w-full bg-gray-100 rounded-lg overflow-hidden">
+                <div className="relative w-full bg-[#1E1E1E] rounded-lg overflow-hidden border border-gray-800">
                   <img src={imageSrc} alt="명함" className="w-full h-auto max-h-96 object-contain" />
-                  {!isAnalyzing && <button onClick={handleReset} className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-lg"><X className="w-4 h-4 text-gray-600" /></button>}
+                  {!isAnalyzing && <button onClick={handleReset} className="absolute top-2 right-2 p-2 bg-[#1E1E1E] border border-gray-800 rounded-full"><X className="w-4 h-4 text-gray-300" /></button>}
                 </div>
                 <div className="flex items-center space-x-3">
-                  <button onClick={handleReset} disabled={isAnalyzing} className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium">다시 선택</button>
-                  <button onClick={handleProcessImage} disabled={isAnalyzing || isUploading} className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-lg font-medium flex items-center justify-center space-x-2 disabled:bg-purple-400">
+                  <button onClick={handleReset} disabled={isAnalyzing} className="btn-secondary flex-1 px-4 py-2.5">다시 선택</button>
+                  <button onClick={handleProcessImage} disabled={isAnalyzing || isUploading} className="btn-primary flex-1 px-4 py-2.5 flex items-center justify-center space-x-2 disabled:opacity-50">
                     {isAnalyzing ? <><Loader2 className="w-4 h-4 animate-spin" /><span>분석 중...</span></> : <><Sparkles className="w-4 h-4" /><span>AI 분석 시작</span></>}
                   </button>
                 </div>
@@ -172,3 +172,5 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
 }
 
 export default BusinessCardScannerModal
+
+

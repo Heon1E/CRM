@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
@@ -12,7 +12,7 @@ const IssueTracker = ({ maxItems = null }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
   if (loading) {
-    return <div className="text-gray-500 text-sm">로딩 중...</div>
+    return <div className="text-gray-300 text-sm">로딩 중...</div>
   }
 
   // 완료된 건은 필터링 (대시보드에서만)
@@ -22,43 +22,37 @@ const IssueTracker = ({ maxItems = null }) => {
 
   // 색상 코딩 함수 (date 기준일과 오늘 날짜 비교)
   const getIssueColor = (issue) => {
-    if (issue.status === '완료') {
-      return 'bg-gray-50 border-gray-200'
-    }
-
-    // date 필드 기준 (기준일)
     const baseDate = issue.date || issue.created_at
     if (!baseDate) {
-      return 'bg-white border-gray-200'
+      return 'bg-[#1E1E1E] border-gray-800'
     }
 
     const now = new Date()
     const baseDateObj = new Date(baseDate)
     const daysDiff = Math.floor((now - baseDateObj) / (1000 * 60 * 60 * 24))
 
-    // 상태가 '진행'이면 기본적으로 초록색이지만, 경과 시간에 따라 경고색이 우선
     if (daysDiff >= 14) {
-      return 'bg-red-50 border-red-200' // 2주일 경과: 빨간색 (최우선)
-    } else if (daysDiff >= 7) {
-      return 'bg-orange-50 border-orange-200' // 1주일 경과: 주황색
-    } else if (issue.status === '진행') {
-      return 'bg-emerald-50 border-emerald-200' // 진행 중: 초록색 (1주일 미만)
+      return 'bg-[#1E1E1E] border-gray-700'
     }
 
-    return 'bg-white border-gray-200' // 정상 (등록 상태, 1주일 미만)
+    if (daysDiff >= 7) {
+      return 'bg-[#1E1E1E] border-gray-700'
+    }
+
+    return 'bg-[#1E1E1E] border-gray-800'
   }
 
   // 상태 색상
   const getStatusColor = (status) => {
     switch (status) {
       case '완료':
-        return 'bg-emerald-50 text-emerald-700'
+        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
       case '진행':
-        return 'bg-blue-50 text-blue-700'
+        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
       case '등록':
-        return 'bg-gray-50 text-gray-700'
+        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
       default:
-        return 'bg-gray-50 text-gray-700'
+        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
     }
   }
 
@@ -77,18 +71,18 @@ const IssueTracker = ({ maxItems = null }) => {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6">
+    <div className="bg-[#1E1E1E] rounded-xl border border-gray-800 p-5 md:p-6">
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => navigate('/issues')}
-          className="text-lg md:text-xl font-bold text-gray-900 flex items-center space-x-2 hover:text-purple-600 transition-colors cursor-pointer"
+          className="text-lg md:text-xl font-semibold text-white flex items-center space-x-2 hover:text-white/80 transition-colors cursor-pointer"
         >
-          <AlertCircle className="w-5 h-5 text-purple-600" />
+          <AlertCircle className="w-5 h-5 text-gray-300" />
           <span>ISSUE 트래커</span>
         </button>
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 flex items-center space-x-1 text-sm font-medium"
+          className="btn-primary px-3 py-1.5 flex items-center space-x-1 text-sm font-medium"
         >
           <Plus className="w-4 h-4" />
           <span>추가</span>
@@ -112,27 +106,27 @@ const IssueTracker = ({ maxItems = null }) => {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-2 flex-wrap">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(issue.status)}`}>
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(issue.status)}`}>
                         {issue.status}
                       </span>
                       {issue.target_date && (
-                        <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-300">
                           목표일: {new Date(issue.target_date).toLocaleDateString('ko-KR')}
                         </span>
                       )}
                       {daysDiff > 0 && (
-                        <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-300">
                           ({daysDiff}일 경과)
                         </span>
                       )}
                     </div>
-                    <h4 className="font-semibold text-gray-900 mb-1 break-words">{issue.title}</h4>
+                    <h4 className="font-semibold text-white mb-1 break-words">{issue.title}</h4>
                     {issue.content && (
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2 break-words">
+                      <p className="text-sm text-gray-300 mb-2 line-clamp-2 break-words">
                         {issue.content}
                       </p>
                     )}
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-300">
                       등록일: {new Date(issue.created_at || issue.date).toLocaleDateString('ko-KR')}
                     </p>
                   </div>
@@ -145,7 +139,7 @@ const IssueTracker = ({ maxItems = null }) => {
                         handleStatusChange(issue.id, e.target.value)
                       }}
                       onClick={(e) => e.stopPropagation()}
-                      className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer ${getStatusColor(issue.status)}`}
+                      className={`px-2 py-1 rounded text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer ${getStatusColor(issue.status)}`}
                     >
                       <option value="등록">등록</option>
                       <option value="진행">진행</option>
@@ -156,7 +150,7 @@ const IssueTracker = ({ maxItems = null }) => {
                         e.stopPropagation()
                         setEditingIssueId(issue.id)
                       }}
-                      className="text-purple-600 hover:text-purple-700 transition-colors"
+                      className="text-gray-300 hover:text-white transition-colors"
                       title="수정"
                     >
                       <Edit className="w-4 h-4" />
@@ -168,7 +162,7 @@ const IssueTracker = ({ maxItems = null }) => {
           })}
         </div>
       ) : (
-        <div className="text-center py-8 text-gray-500 text-sm">
+        <div className="text-center py-8 text-gray-300 text-sm">
           등록된 ISSUE가 없습니다.
         </div>
       )}
@@ -188,3 +182,6 @@ const IssueTracker = ({ maxItems = null }) => {
 }
 
 export default IssueTracker
+
+
+

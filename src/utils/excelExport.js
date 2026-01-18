@@ -356,3 +356,4 @@ export const parseSaleExcel = (file) => {
     reader.readAsArrayBuffer(file)
   })
 }
+

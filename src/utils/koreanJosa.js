@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 한국어 조사(Josa) 처리 유틸리티
  * 받침 유무에 따라 올바른 조사를 자동으로 선택합니다.
  */
@@ -216,5 +216,6 @@ export const formatActivityTitle = (clientName, description = '') => {
   const summary = extractCoreSummary(description)
   return summary ? `${client} - ${summary}` : client
 }
+
 
 

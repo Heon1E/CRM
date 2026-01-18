@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+﻿import { supabase } from '../lib/supabase'
 
 /**
  * 명함 데이터를 CRM에 저장하는 함수
@@ -122,3 +122,4 @@ export const saveCardToCRM = async (cardData, options = {}) => {
     }
   }
 }
+

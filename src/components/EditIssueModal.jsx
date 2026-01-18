@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
@@ -182,8 +182,8 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="ISSUE 수정" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            제목 <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            제목 <span className="text-red-400">*</span>
           </label>
           <input
             type="text"
@@ -196,7 +196,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-300 mb-1">
             내용
           </label>
           <textarea
@@ -207,14 +207,14 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
             placeholder="ISSUE 내용을 입력하세요 (최대 1000자)"
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-sm text-gray-500">
+          <div className="mt-1 text-right text-sm text-gray-300">
             {charCount}/1000
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">
               목표일
             </label>
             <input
@@ -226,8 +226,8 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              상태 <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              상태 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.status}
@@ -246,7 +246,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-sm"
+            className="px-4 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 rounded-xl hover:bg-red-400/30 transition-all duration-200 font-semibold"
           >
             삭제
           </button>
@@ -260,7 +260,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
             </button>
             <button
               type="submit"
-              className="btn-success"
+              className="btn-primary"
             >
               Save
             </button>
@@ -272,3 +272,6 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
 }
 
 export default EditIssueModal
+
+
+

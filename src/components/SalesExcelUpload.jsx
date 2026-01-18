@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+﻿import React, { useState, useRef } from 'react'
 import { Upload, Download, Loader2, Trash2 } from 'lucide-react'
 import { downloadSaleTemplate, parseSaleExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'
@@ -330,7 +330,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
     <div className="flex items-center space-x-3">
       <button
         onClick={handleDownloadTemplate}
-        className="px-4 py-2.5 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm"
+        className="btn-secondary px-4 py-2.5 flex items-center justify-center space-x-2 font-medium"
       >
         <Download className="w-4 h-4" />
         <span>양식 다운로드</span>
@@ -347,7 +347,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
         />
         <label
           htmlFor="sales-excel-upload"
-          className={`px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all duration-200 flex items-center justify-center space-x-2 font-semibold shadow-sm cursor-pointer ${
+          className={`px-4 py-2.5 bg-white text-black rounded-xl hover:bg-zinc-100 transition-all duration-200 flex items-center justify-center space-x-2 font-semibold cursor-pointer ${
             isUploading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
@@ -367,17 +367,17 @@ const SalesExcelUpload = ({ onRefresh }) => {
       {isUploading && uploadProgress.stage && (
         <div className="flex items-center space-x-3 min-w-[220px]">
           <div className="flex-1">
-            <p className="text-xs text-text-secondary mb-1">{uploadProgress.stage}</p>
-            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+            <p className="text-xs text-gray-300 mb-1">{uploadProgress.stage}</p>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-800">
               <div
-                className="h-2 bg-indigo-500 transition-all"
+                className="h-2 bg-white/70 transition-all"
                 style={{
                   width: `${uploadProgress.total > 0 ? Math.min(100, Math.round((uploadProgress.current / uploadProgress.total) * 100)) : 0}%`,
                 }}
               />
             </div>
           </div>
-          <span className="text-xs text-text-secondary whitespace-nowrap">
+          <span className="text-xs text-gray-300 whitespace-nowrap">
             {uploadProgress.total > 0 ? `${uploadProgress.current}/${uploadProgress.total}` : ''}
           </span>
         </div>
@@ -386,10 +386,10 @@ const SalesExcelUpload = ({ onRefresh }) => {
       <button
         onClick={handleDeleteAll}
         disabled={isDeleting || isUploading}
-        className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold shadow-sm transition-all duration-200 ${
+        className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${
           isDeleting || isUploading
-            ? 'opacity-50 cursor-not-allowed bg-gray-400 text-white'
-            : 'bg-red-600 hover:bg-red-700 text-white'
+            ? 'opacity-50 cursor-not-allowed bg-[#1E1E1E] text-gray-300 border border-gray-800'
+            : 'bg-red-400/20 hover:bg-red-400/30 text-red-200 border border-red-400/30'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
@@ -410,3 +410,6 @@ const SalesExcelUpload = ({ onRefresh }) => {
 }
 
 export default SalesExcelUpload
+
+
+

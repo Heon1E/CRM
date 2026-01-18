@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react'
+﻿import React, { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Edit, Download, Loader2 } from 'lucide-react'
+import { Edit, Download, Loader2, Search } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import EditActivityModal from '../components/EditActivityModal'
 import AddActivityModal from '../components/AddActivityModal'
@@ -16,17 +16,28 @@ const Activities = () => {
   const [searchParams] = useSearchParams()
   const [editingActivityId, setEditingActivityId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // 쿼리 파라미터에서 status 필터 가져오기
   const statusFilter = searchParams.get('status')
 
-  // 상태 필터링 적용 (useMemo로 최적화)
+  // 상태 + 거래처 검색 필터링 적용 (useMemo로 최적화)
   const filteredActivities = useMemo(() => {
     const allActivities = activities || []
-    return statusFilter
+    const statusFiltered = statusFilter
       ? allActivities.filter((activity) => activity.status === statusFilter)
       : allActivities
-  }, [activities, statusFilter])
+
+    if (!searchTerm.trim()) {
+      return statusFiltered
+    }
+
+    const term = searchTerm.toLowerCase().trim()
+    return statusFiltered.filter((activity) => {
+      const clientName = activity.clientName || activity.client_name || activity.company || ''
+      return clientName.toLowerCase().includes(term)
+    })
+  }, [activities, statusFilter, searchTerm])
 
   // 날짜별로 그룹화 (useMemo로 최적화)
   const groupedActivities = useMemo(() => {
@@ -90,7 +101,7 @@ const Activities = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
@@ -98,26 +109,20 @@ const Activities = () => {
   const getTypeColor = (type) => {
     switch (type) {
       case '미팅':
-        return 'bg-blue-50 text-blue-700'
       case '제안서':
-        return 'bg-purple-50 text-purple-700'
       case '전화':
-        return 'bg-emerald-50 text-emerald-700'
       case '계약':
-        return 'bg-purple-50 text-purple-700'
       case '견적':
-        return 'bg-amber-50 text-amber-700'
       case '이메일':
-        return 'bg-gray-100 text-gray-600'
       default:
-        return 'bg-gray-100 text-gray-600'
+        return 'bg-white/5 text-gray-300 border border-gray-800'
     }
   }
 
   const getStatusColor = (status) => {
     return status === '완료'
-      ? 'bg-emerald-50 text-emerald-700'
-      : 'bg-amber-50 text-amber-700'
+      ? 'bg-emerald-400/10 text-emerald-300 border border-emerald-400/30'
+      : 'bg-amber-400/10 text-amber-300 border border-amber-400/30'
   }
 
   const handleExport = () => {
@@ -139,20 +144,21 @@ const Activities = () => {
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">영업 활동</h1>
-          <p className="text-gray-500 mt-1.5 text-sm md:text-base">
+          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-white">영업 활동</h1>
+          <p className="text-gray-300 mt-1.5 text-sm md:text-base">
             {statusFilter ? `'${statusFilter}' 상태: ` : '총 '}
             {filteredActivities.length}건의 활동 기록
-            {statusFilter && ` (전체 ${activities.length}건 중)`}
+            {(statusFilter || searchTerm.trim()) && ` (전체 ${activities.length}건 중)`}
           </p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <button
             onClick={handleExport}
-            className="flex-1 sm:flex-none px-4 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm touch-manipulation min-h-[44px]"
+            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Download className="w-4 h-4" />
@@ -160,7 +166,7 @@ const Activities = () => {
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex-1 sm:flex-none px-4 py-3 bg-green-600 text-white border border-green-600 rounded-xl hover:bg-green-700 hover:border-green-700 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm touch-manipulation min-h-[44px]"
+            className="btn-primary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span>+</span>
@@ -169,7 +175,22 @@ const Activities = () => {
         </div>
       </div>
 
-      <div className="card p-5 md:p-6">
+      {/* Search Bar */}
+      <div className="card p-4 md:p-5 bg-[#1E1E1E] border-gray-800">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="거래처 검색..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field w-full pl-10 pr-4 py-3 text-base md:text-base touch-manipulation min-h-[44px]"
+            style={{ fontSize: '16px', WebkitTapHighlightColor: 'transparent' }}
+          />
+        </div>
+      </div>
+
+      <div className="card p-6 bg-[#1E1E1E] border-gray-800">
         <div className="relative" ref={containerRef}>
           {/* Timeline */}
           {visibleDates.length > 0 ? (
@@ -179,9 +200,9 @@ const Activities = () => {
                 <div key={date} className={dateIndex > 0 ? 'mt-8' : ''}>
                   {/* Date Header */}
                   <div className="flex items-center mb-5">
-                    <div className="flex-1 border-t border-gray-200"></div>
+                    <div className="flex-1 border-t border-gray-800"></div>
                     <div className="px-4">
-                      <span className="text-sm font-bold text-text-body bg-gray-50 px-4 py-2 rounded-button">
+                      <span className="text-xs font-semibold text-gray-300 bg-[#1E1E1E] border border-gray-800 px-3 py-1.5 rounded-full">
                         {new Date(date).toLocaleDateString('ko-KR', {
                           month: 'long',
                           day: 'numeric',
@@ -189,7 +210,7 @@ const Activities = () => {
                         })}
                       </span>
                     </div>
-                    <div className="flex-1 border-t border-gray-200"></div>
+                    <div className="flex-1 border-t border-gray-800"></div>
                   </div>
 
                   {/* Activities */}
@@ -198,9 +219,9 @@ const Activities = () => {
                       <div key={activity.id} className="flex items-start space-x-4">
                         {/* Timeline Line */}
                         <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 bg-brand-blue rounded-full border-2 border-white shadow-subtle"></div>
+                          <div className="w-3 h-3 bg-zinc-400/40 rounded-full border-2 border-[#1E1E1E] shadow-subtle"></div>
                           {index < dateActivities.length - 1 && (
-                            <div className="w-0.5 h-full bg-gray-200 mt-2"></div>
+                            <div className="w-0.5 h-full bg-gray-800 mt-2"></div>
                           )}
                         </div>
 
@@ -226,7 +247,7 @@ const Activities = () => {
                             }}
                             enabled={true}
                           >
-                            <div className="bg-gray-50 rounded-xl p-4 md:p-5 hover:bg-gray-100 hover:shadow-sm transition-all duration-200">
+                            <div className="bg-[#1E1E1E] border border-gray-800 rounded-lg p-4 md:p-5 hover:bg-white/5 hover:border-gray-700 transition-all duration-200">
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center space-x-2 mb-3 flex-wrap gap-2">
@@ -242,7 +263,7 @@ const Activities = () => {
                                         e.stopPropagation()
                                         handleStatusToggle(activity)
                                       }}
-                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:shadow-sm touch-manipulation min-h-[44px] ${getStatusColor(
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all touch-manipulation min-h-[44px] ${getStatusColor(
                                         activity.status
                                       )}`}
                                       title="클릭하여 상태 변경"
@@ -253,18 +274,18 @@ const Activities = () => {
                                   </div>
                                   {/* 거래처 중심 제목: [거래처] - [핵심요약] */}
                                   <div className="flex items-start justify-between mb-2 gap-2">
-                                    <h3 className="font-bold text-base md:text-lg text-gray-900 break-words flex-1">
+                                    <h3 className="font-bold text-base md:text-lg text-white break-words flex-1">
                                       {formatActivityTitle(activity.clientName, activity.description)}
                                     </h3>
                                     {/* 회의록 태그 표시 */}
                                     {activity.description && activity.description.includes('[회의록]') && (
-                                      <span className="px-2 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg whitespace-nowrap flex-shrink-0">
+                                      <span className="px-2 py-1 text-xs font-semibold bg-zinc-900/80 text-gray-300 rounded-lg whitespace-nowrap flex-shrink-0 border border-zinc-800">
                                         태그: 회의록
                                       </span>
                                     )}
                                   </div>
                                   {/* 상세 문구: [거래처명]의 [정제된_외부참석자]와 [활동종류] */}
-                                  <p className="text-sm text-gray-600 mb-3 leading-relaxed break-words">
+                                  <p className="text-sm text-gray-300 mb-3 leading-relaxed break-words">
                                     {formatActivityText(
                                       activity.clientName,
                                       activity.user, // 참석자 (정제 로직 적용)
@@ -273,7 +294,7 @@ const Activities = () => {
                                   </p>
                                   {/* 활동 내용 */}
                                   {activity.description && (
-                                    <p className="text-sm text-gray-700 mb-3 leading-relaxed bg-white p-3 rounded-lg border border-gray-200 break-words">
+                                    <p className="text-sm text-gray-300 mb-3 leading-relaxed bg-zinc-900/80 p-3 rounded-lg border border-zinc-800 break-words">
                                       {activity.description}
                                     </p>
                                   )}
@@ -282,7 +303,7 @@ const Activities = () => {
                                 <div className="ml-4 hidden md:flex flex-col space-y-2">
                                   <button
                                     onClick={() => setEditingActivityId(activity.id)}
-                                    className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                                    className="text-gray-300 hover:text-white font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
                                     style={{ WebkitTapHighlightColor: 'transparent' }}
                                   >
                                     <Edit className="w-4 h-4" />
@@ -300,12 +321,12 @@ const Activities = () => {
               )
             })
           ) : (
-            <div className="text-center py-8 text-gray-500">활동 내역이 없습니다.</div>
+            <div className="text-center py-8 text-gray-300">활동 내역이 없습니다.</div>
           )}
           {/* 무한 스크롤 트리거 */}
           {hasMore && (
-            <div className="mt-8 pt-6 border-t border-gray-200 text-center">
-              <div className="flex items-center justify-center space-x-2 text-gray-500">
+            <div className="mt-8 pt-6 border-t border-zinc-800 text-center">
+              <div className="flex items-center justify-center space-x-2 text-gray-300">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span className="text-sm">더 많은 활동을 불러오는 중...</span>
               </div>
@@ -329,3 +350,6 @@ const Activities = () => {
 }
 
 export default Activities
+
+
+

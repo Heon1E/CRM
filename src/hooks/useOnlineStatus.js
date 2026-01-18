@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 
 /**
  * 온라인/오프라인 상태를 감지하는 커스텀 훅
@@ -42,3 +42,4 @@ export const useOnlineStatus = () => {
 
   return { isOnline, wasOffline }
 }
+

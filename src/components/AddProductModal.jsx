@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+﻿import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
@@ -55,7 +55,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            품목명 <span className="text-red-500">*</span>
+            품목명 <span className="text-red-400">*</span>
           </label>
           <input
             type="text"
@@ -69,7 +69,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            품목 종류 <span className="text-red-500">*</span>
+            품목 종류 <span className="text-red-400">*</span>
           </label>
           <select
             value={formData.type}
@@ -116,4 +116,8 @@ const AddProductModal = ({ isOpen, onClose }) => {
 }
 
 export default AddProductModal
+
+
+
+
 

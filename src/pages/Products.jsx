@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { Edit, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
@@ -57,7 +57,7 @@ const Products = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
@@ -87,17 +87,18 @@ const Products = () => {
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">제품 관리</h1>
-          <p className="text-gray-500 mt-1.5 text-sm md:text-base">총 {totalCount}개 제품</p>
+          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-white">제품 관리</h1>
+          <p className="text-gray-300 mt-1.5 text-sm md:text-base">총 {totalCount} 제품</p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
           <ProductExcelUpload />
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex items-center justify-center gap-2 touch-manipulation min-h-[44px] px-4 py-3 w-full sm:w-auto"
+            className="btn-primary flex items-center justify-center gap-2 touch-manipulation min-h-[44px] px-4 py-3 w-full sm:w-auto"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Plus className="w-4 h-4" />
@@ -106,50 +107,50 @@ const Products = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="card overflow-hidden bg-[#1E1E1E] border-gray-800">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-transparent">
+          <table className="min-w-full table-compact divide-y divide-gray-800">
+            <thead className="bg-[#1E1E1E]">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   품목명
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   종류
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   규격
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   작업
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
+            <tbody className="bg-transparent divide-y divide-gray-800">
               {products.length > 0 ? (
                 products.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">{product.name || '-'}</div>
+                  <tr key={product.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-white">{product.name || '-'}</div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{product.type || '-'}</div>
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">{product.type || '-'}</div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{product.standard || '-'}</div>
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">{product.standard || '-'}</div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-sm">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-3">
                         <button
                           onClick={() => setEditingProductId(product.id)}
-                          className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors"
+                          className="text-gray-300 hover:text-white font-medium flex items-center space-x-1 transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                           <span>수정</span>
                         </button>
                         <button
                           onClick={() => handleDelete(product.id)}
-                          className="text-red-500 hover:text-red-600 font-medium flex items-center space-x-1 transition-colors"
+                          className="text-red-300 hover:text-red-200 font-medium flex items-center space-x-1 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                           <span>삭제</span>
@@ -160,7 +161,7 @@ const Products = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="4" className="px-4 py-6 md:px-6 md:py-8 text-center text-gray-300">
                     등록된 제품이 없습니다.
                   </td>
                 </tr>
@@ -192,4 +193,9 @@ const Products = () => {
 }
 
 export default Products
+
+
+
+
+
 

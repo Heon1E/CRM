@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
@@ -309,7 +309,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              회사명 <span className="text-red-500">*</span>
+              회사명 <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -361,7 +361,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
                     <button
                       type="button"
                       onClick={() => handleRemoveContact(index)}
-                      className="text-red-500 hover:text-red-700 transition-colors"
+                          className="text-red-400 hover:text-red-300 transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -516,7 +516,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
                         <button
                           type="button"
                           onClick={() => handleRemoveContractPrice(cp?.productId)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-red-400 hover:text-red-300"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -532,7 +532,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="btn px-4 py-2.5 bg-red-500 text-white hover:bg-red-600 font-medium"
+            className="btn px-4 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 hover:bg-red-400/30 font-medium"
           >
             삭제
           </button>
@@ -558,3 +558,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
 }
 
 export default EditClientModal
+
+
+
+

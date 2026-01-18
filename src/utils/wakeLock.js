@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Screen Wake Lock 유틸리티
  * 화면이 자동으로 꺼지지 않도록 방지하는 기능 제공
  */
@@ -56,3 +56,4 @@ export async function releaseWakeLock() {
 export function isWakeLockActive() {
   return wakeLock !== null
 }
+

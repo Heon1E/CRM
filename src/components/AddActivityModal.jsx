@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+﻿import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -310,7 +310,7 @@ ${currentText}`
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            거래처 <span className="text-red-500">*</span>
+            거래처 <span className="text-red-400">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -328,7 +328,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              활동 유형 <span className="text-red-500">*</span>
+              활동 유형 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.type}
@@ -347,7 +347,7 @@ ${currentText}`
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              상태 <span className="text-red-500">*</span>
+              상태 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.status}
@@ -363,7 +363,7 @@ ${currentText}`
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            날짜 <span className="text-red-500">*</span>
+            날짜 <span className="text-red-400">*</span>
           </label>
           <input
             type="date"
@@ -450,7 +450,7 @@ ${currentText}`
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="block text-sm font-medium text-gray-700">
-              내용 <span className="text-red-500">*</span>
+              내용 <span className="text-red-400">*</span>
             </label>
             <button
               type="button"
@@ -529,4 +529,8 @@ ${currentText}`
 }
 
 export default AddActivityModal
+
+
+
+
 

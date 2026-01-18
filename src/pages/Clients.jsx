@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+﻿import React, { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Edit, Download, Users, Camera, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
@@ -328,13 +328,13 @@ const Clients = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case '매출':
-        return 'bg-emerald-50 text-emerald-700'
+        return 'bg-emerald-400/10 text-emerald-300 border border-emerald-400/30'
       case '신규':
-        return 'bg-blue-50 text-blue-700'
+        return 'bg-amber-400/10 text-amber-300 border border-amber-400/30'
       case '단절':
-        return 'bg-gray-100 text-gray-600'
+        return 'bg-white/5 text-gray-300 border border-gray-800'
       default:
-        return 'bg-gray-100 text-gray-600'
+        return 'bg-white/5 text-gray-300 border border-gray-800'
     }
   }
 
@@ -413,18 +413,19 @@ const Clients = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-text-secondary">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-text-primary">거래처 관리</h1>
-          <p className="text-text-secondary mt-1.5 text-sm md:text-base">
-            총 {totalCount}개 거래처
+          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-white">거래처 관리</h1>
+          <p className="text-gray-300 mt-1.5 text-sm md:text-base">
+            총 {totalCount} 거래처
           </p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-2">
@@ -438,7 +439,7 @@ const Clients = () => {
           </button>
           <button
             onClick={handleDeleteAll}
-            className="btn-danger flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-700 text-white"
+            className="btn-danger flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
             style={{ WebkitTapHighlightColor: 'transparent' }}
             disabled={loading}
           >
@@ -447,7 +448,7 @@ const Clients = () => {
           </button>
           <button
             onClick={() => setIsScannerModalOpen(true)}
-            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white border-purple-600"
+            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Camera className="w-4 h-4" />
@@ -456,7 +457,7 @@ const Clients = () => {
           </button>
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            className="btn-primary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span>+</span>
@@ -467,9 +468,9 @@ const Clients = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="card p-4 md:p-5">
+      <div className="card p-4 md:p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] hover:bg-white/5 transition-colors">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
           <input
             type="text"
             placeholder="회사명 또는 담당자명으로 검색..."
@@ -482,42 +483,42 @@ const Clients = () => {
       </div>
 
       {/* Clients - PC: Table, 모바일: Card with Swipe */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
         {/* PC: Table View (768px 이상) */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-border-light">
-            <thead className="bg-transparent">
+          <table className="min-w-full table-compact divide-y divide-gray-800">
+            <thead className="bg-[#161616]">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   회사명
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   담당자
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   연락처
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   이메일
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   상태
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   최근 주문일
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   Recent Contact Date
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   작년 매출액
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                   작업
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-border-light">
+            <tbody className="bg-transparent divide-y divide-gray-800">
               {Object.keys(visibleGroupedClients).length > 0 ? (
                 Object.keys(visibleGroupedClients).map((company) => {
                   // visibleGroupedClients는 무한 스크롤에 보이는 항목만 포함하므로,
@@ -530,42 +531,42 @@ const Clients = () => {
                   const contactsTooltip = getContactsTooltip(companyClients)
 
                   return (
-                    <tr key={company} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-5">
+                  <tr key={company} className="hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3 md:px-6 md:py-5">
                         <Link
                           to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
-                          className="text-sm font-semibold text-text-primary hover:text-brand-blue transition-colors cursor-pointer"
+                          className="text-sm font-semibold text-white hover:text-white transition-colors cursor-pointer"
                         >
                           {company}
                         </Link>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="px-4 py-3 md:px-6 md:py-5">
                         <div
                           className="flex items-center space-x-2"
                           title={hasMultipleContacts ? contactsTooltip : undefined}
                         >
-                          <div className="text-sm text-text-body">
+                          <div className="text-sm text-gray-300">
                             {primaryContact?.contact_person || '-'}
                           </div>
                           {hasMultipleContacts && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-brand-blue">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-300 border border-gray-800">
                               <Users className="w-3 h-3 mr-1" />
                               외 {companyClients.length - 1}명
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-5">
-                        <div className="text-sm text-text-body">
+                      <td className="px-4 py-3 md:px-6 md:py-5">
+                        <div className="text-sm text-gray-300">
                           {primaryContact?.phone || '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-5">
-                        <div className="text-sm text-text-body">
+                      <td className="px-4 py-3 md:px-6 md:py-5">
+                        <div className="text-sm text-gray-300">
                           {primaryContact?.email || '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap">
+                      <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
                         <span
                           className={`px-3 py-1.5 inline-flex text-xs leading-5 font-semibold rounded-lg ${getStatusColor(
                             primaryContact?.status
@@ -574,21 +575,21 @@ const Clients = () => {
                           {primaryContact?.status || '-'}
                         </span>
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap text-sm text-text-secondary">
+                      <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm text-gray-300">
                         {stats.lastOrder ? stats.lastOrder.split('T')[0] : '-'}
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap text-sm text-text-secondary">
+                      <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm text-gray-300">
                         {stats.lastContact ? stats.lastContact.split('T')[0] : '-'}
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap text-sm font-semibold text-text-primary">
+                      <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm font-semibold text-white">
                         {stats.totalAmount === 0
                           ? '0원'
                           : formatKoreanCurrency(stats.totalAmount || 0)}
                       </td>
-                      <td className="px-6 py-5 whitespace-nowrap text-sm">
+                      <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm">
                         <button
                           onClick={() => setEditingClientId(primaryContact?.id)}
-                          className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px]"
+                          className="text-gray-300 hover:text-white font-medium flex items-center space-x-1 transition-all touch-manipulation px-3 py-2 min-h-[44px] rounded-lg hover:bg-white/5"
                           style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
                           <Edit className="w-4 h-4" />
@@ -600,7 +601,7 @@ const Clients = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="9" className="px-6 py-8 text-center text-text-secondary">
+                  <td colSpan="9" className="px-4 py-6 md:px-6 md:py-8 text-center text-gray-300">
                     {searchTerm ? '검색 결과가 없습니다.' : '거래처가 없습니다.'}
                   </td>
                 </tr>
@@ -618,8 +619,8 @@ const Clients = () => {
       </div>
 
       {/* 모바일: Card View with Swipe (768px 미만) */}
-      <div className="card overflow-hidden md:hidden">
-        <div className="divide-y divide-border-light">
+      <div className="card overflow-hidden md:hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+        <div className="divide-y divide-gray-800">
           {Object.keys(visibleGroupedClients).length > 0 ? (
             Object.keys(visibleGroupedClients).map((company) => {
               const companyClients = visibleGroupedClients[company]
@@ -657,11 +658,11 @@ const Clients = () => {
                 >
                   <Link
                     to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
-                    className="block p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation"
+                    className="block p-4 bg-[#1E1E1E] hover:bg-white/5 transition-colors touch-manipulation"
                     style={{ WebkitTapHighlightColor: 'transparent' }}
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-base font-bold text-text-primary flex-1 break-words">
+                      <h3 className="text-base font-bold text-white flex-1 break-words">
                         {company}
                       </h3>
                       <span
@@ -672,13 +673,13 @@ const Clients = () => {
                         {primaryContact?.status || '-'}
                       </span>
                     </div>
-                    <div className="space-y-1.5 text-sm text-text-secondary">
+                    <div className="space-y-1.5 text-sm text-gray-300">
                       {primaryContact?.contact_person && (
                         <div className="flex items-center space-x-2">
                           <span className="font-medium">담당자:</span>
                           <span>{primaryContact.contact_person}</span>
                           {hasMultipleContacts && (
-                            <span className="text-xs text-brand-blue">
+                            <span className="text-xs text-gray-300">
                               외 {companyClients.length - 1}명
                             </span>
                           )}
@@ -696,16 +697,16 @@ const Clients = () => {
                           <span>{primaryContact.email}</span>
                         </div>
                       )}
-                      <div className="flex items-center space-x-2 mt-2 pt-2 border-t border-gray-100">
-                        <span className="text-xs text-text-secondary">
+                      <div className="flex items-center space-x-2 mt-2 pt-2 border-t border-white/10">
+                        <span className="text-xs text-gray-300">
                           최근 주문: {stats.lastOrder ? stats.lastOrder.split('T')[0] : '-'}
                         </span>
-                        <span className="text-xs text-text-secondary">•</span>
-                        <span className="text-xs text-text-secondary">
+                        <span className="text-xs text-gray-300">•</span>
+                        <span className="text-xs text-gray-300">
                           최근 컨택: {stats.lastContact ? stats.lastContact.split('T')[0] : '-'}
                         </span>
-                        <span className="text-xs text-text-secondary">•</span>
-                        <span className="text-xs font-semibold text-text-primary">
+                        <span className="text-xs text-gray-300">•</span>
+                        <span className="text-xs font-semibold text-white">
                           {stats.totalAmount === 0
                             ? '0원'
                             : formatKoreanCurrency(stats.totalAmount || 0)}
@@ -717,7 +718,7 @@ const Clients = () => {
               )
             })
           ) : (
-            <div className="px-6 py-8 text-center text-text-secondary">
+            <div className="px-6 py-8 text-center text-gray-300">
               {searchTerm ? '검색 결과가 없습니다.' : '거래처가 없습니다.'}
             </div>
           )}
@@ -774,3 +775,7 @@ const Clients = () => {
 }
 
 export default Clients
+
+
+
+

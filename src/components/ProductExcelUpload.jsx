@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+﻿import React, { useState, useRef } from 'react'
 import { Upload, Download, Loader2 } from 'lucide-react'
 import { downloadProductTemplate, parseProductExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'
@@ -57,7 +57,7 @@ const ProductExcelUpload = () => {
     <div className="flex items-center space-x-3">
       <button
         onClick={handleDownloadTemplate}
-        className="px-4 py-2.5 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm"
+        className="btn-secondary px-4 py-2.5 flex items-center justify-center space-x-2 font-medium"
       >
         <Download className="w-4 h-4" />
         <span>양식 다운로드</span>
@@ -74,7 +74,7 @@ const ProductExcelUpload = () => {
         />
         <label
           htmlFor="excel-upload"
-          className={`px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all duration-200 flex items-center justify-center space-x-2 font-semibold shadow-sm cursor-pointer ${
+          className={`px-4 py-2.5 bg-white text-black rounded-xl hover:bg-zinc-100 transition-all duration-200 flex items-center justify-center space-x-2 font-semibold cursor-pointer ${
             isUploading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
@@ -96,3 +96,6 @@ const ProductExcelUpload = () => {
 }
 
 export default ProductExcelUpload
+
+
+

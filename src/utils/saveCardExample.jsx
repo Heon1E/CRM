@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 명함 저장 로직 사용 예시
  * 
  * 이 파일은 참고용 예시입니다.
@@ -144,3 +144,4 @@ export const handleSaveInModal = async (extractedInfo, onClose, onSuccess) => {
  *   )
  * }
  */
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Compress base64 image before upload
  * - Max dimension: 1024px
  * - JPEG quality: 0.6
@@ -60,3 +60,4 @@ export const extractBusinessCardInfo = async (base64Image) => {
 
   return res.json();
 };
+

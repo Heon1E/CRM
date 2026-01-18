@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+﻿import React, { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
@@ -286,7 +286,7 @@ const ClientDetail = () => {
   if (loading || isFetchingClient) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-text-secondary">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
@@ -295,10 +295,10 @@ const ClientDetail = () => {
   if (!resolvedClient) {
     return (
       <div className="flex flex-col items-center justify-center h-screen space-y-4">
-        <p className="text-text-secondary">고객 정보를 찾을 수 없습니다.</p>
+        <p className="text-gray-300">고객 정보를 찾을 수 없습니다.</p>
         <Link
           to="/clients"
-          className="text-brand-blue hover:text-brand-blue-hover font-medium"
+          className="text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg hover:bg-white/5 transition-colors"
         >
           거래처 목록으로 돌아가기
         </Link>
@@ -307,21 +307,22 @@ const ClientDetail = () => {
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link
             to="/clients"
-            className="text-text-secondary hover:text-text-primary transition-colors"
+            className="text-gray-300 hover:text-white transition-all rounded-lg p-2 hover:bg-white/5"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-text-primary">
+            <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+            <h1 className="text-2xl md:text-3xl font-semibold text-white">
               {primaryContact?.company || '거래처 정보'}
             </h1>
-            <p className="text-text-secondary mt-1 text-sm">
+            <p className="text-gray-300 mt-1 text-sm">
               Customer 360 View
             </p>
           </div>
@@ -329,22 +330,22 @@ const ClientDetail = () => {
       </div>
 
       {/* 2컬럼 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 md:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* 좌측 패널: 기본 정보 (1/4) */}
         <div className="lg:col-span-1 space-y-4">
           {/* 기본 정보 카드 */}
-          <div className="card p-5">
+          <div className="card p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
             <div className="space-y-4">
               {/* 회사명 */}
               <div>
                 <div className="flex items-center space-x-2 mb-2">
-                  <Building2 className="w-5 h-5 text-brand-blue" />
-                  <h2 className="text-lg font-bold text-text-primary">
+                  <Building2 className="w-5 h-5 text-gray-300" />
+                  <h2 className="text-lg font-bold text-white">
                     {primaryContact?.company || '-'}
                   </h2>
                 </div>
                 {companyClients.length > 1 && (
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-gray-300">
                     담당자 {companyClients.length}명
                   </p>
                 )}
@@ -353,32 +354,33 @@ const ClientDetail = () => {
               {/* 담당자 목록 */}
               {companyClients.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-text-secondary uppercase">
+                  <h3 className="text-xs font-semibold text-gray-300 uppercase">
                     담당자 목록
                   </h3>
                   {companyClients.map((client, idx) => (
                     <div
                       key={client.id}
-                      className={`p-2 rounded ${
-                        idx === 0 ? 'bg-blue-50' : 'bg-gray-50'
+                      className={`p-2 rounded border border-gray-800 ${
+                        idx === 0 ? 'bg-white/5' : 'bg-[#1E1E1E]'
                       }`}
                     >
-                      <p className="text-sm font-medium text-text-primary">
+                      <p className="text-sm font-medium text-white">
                         {client.contact_person || '-'}
                         {idx === 0 && (
-                          <span className="ml-2 text-xs text-brand-blue">
+                          <span className="ml-2 text-xs text-gray-300">
                             (대표)
                           </span>
                         )}
                       </p>
                       {client.phone && (
-                        <p className="text-xs text-text-secondary mt-1">
-                          📞 {client.phone}
+                        <p className="text-xs text-gray-300 mt-1">
+                          {client.phone}
                         </p>
                       )}
                       {client.email && (
-                        <p className="text-xs text-text-secondary truncate">
-                          ✉️ {client.email}
+                        <p className="flex items-center gap-1 text-xs text-gray-300 truncate">
+                          <Mail className="w-3.5 h-3.5 text-gray-300" />
+                          <span className="truncate">{client.email}</span>
                         </p>
                       )}
                     </div>
@@ -387,27 +389,33 @@ const ClientDetail = () => {
               )}
 
               {/* 연락처 정보 */}
-              <div className="space-y-2 pt-4 border-t border-border-light">
+              <div className="space-y-2 pt-4 border-t border-gray-800">
                 {primaryContact?.phone && (
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-4 h-4 text-text-secondary" />
-                    <span className="text-sm text-text-body">
+                  <div className="group flex items-center space-x-2">
+                    <span className="w-10 h-10 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
+                      <Phone className="w-4 h-4" />
+                    </span>
+                    <span className="text-sm text-gray-300">
                       {primaryContact.phone}
                     </span>
                   </div>
                 )}
                 {primaryContact?.email && (
-                  <div className="flex items-center space-x-2">
-                    <Mail className="w-4 h-4 text-text-secondary" />
-                    <span className="text-sm text-text-body truncate">
+                  <div className="group flex items-center space-x-2">
+                    <span className="w-10 h-10 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
+                      <Mail className="w-4 h-4" />
+                    </span>
+                    <span className="text-sm text-gray-300 truncate">
                       {primaryContact.email}
                     </span>
                   </div>
                 )}
                 {primaryContact?.status && (
-                  <div className="flex items-center space-x-2">
-                    <Activity className="w-4 h-4 text-text-secondary" />
-                    <span className="text-sm text-text-body">
+                  <div className="group flex items-center space-x-2">
+                    <span className="w-10 h-10 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
+                      <Activity className="w-4 h-4" />
+                    </span>
+                    <span className="text-sm text-gray-300">
                       {primaryContact.status}
                     </span>
                   </div>
@@ -417,49 +425,49 @@ const ClientDetail = () => {
           </div>
 
           {/* 매출 통계 카드 */}
-          <div className="card p-5">
-            <h3 className="text-sm font-semibold text-text-secondary uppercase mb-4">
+          <div className="card p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+            <h3 className="text-sm font-semibold text-gray-300 uppercase mb-4">
               매출 통계
             </h3>
             <div className="space-y-4">
               {/* 이번 달 매출 */}
               <div>
-                <p className="text-xs text-text-secondary mb-1">이번 달 매출</p>
-                <p className="text-2xl font-bold text-text-primary">
+                <p className="text-xs text-gray-300 mb-1">이번 달 매출</p>
+                <p className="text-2xl font-semibold text-white">
                   {formatCurrency(thisMonthSales || 0)}
                 </p>
               </div>
 
               {/* 올해 누적 매출 */}
-              <div className="pt-3 border-t border-border-light">
-                <p className="text-xs text-text-secondary mb-1">올해 누적 매출 (YTD)</p>
-                <p className="text-lg font-bold text-text-primary">
+              <div className="pt-3 border-t border-gray-800">
+                <p className="text-xs text-gray-300 mb-1">올해 누적 매출 (YTD)</p>
+                <p className="text-lg font-semibold text-white">
                   {formatCurrency(ytdSales || 0)}
                 </p>
               </div>
 
               {/* 전년 동기 대비 성장률 */}
-              <div className="pt-3 border-t border-border-light">
-                <p className="text-xs text-text-secondary mb-1">작년 대비 성장</p>
+              <div className="pt-3 border-t border-gray-800">
+                <p className="text-xs text-gray-300 mb-1">작년 대비 성장</p>
                 <div className="flex items-center space-x-2">
                   {yoyGrowth.value === null ? (
                     <>
-                      <Minus className="w-4 h-4 text-text-secondary" />
-                      <p className="text-lg font-bold text-text-secondary">
+                      <Minus className="w-4 h-4 text-gray-300" />
+                      <p className="text-lg font-semibold text-gray-300">
                         {yoyGrowth.label}
                       </p>
                     </>
                   ) : yoyGrowth.isPositive ? (
                     <>
-                      <TrendingUp className="w-4 h-4 text-emerald-600" />
-                      <p className="text-lg font-bold text-emerald-600">
+                      <TrendingUp className="w-4 h-4 text-red-300" />
+                      <p className="text-lg font-semibold text-red-300">
                         ▲ {yoyGrowth.label}
                       </p>
                     </>
                   ) : (
                     <>
-                      <TrendingDown className="w-4 h-4 text-red-500" />
-                      <p className="text-lg font-bold text-red-500">
+                      <TrendingDown className="w-4 h-4 text-blue-300" />
+                      <p className="text-lg font-semibold text-blue-300">
                         ▼ {yoyGrowth.label}
                       </p>
                     </>
@@ -471,15 +479,15 @@ const ClientDetail = () => {
         </div>
 
         {/* 우측 패널: 상세 이력 (3/4) */}
-        <div className="lg:col-span-3 space-y-5 md:space-y-6">
+        <div className="lg:col-span-3 space-y-8">
           {/* 활동 타임라인 */}
-          <div className="card p-5 md:p-6">
+          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-text-primary flex items-center space-x-2">
-                <Activity className="w-5 h-5 text-brand-blue" />
+              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
+                <Activity className="w-5 h-5 text-gray-300" />
                 <span>활동 내역</span>
               </h2>
-              <span className="text-sm text-text-secondary">
+              <span className="text-sm text-gray-300">
                 총 {sortedActivities.length}건
               </span>
             </div>
@@ -500,41 +508,43 @@ const ClientDetail = () => {
                     <div key={activity.id} className="relative pl-8">
                       {/* 타임라인 라인 */}
                       {index < sortedActivities.length - 1 && (
-                        <div className="absolute left-3 top-8 bottom-0 w-0.5 bg-border-light"></div>
+                        <div className="absolute left-3 top-8 bottom-0 w-0.5 bg-gray-800"></div>
                       )}
 
                       {/* 타임라인 포인트 */}
-                      <div className="absolute left-0 top-1 w-6 h-6 bg-brand-blue rounded-full border-4 border-white flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                      <div className="absolute left-0 top-1 w-6 h-6 bg-[#1E1E1E] rounded-full border border-gray-800 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-zinc-400/70 rounded-full"></div>
                       </div>
 
                       {/* 활동 내용 */}
-                      <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="group bg-[#1E1E1E] rounded-lg p-4 border border-gray-800 hover:bg-white/5 transition-colors">
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <div className="flex items-center space-x-2 mb-1">
-                              <Calendar className="w-4 h-4 text-text-secondary" />
-                              <span className="text-sm font-semibold text-text-primary">
+                              <span className="w-8 h-8 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
+                                <Calendar className="w-4 h-4" />
+                              </span>
+                              <span className="text-sm font-semibold text-white">
                                 {dateStr}
                               </span>
                             </div>
-                            <p className="text-sm font-medium text-text-body">
+                            <p className="text-sm font-medium text-gray-300">
                               {activity.type || '활동'}
                             </p>
                           </div>
                           {activity.status && (
-                            <span className="text-xs px-2 py-1 bg-blue-50 text-brand-blue rounded">
+                            <span className="text-xs px-2 py-1 bg-white/5 text-gray-300 rounded border border-gray-800">
                               {activity.status}
                             </span>
                           )}
                         </div>
                         {activity.description && (
-                          <p className="text-sm text-text-secondary mt-2">
+                          <p className="text-sm text-gray-300 mt-2">
                             {activity.description}
                           </p>
                         )}
                         {activity.user && (
-                          <p className="text-xs text-text-secondary mt-2">
+                          <p className="text-xs text-gray-300 mt-2">
                             담당: {activity.user}
                           </p>
                         )}
@@ -544,22 +554,22 @@ const ClientDetail = () => {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 text-text-secondary">
+              <div className="text-center py-8 text-gray-300">
                 활동 내역이 없습니다.
               </div>
             )}
           </div>
 
           {/* 구매 이력 */}
-          <div className="card p-5 md:p-6">
+          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-text-primary flex items-center space-x-2">
-                <DollarSign className="w-5 h-5 text-brand-green" />
+              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
+                <DollarSign className="w-5 h-5 text-gray-300" />
                 <span>구매 이력</span>
               </h2>
               <div className="text-right">
-                <p className="text-xs text-text-secondary">올해 누적 매출액</p>
-                <p className="text-xl font-bold text-brand-green">
+                <p className="text-xs text-gray-300">올해 누적 매출액</p>
+                <p className="text-xl font-semibold text-white">
                   {formatCurrency(ytdSales || 0)}
                 </p>
               </div>
@@ -567,27 +577,27 @@ const ClientDetail = () => {
 
             {sortedSales.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border-light">
-                  <thead className="bg-transparent">
+                <table className="min-w-full table-compact divide-y divide-gray-800">
+                  <thead className="bg-[#161616]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         날짜
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         품목
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         수량
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         금액
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
                         비고
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-border-light">
+                  <tbody className="bg-transparent divide-y divide-gray-800">
                     {sortedSales.map((sale) => {
                       const saleDate = sale.sale_date || sale.date
                       const dateStr = saleDate
@@ -610,29 +620,29 @@ const ClientDetail = () => {
                       return (
                         <tr
                           key={sale.id}
-                          className="hover:bg-gray-50 transition-colors"
+                          className="hover:bg-white/5 transition-colors"
                         >
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-text-body">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
                             {dateStr}
                           </td>
-                          <td className="px-4 py-4 text-sm text-text-body">
+                          <td className="px-4 py-4 text-sm text-gray-300">
                             {itemName}
                             {items.length > 1 && (
-                              <span className="text-xs text-text-secondary ml-1">
+                              <span className="text-xs text-gray-300 ml-1">
                                 외 {items.length - 1}건
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-text-body">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
                             {items.reduce(
                               (sum, item) => sum + (item.quantity || 0),
                               0
                             )}
                           </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-text-primary text-right">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-white text-right">
                             {formatCurrency(sale.totalAmount || 0)}
                           </td>
-                          <td className="px-4 py-4 text-sm text-text-secondary">
+                          <td className="px-4 py-4 text-sm text-gray-300">
                             <div className="max-w-xs truncate">
                               {sale.notes || '-'}
                             </div>
@@ -644,7 +654,7 @@ const ClientDetail = () => {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 text-text-secondary">
+              <div className="text-center py-8 text-gray-300">
                 구매 이력이 없습니다.
               </div>
             )}
@@ -656,3 +666,7 @@ const ClientDetail = () => {
 }
 
 export default ClientDetail
+
+
+
+

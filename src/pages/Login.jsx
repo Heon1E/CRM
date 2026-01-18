@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+﻿import React, { useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -36,20 +36,20 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background-default flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-text-primary">
+        <h2 className="mt-6 text-center text-3xl font-semibold text-slate-900">
           {appTitle}
         </h2>
-        <p className="mt-2 text-center text-sm text-text-secondary">
+        <p className="mt-2 text-center text-sm text-slate-500">
           Google 계정으로 시작하세요
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="card py-8 px-4 sm:px-10">
+        <div className="bg-white rounded-2xl shadow-sm py-8 px-4 sm:px-10">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6">
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-6">
               {error}
             </div>
           )}
@@ -59,7 +59,7 @@ const Login = () => {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-border-input rounded-md shadow-sm text-base font-medium text-text-body bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:opacity-50 transition-colors"
+              className="w-full flex justify-center items-center py-3 px-4 border border-slate-200 rounded-lg text-base font-medium text-slate-800 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 transition-colors"
             >
               <svg className="w-6 h-6 mr-3" viewBox="0 0 24 24">
                 <path
@@ -82,7 +82,7 @@ const Login = () => {
               {loading ? '로그인 중...' : 'Google로 시작하기'}
             </button>
 
-            <p className="text-xs text-center text-text-secondary mt-4">
+            <p className="text-xs text-center text-slate-500 mt-4">
               로그인 시 Google 캘린더 연동 권한이 함께 요청됩니다.
             </p>
           </div>
@@ -93,4 +93,8 @@ const Login = () => {
 }
 
 export default Login
+
+
+
+
 

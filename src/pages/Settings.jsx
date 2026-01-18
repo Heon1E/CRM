@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -213,27 +213,28 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">설정</h1>
-        <p className="text-gray-500 mt-1.5 text-sm md:text-base">시스템 설정 및 관리</p>
+        <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+        <h1 className="text-2xl md:text-3xl font-semibold text-white">설정</h1>
+        <p className="text-gray-300 mt-1.5 text-sm md:text-base">시스템 설정 및 관리</p>
       </div>
 
       {/* 탭 메뉴 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-1">
+      <div className="card p-1 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveTab('general')}
             className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
               activeTab === 'general'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'text-gray-700 hover:bg-gray-50'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-300 hover:bg-white/5'
             }`}
           >
             일반 설정
@@ -242,8 +243,8 @@ const Settings = () => {
             onClick={() => setActiveTab('products')}
             className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
               activeTab === 'products'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'text-gray-700 hover:bg-gray-50'
+                ? 'bg-white/10 text-white'
+                : 'text-gray-300 hover:bg-white/5'
             }`}
           >
             제품 관리
@@ -254,11 +255,11 @@ const Settings = () => {
       {/* 일반 설정 탭 */}
       {activeTab === 'general' && (
         <>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-5">일반 설정</h2>
+          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+            <h2 className="text-lg font-semibold text-white mb-5">일반 설정</h2>
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
                   회사명
                 </label>
                 <input
@@ -267,11 +268,11 @@ const Settings = () => {
                   value={settings.company_name}
                   onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
                   disabled={settingsLoading}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="input-field w-full disabled:bg-[#121212] disabled:cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
                   대표 이메일
                 </label>
                 <input
@@ -280,14 +281,14 @@ const Settings = () => {
                   value={settings.email}
                   onChange={(e) => setSettings({ ...settings, email: e.target.value })}
                   disabled={settingsLoading}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all disabled:bg-gray-50 disabled:cursor-not-allowed"
+                  className="input-field w-full disabled:bg-[#121212] disabled:cursor-not-allowed"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-5">알림 설정</h2>
+          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+            <h2 className="text-lg font-semibold text-white mb-5">알림 설정</h2>
             <div className="space-y-4">
               <label className="flex items-center cursor-pointer">
                 <input
@@ -295,9 +296,9 @@ const Settings = () => {
                   checked={settings.email_notification}
                   onChange={(e) => setSettings({ ...settings, email_notification: e.target.checked })}
                   disabled={settingsLoading}
-                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4 disabled:cursor-not-allowed"
+                  className="rounded border-border-input text-white focus:ring-white/20 w-4 h-4 disabled:cursor-not-allowed"
                 />
-                <span className="ml-3 text-sm font-medium text-gray-700">이메일 알림 받기</span>
+                <span className="ml-3 text-sm font-medium text-gray-300">이메일 알림 받기</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -305,9 +306,9 @@ const Settings = () => {
                   checked={settings.new_client_notification}
                   onChange={(e) => setSettings({ ...settings, new_client_notification: e.target.checked })}
                   disabled={settingsLoading}
-                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4 disabled:cursor-not-allowed"
+                  className="rounded border-border-input text-white focus:ring-white/20 w-4 h-4 disabled:cursor-not-allowed"
                 />
-                <span className="ml-3 text-sm font-medium text-gray-700">새 고객 등록 알림</span>
+                <span className="ml-3 text-sm font-medium text-gray-300">새 고객 등록 알림</span>
               </label>
               <label className="flex items-center cursor-pointer">
                 <input
@@ -315,21 +316,21 @@ const Settings = () => {
                   checked={settings.sales_goal_notification}
                   onChange={(e) => setSettings({ ...settings, sales_goal_notification: e.target.checked })}
                   disabled={settingsLoading}
-                  className="rounded border-gray-200 text-purple-600 focus:ring-purple-500 w-4 h-4 disabled:cursor-not-allowed"
+                  className="rounded border-border-input text-white focus:ring-white/20 w-4 h-4 disabled:cursor-not-allowed"
                 />
-                <span className="ml-3 text-sm font-medium text-gray-700">매출 목표 달성 알림</span>
+                <span className="ml-3 text-sm font-medium text-gray-300">매출 목표 달성 알림</span>
               </label>
             </div>
           </div>
 
           {/* 데이터 일괄 관리 섹션 */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 md:p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-5">데이터 일괄 관리</h2>
+          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+            <h2 className="text-lg font-semibold text-white mb-5">데이터 일괄 관리</h2>
             <div className="space-y-6">
               {/* 거래처 일괄 등록 */}
               <div>
-                <h3 className="text-base font-semibold text-gray-800 mb-3">거래처 일괄 등록</h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <h3 className="text-base font-semibold text-white mb-3">거래처 일괄 등록</h3>
+                <p className="text-sm text-gray-300 mb-4">
                   엑셀 파일을 업로드하여 거래처를 일괄 등록할 수 있습니다. 담당자1은 자동으로 키맨으로 지정됩니다.
                 </p>
                 <ClientExcelUpload />
@@ -337,8 +338,8 @@ const Settings = () => {
 
               {/* 매출 일괄 등록 */}
               <div>
-                <h3 className="text-base font-semibold text-gray-800 mb-3">매출 일괄 등록</h3>
-                <p className="text-sm text-gray-600 mb-4">
+                <h3 className="text-base font-semibold text-white mb-3">매출 일괄 등록</h3>
+                <p className="text-sm text-gray-300 mb-4">
                   엑셀 파일을 업로드하여 매출을 일괄 등록할 수 있습니다. 거래처명은 정확히 일치해야 합니다.
                 </p>
                 <SalesExcelUpload />
@@ -350,14 +351,14 @@ const Settings = () => {
             <button
               onClick={handleCancel}
               disabled={settingsLoading}
-              className="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-secondary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               취소
             </button>
             <button
               onClick={handleSave}
               disabled={settingsLoading}
-              className="px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all duration-200 font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-primary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {settingsLoading ? '저장 중...' : '저장'}
             </button>
@@ -367,17 +368,18 @@ const Settings = () => {
 
       {/* 제품 관리 탭 */}
       {activeTab === 'products' && (
-        <div className="space-y-5 md:space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">제품 관리</h2>
-              <p className="text-gray-500 mt-1.5 text-sm md:text-base">총 {products.length}개 제품</p>
+              <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+              <h2 className="text-xl md:text-2xl font-semibold text-white">제품 관리</h2>
+              <p className="text-gray-300 mt-1.5 text-sm md:text-base">총 {products.length} 제품</p>
             </div>
             <div className="flex items-center space-x-3 w-full sm:w-auto">
               <ProductExcelUpload />
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="btn-success w-full sm:w-auto flex items-center justify-center space-x-2"
+                className="btn-primary w-full sm:w-auto flex items-center justify-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>제품 추가</span>
@@ -385,50 +387,50 @@ const Settings = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="card overflow-hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-100">
-                <thead className="bg-transparent">
+              <table className="min-w-full table-compact divide-y divide-gray-800">
+                <thead className="bg-[#161616]">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                       품목명
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                       종류
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                       규격
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                       작업
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100">
+                <tbody className="bg-transparent divide-y divide-gray-800">
                   {products.length > 0 ? (
                     products.map((product) => (
-                      <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-5 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">{product.name || '-'}</div>
+                      <tr key={product.id} className="hover:bg-white/5 transition-colors">
+                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-white">{product.name || '-'}</div>
                         </td>
-                        <td className="px-6 py-5 whitespace-nowrap">
-                          <div className="text-sm text-gray-600">{product.type || '-'}</div>
+                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{product.type || '-'}</div>
                         </td>
-                        <td className="px-6 py-5 whitespace-nowrap">
-                          <div className="text-sm text-gray-600">{product.standard || '-'}</div>
+                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{product.standard || '-'}</div>
                         </td>
-                        <td className="px-6 py-5 whitespace-nowrap text-sm">
+                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm">
                           <div className="flex items-center space-x-3">
                             <button
                               onClick={() => setEditingProductId(product.id)}
-                              className="text-brand-blue hover:text-brand-blue-hover font-medium flex items-center space-x-1 transition-colors"
+                              className="text-gray-300 hover:text-white font-medium flex items-center space-x-1 transition-all px-3 py-2 rounded-lg hover:bg-white/5"
                             >
                               <Edit className="w-4 h-4" />
                               <span>수정</span>
                             </button>
                             <button
                               onClick={() => handleDelete(product.id)}
-                              className="text-red-500 hover:text-red-600 font-medium flex items-center space-x-1 transition-colors"
+                              className="text-red-200 font-medium flex items-center space-x-1 transition-all px-3 py-2 rounded-lg bg-red-400/10 border border-red-400/30 hover:bg-red-400/20"
                             >
                               <Trash2 className="w-4 h-4" />
                               <span>삭제</span>
@@ -439,7 +441,7 @@ const Settings = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan="4" className="px-4 py-6 md:px-6 md:py-8 text-center text-gray-300">
                         등록된 제품이 없습니다.
                       </td>
                     </tr>
@@ -466,3 +468,8 @@ const Settings = () => {
 }
 
 export default Settings
+
+
+
+
+

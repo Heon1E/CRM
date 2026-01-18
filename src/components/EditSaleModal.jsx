@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'
@@ -508,7 +508,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              거래처 <span className="text-red-500">*</span>
+              거래처 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.clientId || ''}
@@ -527,7 +527,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              날짜 <span className="text-red-500">*</span>
+              날짜 <span className="text-red-400">*</span>
             </label>
             <input
               type="date"
@@ -543,7 +543,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
         <div>
           <div className="flex justify-between items-center mb-3">
             <label className="block text-sm font-medium text-gray-700">
-              품목 <span className="text-red-500">*</span>
+              품목 <span className="text-red-400">*</span>
             </label>
             <button
               type="button"
@@ -567,7 +567,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
                       <button
                         type="button"
                         onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-400 hover:text-red-300"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -669,7 +669,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="px-5 py-2.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-all duration-200 font-medium shadow-sm hover:shadow"
+            className="px-5 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 rounded-md hover:bg-red-400/30 transition-all duration-200 font-medium"
           >
             삭제
           </button>
@@ -695,3 +695,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
 }
 
 export default EditSaleModal
+
+
+
+

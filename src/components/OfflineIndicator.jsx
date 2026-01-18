@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { WifiOff, Wifi, CloudOff, CheckCircle2 } from 'lucide-react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { getQueueCount } from '../utils/syncQueue'
@@ -78,12 +78,13 @@ const OfflineIndicator = () => {
         fixed top-16 left-0 right-0 z-40 px-4 py-2 md:py-3
         flex items-center justify-center space-x-2
         transition-all duration-300 ease-in-out
+        bg-white border-b border-slate-200
         ${
           showReconnected
-            ? 'bg-green-50 border-b border-green-200 text-green-800'
-            : isOnline 
-            ? 'bg-yellow-50 border-b border-yellow-200 text-yellow-800' 
-            : 'bg-red-50 border-b border-red-200 text-red-800'
+            ? 'text-emerald-600'
+            : isOnline
+            ? 'text-amber-600'
+            : 'text-red-600'
         }
         shadow-sm
       `}
@@ -116,7 +117,7 @@ const OfflineIndicator = () => {
           <span className="text-xs md:text-sm font-medium text-center">
             현재 오프라인 상태입니다. 작성한 데이터는 연결 시 자동 저장됩니다.
             {pendingSyncCount > 0 && (
-              <span className="ml-1 font-semibold text-red-900">
+              <span className="ml-1 font-semibold text-red-600">
                 (대기 중: {pendingSyncCount}개)
               </span>
             )}
@@ -128,3 +129,6 @@ const OfflineIndicator = () => {
 }
 
 export default OfflineIndicator
+
+
+

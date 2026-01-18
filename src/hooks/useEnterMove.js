@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 
 /**
  * 전역 엔터 네비게이션 훅
@@ -161,4 +161,5 @@ const useEnterMove = ({ formRef, enabled = true, skipSelectors = ['textarea'] })
 }
 
 export default useEnterMove
+
 

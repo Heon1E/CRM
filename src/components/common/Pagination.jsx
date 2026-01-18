@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 /**
@@ -65,15 +65,15 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
   }
 
   return (
-    <div className="flex items-center justify-center space-x-2 py-4 px-4 bg-white border-t border-gray-200">
+    <div className="flex items-center justify-center space-x-2 py-4 px-4 bg-[#1E1E1E] border-t border-gray-800">
       {/* 이전 버튼 */}
       <button
         onClick={handlePrev}
         disabled={currentPage === 1}
         className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors touch-manipulation ${
           currentPage === 1
-            ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-            : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+            ? 'border-gray-800 text-gray-300 cursor-not-allowed'
+            : 'border-gray-800 text-gray-300 hover:bg-white/5'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
@@ -86,13 +86,13 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
           <>
             <button
               onClick={() => handlePageClick(1)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors touch-manipulation"
+              className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-800 text-gray-300 hover:bg-white/5 transition-colors touch-manipulation"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               1
             </button>
             {pageNumbers[0] > 2 && (
-              <span className="px-2 text-gray-400">...</span>
+              <span className="px-2 text-gray-300">...</span>
             )}
           </>
         )}
@@ -103,8 +103,8 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
             onClick={() => handlePageClick(page)}
             className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors touch-manipulation ${
               page === currentPage
-                ? 'bg-brand-blue text-white border-brand-blue font-semibold'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                ? 'bg-white/10 text-white border-gray-800 font-semibold'
+                : 'border-gray-800 text-gray-300 hover:bg-white/5'
             }`}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
@@ -115,11 +115,11 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
         {pageNumbers[pageNumbers.length - 1] < totalPages && (
           <>
             {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
-              <span className="px-2 text-gray-400">...</span>
+              <span className="px-2 text-gray-300">...</span>
             )}
             <button
               onClick={() => handlePageClick(totalPages)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors touch-manipulation"
+              className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-800 text-gray-300 hover:bg-white/5 transition-colors touch-manipulation"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               {totalPages}
@@ -133,9 +133,9 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
         onClick={handleNext}
         disabled={currentPage === totalPages}
         className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors touch-manipulation ${
-          currentPage === totalPages
-            ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-            : 'border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+        currentPage === totalPages
+          ? 'border-gray-800 text-gray-300 cursor-not-allowed'
+          : 'border-gray-800 text-gray-300 hover:bg-white/5'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
@@ -143,7 +143,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
       </button>
 
       {/* 페이지 정보 */}
-      <div className="ml-4 text-sm text-gray-600 hidden sm:block">
+      <div className="ml-4 text-sm text-gray-300 hidden sm:block">
         {totalCount > 0 ? (
           <>
             {((currentPage - 1) * pageSize + 1).toLocaleString()} -{' '}
@@ -159,3 +159,5 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
 }
 
 export default Pagination
+
+

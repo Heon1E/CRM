@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react'
+﻿import React, { useState, useMemo, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
-import { CheckCircle2, TrendingUp, ArrowRight } from 'lucide-react'
+import { CheckCircle2, TrendingUp, ArrowRight, Mail } from 'lucide-react'
 import Toast from '../components/Toast'
 import { showConfirm } from '../utils/alert'
 
@@ -175,42 +175,43 @@ const PipelineBoard = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-text-secondary">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-text-primary flex items-center space-x-2">
-            <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-brand-blue" />
+          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-white flex items-center space-x-2">
+            <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
             <span>영업 파이프라인</span>
           </h1>
-          <p className="text-text-secondary mt-1.5 text-sm md:text-base">
+          <p className="text-gray-300 mt-1.5 text-sm md:text-base">
             총 {activeClients.length}건의 영업 기회
           </p>
         </div>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-6 overflow-x-auto pb-4">
           {/* 영업 단계 컬럼들 */}
           {stages.map((stage) => {
             const stageClients = clientsByStage[stage] || []
             return (
               <div
                 key={stage}
-                className="flex-shrink-0 w-72 bg-gray-50 rounded-lg p-4"
+                className="flex-shrink-0 w-72 bg-[#1E1E1E] border border-gray-800 rounded-2xl p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all hover:border-gray-700 hover:bg-white/5"
                 style={{ minHeight: '600px' }}
               >
                 {/* 컬럼 헤더 */}
                 <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-text-primary mb-1">
+                  <h3 className="text-sm font-semibold text-white mb-1">
                     {stage}
                   </h3>
-                  <div className="text-xs text-text-secondary">
+                  <div className="text-xs text-gray-300">
                     {stageClients.length}건
                   </div>
                 </div>
@@ -222,7 +223,7 @@ const PipelineBoard = () => {
                       ref={provided.innerRef}
                       {...provided.droppableProps}
                       className={`space-y-3 min-h-[500px] ${
-                        snapshot.isDraggingOver ? 'bg-blue-50 rounded-lg' : ''
+                        snapshot.isDraggingOver ? 'bg-white/5 rounded-lg' : ''
                       }`}
                     >
                       {stageClients.map((client, index) => (
@@ -236,29 +237,30 @@ const PipelineBoard = () => {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className={`card p-4 cursor-move transition-all ${
+                              className={`card p-4 cursor-move transition-all bg-[#1E1E1E] border-gray-800 rounded-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ${
                                 snapshot.isDragging
-                                  ? 'shadow-lg rotate-2'
-                                  : 'hover:shadow-md'
+                                  ? 'rotate-2'
+                                  : 'hover:bg-white/5 hover:border-gray-700'
                               }`}
                             >
                               <div className="space-y-2">
-                                <h4 className="font-semibold text-text-primary text-sm">
+                                <h4 className="font-semibold text-white text-sm">
                                   {client.company || '-'}
                                 </h4>
                                 {client.contact_person && (
-                                  <p className="text-xs text-text-body">
+                                  <p className="text-xs text-gray-300">
                                     담당자: {client.contact_person}
                                   </p>
                                 )}
                                 {client.phone && (
-                                  <p className="text-xs text-text-secondary">
-                                    📞 {client.phone}
+                                  <p className="text-xs text-gray-300">
+                                    {client.phone}
                                   </p>
                                 )}
                                 {client.email && (
-                                  <p className="text-xs text-text-secondary truncate">
-                                    ✉️ {client.email}
+                                  <p className="flex items-center gap-1 text-xs text-gray-300 truncate">
+                                    <Mail className="w-3.5 h-3.5 text-gray-300" />
+                                    <span className="truncate">{client.email}</span>
                                   </p>
                                 )}
                               </div>
@@ -281,10 +283,10 @@ const PipelineBoard = () => {
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={`bg-gray-50 rounded-lg p-4 border-2 border-dashed ${
+                  className={`bg-[#1E1E1E] rounded-2xl p-4 border-2 border-dashed shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all ${
                     snapshot.isDraggingOver
-                      ? 'border-brand-green bg-brand-green bg-opacity-5'
-                      : 'border-border-light'
+                      ? 'border-blue-400/40 bg-blue-500/10'
+                      : 'border-gray-800 hover:border-gray-700 hover:bg-white/5'
                   }`}
                   style={{ minHeight: '600px' }}
                 >
@@ -297,27 +299,27 @@ const PipelineBoard = () => {
                       <CheckCircle2
                         className={`w-12 h-12 ${
                           snapshot.isDraggingOver
-                            ? 'text-brand-green'
-                            : 'text-text-secondary'
+                            ? 'text-blue-300'
+                            : 'text-gray-300'
                         }`}
                       />
                     </div>
                     <h3
                       className={`text-lg font-bold mb-2 ${
                         snapshot.isDraggingOver
-                          ? 'text-brand-green'
-                          : 'text-text-primary'
+                          ? 'text-blue-300'
+                          : 'text-white'
                       }`}
                     >
                       계약 성사 (Win)
                     </h3>
                     <div className="flex items-center space-x-2 mb-2">
-                      <ArrowRight className="w-4 h-4 text-text-secondary" />
+                      <ArrowRight className="w-4 h-4 text-gray-300" />
                       <p
                         className={`text-sm text-center ${
                           snapshot.isDraggingOver
-                            ? 'text-brand-green font-semibold'
-                            : 'text-text-secondary'
+                            ? 'text-blue-300 font-semibold'
+                            : 'text-gray-300'
                         }`}
                       >
                         협상중 단계의 카드를
@@ -326,19 +328,19 @@ const PipelineBoard = () => {
                     <p
                       className={`text-sm text-center mb-4 ${
                         snapshot.isDraggingOver
-                          ? 'text-brand-green font-semibold'
-                          : 'text-text-secondary'
+                          ? 'text-blue-300 font-semibold'
+                          : 'text-gray-300'
                       }`}
                     >
                       여기로 끌어다 놓으세요
                     </p>
                     {snapshot.isDraggingOver && (
-                      <div className="mt-4 text-brand-green font-semibold animate-pulse text-lg">
+                      <div className="mt-4 text-blue-300 font-semibold animate-pulse text-lg">
                         놓으세요! 🎉
                       </div>
                     )}
                     {!snapshot.isDraggingOver && (
-                      <div className="text-xs text-text-secondary text-center mt-4">
+                      <div className="text-xs text-gray-300 text-center mt-4">
                         드롭존
                       </div>
                     )}
@@ -364,3 +366,6 @@ const PipelineBoard = () => {
 }
 
 export default PipelineBoard
+
+
+

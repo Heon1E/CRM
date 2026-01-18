@@ -1,20 +1,22 @@
-import Swal from 'sweetalert2'
+﻿import Swal from 'sweetalert2'
 import withReactContent from 'sweetalert2-react-content'
 
 const ReactSwal = withReactContent(Swal)
 
 // 공통 설정
 const commonConfig = {
-  confirmButtonColor: '#6366f1', // indigo-500
-  cancelButtonColor: '#6b7280', // gray-500
+  confirmButtonColor: '#FFFFFF',
+  cancelButtonColor: '#3F3F46',
+  background: '#1E1E1E',
+  color: '#FAFAFA',
   buttonsStyling: true,
   allowOutsideClick: false,
   allowEscapeKey: true,
   customClass: {
-    popup: 'rounded-lg',
+    popup: 'rounded-lg border border-gray-800',
     confirmButton: 'px-4 py-2 rounded-md font-medium',
     cancelButton: 'px-4 py-2 rounded-md font-medium',
-    htmlContainer: 'text-left break-words whitespace-normal',
+    htmlContainer: 'text-left break-words whitespace-normal text-gray-300',
   },
 }
 

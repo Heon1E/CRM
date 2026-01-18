@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 한국 전화번호 포맷터 유틸리티
  * 숫자만 입력된 전화번호를 한국 전화번호 형식으로 자동 변환
  */
@@ -96,3 +96,4 @@ export const handlePhoneBlur = (value, setFormData, formData) => {
   const formatted = formatKoreanPhone(value)
   setFormData({ ...formData, phone: formatted })
 }
+

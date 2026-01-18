@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+﻿import React, { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { showError } from '../utils/alert' // ★ 본인의 supabase 클라이언트 경로로 수정 필요
 

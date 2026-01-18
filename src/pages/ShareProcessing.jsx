@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
@@ -283,30 +283,30 @@ const ShareProcessing = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+    <div className="min-h-screen flex items-center justify-center bg-[#121212] p-4">
+      <div className="bg-[#1E1E1E] border border-gray-800 rounded-lg p-8 max-w-md w-full text-center">
         {status === 'loading' && (
           <>
-            <Loader2 className="w-16 h-16 mx-auto mb-4 text-blue-600 animate-spin" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">파일 처리 중</h2>
-            <p className="text-gray-600">{message}</p>
+            <Loader2 className="w-16 h-16 mx-auto mb-4 text-gray-300 animate-spin" />
+            <h2 className="text-xl font-semibold text-white mb-2">파일 처리 중</h2>
+            <p className="text-gray-300">{message}</p>
           </>
         )}
 
         {status === 'processing' && (
           <>
-            <Loader2 className="w-16 h-16 mx-auto mb-4 text-blue-600 animate-spin" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">오디오 분석 중</h2>
-            <p className="text-gray-600">{message}</p>
+            <Loader2 className="w-16 h-16 mx-auto mb-4 text-gray-300 animate-spin" />
+            <h2 className="text-xl font-semibold text-white mb-2">오디오 분석 중</h2>
+            <p className="text-gray-300">{message}</p>
             {analysisResult && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg text-left">
-                <p className="text-sm text-blue-900">
+              <div className="mt-4 p-4 bg-[#1E1E1E] rounded-lg text-left border border-gray-800">
+                <p className="text-sm text-gray-300">
                   <strong>거래처:</strong> {analysisResult.clientName || '없음'}
                 </p>
-                <p className="text-sm text-blue-900">
+                <p className="text-sm text-gray-300">
                   <strong>날짜:</strong> {analysisResult.date}
                 </p>
-                <p className="text-sm text-blue-900">
+                <p className="text-sm text-gray-300">
                   <strong>유형:</strong> {analysisResult.type}
                 </p>
               </div>
@@ -316,35 +316,35 @@ const ShareProcessing = () => {
 
         {status === 'success' && (
           <>
-            <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-green-600" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">처리 완료</h2>
-            <p className="text-gray-600 mb-4">{message}</p>
+            <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-emerald-300" />
+            <h2 className="text-xl font-semibold text-white mb-2">처리 완료</h2>
+            <p className="text-gray-300 mb-4">{message}</p>
             {analysisResult && (
-              <div className="mt-4 p-4 bg-green-50 rounded-lg text-left">
-                <p className="text-sm text-green-900">
+              <div className="mt-4 p-4 bg-[#1E1E1E] rounded-lg text-left border border-gray-800">
+                <p className="text-sm text-emerald-300">
                   <strong>거래처:</strong> {analysisResult.clientName || '없음'}
                 </p>
-                <p className="text-sm text-green-900">
+                <p className="text-sm text-emerald-300">
                   <strong>날짜:</strong> {analysisResult.date}
                 </p>
-                <p className="text-sm text-green-900">
+                <p className="text-sm text-emerald-300">
                   <strong>유형:</strong> {analysisResult.type}
                 </p>
-                <p className="text-sm text-green-900 mt-2">
+                <p className="text-sm text-emerald-300 mt-2">
                   <strong>요약:</strong> {analysisResult.summary}
                 </p>
               </div>
             )}
-            <p className="text-sm text-gray-500 mt-4">잠시 후 대시보드로 이동합니다...</p>
+            <p className="text-sm text-gray-300 mt-4">잠시 후 대시보드로 이동합니다...</p>
           </>
         )}
 
         {status === 'error' && (
           <>
-            <XCircle className="w-16 h-16 mx-auto mb-4 text-red-600" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">오류 발생</h2>
-            <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500 mt-4">잠시 후 대시보드로 이동합니다...</p>
+            <XCircle className="w-16 h-16 mx-auto mb-4 text-rose-400" />
+            <h2 className="text-xl font-semibold text-white mb-2">오류 발생</h2>
+            <p className="text-gray-300 mb-4">{message}</p>
+            <p className="text-sm text-gray-300 mt-4">잠시 후 대시보드로 이동합니다...</p>
           </>
         )}
       </div>
@@ -353,3 +353,6 @@ const ShareProcessing = () => {
 }
 
 export default ShareProcessing
+
+
+

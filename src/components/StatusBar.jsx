@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { Loader2, CheckCircle2, AlertCircle, CloudUpload } from 'lucide-react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'
@@ -55,12 +55,12 @@ const StatusBar = () => {
         transition-all duration-300 ease-in-out
         ${
           !isOnline
-            ? 'bg-red-50 border-t border-red-200 text-red-800'
+            ? 'bg-red-400/10 border-t border-red-400/30 text-red-300'
             : pendingSyncCount > 0
-            ? 'bg-yellow-50 border-t border-yellow-200 text-yellow-800'
-            : 'bg-gray-50 border-t border-gray-200 text-gray-800'
+            ? 'bg-amber-400/10 border-t border-amber-400/30 text-amber-300'
+            : 'bg-[#1E1E1E] border-t border-gray-800 text-gray-300'
         }
-        shadow-lg
+        shadow-soft
       `}
       style={{
         WebkitTapHighlightColor: 'transparent',
@@ -89,7 +89,7 @@ const StatusBar = () => {
       {/* 오른쪽: 상세 정보 (있을 경우) */}
       {pendingSyncCount > 0 && isOnline && (
         <div className="flex items-center space-x-1 flex-shrink-0">
-          <CheckCircle2 className="w-3 h-3 text-yellow-600" />
+          <CheckCircle2 className="w-3 h-3 text-amber-200" />
         </div>
       )}
     </div>
@@ -97,3 +97,6 @@ const StatusBar = () => {
 }
 
 export default StatusBar
+
+
+

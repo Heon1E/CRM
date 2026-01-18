@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+﻿import React, { useState, useRef, useEffect } from 'react'
 import { Edit, Trash2 } from 'lucide-react'
 
 /**
@@ -169,7 +169,7 @@ const SwipeableListItem = ({
               e.stopPropagation()
               handleActionClick('edit')
             }}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 active:bg-blue-700 flex items-center justify-center text-white font-medium transition-colors touch-manipulation"
+            className="flex-1 bg-[#1E1E1E] text-white border border-gray-800 hover:bg-white/5 active:bg-white/10 flex items-center justify-center font-medium transition-colors touch-manipulation"
             style={{ minWidth: '80px', minHeight: '44px', WebkitTapHighlightColor: 'transparent' }}
             aria-label={editLabel}
           >
@@ -182,7 +182,7 @@ const SwipeableListItem = ({
               e.stopPropagation()
               handleActionClick('delete')
             }}
-            className="flex-1 bg-red-500 hover:bg-red-600 active:bg-red-700 flex items-center justify-center text-white font-medium transition-colors touch-manipulation"
+            className="flex-1 bg-red-400/20 hover:bg-red-400/30 active:bg-red-400/40 flex items-center justify-center text-red-200 font-medium transition-colors touch-manipulation border border-red-400/30"
             style={{ minWidth: '80px', minHeight: '44px', WebkitTapHighlightColor: 'transparent' }}
             aria-label={deleteLabel}
           >
@@ -193,7 +193,7 @@ const SwipeableListItem = ({
 
       {/* 리스트 항목 (앞면) */}
       <div
-        className="relative bg-white transition-transform duration-300 ease-out"
+        className="relative bg-[#1E1E1E] transition-transform duration-300 ease-out"
         style={{
           transform: `translateX(${translateX}px)`,
           touchAction: isDragging ? 'none' : 'pan-y pan-x', // 드래그 중이 아닐 때만 스크롤 허용
@@ -211,3 +211,6 @@ const SwipeableListItem = ({
 }
 
 export default SwipeableListItem
+
+
+

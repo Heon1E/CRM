@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -16,6 +16,7 @@ import Settings from './pages/Settings'
 import PipelineBoard from './pages/PipelineBoard'
 import Login from './pages/Login'
 import ShareProcessing from './pages/ShareProcessing'
+import AgentChatWindow from './components/AgentChatWindow'
 
 // 인증 상태에 따른 라우팅 컴포넌트
 const ProtectedRoutes = () => {
@@ -24,10 +25,10 @@ const ProtectedRoutes = () => {
   // [핵심] 인증 확인 중이면 로딩 화면만 표시
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-background-default">
+      <div className="flex items-center justify-center h-screen bg-slate-50">
         <div className="text-center">
-          <div className="text-text-secondary mb-2">로그인 상태 확인 중...</div>
-          <div className="text-xs text-text-secondary">잠시만 기다려주세요</div>
+          <div className="text-slate-500 mb-2">로그인 상태 확인 중...</div>
+          <div className="text-xs text-slate-400">잠시만 기다려주세요</div>
         </div>
       </div>
     )
@@ -74,11 +75,12 @@ function App() {
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#fff',
-                color: '#363636',
+                background: '#FFFFFF',
+                color: '#1F2937',
                 borderRadius: '12px',
                 padding: '16px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 6px 10px -6px rgba(15, 23, 42, 0.15)',
                 fontSize: '14px',
                 fontWeight: 500,
                 minWidth: '300px',
@@ -86,24 +88,26 @@ function App() {
               },
               success: {
                 iconTheme: {
-                  primary: '#10b981',
-                  secondary: '#fff'
+                  primary: '#10B981',
+                  secondary: '#FFFFFF'
                 },
                 style: {
-                  border: '1px solid #10b981'
+                  border: '1px solid rgba(16, 185, 129, 0.3)'
                 }
               },
               error: {
                 iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff'
+                  primary: '#EF4444',
+                  secondary: '#FFFFFF'
                 },
                 style: {
-                  border: '1px solid #ef4444'
+                  border: '1px solid rgba(239, 68, 68, 0.3)'
                 }
               }
             }}
           />
+          {/* AI Developer Agent Chat Interface */}
+          <AgentChatWindow />
         </BackgroundTaskProvider>
       </DataProvider>
     </AuthProvider>
@@ -111,3 +115,4 @@ function App() {
 }
 
 export default App
+

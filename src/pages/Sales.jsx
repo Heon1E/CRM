@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { Edit, Download, Plus, Trash2 } from 'lucide-react'
+﻿import React, { useState, useEffect, useMemo } from 'react'
+import { Edit, Download, Plus, Trash2, Search } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
@@ -22,13 +22,15 @@ const Sales = () => {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // 데이터 페칭 함수 (Split Fetching: sales + sales_items 병합, HTTP 400 방지)
   const fetchData = async () => {
     try {
       setLoading(true)
-      const from = (page - 1) * PAGE_SIZE
-      const to = from + PAGE_SIZE - 1
+      const isSearching = !!searchTerm.trim()
+      const from = isSearching ? 0 : (page - 1) * PAGE_SIZE
+      const to = isSearching ? 99999 : from + PAGE_SIZE - 1
 
       // Step 1: sales 테이블에서 기본 정보 조회 (페이지네이션 적용)
       const { data: salesData, error: salesError, count } = await supabase
@@ -113,7 +115,12 @@ const Sales = () => {
   useEffect(() => {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]) // clients는 fetchData 내부에서 사용하므로 의존성에서 제외
+  }, [page, searchTerm]) // searchTerm 변경 시 전체 조회
+
+  // 검색어 변경 시 첫 페이지로 리셋
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm])
 
   // 전표 그룹핑 함수: 같은 날짜 + 같은 고객으로 그룹핑
   const groupSalesBySlip = useMemo(() => {
@@ -198,14 +205,23 @@ const Sales = () => {
     })
   }, [sales])
 
-  // 그룹핑된 데이터 사용
-  const sortedSales = groupSalesBySlip
+  // 거래처 검색 필터링
+  const filteredSales = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return groupSalesBySlip
+    }
+
+    const term = searchTerm.toLowerCase().trim()
+    return groupSalesBySlip.filter((slip) =>
+      (slip.clientName || '').toLowerCase().includes(term)
+    )
+  }, [groupSalesBySlip, searchTerm])
 
   // ===== 모든 Hooks 선언이 끝난 후에 조건부 return 배치 =====
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-500">데이터를 불러오는 중...</div>
+        <div className="text-gray-300">데이터를 불러오는 중...</div>
       </div>
     )
   }
@@ -332,11 +348,15 @@ const Sales = () => {
   }
 
   return (
-    <div className="space-y-5 md:space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">매출 관리</h1>
-          <p className="text-text-secondary mt-1.5 text-sm md:text-base">총 {totalCount}건의 매출 전표</p>
+          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
+          <h1 className="text-2xl md:text-3xl font-semibold text-white">매출 관리</h1>
+          <p className="text-gray-300 mt-1.5 text-sm md:text-base">
+            총 {filteredSales.length} 매출 전표
+            {searchTerm.trim() && ` (전체 ${totalCount}건 중)`}
+          </p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-2">
           <button
@@ -350,7 +370,7 @@ const Sales = () => {
           <SalesExcelUpload onRefresh={fetchData} />
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="btn-success flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
+            className="btn-primary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <Plus className="w-4 h-4" />
@@ -359,77 +379,92 @@ const Sales = () => {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="card p-4 md:p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] hover:bg-white/5 transition-colors">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="거래처 검색..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-field w-full pl-10 pr-4 py-3 text-base md:text-base touch-manipulation min-h-[44px]"
+            style={{ fontSize: '16px', WebkitTapHighlightColor: 'transparent' }}
+          />
+        </div>
+      </div>
+
       {/* Sales - PC: Table, 모바일: Card with Swipe */}
-      <div className="card overflow-hidden">
+      <div className="card overflow-hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
         {/* PC: Table View (768px 이상) */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-border-light">
-            <thead className="bg-transparent">
+          <table className="min-w-full table-compact divide-y divide-gray-800">
+            <thead className="bg-[#161616]">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   날짜
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   거래처
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   대표 품목
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   품목 수
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   총 매출액
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   비고
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
                   작업
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-100">
-              {sortedSales.length > 0 ? (
-                sortedSales.map((slip) => (
-                  <tr key={slip.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-5 whitespace-nowrap text-sm font-semibold text-gray-900">
+            <tbody className="bg-transparent divide-y divide-gray-800">
+              {filteredSales.length > 0 ? (
+                filteredSales.map((slip) => (
+                  <tr key={slip.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm font-semibold text-white">
                       {slip.date ? slip.date.split('T')[0] : '-'}
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-white">
                         {slip.clientName || '-'}
                       </div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
+                      <div className="text-sm text-gray-300">
                         {slip.displayItem || slip.displayItemName || '-'}
                       </div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm text-gray-300">
                       {slip.itemCount > 1 ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-300 border border-gray-800">
                           {slip.itemCount}건
                         </span>
                       ) : (
-                        <span className="text-gray-500">1건</span>
+                        <span className="text-gray-300">1건</span>
                       )}
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm font-semibold text-white">
                       {formatKoreanCurrency(slip.totalAmount || 0)}
                     </td>
-                    <td className="px-6 py-5 text-sm text-gray-500">
+                    <td className="px-4 py-3 md:px-6 md:py-5 text-sm text-gray-300">
                       <div className="max-w-xs truncate">{slip.notes || '-'}</div>
                     </td>
-                    <td className="px-6 py-5 whitespace-nowrap text-sm">
+                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-3">
                         <button
                           onClick={() => handleEdit(slip)}
                           disabled={!slip.id}
-                          className={`font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px] ${
+                          className={`font-medium flex items-center space-x-1 transition-all touch-manipulation px-3 py-2 min-h-[44px] rounded-lg ${
                             slip.id 
-                              ? 'text-brand-blue hover:text-brand-blue-hover' 
-                              : 'text-gray-400 cursor-not-allowed'
+                              ? 'text-gray-300 hover:text-white hover:bg-white/5' 
+                              : 'text-gray-300 cursor-not-allowed'
                           }`}
                           style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
@@ -439,10 +474,10 @@ const Sales = () => {
                         <button
                           onClick={() => handleDelete(slip)}
                           disabled={!slip.id}
-                          className={`font-medium flex items-center space-x-1 transition-colors touch-manipulation px-3 py-2 min-h-[44px] ${
+                          className={`font-medium flex items-center space-x-1 transition-all touch-manipulation px-3 py-2 min-h-[44px] rounded-lg ${
                             slip.id 
-                              ? 'text-red-500 hover:text-red-600' 
-                              : 'text-gray-400 cursor-not-allowed'
+                              ? 'text-red-200 bg-red-400/10 border border-red-400/30 hover:bg-red-400/20' 
+                              : 'text-gray-300 cursor-not-allowed'
                           }`}
                           style={{ WebkitTapHighlightColor: 'transparent' }}
                         >
@@ -455,7 +490,7 @@ const Sales = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="7" className="px-4 py-6 md:px-6 md:py-8 text-center text-gray-300">
                     매출 기록이 없습니다.
                   </td>
                 </tr>
@@ -464,35 +499,37 @@ const Sales = () => {
           </table>
         </div>
         {/* Pagination */}
-        <Pagination
-          totalCount={totalCount}
-          pageSize={PAGE_SIZE}
-          currentPage={page}
-          onPageChange={setPage}
-        />
+        {!searchTerm.trim() && (
+          <Pagination
+            totalCount={totalCount}
+            pageSize={PAGE_SIZE}
+            currentPage={page}
+            onPageChange={setPage}
+          />
+        )}
       </div>
 
       {/* 모바일: Card View with Swipe (768px 미만) */}
-      <div className="card overflow-hidden md:hidden">
-        <div className="md:hidden divide-y divide-border-light">
-          {sortedSales.length > 0 ? (
-            sortedSales.map((slip) => (
+      <div className="card overflow-hidden md:hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+        <div className="md:hidden divide-y divide-gray-800">
+          {filteredSales.length > 0 ? (
+            filteredSales.map((slip) => (
               <SwipeableListItem
                 key={slip.id}
                 onEdit={() => handleEdit(slip)}
                 onDelete={() => handleDelete(slip)}
                 enabled={!!slip.id}
               >
-                <div className="p-4 bg-white hover:bg-gray-50 transition-colors touch-manipulation min-h-[44px]">
+                <div className="p-4 bg-[#1E1E1E] hover:bg-white/5 transition-colors touch-manipulation min-h-[44px]">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-base font-bold text-gray-900 flex-1 break-words">
+                    <h3 className="text-base font-semibold text-white flex-1 break-words">
                       {slip.date ? slip.date.split('T')[0] : '-'}
                     </h3>
-                    <span className="ml-2 text-base font-bold text-gray-900 whitespace-nowrap">
+                    <span className="ml-2 text-base font-semibold text-white whitespace-nowrap">
                       {formatKoreanCurrency(slip.totalAmount || 0)}
                     </span>
                   </div>
-                  <div className="space-y-1.5 text-sm text-gray-600">
+                  <div className="space-y-1.5 text-sm text-gray-300">
                     <div className="flex items-start space-x-2">
                       <span className="font-medium whitespace-nowrap">거래처:</span>
                       <span className="break-words flex-1">{slip.clientName || '-'}</span>
@@ -503,13 +540,13 @@ const Sales = () => {
                         {slip.displayItem || slip.displayItemName || '-'}
                       </span>
                       {slip.itemCount > 1 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white/5 text-gray-300 border border-gray-800 whitespace-nowrap">
                           {slip.itemCount}건
                         </span>
                       )}
                     </div>
                     {slip.notes && (
-                      <div className="mt-2 pt-2 border-t border-gray-100 text-sm text-gray-500 break-words">
+                      <div className="mt-2 pt-2 border-t border-gray-800 text-sm text-gray-300 break-words">
                         {slip.notes}
                       </div>
                     )}
@@ -518,7 +555,7 @@ const Sales = () => {
               </SwipeableListItem>
             ))
           ) : (
-            <div className="px-6 py-8 text-center text-text-secondary">
+            <div className="px-6 py-8 text-center text-gray-300">
               매출 기록이 없습니다.
             </div>
           )}
@@ -547,3 +584,8 @@ const Sales = () => {
 }
 
 export default Sales
+
+
+
+
+

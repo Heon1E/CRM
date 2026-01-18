@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'
 
@@ -18,7 +18,7 @@ const BackgroundTaskIndicator = () => {
 
   return (
     <div
-      className="fixed top-16 left-0 right-0 z-40 bg-blue-50 border-b border-blue-200 px-4 py-2 md:py-2.5 shadow-sm"
+      className="fixed top-16 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-2 md:py-2.5"
       style={{
         marginTop: '0',
         WebkitTapHighlightColor: 'transparent'
@@ -26,13 +26,16 @@ const BackgroundTaskIndicator = () => {
     >
       <div className="flex items-center justify-center space-x-2 max-w-7xl mx-auto">
         <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-blue-600 animate-spin flex-shrink-0" />
-        <span className="text-xs md:text-sm font-medium text-blue-900 text-center">
+        <span className="text-xs md:text-sm font-medium text-slate-800 text-center">
           AI 분석 중... ({activeTasks.length}개 작업)
         </span>
-        <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0 animate-pulse" />
+        <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-slate-400 flex-shrink-0 animate-pulse" />
       </div>
     </div>
   )
 }
 
 export default BackgroundTaskIndicator
+
+
+

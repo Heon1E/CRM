@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+﻿import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
@@ -102,8 +102,8 @@ const AddIssueModal = ({ isOpen, onClose }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="ISSUE 추가" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            제목 <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            제목 <span className="text-red-400">*</span>
           </label>
           <input
             type="text"
@@ -116,7 +116,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-300 mb-1">
             내용
           </label>
           <textarea
@@ -127,14 +127,14 @@ const AddIssueModal = ({ isOpen, onClose }) => {
             placeholder="ISSUE 내용을 입력하세요 (최대 1000자)"
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-sm text-gray-500">
+          <div className="mt-1 text-right text-sm text-gray-300">
             {charCount}/1000
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">
               목표일
             </label>
             <input
@@ -146,8 +146,8 @@ const AddIssueModal = ({ isOpen, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              상태 <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              상태 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.status}
@@ -172,7 +172,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
           </button>
           <button
             type="submit"
-            className="btn-success"
+            className="btn-primary"
           >
             Save
           </button>
@@ -183,3 +183,6 @@ const AddIssueModal = ({ isOpen, onClose }) => {
 }
 
 export default AddIssueModal
+
+
+

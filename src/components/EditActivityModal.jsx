@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
@@ -276,7 +276,7 @@ ${currentText}`
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            거래처 <span className="text-red-500">*</span>
+            거래처 <span className="text-red-400">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -294,7 +294,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              활동 유형 <span className="text-red-500">*</span>
+              활동 유형 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.type}
@@ -313,7 +313,7 @@ ${currentText}`
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              상태 <span className="text-red-500">*</span>
+              상태 <span className="text-red-400">*</span>
             </label>
             <select
               value={formData.status}
@@ -329,7 +329,7 @@ ${currentText}`
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            날짜 <span className="text-red-500">*</span>
+            날짜 <span className="text-red-400">*</span>
           </label>
             <input
               type="date"
@@ -416,7 +416,7 @@ ${currentText}`
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="block text-sm font-medium text-gray-700">
-              내용 <span className="text-red-500">*</span>
+              내용 <span className="text-red-400">*</span>
             </label>
             <button
               type="button"
@@ -455,7 +455,7 @@ ${currentText}`
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2.5 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-all duration-200 font-semibold shadow-sm"
+            className="px-4 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 rounded-xl hover:bg-red-400/30 transition-all duration-200 font-semibold"
           >
             삭제
           </button>
@@ -481,4 +481,8 @@ ${currentText}`
 }
 
 export default EditActivityModal
+
+
+
+
 

@@ -1,4 +1,4 @@
-import { openDB } from 'idb'
+﻿import { openDB } from 'idb'
 
 const DB_NAME = 'XavianCRM'
 const DB_VERSION = 1
@@ -183,3 +183,4 @@ export const getStoreName = (tableName) => {
   }
   return mapping[tableName] || null
 }
+

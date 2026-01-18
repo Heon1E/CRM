@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -24,7 +24,7 @@ const MobileFAB = () => {
       {/* 일정 추가 버튼 */}
       <button 
         onClick={handleAddActivity}
-        className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="p-3 bg-white text-black rounded-full hover:bg-zinc-100 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
         style={{ WebkitTapHighlightColor: 'transparent' }}
         aria-label="일정 추가"
         title="일정 추가"
@@ -36,3 +36,6 @@ const MobileFAB = () => {
 }
 
 export default MobileFAB
+
+
+

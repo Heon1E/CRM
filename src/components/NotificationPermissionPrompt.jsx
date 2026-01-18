@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { Bell, X } from 'lucide-react'
 import { requestNotificationPermission, isPushSubscribed } from '../utils/pushNotification'
 
@@ -88,7 +88,7 @@ const NotificationPermissionPrompt = () => {
 
   return (
     <div
-      className="fixed top-16 left-0 right-0 z-40 bg-blue-50 border-b border-blue-200 px-4 py-3 md:py-4 shadow-sm"
+      className="fixed top-16 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 py-3 md:py-4"
       style={{
         marginTop: '0',
         WebkitTapHighlightColor: 'transparent'
@@ -98,10 +98,10 @@ const NotificationPermissionPrompt = () => {
         <div className="flex items-center space-x-3 flex-1">
           <Bell className="w-5 h-5 md:w-6 md:h-6 text-blue-600 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm md:text-base font-medium text-blue-900">
+            <p className="text-sm md:text-base font-medium text-slate-800">
               푸시 알림을 활성화하여 백업 완료 등의 중요 알림을 받아보세요.
             </p>
-            <p className="text-xs md:text-sm text-blue-700 mt-1">
+            <p className="text-xs md:text-sm text-slate-500 mt-1">
               브라우저 알림 권한이 필요합니다.
             </p>
           </div>
@@ -109,14 +109,14 @@ const NotificationPermissionPrompt = () => {
         <div className="flex items-center space-x-2 ml-4">
           <button
             onClick={handleRequestPermission}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm md:text-base touch-manipulation min-h-[44px]"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium text-sm md:text-base touch-manipulation min-h-[44px]"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             허용하기
           </button>
           <button
             onClick={handleDismiss}
-            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
             style={{ WebkitTapHighlightColor: 'transparent' }}
             aria-label="닫기"
           >
@@ -129,3 +129,6 @@ const NotificationPermissionPrompt = () => {
 }
 
 export default NotificationPermissionPrompt
+
+
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 푸시 알림 유틸리티 함수
  * Web Push API를 활용한 푸시 알림 기능
  */
@@ -217,3 +217,4 @@ export const isPushSubscribed = async () => {
     return false
   }
 }
+

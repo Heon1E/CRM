@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+﻿import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
@@ -157,7 +157,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              회사명 <span className="text-red-500">*</span>
+              회사명 <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -209,7 +209,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
                     <button
                       type="button"
                       onClick={() => handleRemoveContact(index)}
-                      className="text-red-500 hover:text-red-700 transition-colors"
+                      className="text-red-400 hover:text-red-300 transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -312,4 +312,8 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
 }
 
 export default AddClientModal
+
+
+
+
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -101,12 +101,12 @@ const ForgotPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="mt-6 text-center text-3xl font-semibold text-slate-900">
           비밀번호 찾기
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-slate-500">
           <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
             로그인으로 돌아가기
           </Link>
@@ -114,17 +114,17 @@ const ForgotPassword = () => {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="bg-white rounded-2xl shadow-sm py-8 px-4 sm:px-10">
           {step === 1 && (
             <form className="space-y-6" onSubmit={handleSendVerification}>
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
                   {error}
                 </div>
               )}
 
               <div>
-                <label htmlFor="user_id" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="user_id" className="block text-sm font-medium text-slate-700">
                   아이디
                 </label>
                 <input
@@ -134,12 +134,12 @@ const ForgotPassword = () => {
                   required
                   value={formData.user_id}
                   onChange={handleChange}
-                  className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 input-field w-full"
                 />
               </div>
 
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
                   휴대폰 번호
                 </label>
                 <input
@@ -149,7 +149,7 @@ const ForgotPassword = () => {
                   required
                   value={formData.phone}
                   onChange={handleChange}
-                  className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 input-field w-full"
                   placeholder="010-1234-5678"
                 />
               </div>
@@ -158,7 +158,7 @@ const ForgotPassword = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="btn-primary w-full flex justify-center py-2 px-4 disabled:opacity-50"
                 >
                   {loading ? '발송 중...' : '인증번호 발송'}
                 </button>
@@ -169,13 +169,13 @@ const ForgotPassword = () => {
           {step === 2 && (
             <form className="space-y-6" onSubmit={handleVerifyCode}>
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
                   {error}
                 </div>
               )}
 
               <div>
-                <label htmlFor="verificationCode" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="verificationCode" className="block text-sm font-medium text-slate-700">
                   인증번호
                 </label>
                 <input
@@ -185,11 +185,11 @@ const ForgotPassword = () => {
                   required
                   value={formData.verificationCode}
                   onChange={handleChange}
-                  className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 input-field w-full"
                   placeholder="6자리 인증번호"
                   maxLength={6}
                 />
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-slate-500">
                   콘솔(Console)에서 인증번호를 확인하세요.
                 </p>
               </div>
@@ -198,14 +198,14 @@ const ForgotPassword = () => {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="btn-secondary flex-1 py-2 px-4"
                 >
                   이전
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  className="btn-primary flex-1 py-2 px-4 disabled:opacity-50"
                 >
                   확인
                 </button>
@@ -216,13 +216,13 @@ const ForgotPassword = () => {
           {step === 3 && (
             <form className="space-y-6" onSubmit={handleResetPassword}>
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
                   {error}
                 </div>
               )}
 
               <div>
-                <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="newPassword" className="block text-sm font-medium text-slate-700">
                   새 비밀번호
                 </label>
                 <input
@@ -232,13 +232,13 @@ const ForgotPassword = () => {
                   required
                   value={formData.newPassword}
                   onChange={handleChange}
-                  className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 input-field w-full"
                   placeholder="최소 6자 이상"
                 />
               </div>
 
               <div>
-                <label htmlFor="newPasswordConfirm" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="newPasswordConfirm" className="block text-sm font-medium text-slate-700">
                   새 비밀번호 확인
                 </label>
                 <input
@@ -248,7 +248,7 @@ const ForgotPassword = () => {
                   required
                   value={formData.newPasswordConfirm}
                   onChange={handleChange}
-                  className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 input-field w-full"
                 />
               </div>
 
@@ -256,7 +256,7 @@ const ForgotPassword = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="btn-primary w-full flex justify-center py-2 px-4 disabled:opacity-50"
                 >
                   {loading ? '재설정 중...' : '비밀번호 재설정'}
                 </button>
@@ -270,4 +270,8 @@ const ForgotPassword = () => {
 }
 
 export default ForgotPassword
+
+
+
+
 

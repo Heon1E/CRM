@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { X } from 'lucide-react'
 
 const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
@@ -16,27 +16,27 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 z-40 transition-opacity bg-gray-900 bg-opacity-50"
+          className="fixed inset-0 z-40 transition-opacity bg-black/60 backdrop-blur-md"
           onClick={onClose}
         ></div>
 
         {/* Modal */}
         <div
-          className={`relative z-50 inline-block align-bottom bg-white rounded-card text-left overflow-hidden shadow-modal transform transition-all sm:my-8 sm:align-middle ${sizeClasses[size]} w-full`}
+          className={`relative z-50 inline-block align-bottom bg-[#1E1E1E] border border-gray-800 rounded-card text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle ${sizeClasses[size]} w-full`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-border-light">
-            <h3 className="text-lg font-bold text-text-primary">{title}</h3>
+          <div className="flex items-center justify-between px-4 py-4 md:px-6 md:py-5 border-b border-gray-800">
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
             <button
               onClick={onClose}
-              className="text-text-secondary hover:text-text-body transition-colors p-1 hover:bg-gray-50 rounded-button"
+              className="text-gray-300 hover:text-white transition-colors p-1 hover:bg-white/5 rounded-button"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="px-6 py-5 modal-content">{children}</div>
+          <div className="px-4 py-4 md:px-6 md:py-5 modal-content">{children}</div>
         </div>
       </div>
     </div>
@@ -44,4 +44,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 }
 
 export default Modal
+
+
+
 

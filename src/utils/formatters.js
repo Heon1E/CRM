@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 공통 포맷팅 유틸리티 함수
  * 날짜, 금액 등 반복되는 포맷팅 로직을 통합
  */
@@ -147,3 +147,4 @@ export const formatKoreanCurrency = (amount) => {
   const man = Math.floor(amountNum / 10000)
   return `${man.toLocaleString()}만원`
 }
+

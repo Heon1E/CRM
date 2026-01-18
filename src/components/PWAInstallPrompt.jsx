@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { X, Download } from 'lucide-react'
 
 const PWAInstallPrompt = () => {
@@ -171,16 +171,16 @@ const PWAInstallPrompt = () => {
   }
 
   return (
-    <div className="fixed top-16 left-0 right-0 bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg z-40">
+    <div className="fixed top-16 left-0 right-0 bg-white text-slate-800 border-b border-slate-200 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <Download className="w-5 h-5 flex-shrink-0" />
+            <Download className="w-5 h-5 flex-shrink-0 text-blue-600" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
                 더 편리한 사용을 위해 앱을 설치하세요
               </p>
-              <p className="text-xs text-purple-100 mt-0.5 hidden sm:block">
+              <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
                 홈 화면에서 바로 접근할 수 있습니다
               </p>
             </div>
@@ -188,7 +188,7 @@ const PWAInstallPrompt = () => {
           <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
             <button
               onClick={handleInstallClick}
-              className="px-3 sm:px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 transition-all duration-200 font-semibold text-xs sm:text-sm shadow-sm flex items-center space-x-1"
+              className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-all duration-200 font-semibold text-xs sm:text-sm flex items-center space-x-1"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">설치하기</span>
@@ -196,7 +196,7 @@ const PWAInstallPrompt = () => {
             </button>
             <button
               onClick={handleDismiss}
-              className="p-2 text-white hover:bg-purple-800 rounded-lg transition-all duration-200 flex-shrink-0"
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-all duration-200 flex-shrink-0"
               aria-label="닫기"
             >
               <X className="w-5 h-5" />
@@ -209,3 +209,6 @@ const PWAInstallPrompt = () => {
 }
 
 export default PWAInstallPrompt
+
+
+
