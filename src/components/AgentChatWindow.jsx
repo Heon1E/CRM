@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageSquare, X, Send, Minimize2, Terminal, Loader2, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { MessageSquare, X, Send, Minimize2, Terminal, Loader2, Image as ImageIcon, Trash2, Mic, MicOff } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 const AgentChatWindow = () => {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -7,7 +9,7 @@ const AgentChatWindow = () => {
     {
       id: 1,
       type: 'agent',
-      content: '안녕하세요! Cursor Developer Agent입니다. 코드베이스 수정을 도와드릴게요.',
+      content: '안녕하세요! AI 비서입니다. 명함 촬영, 활동 기록, 음성 입력으로 자동 등록을 도와드릴게요! 🎤📸',
       timestamp: new Date()
     }
   ])
@@ -15,8 +17,11 @@ const AgentChatWindow = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recognition, setRecognition] = useState(null)
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
+  const { user } = useAuth()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -25,6 +30,41 @@ const AgentChatWindow = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Web Speech API 초기화
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognitionInstance = new SpeechRecognition()
+      recognitionInstance.continuous = false
+      recognitionInstance.interimResults = false
+      recognitionInstance.lang = 'ko-KR'
+
+      recognitionInstance.onresult = (event) => {
+        const transcript = event.results[0][0].transcript
+        setInputValue(transcript)
+        setIsRecording(false)
+      }
+
+      recognitionInstance.onerror = (event) => {
+        console.error('Speech recognition error:', event.error)
+        setIsRecording(false)
+        const errorMsg = {
+          id: messages.length + 1,
+          type: 'agent',
+          content: `⚠️ 음성인식 오류: ${event.error === 'no-speech' ? '음성이 감지되지 않았습니다.' : '음성인식에 실패했습니다.'}`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, errorMsg])
+      }
+
+      recognitionInstance.onend = () => {
+        setIsRecording(false)
+      }
+
+      setRecognition(recognitionInstance)
+    }
+  }, [])
 
   const handleSendMessage = async () => {
     if ((!inputValue.trim() && !selectedImage) || isLoading) return
@@ -64,9 +104,20 @@ const AgentChatWindow = () => {
       if (import.meta.env.DEV && apiKey) {
         console.log('🔧 Development mode: Calling Gemini API directly')
         
-        const systemPrompt = `당신은 프론트엔드 개발 전문가입니다. React, Supabase, Tailwind CSS를 사용하는 CRM 프로젝트를 돕고 있습니다.
-사용자의 요청을 분석하고, 구체적인 코드 수정 방안을 제시하세요.
-항상 한국어로 답변하며, 명확하고 실행 가능한 지침을 제공하세요.`
+        const systemPrompt = `당신은 CRM 비서 AI입니다. 사용자의 입력을 분석하여 다음 작업을 수행합니다:
+
+**1. 명함 인식 (이미지가 있을 때)**
+- 명함에서 정보를 추출하여 JSON 형식으로 반환
+- 형식: {"action": "add_client", "client": {"company": "회사명", "contact_person": "담당자", "phone": "전화번호", "email": "이메일", "address": "주소"}}
+
+**2. 활동내역 등록 (텍스트 입력)**
+- "오늘 A사 방문", "B사 김대리와 미팅" 등을 파싱
+- 형식: {"action": "add_activity", "activity": {"title": "활동명", "client_name": "거래처명", "activity_type": "미팅|전화|방문|이메일", "notes": "내용", "activity_date": "YYYY-MM-DD"}}
+
+**3. 일반 대화**
+- 위 두 가지에 해당하지 않으면 친절하게 대화
+
+**중요:** 명함이나 활동 등록이 감지되면 반드시 JSON을 \`\`\`json 블록 안에 포함하여 답변하세요.`
 
         // Gemini 포맷으로 변환 (이미지 포함)
         const contents = conversationHistory.map((msg, idx) => {
@@ -119,6 +170,9 @@ const AgentChatWindow = () => {
 
         const data = await response.json()
         assistantText = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성할 수 없습니다.'
+        
+        // DB 저장 시도
+        await processAndSaveData(assistantText, inputValue, currentImagePreview)
       } 
       // 프로덕션 환경: Serverless Function 사용
       else {
@@ -144,6 +198,9 @@ const AgentChatWindow = () => {
 
         const data = await response.json()
         assistantText = data.content?.[0]?.text || '응답을 생성할 수 없습니다.'
+        
+        // DB 저장 시도
+        await processAndSaveData(assistantText, inputValue, currentImagePreview)
       }
 
       const agentResponse = {
@@ -215,6 +272,89 @@ const AgentChatWindow = () => {
         }
         break
       }
+    }
+  }
+
+  const toggleRecording = () => {
+    if (!recognition) {
+      const errorMsg = {
+        id: messages.length + 1,
+        type: 'agent',
+        content: '⚠️ 이 브라우저는 음성인식을 지원하지 않습니다. Chrome 브라우저를 사용해주세요.',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMsg])
+      return
+    }
+
+    if (isRecording) {
+      recognition.stop()
+      setIsRecording(false)
+    } else {
+      recognition.start()
+      setIsRecording(true)
+    }
+  }
+
+  // Gemini를 통한 명령 파싱 및 DB 저장
+  const processAndSaveData = async (aiResponse, userText, userImage) => {
+    try {
+      // Gemini 응답에서 JSON 추출 시도
+      const jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/) || aiResponse.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) return false
+
+      const parsedData = JSON.parse(jsonMatch[1] || jsonMatch[0])
+      
+      if (parsedData.action === 'add_client' && parsedData.client) {
+        // 거래처 등록
+        const { data, error } = await supabase
+          .from('clients')
+          .insert({
+            ...parsedData.client,
+            created_by: user?.id,
+            created_at: new Date().toISOString()
+          })
+          .select()
+
+        if (error) throw error
+
+        const successMsg = {
+          id: messages.length + 1,
+          type: 'agent',
+          content: `✅ 거래처 등록 완료!\n\n**${parsedData.client.company}**\n담당자: ${parsedData.client.contact_person || '-'}\n연락처: ${parsedData.client.phone || '-'}`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, successMsg])
+        return true
+      }
+
+      if (parsedData.action === 'add_activity' && parsedData.activity) {
+        // 활동내역 등록
+        const { data, error } = await supabase
+          .from('activities')
+          .insert({
+            ...parsedData.activity,
+            created_by: user?.id,
+            activity_date: parsedData.activity.activity_date || new Date().toISOString()
+          })
+          .select()
+
+        if (error) throw error
+
+        const successMsg = {
+          id: messages.length + 1,
+          type: 'agent',
+          content: `✅ 활동내역 등록 완료!\n\n${parsedData.activity.title}\n일시: ${parsedData.activity.activity_date}\n내용: ${parsedData.activity.notes || '-'}`,
+          timestamp: new Date()
+        }
+        setMessages(prev => [...prev, successMsg])
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error('Data processing error:', error)
+      return false
     }
   }
 
@@ -365,8 +505,27 @@ const AgentChatWindow = () => {
             onClick={() => fileInputRef.current?.click()}
             className="flex-shrink-0 w-10 h-10 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"
             aria-label="이미지 첨부"
+            title="명함/이미지 첨부"
           >
             <ImageIcon className="w-5 h-5 mx-auto" />
+          </button>
+
+          {/* 음성 녹음 버튼 */}
+          <button
+            onClick={toggleRecording}
+            className={`flex-shrink-0 w-10 h-10 rounded-xl transition-all ${
+              isRecording 
+                ? 'bg-red-500 text-white animate-pulse' 
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+            aria-label="음성 녹음"
+            title={isRecording ? '녹음 중지' : '음성 입력'}
+          >
+            {isRecording ? (
+              <MicOff className="w-5 h-5 mx-auto" />
+            ) : (
+              <Mic className="w-5 h-5 mx-auto" />
+            )}
           </button>
           
           <textarea
