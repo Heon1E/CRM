@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, Users, Activity, Settings, DollarSign, LogOut, User, TrendingUp, Cloud, Bell } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'

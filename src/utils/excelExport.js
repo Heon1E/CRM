@@ -1,4 +1,4 @@
-﻿import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx'
 import { formatCurrency } from './formatters'
 
 export const exportClientsToExcel = (clients) => {

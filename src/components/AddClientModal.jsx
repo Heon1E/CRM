@@ -1,10 +1,11 @@
-﻿import React, { useState, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
 import { showWarning, showSuccess, showError } from '../utils/alert'
 import { formatKoreanPhone } from '../utils/phoneFormatter'
 import { Plus, X } from 'lucide-react'
+import { CLIENT_STATUS_OPTIONS } from '../utils/clientStatus'
 
 const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
   const { addClient } = useData()
@@ -284,9 +285,9 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
             onChange={(e) => setFormData({ ...formData, status: e.target.value })}
             className="input-field"
           >
-            <option value="매출">매출</option>
-            <option value="신규">신규</option>
-            <option value="단절">단절</option>
+            {CLIENT_STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
           </select>
         </div>
 

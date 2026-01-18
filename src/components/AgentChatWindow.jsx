@@ -197,6 +197,27 @@ const AgentChatWindow = () => {
     }
   }
 
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault()
+        const file = items[i].getAsFile()
+        if (file) {
+          setSelectedImage(file)
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            setImagePreview(reader.result)
+          }
+          reader.readAsDataURL(file)
+        }
+        break
+      }
+    }
+  }
+
   const formatTime = (date) => {
     return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
   }
@@ -350,7 +371,8 @@ const AgentChatWindow = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Command the agent (e.g., 'Fix the chart data bug')..."
+            onPaste={handlePaste}
+            placeholder="Type a command or paste a screenshot (Ctrl+V)..."
             className="flex-1 resize-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-teal/50 focus:border-primary-teal transition-all"
             rows="2"
           />
@@ -368,7 +390,9 @@ const AgentChatWindow = () => {
           </button>
         </div>
         <p className="text-xs text-slate-400 mt-2">
-          Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs">Enter</kbd> to send, <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs">Shift+Enter</kbd> for new line
+          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs">Enter</kbd> to send, 
+          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs ml-1">Shift+Enter</kbd> for new line, 
+          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs ml-1">Ctrl+V</kbd> to paste image
         </p>
       </div>
     </div>

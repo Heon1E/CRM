@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Edit, Download, Loader2, Search } from 'lucide-react'
 import { useData } from '../contexts/DataContext'

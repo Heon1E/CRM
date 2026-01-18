@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
@@ -16,6 +16,7 @@ import {
   Minus,
 } from 'lucide-react'
 import { formatCurrency } from '../utils/formatters'
+import { coerceClientStatus } from '../utils/clientStatus'
 import { showError } from '../utils/alert'
 
 const ClientDetail = () => {
@@ -416,7 +417,7 @@ const ClientDetail = () => {
                       <Activity className="w-4 h-4" />
                     </span>
                     <span className="text-sm text-gray-300">
-                      {primaryContact.status}
+                      {coerceClientStatus(primaryContact.status, '-')}
                     </span>
                   </div>
                 )}

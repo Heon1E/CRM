@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Users, Activity, Settings, TrendingUp } from 'lucide-react'
 

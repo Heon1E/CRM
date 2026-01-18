@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Camera, Image, Sparkles, Loader2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'

@@ -1,28 +1,24 @@
-﻿import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import { CheckCircle2, TrendingUp, ArrowRight, Mail } from 'lucide-react'
 import Toast from '../components/Toast'
 import { showConfirm } from '../utils/alert'
+import { PIPELINE_STATUSES, isPipelineCandidate, normalizeStatus, coerceClientStatus } from '../utils/clientStatus'
 
 const PipelineBoard = () => {
   const { clients, loading, updateClient, addSale } = useData()
   const [toast, setToast] = useState(null)
 
   // 영업 단계 정의 (거래중 제외)
-  const stages = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
+  const stages = PIPELINE_STATUSES
 
   // 파이프라인 대상자 필터링: '신규' 또는 '단절' 상태인 거래처만 포함
   // '활성' 상태인 거래처는 파이프라인에서 제외
   const activeClients = useMemo(() => {
     if (!clients || !Array.isArray(clients)) return []
-    return clients.filter((client) => {
-      const status = client.status || ''
-      // 파이프라인 단계에 해당하는 상태 또는 '신규', '단절' 상태만 포함
-      const pipelineStatuses = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
-      return pipelineStatuses.includes(status) || status === '신규' || status === '단절'
-    })
+    return clients.filter((client) => isPipelineCandidate(client.status))
   }, [clients])
 
   // 기존 데이터 자동 동기화: '신규' 또는 '단절' 상태인 거래처를 첫 번째 단계('잠재고객')로 자동 설정
@@ -30,13 +26,10 @@ const PipelineBoard = () => {
     if (loading || !clients || !Array.isArray(clients)) return
     
     const syncNewClients = async () => {
-      // 파이프라인 단계 정의 (Hook 순서 유지를 위해 상수로 정의)
-      const pipelineStages = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
-      
       // '신규' 또는 '단절' 상태인 거래처 중 파이프라인 단계에 없는 것들 찾기
       const newOrInactiveClients = clients.filter((client) => {
-        const status = client.status || ''
-        return (status === '신규' || status === '단절') && !pipelineStages.includes(status)
+        const status = normalizeStatus(client.status)
+        return (status === '신규' || status === '단절') && !PIPELINE_STATUSES.includes(status)
       })
 
       // 각 거래처를 '잠재고객' 단계로 자동 설정
@@ -59,10 +52,7 @@ const PipelineBoard = () => {
   const clientsByStage = useMemo(() => {
     const grouped = {}
     stages.forEach((stage) => {
-      grouped[stage] = activeClients.filter((client) => {
-        const status = client.status || '잠재고객'
-        return status === stage
-      })
+      grouped[stage] = activeClients.filter((client) => normalizeStatus(client.status) === stage)
     })
     return grouped
   }, [activeClients, stages])
@@ -92,9 +82,9 @@ const PipelineBoard = () => {
       if (destination.droppableId === 'win-zone') {
         // 사용자 확인
         const confirmed = await showConfirm(
-          '계약이 완료되었습니다. 해당 거래처를 \'활성\' 고객으로 전환하고 매출 실적에 반영하시겠습니까?',
+          '계약이 완료되었습니다. 해당 거래처를 \'매출\' 상태로 전환하고 매출 실적에 반영하시겠습니까?',
           '축하합니다! 계약 성사',
-          '활성 고객 전환',
+          '매출 상태 전환',
           '취소',
           'success',
           '#10b981' // 녹색 (green-500)
@@ -105,10 +95,10 @@ const PipelineBoard = () => {
           return
         }
 
-        // 1. 거래처 status를 '활성'으로 변경
+        // 1. 거래처 status를 '매출'로 변경 (DB enum 기준)
         await updateClient(clientId, {
           ...client,
-          status: '활성',
+          status: coerceClientStatus('매출'),
         })
 
         // 2. 매출 테이블에 새 데이터 추가 (날짜: 오늘, 거래처: 해당 거래처, 금액: 0 또는 기본값)
@@ -131,7 +121,7 @@ const PipelineBoard = () => {
         }
 
         // 토스트 메시지 표시
-        setToast('계약이 성사되어 \'활성\' 고객으로 전환되었습니다')
+        setToast('계약이 성사되어 \'매출\' 상태로 전환되었습니다')
         return
       }
 
@@ -140,9 +130,9 @@ const PipelineBoard = () => {
       const oldStatus = client.status || ''
 
       // 이전 단계로 되돌리는 경우 확인 (활성 -> 파이프라인 단계로 되돌리는 경우)
-      if (oldStatus === '활성' && stages.includes(newStatus)) {
+      if (oldStatus === '매출' && stages.includes(newStatus)) {
         const confirmed = window.confirm(
-          '이미 \'활성\' 상태인 고객을 파이프라인 단계로 되돌리시겠습니까?\n\n' +
+          '이미 \'매출\' 상태인 고객을 파이프라인 단계로 되돌리시겠습니까?\n\n' +
           '상태를 \'신규\'로 변경하시겠습니까? (취소 시 현재 상태 유지)'
         )
         if (confirmed) {

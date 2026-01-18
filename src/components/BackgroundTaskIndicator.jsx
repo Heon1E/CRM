@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'
 

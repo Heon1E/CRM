@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Bell, X } from 'lucide-react'
 import { requestNotificationPermission, isPushSubscribed } from '../utils/pushNotification'
 

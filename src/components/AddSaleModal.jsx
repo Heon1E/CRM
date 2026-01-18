@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'

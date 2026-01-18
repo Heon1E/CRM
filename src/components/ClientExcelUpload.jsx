@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react'
+import React, { useState, useRef } from 'react'
 import { Upload, Download, Loader2 } from 'lucide-react'
 import { downloadClientTemplate, parseClientExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'

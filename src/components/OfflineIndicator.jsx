@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { WifiOff, Wifi, CloudOff, CheckCircle2 } from 'lucide-react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { getQueueCount } from '../utils/syncQueue'

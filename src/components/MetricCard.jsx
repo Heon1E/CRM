@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 
 const MetricCard = ({
   title,
@@ -20,8 +20,8 @@ const MetricCard = ({
   }
 
   // 배경색 클래스 (기본값: 흰색)
-  const bgColorClass = bgColor || 'bg-[#1E1E1E]'
-  const iconBg = iconBgClass || 'bg-white/10'
+  const bgColorClass = bgColor || 'bg-white'
+  const iconBg = iconBgClass || 'bg-slate-100'
   const iconRounded = iconRoundedClass || 'rounded-full'
 
   const hasIcon = icon !== undefined && icon !== null && icon !== false
@@ -35,7 +35,7 @@ const MetricCard = ({
     >
       {sparkline && (
         <svg
-          className="absolute -right-4 -bottom-6 w-36 h-20 text-white opacity-10 pointer-events-none"
+          className="absolute -right-4 -bottom-6 w-36 h-20 text-slate-200 opacity-60 pointer-events-none"
           viewBox="0 0 120 60"
           aria-hidden="true"
         >
@@ -47,32 +47,25 @@ const MetricCard = ({
           />
         </svg>
       )}
-      <div className="flex items-start justify-between p-4 md:p-5">
+      <div className="flex items-start justify-between p-6">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            {hasIcon && (
-              <span className="text-xs text-gray-300">
-                {React.isValidElement(icon) ? icon : icon}
-              </span>
-            )}
-            <p className="text-[11px] md:text-xs font-semibold text-zinc-400 uppercase tracking-[0.15em]">
-              {title}
-            </p>
-          </div>
-          <p className="text-3xl md:text-4xl font-bold tracking-tight break-words text-white">
+          <p className="text-[11px] md:text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]">
+            {title}
+          </p>
+          <p className="text-3xl md:text-4xl font-bold tracking-tight break-words text-blue-600">
             {value}
           </p>
           {trend && trendValue && (
             <div className="flex items-center mt-2 flex-wrap">
-              <span className={`text-xs font-medium ${trend === 'up' ? 'text-red-300' : 'text-blue-300'}`}>
+              <span className="text-xs font-medium text-slate-500">
                 {trend === 'up' ? '↑' : '↓'} {trendValue}
               </span>
-              <span className="text-xs text-gray-300 ml-2">전월 대비</span>
+              <span className="text-xs text-slate-400 ml-2">전월 대비</span>
             </div>
           )}
         </div>
         {hasIcon && (
-          <div className={`w-9 h-9 md:w-10 md:h-10 ${iconBg} ${iconRounded} flex items-center justify-center flex-shrink-0 ml-3 text-gray-300`}>
+          <div className={`w-10 h-10 ${iconBg} ${iconRounded} flex items-center justify-center flex-shrink-0 ml-3 text-slate-600`}>
             {React.isValidElement(icon) ? icon : <span className="text-lg md:text-xl">{icon}</span>}
           </div>
         )}

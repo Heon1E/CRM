@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { useData } from '../contexts/DataContext'

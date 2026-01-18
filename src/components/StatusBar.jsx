@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Loader2, CheckCircle2, AlertCircle, CloudUpload } from 'lucide-react'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useBackgroundTask } from '../contexts/BackgroundTaskContext'

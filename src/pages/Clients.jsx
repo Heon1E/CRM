@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Edit, Download, Users, Camera, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
@@ -9,6 +9,7 @@ import BusinessCardScannerModal from '../components/BusinessCardScannerModal'
 import SwipeableListItem from '../components/SwipeableListItem'
 import Pagination from '../components/common/Pagination'
 import { exportClientsToExcel } from '../utils/excelExport'
+import { coerceClientStatus, getClientStatusTone } from '../utils/clientStatus'
 import { showConfirm, showError, showSuccess } from '../utils/alert'
 import { formatKoreanCurrency } from '../utils/formatters'
 
@@ -326,15 +327,15 @@ const Clients = () => {
 
   // 상태 색상 함수 (매출, 신규, 단절 통일)
   const getStatusColor = (status) => {
-    switch (status) {
-      case '매출':
-        return 'bg-emerald-400/10 text-emerald-300 border border-emerald-400/30'
-      case '신규':
-        return 'bg-amber-400/10 text-amber-300 border border-amber-400/30'
-      case '단절':
-        return 'bg-white/5 text-gray-300 border border-gray-800'
+    switch (getClientStatusTone(status)) {
+      case 'sales':
+        return 'bg-pastel-green text-ink-green border border-emerald-200/60'
+      case 'new':
+        return 'bg-pastel-peach text-ink-peach border border-orange-200/60'
+      case 'inactive':
+        return 'bg-stone-100 text-slate-500 border border-stone-200'
       default:
-        return 'bg-white/5 text-gray-300 border border-gray-800'
+        return 'bg-stone-100 text-slate-500 border border-stone-200'
     }
   }
 
@@ -572,7 +573,7 @@ const Clients = () => {
                             primaryContact?.status
                           )}`}
                         >
-                          {primaryContact?.status || '-'}
+                          {coerceClientStatus(primaryContact?.status, '-')}
                         </span>
                       </td>
                       <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm text-gray-300">

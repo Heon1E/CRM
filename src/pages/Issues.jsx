@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { Plus, Edit, Trash2, AlertCircle } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import AddIssueModal from '../components/AddIssueModal'

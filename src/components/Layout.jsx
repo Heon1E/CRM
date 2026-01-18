@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import TopNavbar from './TopNavbar'
 import PWAInstallPrompt from './PWAInstallPrompt'
 import OfflineIndicator from './OfflineIndicator'
