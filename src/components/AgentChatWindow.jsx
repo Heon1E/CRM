@@ -267,17 +267,19 @@ const AgentChatWindow = () => {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsExpanded(false)}
-            className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+            className="p-2 bg-white/10 hover:bg-white/25 rounded-lg transition-all border border-white/20 backdrop-blur-sm"
             aria-label="Minimize"
+            title="최소화"
           >
-            <Minimize2 className="w-4 h-4" />
+            <Minimize2 className="w-4 h-4 drop-shadow-md" />
           </button>
           <button
             onClick={() => setIsExpanded(false)}
-            className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+            className="p-2 bg-white/10 hover:bg-white/25 rounded-lg transition-all border border-white/20 backdrop-blur-sm"
             aria-label="Close"
+            title="닫기"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 drop-shadow-md" />
           </button>
         </div>
       </div>
