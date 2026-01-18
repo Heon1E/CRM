@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { MessageSquare, X, Send, Minimize2, Terminal, Loader2 } from 'lucide-react'
+import { MessageSquare, X, Send, Minimize2, Terminal, Loader2, Image as ImageIcon, Trash2 } from 'lucide-react'
 
 const AgentChatWindow = () => {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -13,7 +13,10 @@ const AgentChatWindow = () => {
   ])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [imagePreview, setImagePreview] = useState(null)
   const messagesEndRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -24,17 +27,25 @@ const AgentChatWindow = () => {
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return
+    if ((!inputValue.trim() && !selectedImage) || isLoading) return
 
     const userMessage = {
       id: messages.length + 1,
       type: 'user',
       content: inputValue,
+      image: imagePreview,
       timestamp: new Date()
     }
 
     setMessages(prev => [...prev, userMessage])
+    const currentImage = selectedImage
+    const currentImagePreview = imagePreview
     setInputValue('')
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
     setIsLoading(true)
 
     try {
@@ -57,11 +68,27 @@ const AgentChatWindow = () => {
 사용자의 요청을 분석하고, 구체적인 코드 수정 방안을 제시하세요.
 항상 한국어로 답변하며, 명확하고 실행 가능한 지침을 제공하세요.`
 
-        // Gemini 포맷으로 변환
-        const contents = conversationHistory.map((msg, idx) => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }]
-        }))
+        // Gemini 포맷으로 변환 (이미지 포함)
+        const contents = conversationHistory.map((msg, idx) => {
+          const parts = [{ text: msg.content }]
+          
+          // 이미지가 있으면 추가 (base64 inline_data 형식)
+          if (msg.role === 'user' && currentImagePreview) {
+            const base64Data = currentImagePreview.split(',')[1]
+            const mimeType = currentImagePreview.split(';')[0].split(':')[1]
+            parts.push({
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data
+              }
+            })
+          }
+          
+          return {
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: parts
+          }
+        })
 
         // 시스템 프롬프트를 첫 번째 user 메시지에 추가
         if (contents.length > 0) {
@@ -150,6 +177,26 @@ const AgentChatWindow = () => {
     }
   }
 
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0]
+    if (file && file.type.startsWith('image/')) {
+      setSelectedImage(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const formatTime = (date) => {
     return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
   }
@@ -183,7 +230,7 @@ const AgentChatWindow = () => {
 
   // Expanded Chat Window
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-96 h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+    <div className="fixed bottom-6 right-6 z-50 w-[768px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary-teal to-primary-teal-dark text-white">
         <div className="flex items-center gap-2">
@@ -228,6 +275,13 @@ const AgentChatWindow = () => {
                   : 'bg-white border border-slate-200 text-slate-800 shadow-sm'
               }`}
             >
+              {message.image && (
+                <img 
+                  src={message.image} 
+                  alt="첨부 이미지" 
+                  className="max-w-full rounded-lg mb-2 max-h-48 object-contain"
+                />
+              )}
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
               <p
                 className={`text-xs mt-1 ${
@@ -257,7 +311,41 @@ const AgentChatWindow = () => {
 
       {/* Input Area */}
       <div className="border-t border-slate-200 bg-white p-4">
+        {/* 이미지 미리보기 */}
+        {imagePreview && (
+          <div className="mb-3 relative inline-block">
+            <img 
+              src={imagePreview} 
+              alt="미리보기" 
+              className="max-h-32 rounded-lg border border-slate-200"
+            />
+            <button
+              onClick={handleRemoveImage}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors flex items-center justify-center"
+              aria-label="이미지 제거"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        
         <div className="flex items-end gap-2">
+          {/* 이미지 첨부 버튼 */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-shrink-0 w-10 h-10 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"
+            aria-label="이미지 첨부"
+          >
+            <ImageIcon className="w-5 h-5 mx-auto" />
+          </button>
+          
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -268,7 +356,7 @@ const AgentChatWindow = () => {
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={(!inputValue.trim() && !selectedImage) || isLoading}
             className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-teal to-primary-teal-dark text-white rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
             aria-label="Send"
           >
