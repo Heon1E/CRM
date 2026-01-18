@@ -233,30 +233,56 @@ const Dashboard = () => {
       console.log('Starting sales data fetch...')
       try {
         setSalesLoading(true)
-        const { data: salesData, error: salesError } = await supabase
-          .from('sales')
-          .select('*')
-          .order('sale_date', { ascending: false })
-          .range(0, 99999)
+        // 전체 데이터 가져오기 (제한 없음)
+        let allSalesData = []
+        let from = 0
+        const batchSize = 1000
+        
+        while (true) {
+          const { data: salesData, error: salesError } = await supabase
+            .from('sales')
+            .select('*')
+            .order('sale_date', { ascending: false })
+            .range(from, from + batchSize - 1)
 
-        if (salesError) throw salesError
+          if (salesError) throw salesError
+          if (!salesData || salesData.length === 0) break
+          
+          allSalesData = [...allSalesData, ...salesData]
+          
+          if (salesData.length < batchSize) break
+          from += batchSize
+        }
+
+        console.log(`Total sales records loaded: ${allSalesData.length}`)
+        
+        // sales_items도 전체 가져오기
         let allItems = []
         try {
-          const { data: itemsData, error: itemsError } = await supabase
-            .from('sales_items')
-            .select('*')
-            .range(0, 99999)
+          let itemsFrom = 0
+          while (true) {
+            const { data: itemsData, error: itemsError } = await supabase
+              .from('sales_items')
+              .select('*')
+              .range(itemsFrom, itemsFrom + batchSize - 1)
 
-          if (itemsError) {
-            console.warn('[Dashboard.jsx] sales_items 조회 실패:', itemsError)
-          } else {
-            allItems = itemsData || []
+            if (itemsError) {
+              console.warn('[Dashboard.jsx] sales_items 조회 실패:', itemsError)
+              break
+            }
+            if (!itemsData || itemsData.length === 0) break
+            
+            allItems = [...allItems, ...itemsData]
+            
+            if (itemsData.length < batchSize) break
+            itemsFrom += batchSize
           }
+          console.log(`Total sales_items loaded: ${allItems.length}`)
         } catch (itemsError) {
           console.warn('[Dashboard.jsx] sales_items 조회 중 오류:', itemsError)
         }
 
-        const normalizedSales = (salesData || []).map((sale) => {
+        const normalizedSales = (allSalesData || []).map((sale) => {
           const mergedItems = allItems.filter((item) => item.sale_id === sale.id)
           const finalItems = mergedItems.length > 0 ? mergedItems : (sale.items || [])
           let calculatedTotal = sale.total_amount || sale.totalAmount || 0
@@ -706,15 +732,6 @@ const Dashboard = () => {
           <div className="flex-1">
             <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-[0.2em]">Overview</p>
             <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Dashboard</h1>
-            {rawSalesData.length > 0 ? (
-              <p className="text-green-500 text-sm font-medium mt-1">
-                ✅ Data Loaded: {rawSalesData.length} records found.
-              </p>
-            ) : (
-              <p className="text-red-500 text-sm font-medium mt-1">
-                ❌ No Data Loaded Yet.
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto justify-end md:hidden">
             <AppInstallGuide />
