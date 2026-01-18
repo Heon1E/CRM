@@ -449,7 +449,8 @@ const Dashboard = () => {
     if (previousValue > 0) {
       return Math.round(((currentValue - previousValue) / previousValue) * 100)
     }
-    return currentValue > 0 ? 100 : 0
+    // 전년 데이터 없음 - null 반환 (UI에서 "신규" 표시)
+    return null
   }
 
   const now = new Date()
@@ -664,8 +665,8 @@ const Dashboard = () => {
       iconColor: 'text-ink-teal',
       cardBg: 'bg-gradient-to-br from-blue-50/80 to-white',
       trend: {
-        direction: clientTrendPercent >= 0 ? 'up' : 'down',
-        value: `${Math.abs(clientTrendPercent)}%`,
+        direction: clientTrendPercent !== null && clientTrendPercent >= 0 ? 'up' : 'down',
+        value: clientTrendPercent !== null ? `${Math.abs(clientTrendPercent)}%` : null,
         note: '전년 동월 대비',
       },
     },
@@ -677,8 +678,8 @@ const Dashboard = () => {
       iconColor: 'text-slate-600',
       cardBg: 'bg-gradient-to-br from-stone-50/80 to-white',
       trend: {
-        direction: activeClientTrendPercent >= 0 ? 'up' : 'down',
-        value: `${Math.abs(activeClientTrendPercent)}%`,
+        direction: activeClientTrendPercent !== null && activeClientTrendPercent >= 0 ? 'up' : 'down',
+        value: activeClientTrendPercent !== null ? `${Math.abs(activeClientTrendPercent)}%` : null,
         note: '전년 동월 대비',
       },
     },
@@ -690,8 +691,8 @@ const Dashboard = () => {
       iconColor: 'text-ink-green',
       cardBg: 'bg-gradient-to-br from-teal-50/80 to-white',
       trend: {
-        direction: salesYoYPercent >= 0 ? 'up' : 'down',
-        value: `${Math.abs(salesYoYPercent).toFixed(1)}%`,
+        direction: salesYoYPercent !== null && salesYoYPercent >= 0 ? 'up' : 'down',
+        value: salesYoYPercent !== null ? `${Math.abs(salesYoYPercent).toFixed(1)}%` : null,
         note: '전년 동월 대비',
       },
     },
@@ -703,8 +704,8 @@ const Dashboard = () => {
       iconColor: 'text-ink-purple',
       cardBg: 'bg-gradient-to-br from-purple-50/80 to-white',
       trend: {
-        direction: averageDealTrendPercent >= 0 ? 'up' : 'down',
-        value: `${Math.abs(averageDealTrendPercent)}%`,
+        direction: averageDealTrendPercent !== null && averageDealTrendPercent >= 0 ? 'up' : 'down',
+        value: averageDealTrendPercent !== null ? `${Math.abs(averageDealTrendPercent)}%` : null,
         note: '전년 동월 대비',
       },
     },
@@ -753,10 +754,16 @@ const Dashboard = () => {
                   <p className="text-sm text-slate-500 font-medium">{metric.label}</p>
                   <p className="text-4xl font-extrabold text-slate-900">{metric.value}</p>
                   <div className="mt-3 text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                    <span className={metric.trend.direction === 'up' ? 'text-red-500' : 'text-blue-500'}>
-                      {metric.trend.direction === 'up' ? '↑' : '↓'} {metric.trend.value}
-                    </span>
-                    <span>{metric.trend.note}</span>
+                    {metric.trend.value === null || metric.trend.value === 'null%' ? (
+                      <span className="text-slate-400">신규 데이터 (비교 불가)</span>
+                    ) : (
+                      <>
+                        <span className={metric.trend.direction === 'up' ? 'text-rose-600' : 'text-sky-600'}>
+                          {metric.trend.direction === 'up' ? '↑' : '↓'} {metric.trend.value}
+                        </span>
+                        <span>{metric.trend.note}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
