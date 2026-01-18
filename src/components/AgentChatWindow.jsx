@@ -264,22 +264,22 @@ const AgentChatWindow = () => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setIsExpanded(false)}
-            className="p-2 bg-white/10 hover:bg-white/25 rounded-lg transition-all border border-white/20 backdrop-blur-sm"
+            className="p-2.5 bg-slate-900/80 hover:bg-slate-900 rounded-lg transition-all shadow-lg border border-slate-700"
             aria-label="Minimize"
             title="최소화"
           >
-            <Minimize2 className="w-4 h-4 drop-shadow-md" />
+            <Minimize2 className="w-5 h-5 text-white" />
           </button>
           <button
             onClick={() => setIsExpanded(false)}
-            className="p-2 bg-white/10 hover:bg-white/25 rounded-lg transition-all border border-white/20 backdrop-blur-sm"
+            className="p-2.5 bg-red-500/90 hover:bg-red-600 rounded-lg transition-all shadow-lg border border-red-400"
             aria-label="Close"
             title="닫기"
           >
-            <X className="w-4 h-4 drop-shadow-md" />
+            <X className="w-5 h-5 text-white" />
           </button>
         </div>
       </div>
