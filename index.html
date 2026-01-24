@@ -1,47 +1,43 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-    
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#9333ea" />
-    <meta name="description" content="고객 관계 관리 시스템" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Xavian CRM" />
-    
-    <!-- iOS Safari 아이콘 -->
-    <link rel="apple-touch-icon" href="/vite.svg" />
-    
-    <title>Xavian CRM</title>
-    
-    <!-- global 변수 폴리필 (브라우저 환경에서 Node.js global 변수 지원) -->
-    <script>
-      if (typeof global === 'undefined') {
-        window.global = window;
-      }
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-    
-    <!-- 
-      참고: 향후 외부 스크립트 태그를 추가할 경우, 
-      CORS 에러 디버깅을 위해 crossorigin="anonymous" 속성을 반드시 추가하세요.
-      
-      예시:
-      <script src="https://some-external-cdn.com/library.js" crossorigin="anonymous"></script>
-    -->
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#9333ea" />
+  <meta name="description" content="고객 관계 관리 시스템" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Xavian CRM" />
+
+  <!-- iOS Safari 아이콘 -->
+  <link rel="apple-touch-icon" href="/vite.svg" />
+
+  <title>Xavian CRM</title>
+
+  <!-- global 변수 폴리필 (브라우저 환경에서 Node.js global 변수 지원) -->
+  <script>
+    if (typeof global === 'undefined') {
+      window.global = window;
+    }
+  </script>
+
+
+
+  <!-- Kakao Postcode API (주소 검색) -->
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>
-
-
-
-

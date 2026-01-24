@@ -13,30 +13,33 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+      <div className="flex items-center justify-center min-h-screen px-4 py-4 text-center">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 z-40 transition-opacity bg-black/60 backdrop-blur-md"
+          className="fixed inset-0 z-40 bg-black/40"
           onClick={onClose}
         ></div>
 
-        {/* Modal */}
+        {/* Modal Window */}
         <div
-          className={`relative z-50 inline-block align-bottom bg-[#1E1E1E] border border-gray-800 rounded-card text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle ${sizeClasses[size]} w-full`}
+          className={`relative z-50 inline-block oracle-raised text-left overflow-hidden transform shadow-none ${sizeClasses[size]} w-full`}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-4 md:px-6 md:py-5 border-b border-gray-800">
-            <h3 className="text-lg font-semibold text-white">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-300 hover:text-white transition-colors p-1 hover:bg-white/5 rounded-button"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          {/* Header / Title Bar */}
+          <div className="oracle-title-bar h-7 mb-0">
+            <h3 className="text-[11px] font-bold text-white px-2 tracking-tight">{title}</h3>
+            <div className="flex gap-1 pr-1">
+              <button
+                onClick={onClose}
+                className="w-5 h-4 flex items-center justify-center bg-gray-300 border border-white font-bold text-[10px] text-black"
+                title="Close"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
-          {/* Content */}
-          <div className="px-4 py-4 md:px-6 md:py-5 modal-content">{children}</div>
+          {/* Content Area */}
+          <div className="px-4 py-4 modal-content bg-[#c0c0c0]">{children}</div>
         </div>
       </div>
     </div>

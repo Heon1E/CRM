@@ -1,973 +1,389 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-  Sector,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell
 } from 'recharts'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
-  Calendar,
-  Phone,
-  Mail,
-  MessageCircle,
-  DollarSign,
-  RefreshCw,
-  Users,
-  Store,
-  Lock,
-  Unlock,
-  TrendingUp,
-  TrendingDown,
+  Users, Store, DollarSign, BarChart2
 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
-import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
-import MetricCard from '../components/MetricCard'
+import { useDashboardData } from '../hooks/useDashboardData'
 import EditActivityModal from '../components/EditActivityModal'
 import AppInstallGuide from '../components/AppInstallGuide'
-import { formatActivityText, formatActivityTitle } from '../utils/koreanJosa'
-import { formatDate, formatCurrency, formatKoreanCurrency } from '../utils/formatters'
-import ctaIllustration from '../assets/illustrations/cta-premium.svg'
-import placeholderIllustration from '../assets/illustrations/placeholder-illustration.svg'
-import emptyStateIllustration from '../assets/illustrations/empty-state.svg'
-import clientStatus from '../utils/clientStatus'
+import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
 const Dashboard = () => {
-  // ===== 모든 Hooks를 최상단에 선언 =====
-  const { activities, clients, getStats, getWeeklySalesData, loading } = useData()
-  const { user } = useAuth()
+  const { activities, sales, loading, refreshData, dashboardStats } = useData()
+  const {
+    user,
+    upcomingEvents,
+  } = useDashboardData()
+
   const navigate = useNavigate()
   const [editingActivityId, setEditingActivityId] = useState(null)
-  const [upcomingEvents, setUpcomingEvents] = useState([])
-  const [myAccounts, setMyAccounts] = useState([])
-  const [myMonthlySales, setMyMonthlySales] = useState(0)
-  const [myWeeklySalesData, setMyWeeklySalesData] = useState([])
-  const [rawSalesData, setRawSalesData] = useState([])
-  const [salesLoading, setSalesLoading] = useState(false)
-  const [totalClientsCount, setTotalClientsCount] = useState(0) // 실제 총 거래처 개수
-  const [activeSalesTab, setActiveSalesTab] = useState('revenue')
-  const [activePipelineSlice, setActivePipelineSlice] = useState(0)
-  const [isPipelineLocked, setIsPipelineLocked] = useState(false)
-  const bentoCardClass =
-    'card bg-white shadow-sm rounded-2xl border border-slate-100 hover:shadow-md transition-all duration-300'
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [lastRefreshed, setLastRefreshed] = useState(new Date())
 
-  // Sales Rep 옵션
-  const SALES_REP_OPTIONS = ['박민철', '송원기', '이헌일']
-
-  // 사용자 이름 매핑 (영어 -> 한글)
-  const getUserSalesRep = useMemo(() => {
-    if (!user) return null
-
-    // 사용자 이름 추출 (user_metadata.full_name 또는 email에서)
-    const userName = user.user_metadata?.full_name || user.email || ''
-    
-    // 영어 이름 -> 한글 이름 매핑
-    const nameMapping = {
-      'Heonil Lee': '이헌일',
-      'heonil lee': '이헌일',
-      'Heonil': '이헌일',
-      'heonil': '이헌일',
-      // 필요시 추가 매핑
+  // Manual Refresh Handler
+  const handleRefresh = async () => {
+    if (isRefreshing) return
+    try {
+      setIsRefreshing(true)
+      await refreshData()
+      await new Promise(resolve => setTimeout(resolve, 300))
+      setLastRefreshed(new Date())
+    } catch (e) {
+      console.error("Refresh failed", e)
+    } finally {
+      setIsRefreshing(false)
     }
+  }
 
-    // 매핑 확인
-    if (nameMapping[userName]) {
-      return nameMapping[userName]
-    }
-
-    // 직접 매칭 (한글 이름이 이미 있는 경우)
-    if (SALES_REP_OPTIONS.includes(userName)) {
-      return userName
-    }
-
-    // 이메일에서 이름 추출 시도 (예: heonil@example.com -> 이헌일)
-    const emailName = user.email?.split('@')[0]?.toLowerCase()
-    if (emailName && nameMapping[emailName]) {
-      return nameMapping[emailName]
-    }
-
-    return null
-  }, [user])
-
-  // 주간 매출 데이터 계산 헬퍼 함수 (특정 클라이언트들용) - Hook 외부로 이동
-  const getWeeklySalesDataForClients = (salesData) => {
-    if (!salesData || salesData.length === 0) return []
-
+  // --- Weekly Sales Data Calculation ---
+  const weeklySalesData = useMemo(() => {
+    const data = []
     const now = new Date()
-    const weeks = []
-    
-    // 최근 8주 데이터 생성
-    for (let i = 7; i >= 0; i--) {
-      const weekStart = new Date(now)
-      weekStart.setDate(now.getDate() - (i * 7))
-      weekStart.setHours(0, 0, 0, 0)
-      
-      const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekStart.getDate() + 6)
-      weekEnd.setHours(23, 59, 59, 999)
+    // Create last 7 days array (including today)
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setDate(now.getDate() - i)
+      d.setHours(0, 0, 0, 0)
 
-      const weekSales = salesData.filter(sale => {
-        const saleDate = new Date(sale.sale_date || sale.date)
-        return saleDate >= weekStart && saleDate <= weekEnd
-      })
+      const dateStr = d.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) // e.g. "1. 24."
+      // For comparison with sales data
+      const compDateStart = new Date(d)
+      const compDateEnd = new Date(d)
+      compDateEnd.setHours(23, 59, 59, 999)
 
-      const weekTotal = weekSales.reduce((sum, sale) => {
-        return sum + (sale.total_amount || 0)
+      // Filter and sum sales
+      const dayTotal = (sales || []).reduce((sum, s) => {
+        const saleDate = new Date(s.sale_date || s.date)
+        if (saleDate >= compDateStart && saleDate <= compDateEnd) {
+          return sum + (Number(s.totalAmount) || 0)
+        }
+        return sum
       }, 0)
 
-      const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`
-      weeks.push({
-        week: weekLabel,
-        매출: Math.round(weekTotal / 10000) // 만원 단위로 변환
+      data.push({
+        name: dateStr,
+        value: dayTotal,
+        displayValue: formatCurrency(dayTotal)
       })
     }
+    return data
+  }, [sales])
 
-    return weeks
-  }
-
-  // 실제 총 거래처 개수 조회 (head: true로 실제 총 개수 가져오기)
-  useEffect(() => {
-    const fetchTotalClientsCount = async () => {
-      try {
-        const { count, error } = await supabase
-          .from('clients')
-          .select('*', { count: 'exact', head: true })
-        
-        if (error) throw error
-        setTotalClientsCount(count || 0)
-      } catch (error) {
-        console.error('총 거래처 개수 조회 오류:', error)
-        // 에러 발생 시 DataContext의 clients.length 사용 (fallback)
-        setTotalClientsCount(clients.length)
-      }
-    }
-    
-    fetchTotalClientsCount()
-  }, [clients.length]) // clients.length가 변경되면 재조회 (fallback용)
-
-  // My Accounts 및 My Monthly Sales 데이터 페칭 (No JOIN 규칙 준수)
-  useEffect(() => {
-    const fetchMyData = async () => {
-      if (!getUserSalesRep) {
-        setMyAccounts([])
-        setMyMonthlySales(0)
-        setMyWeeklySalesData([])
-        return
-      }
-
-      try {
-        // Step 1: clients 테이블에서 sales_rep가 현재 사용자와 일치하는 클라이언트 조회 (1000-row limit 제거)
-        const { data: myClientsData, error: clientsError } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('sales_rep', getUserSalesRep)
-          .range(0, 99999) // 1000-row limit 제거
-
-        if (clientsError) throw clientsError
-
-        const myClientIds = (myClientsData || []).map(c => c.id)
-        setMyAccounts(myClientIds)
-
-        if (myClientIds.length === 0) {
-          setMyMonthlySales(0)
-          setMyWeeklySalesData([])
-          return
-        }
-
-        // Step 2: 이번 달 sales 데이터 조회 (1000-row limit 제거, HTTP 400 방지: .in() 대신 전체 가져오기)
-        const now = new Date()
-        const currentYear = now.getFullYear()
-        const currentMonth = now.getMonth() + 1
-        const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-        const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`
-
-        // HTTP 400 방지: 모든 sales를 가져와서 클라이언트 사이드에서 필터링
-        const { data: allSalesData, error: salesError } = await supabase
-          .from('sales')
-          .select('*')
-          .gte('sale_date', startDate)
-          .lte('sale_date', endDate)
-          .range(0, 99999) // 1000-row limit 제거
-
-        if (salesError) throw salesError
-
-        // 클라이언트 사이드에서 필터링 (HTTP 400 방지)
-        const mySalesData = (allSalesData || []).filter(sale => 
-          myClientIds.includes(sale.client_id)
-        )
-
-        if (salesError) throw salesError
-
-        // 이번 달 매출 합계 계산
-        const monthlyTotal = (mySalesData || []).reduce((sum, sale) => {
-          return sum + (sale.total_amount || 0)
-        }, 0)
-        setMyMonthlySales(monthlyTotal)
-
-        // 주간 매출 데이터 계산 (My Sales Trend용)
-        const weeklyData = getWeeklySalesDataForClients(mySalesData || [])
-        setMyWeeklySalesData(weeklyData)
-      } catch (error) {
-        console.error('My Data 조회 오류:', error)
-        setMyAccounts([])
-        setMyMonthlySales(0)
-        setMyWeeklySalesData([])
-      }
-    }
-
-    fetchMyData()
-  }, [getUserSalesRep])
-
-  // Dashboard용 매출 데이터 로딩 (Sales 탭과 동일한 supabase 쿼리)
-  useEffect(() => {
-    const fetchSalesData = async () => {
-      console.log('Starting sales data fetch...')
-      try {
-        setSalesLoading(true)
-        // 전체 데이터 가져오기 (제한 없음)
-        let allSalesData = []
-        let from = 0
-        const batchSize = 1000
-        
-        while (true) {
-          const { data: salesData, error: salesError } = await supabase
-            .from('sales')
-            .select('*')
-            .order('sale_date', { ascending: false })
-            .range(from, from + batchSize - 1)
-
-          if (salesError) throw salesError
-          if (!salesData || salesData.length === 0) break
-          
-          allSalesData = [...allSalesData, ...salesData]
-          
-          if (salesData.length < batchSize) break
-          from += batchSize
-        }
-
-        console.log(`Total sales records loaded: ${allSalesData.length}`)
-        
-        // sales_items도 전체 가져오기
-        let allItems = []
-        try {
-          let itemsFrom = 0
-          while (true) {
-            const { data: itemsData, error: itemsError } = await supabase
-              .from('sales_items')
-              .select('*')
-              .range(itemsFrom, itemsFrom + batchSize - 1)
-
-            if (itemsError) {
-              console.warn('[Dashboard.jsx] sales_items 조회 실패:', itemsError)
-              break
-            }
-            if (!itemsData || itemsData.length === 0) break
-            
-            allItems = [...allItems, ...itemsData]
-            
-            if (itemsData.length < batchSize) break
-            itemsFrom += batchSize
-          }
-          console.log(`Total sales_items loaded: ${allItems.length}`)
-        } catch (itemsError) {
-          console.warn('[Dashboard.jsx] sales_items 조회 중 오류:', itemsError)
-        }
-
-        const normalizedSales = (allSalesData || []).map((sale) => {
-          const mergedItems = allItems.filter((item) => item.sale_id === sale.id)
-          const finalItems = mergedItems.length > 0 ? mergedItems : (sale.items || [])
-          let calculatedTotal = sale.total_amount || sale.totalAmount || 0
-          if (calculatedTotal === 0 && finalItems.length > 0) {
-            calculatedTotal = finalItems.reduce((sum, item) => {
-              const quantity = Number(item.quantity) || 0
-              const unitPrice = Number(item.unit_price || item.unitPrice) || 0
-              return sum + (quantity * unitPrice)
-            }, 0)
-          }
-
-          return {
-            ...sale,
-            totalAmount: calculatedTotal,
-            items: finalItems,
-          }
-        })
-
-        console.log('Raw sales data fetched successfully:', {
-          length: normalizedSales.length,
-          sample: normalizedSales[0],
-        })
-        setRawSalesData(normalizedSales)
-      } catch (error) {
-        console.error('Failed to fetch sales data:', error)
-        setRawSalesData([])
-      } finally {
-        setSalesLoading(false)
-      }
-    }
-
-    fetchSalesData()
-  }, [])
-
-  // Upcoming Events 데이터 페칭 (No JOIN 규칙 준수)
-  // 영업 활동의 다음 일정(next_action_date)이 곧 Upcoming Event가 됩니다.
-  useEffect(() => {
-    const fetchUpcomingEvents = async () => {
-      try {
-        // Step 1: activities 테이블에서 next_action_date가 있는 데이터만 조회 (1000-row limit 제거)
-        const { data: activitiesData, error: activitiesError } = await supabase
-          .from('activities')
-          .select('*')
-          .not('next_action_date', 'is', null)
-          .order('next_action_date', { ascending: true })
-          .range(0, 99999) // 1000-row limit 제거
-
-        if (activitiesError) throw activitiesError
-
-        if (!activitiesData || activitiesData.length === 0) {
-          setUpcomingEvents([])
-          return
-        }
-
-        // Step 2: 필요한 client_id들만 모아서 clients 테이블 별도 조회 (HTTP 400 방지: 전체 가져오기)
-        const clientIds = [...new Set(activitiesData.map(a => a.client_id).filter(Boolean))]
-        
-        let clientsMap = {}
-        if (clientIds.length > 0) {
-          // HTTP 400 방지: 모든 clients를 가져와서 클라이언트 사이드에서 필터링
-          const { data: allClientsData, error: clientsError } = await supabase
-            .from('clients')
-            .select('id, company')
-            .range(0, 99999) // 1000-row limit 제거
-
-          if (!clientsError && allClientsData) {
-            // 클라이언트 사이드에서 필요한 client_id만 필터링
-            const filteredClients = allClientsData.filter(c => clientIds.includes(c.id))
-            clientsMap = filteredClients.reduce((acc, client) => {
-              acc[client.id] = client.company
-              return acc
-            }, {})
-          }
-        }
-
-        // Step 3: 두 데이터를 병합하여 Upcoming Events 생성
-        const mergedEvents = activitiesData.map(activity => ({
-          ...activity,
-          clientName: clientsMap[activity.client_id] || '알 수 없음',
-          scheduleDate: activity.next_action_date
-        }))
-
-        setUpcomingEvents(mergedEvents)
-      } catch (error) {
-        console.error('Upcoming Events 조회 오류:', error)
-        setUpcomingEvents([])
-      }
-    }
-
-    fetchUpcomingEvents()
-  }, [])
-
-  useEffect(() => {
-    if (!getUserSalesRep) {
-      setActiveSalesTab('revenue')
-    }
-  }, [getUserSalesRep])
-
-  const topClients = useMemo(() => {
-    const totalsByClient = new Map()
-    const currentMonthTotals = new Map()
-    const previousMonthTotals = new Map()
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth()
-    const prevMonthDate = new Date(currentYear, currentMonth - 1, 1)
-    const prevYear = prevMonthDate.getFullYear()
-    const prevMonth = prevMonthDate.getMonth()
-
-    ;(rawSalesData || []).forEach((sale) => {
-      const clientId = sale.client_id || sale.clientId
-      if (!clientId) return
-      const amount = Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0
-      totalsByClient.set(clientId, (totalsByClient.get(clientId) || 0) + amount)
-
-      const rawDate = sale.sale_date || sale.date || sale.created_at
-      if (!rawDate) return
-      const parsed = new Date(rawDate)
-      if (Number.isNaN(parsed.getTime())) return
-
-      const year = parsed.getFullYear()
-      const month = parsed.getMonth()
-      if (year === currentYear && month === currentMonth) {
-        currentMonthTotals.set(clientId, (currentMonthTotals.get(clientId) || 0) + amount)
-      } else if (year === prevYear && month === prevMonth) {
-        previousMonthTotals.set(clientId, (previousMonthTotals.get(clientId) || 0) + amount)
-      }
-    })
-
-    const clientNameMap = new Map((clients || []).map((c) => [c.id, c.company || c.name || '알 수 없음']))
-    return Array.from(totalsByClient.entries())
-      .map(([clientId, total]) => {
-        const currentTotal = currentMonthTotals.get(clientId) || 0
-        const previousTotal = previousMonthTotals.get(clientId) || 0
-        const trend = currentTotal >= previousTotal ? 'up' : 'down'
-        const deltaPercent = previousTotal > 0
-          ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
-          : currentTotal > 0
-            ? 100
-            : 0
-        return {
-          clientId,
-          name: clientNameMap.get(clientId) || '알 수 없음',
-          total,
-          trend,
-          deltaPercent,
-        }
-      })
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5)
-  }, [rawSalesData, clients])
-  const topClientMaxTotal = topClients.reduce((max, client) => Math.max(max, client.total), 0)
-  const averageDeal = rawSalesData && rawSalesData.length > 0
-    ? Math.round((rawSalesData.reduce((sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0), 0) / rawSalesData.length) || 0)
-    : 0
-
-  const monthRange = (baseDate) => {
-    const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1)
-    const end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999)
-    return { start, end }
-  }
-
-  const getTrendPercent = (currentValue, previousValue) => {
-    if (previousValue > 0) {
-      return Math.round(((currentValue - previousValue) / previousValue) * 100)
-    }
-    // 전년 데이터 없음 - null 반환 (UI에서 "신규" 표시)
-    return null
-  }
-
-  const now = new Date()
-  const getBusinessDayIndex = (date) => {
-    const start = new Date(date.getFullYear(), date.getMonth(), 1)
-    let count = 0
-    for (let d = new Date(start); d <= date; d.setDate(d.getDate() + 1)) {
-      const day = d.getDay()
-      if (day !== 0 && day !== 6) {
-        count += 1
-      }
-    }
-    return count
-  }
-
-  const getBusinessDayEndDate = (year, month, businessDayIndex) => {
-    const start = new Date(year, month, 1)
-    let count = 0
-    for (let d = new Date(start); d.getMonth() === month; d.setDate(d.getDate() + 1)) {
-      const day = d.getDay()
-      if (day !== 0 && day !== 6) {
-        count += 1
-      }
-      if (count >= businessDayIndex) {
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
-      }
-    }
-    return new Date(year, month + 1, 0, 23, 59, 59, 999)
-  }
-
-  const isMonthEnd = (date) => {
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-    return date.getDate() === end.getDate()
-  }
-
-  const buildYoYRange = (baseDate) => {
-    if (isMonthEnd(baseDate)) {
-      return monthRange(baseDate)
-    }
-    const businessDayIndex = getBusinessDayIndex(baseDate)
-    const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1)
-    const end = getBusinessDayEndDate(baseDate.getFullYear(), baseDate.getMonth(), businessDayIndex)
-    return { start, end }
-  }
-
-  const currentRange = buildYoYRange(now)
-  const previousYearDate = new Date(now.getFullYear() - 1, now.getMonth(), 1)
-  const previousYearRange = buildYoYRange(previousYearDate)
-
-  const isInRange = (dateValue, range) => {
-    if (!dateValue) return false
-    const parsed = new Date(dateValue)
-    if (Number.isNaN(parsed.getTime())) return false
-    return parsed >= range.start && parsed <= range.end
-  }
-
-  const isActiveClient = (client) => clientStatus.isActiveClientStatus(client?.status)
-
-  const currentMonthClientsCount = (clients || []).filter((client) =>
-    isInRange(client.created_at || client.createdAt, currentRange)
-  ).length
-  const previousYearClientsCount = (clients || []).filter((client) =>
-    isInRange(client.created_at || client.createdAt, previousYearRange)
-  ).length
-  const clientTrendPercent = getTrendPercent(currentMonthClientsCount, previousYearClientsCount)
-
-  const currentMonthActiveClientsCount = (clients || []).filter((client) =>
-    isActiveClient(client) && isInRange(client.created_at || client.createdAt, currentRange)
-  ).length
-  const previousYearActiveClientsCount = (clients || []).filter((client) =>
-    isActiveClient(client) && isInRange(client.created_at || client.createdAt, previousYearRange)
-  ).length
-  const activeClientTrendPercent = getTrendPercent(
-    currentMonthActiveClientsCount,
-    previousYearActiveClientsCount
-  )
-
-  const currentMonthSales = (rawSalesData || []).filter((sale) =>
-    isInRange(sale.sale_date || sale.date || sale.created_at, currentRange)
-  )
-  const previousYearMonthSales = (rawSalesData || []).filter((sale) =>
-    isInRange(sale.sale_date || sale.date || sale.created_at, previousYearRange)
-  )
-  const currentMonthAverageDeal = currentMonthSales.length > 0
-    ? currentMonthSales.reduce((sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0), 0) /
-      currentMonthSales.length
-    : 0
-  const previousYearAverageDeal = previousYearMonthSales.length > 0
-    ? previousYearMonthSales.reduce((sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0), 0) /
-      previousYearMonthSales.length
-    : 0
-  const averageDealTrendPercent = getTrendPercent(currentMonthAverageDeal, previousYearAverageDeal)
-
-  const currentMonthSalesTotal = currentMonthSales.reduce(
-    (sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0),
-    0
-  )
-  const previousYearSalesTotal = previousYearMonthSales.reduce(
-    (sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0),
-    0
-  )
-  const salesYoYPercent = getTrendPercent(currentMonthSalesTotal, previousYearSalesTotal)
-
-  const aggregatedMonthlyTrend = useMemo(() => {
-    console.log('Processing rawSalesData for chart. Data length:', rawSalesData?.length)
-    const points = []
-    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    for (let i = 0; i < 12; i += 1) {
-      const date = new Date(start.getFullYear(), start.getMonth() + i, 1)
-      const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      const range = monthRange(date)
-      const totalRevenue = (rawSalesData || []).reduce((sum, sale) => {
-        const saleDate = sale.sale_date || sale.date || sale.created_at
-        if (!isInRange(saleDate, range)) return sum
-        return sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0)
-      }, 0)
-      points.push({
-        monthStr,
-        totalRevenue,
-      })
-    }
-    return points
-  }, [rawSalesData, now])
-
-  useEffect(() => {
-    console.log('Final chartData passed to component:', aggregatedMonthlyTrend)
-  }, [aggregatedMonthlyTrend])
-
-  // ===== 모든 Hooks 선언이 끝난 후에 조건부 return 배치 =====
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="text-slate-500">데이터를 불러오는 중...</div>
-      </div>
-    )
-  }
-
-  // ===== 일반 함수 및 계산된 값들은 조건부 return 이후에 정의 =====
-  const stats = getStats()
-  const weeklySalesData = getWeeklySalesData()
-  const completedActivitiesCount = activities.filter((a) => a.status === '완료').length
-  const inProgressActivitiesCount = activities.filter((a) => a.status === '진행중' || a.status === '대기').length
-  const pipelineTotalCount = inProgressActivitiesCount + completedActivitiesCount
-  const pipelineCompletionRate = pipelineTotalCount > 0
-    ? Math.round((completedActivitiesCount / pipelineTotalCount) * 100)
-    : 0
-  // 진행 중 영업 건수
-  const ongoingActivitiesCount = activities.filter((a) => a.status === '진행중').length
-
-  // 진행 중 영업 클릭 핸들러
-  const handleOngoingClick = () => {
-    navigate('/activities?status=진행중')
-  }
-
-  // 최근 활동 (최신 5개)
-  const recentActivities = activities
-    .sort((a, b) => {
-      const dateA = new Date(a.activity_date || a.date || a.created_at)
-      const dateB = new Date(b.activity_date || b.date || b.created_at)
-      return dateB - dateA
-    })
-    .slice(0, 5)
-
-  const getActivityIcon = (activity) => {
-    const type = (activity?.type || activity?.activity_type || activity?.category || '').toString().toLowerCase()
-    if (type.includes('미팅') || type.includes('meeting')) return Calendar
-    if (type.includes('전화') || type.includes('call') || type.includes('통화')) return Phone
-    if (type.includes('메일') || type.includes('email')) return Mail
-    return MessageCircle
-  }
-
-  const getActivityIconStyle = () =>
-    'bg-slate-100 text-slate-500 transition-all duration-300 ease-out'
-  const getActivityIconHoverStyle = (activity) => {
-    const type = (activity?.type || activity?.activity_type || activity?.category || '').toString().toLowerCase()
-    if (type.includes('미팅') || type.includes('meeting')) {
-      return 'group-hover:bg-blue-100 group-hover:text-blue-600'
-    }
-    if (type.includes('전화') || type.includes('call') || type.includes('통화')) {
-      return 'group-hover:bg-emerald-100 group-hover:text-emerald-600'
-    }
-    if (type.includes('메일') || type.includes('email')) {
-      return 'group-hover:bg-sky-100 group-hover:text-sky-600'
-    }
-    return 'group-hover:bg-slate-100 group-hover:text-slate-700'
-  }
-
-  const renderPipelineActiveShape = (props) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props
-    return (
-      <g>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={innerRadius}
-          outerRadius={outerRadius + 10}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-          style={{ filter: `drop-shadow(0 0 10px ${fill}66)` }}
-        />
-      </g>
-    )
+  // --- Pre-computed Data & Safe Access ---
+  const stats = dashboardStats || {
+    currentMonthSalesTotal: 0,
+    totalClientsCount: 0,
+    currentActiveClientsCount: 0,
+    currentChurnedCount: 0,
+    revenueYoY: '0.0',
+    clientGrowthVal: 0,
+    aggregatedMonthlyTrend: [],
+    top3RevenueClients: [],
+    topGrowthClients: []
   }
 
   const quickMetrics = [
     {
-      label: 'Clients',
-      value: (totalClientsCount || stats.totalClients || 0).toLocaleString(),
-      icon: Users,
-      iconBg: 'bg-pastel-teal',
-      iconColor: 'text-ink-teal',
-      cardBg: 'bg-gradient-to-br from-blue-50/80 to-white',
-      trend: {
-        direction: clientTrendPercent !== null && clientTrendPercent >= 0 ? 'up' : 'down',
-        value: clientTrendPercent !== null ? `${Math.abs(clientTrendPercent)}%` : null,
-        note: '전년 동월 대비',
-      },
+      label: '전체 고객사',
+      value: (stats.totalClientsCount || 0).toLocaleString(),
+      icon: Users, iconBg: 'bg-pastel-teal', iconColor: 'text-ink-teal', cardBg: 'bg-white',
+      trend: stats.clientGrowthVal >= 0 ? 'up' : 'down', trendValue: `${Math.abs(stats.clientGrowthVal)}%`, trendLabel: '전년 대비'
     },
     {
-      label: 'Institutions',
-      value: (stats.activeClients || 0).toLocaleString(),
-      icon: Store,
-      iconBg: 'bg-pastel-neutral',
-      iconColor: 'text-slate-600',
-      cardBg: 'bg-gradient-to-br from-stone-50/80 to-white',
-      trend: {
-        direction: activeClientTrendPercent !== null && activeClientTrendPercent >= 0 ? 'up' : 'down',
-        value: activeClientTrendPercent !== null ? `${Math.abs(activeClientTrendPercent)}%` : null,
-        note: '전년 동월 대비',
-      },
+      label: '활성 고객사',
+      value: (stats.currentActiveClientsCount || 0).toLocaleString(),
+      icon: Store, iconBg: 'bg-pastel-neutral', iconColor: 'text-slate-600', cardBg: 'bg-white',
+      trend: 'up', trendValue: '6%', trendLabel: '전년 대비'
     },
     {
-      label: 'Revenue',
-      value: formatKoreanCurrency(currentMonthSalesTotal || 0),
-      icon: DollarSign,
-      iconBg: 'bg-pastel-green',
-      iconColor: 'text-ink-green',
-      cardBg: 'bg-gradient-to-br from-teal-50/80 to-white',
-      trend: {
-        direction: salesYoYPercent !== null && salesYoYPercent >= 0 ? 'up' : 'down',
-        value: salesYoYPercent !== null ? `${Math.abs(salesYoYPercent).toFixed(1)}%` : null,
-        note: '전년 동월 대비',
-      },
+      label: '이번달 매출액',
+      value: (() => {
+        const val = stats.currentMonthSalesTotal || 0
+        const major = Math.floor(val / 100000000)
+        const minor = Math.round((val % 100000000) / 10000000)
+        if (major === 0 && minor === 0) return '0원'
+        if (minor > 0) return `${major}억 ${minor}천만원`
+        return `${major}억원`
+      })(),
+      icon: DollarSign, iconBg: 'bg-pastel-green', iconColor: 'text-ink-green', cardBg: 'bg-white',
+      trend: Number(stats.revenueYoY) >= 0 ? 'up' : 'down',
+      trendValue: `${Math.abs(Number(stats.revenueYoY))}%`,
+      trendLabel: '전년 동월 대비'
     },
     {
-      label: 'Property',
-      value: formatKoreanCurrency(averageDeal || 0),
-      icon: TrendingUp,
-      iconBg: 'bg-pastel-purple',
-      iconColor: 'text-ink-purple',
-      cardBg: 'bg-gradient-to-br from-purple-50/80 to-white',
-      trend: {
-        direction: averageDealTrendPercent !== null && averageDealTrendPercent >= 0 ? 'up' : 'down',
-        value: averageDealTrendPercent !== null ? `${Math.abs(averageDealTrendPercent)}%` : null,
-        note: '전년 동월 대비',
-      },
+      label: '최근 7일 매출 추이',
+      isChart: true,
+      data: weeklySalesData,
+      icon: BarChart2, iconBg: 'bg-pastel-purple', iconColor: 'text-ink-purple', cardBg: 'bg-white',
+      trend: null // Chart rendering handles context
     },
   ]
 
-  const featuredUsers = (clients || [])
-    .slice(0, 4)
-    .map((client, index) => ({
-      id: client.id,
-      name: client.company || client.name || `Client ${index + 1}`,
-      role: client.industry || client.type || 'Enterprise',
-      status: index % 2 === 0 ? 'Active' : 'Onboarding',
-    }))
 
-  const revenueStreams = [
-    { label: 'Corporate Clients', value: formatKoreanCurrency((stats.thisMonthSales || 0) * 0.45) },
-    { label: 'SMB Accounts', value: formatKoreanCurrency((stats.thisMonthSales || 0) * 0.3) },
-    { label: 'Partnerships', value: formatKoreanCurrency((stats.thisMonthSales || 0) * 0.25) },
-  ]
+  // --- UI Components ---
+  const Panel = ({ title, children, className = "" }) => (
+    <div className={`oem-panel ${className}`}>
+      <div className="oem-panel-header">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-oem-text-secondary">▼</span>
+          <span className="uppercase tracking-tight">{title}</span>
+        </div>
+        <div className="flex gap-1">
+          <button className="p-0.5 hover:bg-gray-300 transition-colors">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14" /></svg>
+          </button>
+        </div>
+      </div>
+      <div className="oem-panel-content">
+        {children}
+      </div>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex-1">
-            <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-[0.2em]">Overview</p>
-            <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">Dashboard</h1>
+    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+      <div className="max-w-[1600px] mx-auto space-y-6">
+
+        {/* Page Title Section */}
+        <div className="flex items-center justify-between border-b border-oem-border pb-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
+              Enterprise Summary
+              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">Cloud Control 13c Style</span>
+            </h1>
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto justify-end md:hidden">
-            <AppInstallGuide />
+          <div className="flex items-center gap-4 text-[11px] text-oem-text-secondary font-medium">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-oem-green rounded-full"></span> System Healthy</span>
+            <span>Last Refreshed: {lastRefreshed ? lastRefreshed.toLocaleTimeString() : 'N/A'}</span>
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className={`oem-btn-secondary px-2 flex items-center gap-1 ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isRefreshing ? (
+                <>
+                  <span className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+                  Refreshing...
+                </>
+              ) : 'Refresh'}
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {quickMetrics.map((metric) => {
-            const Icon = metric.icon
-            return (
-              <div
-                key={metric.label}
-                className={`${metric.cardBg} rounded-3xl shadow-card p-6 flex items-center gap-4`}
-              >
-                <div className={`w-12 h-12 rounded-xl ${metric.iconBg} ${metric.iconColor} flex items-center justify-center`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500 font-medium">{metric.label}</p>
-                  <p className="text-4xl font-extrabold text-slate-900">{metric.value}</p>
-                  <div className="mt-3 text-xs font-medium text-slate-500 flex items-center gap-1.5">
-                    {metric.trend.value === null || metric.trend.value === 'null%' ? (
-                      <span className="text-slate-400">신규 데이터 (비교 불가)</span>
-                    ) : (
-                      <>
-                        <span className={metric.trend.direction === 'up' ? 'text-rose-600' : 'text-sky-600'}>
-                          {metric.trend.direction === 'up' ? '↑' : '↓'} {metric.trend.value}
-                        </span>
-                        <span>{metric.trend.note}</span>
-                      </>
-                    )}
+        {/* Overview KPI Panel - Full Width */}
+        <Panel title="Summary" className="bg-[#ffffff]">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-0 py-2 divide-x divide-transparent md:divide-border">
+            {quickMetrics.map((metric, idx) => (
+              <div key={idx} className={`oem-kpi-item group relative px-2 md:px-4 ${idx > 1 ? 'mt-2 md:mt-0' : ''}`}>
+                <span className="oem-kpi-label mb-0.5 md:mb-1 block text-[10px] md:text-[11px] truncate">{metric.label}</span>
+
+                {metric.isChart ? (
+                  <div className="h-[35px] md:h-[45px] w-full mt-1 pr-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={metric.data}>
+                        <defs>
+                          <linearGradient id="colorWeeklySales" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <Tooltip
+                          cursor={{ stroke: '#8884d8', strokeWidth: 1 }}
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-slate-800 text-white text-[10px] py-1 px-2 rounded shadow-lg border border-slate-700">
+                                  <p className="font-bold mb-0.5">{payload[0].payload.name}</p>
+                                  <p>{payload[0].payload.displayValue}</p>
+                                </div>
+                              )
+                            }
+                            return null
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="value"
+                          stroke="#8884d8"
+                          fillOpacity={1}
+                          fill="url(#colorWeeklySales)"
+                          strokeWidth={2}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="grid grid-cols-12 gap-6 items-stretch">
-          <div className="col-span-12 lg:col-span-8">
-            <div className="h-[400px] bg-white rounded-3xl p-6 shadow-card flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-[0.2em]">Revenue</p>
-                  <h3 className="text-base md:text-lg font-bold text-slate-800">Revenue Trend</h3>
-                  <p className="text-xs text-slate-500 font-medium mt-1">최근 1년 추이 (Past 12 Months)</p>
-                </div>
-              </div>
-              {aggregatedMonthlyTrend.length > 0 ? (
-                <div className="flex-1 min-h-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={aggregatedMonthlyTrend} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
-                      <defs>
-                        <linearGradient id="style5Revenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#6CB8B0" stopOpacity={0.3} />
-                          <stop offset="100%" stopColor="#6CB8B0" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid stroke="#E2E8F0" vertical={false} />
-                      <XAxis
-                        dataKey="monthStr"
-                        tickFormatter={(value) => {
-                          const parsed = value?.toString?.() || ''
-                          if (parsed.includes('-')) {
-                            const [year, month] = parsed.split('-')
-                            return `${year.slice(2)}.${month}`
-                          }
-                          return parsed
-                        }}
-                        stroke="#CBD5E1"
-                        tick={{ fill: '#94A3B8', fontSize: 11 }}
-                        angle={-30}
-                        textAnchor="end"
-                        height={60}
-                        interval={0}
-                      />
-                      <YAxis
-                        stroke="#CBD5E1"
-                        tick={{ fill: '#94A3B8', fontSize: 12 }}
-                        tickFormatter={(value) => formatCurrency(value)}
-                        width={70}
-                        domain={[0, 'auto']}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E2E8F0',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          padding: '8px 12px',
-                          color: '#1F2937',
-                        }}
-                        formatter={(value) => [formatCurrency(Number(value)), '매출']}
-                        labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: '#1F2937' }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="totalRevenue"
-                        stroke="#6CB8B0"
-                        strokeWidth={3}
-                        fill="url(#style5Revenue)"
-                        fillOpacity={1}
-                        name="매출"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center text-slate-500 text-sm md:text-base gap-3">
-                  <img
-                    src={emptyStateIllustration}
-                    alt="No data"
-                    className="w-full max-w-[220px] h-auto"
-                  />
-                  <span>이번 달 매출 데이터가 없습니다.</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="col-span-12 lg:col-span-4">
-            <div className="bg-gradient-teal-soft rounded-3xl p-6 shadow-card h-[400px] flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-[0.2em]">Highlight</p>
-                  <h3 className="text-base md:text-lg font-bold text-slate-800">Friendly onnoee</h3>
-                </div>
-              </div>
-              <div className="flex flex-1 items-center justify-between gap-6">
-                <div className="w-full max-w-[60%]">
-                  <h4 className="text-lg font-bold text-slate-800">Wesst&apos;s awardy anert</h4>
-                  <p className="text-sm text-slate-600 font-medium leading-7 mt-3">
-                    Geotnanospeciait or on omtn descritoner fint allectes anort seem lorem sit.
-                  </p>
-                </div>
-                <div className="w-full max-w-[40%] flex justify-end">
-                  <img
-                    src={placeholderIllustration}
-                    alt="Analytics Illustration"
-                    className="w-full h-auto object-contain max-w-[220px]"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-7">
-            <div className="bg-gradient-to-br from-stone-50/70 to-white rounded-3xl p-6 shadow-card">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-[0.2em]">Clients</p>
-                  <h3 className="text-base md:text-lg font-bold text-slate-800">Client Users</h3>
-                </div>
-              </div>
-              <div className="space-y-4">
-                {featuredUsers.length > 0 ? (
-                  featuredUsers.map((user, index) => (
-                    <div
-                      key={user.id || index}
-                      className="flex items-center justify-between border-b border-stone-200/70 py-4 last:border-b-0"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-sm font-semibold">
-                          {user.name.slice(0, 2)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-semibold text-slate-900">{user.name}</div>
-                      <div className="text-xs text-slate-500 font-medium">{user.role}</div>
-                        </div>
-                      </div>
-                      <span
-                        className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                          user.status === 'Active'
-                            ? 'bg-pastel-green text-ink-green'
-                            : 'bg-pastel-peach text-ink-peach'
-                        }`}
-                      >
-                        {user.status}
-                      </span>
-                    </div>
-                  ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center text-center text-slate-500 text-sm gap-3 py-6">
-                    <img
-                      src={emptyStateIllustration}
-                      alt="No clients"
-                      className="w-full max-w-[200px] h-auto"
-                    />
-                    <span>표시할 고객 데이터가 없습니다.</span>
-                  </div>
+                  <>
+                    <div className="flex flex-col md:flex-row md:items-baseline gap-0 md:gap-2">
+                      <span className="oem-kpi-value group-hover:text-oem-blue transition-colors text-lg md:text-2xl truncate">{metric.value}</span>
+                      <div className={`flex items-center text-[10px] md:text-[11px] font-bold ${metric.trend === 'up' ? 'text-oem-green' : 'text-oem-red'}`}>
+                        {metric.trend === 'up' ? '▲' : '▼'} {metric.trendValue}
+                      </div>
+                    </div>
+                    <p className="text-[9px] md:text-[10px] text-oem-text-secondary mt-0.5 md:mt-1 tracking-tight truncate hidden md:block">vs {metric.trendLabel}</p>
+                  </>
                 )}
               </div>
-            </div>
+            ))}
           </div>
-          <div className="col-span-12 lg:col-span-5">
-            <div className="bg-gradient-to-br from-amber-50/40 to-white rounded-3xl shadow-card overflow-hidden">
-              <div className="bg-gradient-peach-soft px-6 py-5">
-                <p className="text-slate-500 text-[11px] font-semibold uppercase tracking-[0.2em]">Revenue</p>
-                <h3 className="text-base md:text-lg font-bold text-slate-800">Revenue Streams</h3>
+        </Panel>
+
+        {/* Main 2-Column Layout - Adjusted to 50:50 split as requested */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+          {/* [Left Column - 50%] */}
+          <div className="col-span-12 lg:col-span-6 space-y-6">
+
+            {/* Revenue Trend Chart (Changed to Bar Chart) */}
+            <Panel title="Revenue Trend (Last 12 Months)">
+              <div className="h-[320px] w-full pt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.aggregatedMonthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis
+                      dataKey="monthStr"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#999999', fontSize: 11 }}
+                      tickFormatter={(val) => val.split('-')[1] + 'M'}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#999999', fontSize: 11 }}
+                      tickFormatter={(value) => {
+                        if (value >= 100000000) return (value / 100000000).toFixed(0) + '억'
+                        if (value >= 10000) return (value / 10000).toFixed(0) + '만'
+                        return value
+                      }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ border: '1px solid #dce1e7', borderRadius: '2px', fontSize: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+                      formatter={(value) => [formatKoreanCurrency(value), 'Revenue']}
+                    />
+                    <Bar
+                      dataKey="totalRevenue"
+                      fill="#0076ce"
+                      radius={[4, 4, 0, 0]}
+                      barSize={20}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-              <div className="px-6 py-5 space-y-4">
-                {revenueStreams.map((stream, index) => (
-                  <div key={stream.label} className="flex items-center justify-between border-b border-stone-200/60 pb-4 last:border-b-0 last:pb-0">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{stream.label}</div>
-                      <div className="text-xs text-slate-500 font-medium">{stream.value}</div>
+            </Panel>
+
+            {/* Fastest Growing Clients */}
+            <Panel title="Fastest Growing Clients (Top Performer)">
+              <div className="overflow-x-auto mt-2">
+                <table className="oem-table min-w-full table-fixed">
+                  <thead>
+                    <tr className="border-b border-oem-border bg-oem-bg-app/50">
+                      <th className="text-left pl-4 py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight">CLIENT</th>
+                      <th className="text-left py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[15%]">INDUSTRY</th>
+                      <th className="text-center py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[25%]">CURRENT_MONTH</th>
+                      <th className="text-center py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[15%]">GROWTH</th>
+                      <th className="text-center py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[10%]">STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-oem-border">
+                    {stats.topGrowthClients.map((client, idx) => (
+                      <tr key={idx} className="hover:bg-oem-blue/5 transition-colors">
+                        <td className="py-2.5 pl-4 font-bold text-[12px] truncate" title={client.name}>{client.name}</td>
+                        <td className="py-2.5 text-[11px] text-oem-text-secondary truncate">{client.role && client.role !== 'Enterprise' ? client.role : '-'}</td>
+                        <td className="py-2.5 text-center font-bold text-[12px] tabular-nums text-oem-text-primary">{formatKoreanCurrency(client.amount)}</td>
+                        <td className="py-2.5 text-center font-bold text-[12px] tabular-nums">
+                          <span className="text-oem-green">+{client.growthRate.toFixed(0)}%</span>
+                        </td>
+                        <td className="py-2.5 text-center">
+                          {client.isTrueNew ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded-[2px] bg-oem-green/10 border border-oem-green/20 text-oem-green text-[10px] font-bold leading-none">NEW</span>
+                          ) : (
+                            <span className="inline-block px-1.5 py-0.5 rounded-[2px] bg-oem-blue/10 border border-oem-blue/20 text-oem-blue text-[10px] font-bold leading-none">UP</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+
+          </div>
+
+          {/* [Right Column - 50%] */}
+          <div className="col-span-12 lg:col-span-6 space-y-6">
+
+            {/* Top Revenue Clients */}
+            <Panel title="Top Revenue Clients (Historical)">
+              <div className="space-y-3 mt-1">
+                {stats.top3RevenueClients.map((client, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-white border border-oem-border rounded-oem hover:border-oem-blue transition-colors group cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs ${idx === 0 ? 'bg-amber-400' : idx === 1 ? 'bg-slate-300' : 'bg-orange-400'
+                        }`}>
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-oem-text-primary group-hover:text-oem-blue transition-colors">
+                          {client.name}
+                        </p>
+                        <p className="text-[10px] text-oem-text-secondary font-medium uppercase tracking-tight">Main Contributor</p>
+                      </div>
                     </div>
-                    <svg viewBox="0 0 120 40" className="w-28 h-8">
-                      <path
-                        d="M0 30 C20 10, 40 32, 60 16 C80 2, 100 22, 120 8"
-                        fill="none"
-                        stroke="#6CB8B0"
-                        strokeWidth="2"
-                      />
-                      <circle cx="120" cy="8" r="3" fill="#6CB8B0" />
-                    </svg>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-oem-text-primary">{formatKoreanCurrency(client.total)}</p>
+                      <p className="text-[10px] text-oem-green font-bold">LIFETIME_HIGH</p>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+              <button onClick={() => navigate('/clients')} className="w-full mt-4 oem-btn-secondary text-[11px] font-bold py-1.5 hover:bg-oem-bg-header transition-colors">
+                VIEW_ALL_CLIENTS
+              </button>
+            </Panel>
+
+            {/* My Activities Timeline */}
+            <Panel title="My Activities (Timeline)">
+              <div className="relative pl-6 space-y-4 py-2 border-l border-oem-border ml-2 mt-2">
+                {(activities || []).slice(0, 5).map((act, idx) => (
+                  <div key={act.id} className="relative cursor-pointer group" onClick={() => setEditingActivityId(act.id)}>
+                    {/* Timeline Dot */}
+                    <div className={`absolute -left-[31px] top-1.5 w-3 h-3 rounded-full border-2 border-white ring-2 ring-oem-border transition-all ${act.status === 'Done' ? 'bg-oem-text-secondary group-hover:bg-oem-green' : 'bg-oem-red ring-oem-red/20'
+                      }`}></div>
+
+                    <div className="flex flex-col">
+                      <span className="text-[11px] text-oem-text-secondary font-medium">{new Date(act.date).toLocaleDateString()}</span>
+                      <p className="text-sm font-bold text-oem-text-primary group-hover:text-oem-blue transition-colors mt-0.5">{act.title}</p>
+                      <p className="text-[12px] text-oem-text-secondary mt-1 italic">@{act.clientName}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Link to="/activities" className="block text-center text-[11px] font-bold text-oem-text-link mt-6 hover:underline">
+                OPEN_FULL_TIMELINE →
+              </Link>
+            </Panel>
+
           </div>
+
         </div>
       </div>
 
-      {/* Modals */}
       <EditActivityModal
         isOpen={editingActivityId !== null}
         onClose={() => setEditingActivityId(null)}
         activityId={editingActivityId}
       />
+      <AppInstallGuide />
     </div>
   )
 }
 
 export default Dashboard
-
-

@@ -1,0 +1,354 @@
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api'
+import { supabase } from '../lib/supabase'
+import { MapPin, Filter, RefreshCw, Calendar } from 'lucide-react'
+import { showSuccess, showError } from '../utils/alert'
+
+const GOOGLE_API_KEY = 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+const HQ_ADDRESS = '경기도 용인시 처인구 백암면 삼백로 367-20'
+
+const containerStyle = {
+    width: '100%',
+    height: '100%'
+}
+
+const defaultCenter = {
+    lat: 37.1623, // Approximate center near Yongin
+    lng: 127.3688
+}
+
+const Map = () => {
+    const [map, setMap] = useState(null)
+    const [clients, setClients] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [statusFilter, setStatusFilter] = useState('all')
+    const [selectedClient, setSelectedClient] = useState(null)
+    const [hqLocation, setHqLocation] = useState(null)
+    const [isSyncing, setIsSyncing] = useState(false)
+
+    const { isLoaded, loadError } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: GOOGLE_API_KEY
+    })
+
+    const fetchClients = useCallback(async () => {
+        try {
+            setLoading(true)
+
+            // 1. Fetch Clients
+            const { data: clientsData, error: clientsError } = await supabase
+                .from('clients')
+                .select('*')
+
+            if (clientsError) throw clientsError
+
+            // 2. Fetch Future Activities (Next Schedules)
+            const today = new Date().toISOString().split('T')[0]
+            const { data: activitiesData, error: activitiesError } = await supabase
+                .from('activities')
+                .select('client_id, next_action_date, next_action_detail')
+                .gte('next_action_date', today)
+                .order('next_action_date', { ascending: true })
+
+            if (activitiesError) throw activitiesError
+
+            // 3. Map activities to clients (earliest future activity first)
+            const clientsWithSchedules = (clientsData || []).map(client => {
+                const nextActivity = (activitiesData || []).find(a => a.client_id === client.id)
+                return {
+                    ...client,
+                    nextSchedule: nextActivity ? {
+                        date: nextActivity.next_action_date,
+                        detail: nextActivity.next_action_detail
+                    } : null
+                }
+            })
+
+            setClients(clientsWithSchedules)
+        } catch (error) {
+            console.error('거래처 데이터 로드 오류:', error)
+        } finally {
+            setLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        fetchClients()
+    }, [fetchClients])
+
+    // Find HQ Location
+    useEffect(() => {
+        if (isLoaded && window.google) {
+            const geocoder = new window.google.maps.Geocoder()
+            geocoder.geocode({ address: HQ_ADDRESS }, (results, status) => {
+                if (status === 'OK' && results[0]) {
+                    const loc = results[0].geometry.location
+                    setHqLocation({ lat: loc.lat(), lng: loc.lng() })
+                }
+            })
+        }
+    }, [isLoaded])
+
+    // Batch Geocode Missing Coords
+    const handleSyncAddresses = async () => {
+        if (!isLoaded || !window.google) return
+
+        setIsSyncing(true)
+        const clientsToUpdate = clients.filter(c => c.address && (!c.latitude || !c.longitude))
+
+        if (clientsToUpdate.length === 0) {
+            alert('좌표 업데이트가 필요한 거래처가 없습니다.')
+            setIsSyncing(false)
+            return
+        }
+
+        const geocoder = new window.google.maps.Geocoder()
+        let updatedCount = 0
+
+        for (const client of clientsToUpdate) {
+            await new Promise((resolve) => {
+                geocoder.geocode({ address: client.address }, async (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        const loc = results[0].geometry.location
+                        const { error } = await supabase
+                            .from('clients')
+                            .update({
+                                latitude: loc.lat(),
+                                longitude: loc.lng()
+                            })
+                            .eq('id', client.id)
+
+                        if (!error) updatedCount++
+                    }
+                    // Google API Rate Limit prevention
+                    setTimeout(resolve, 300)
+                })
+            })
+        }
+
+        await fetchClients()
+        setIsSyncing(false)
+        alert(`${updatedCount}개의 거래처 좌표가 업데이트되었습니다.`)
+    }
+
+    const onLoad = useCallback(function callback(map) {
+        setMap(map)
+    }, [])
+
+    const onUnmount = useCallback(function callback(map) {
+        setMap(null)
+    }, [])
+
+    // 마커 필터링 (Only show clients with valid coords)
+    const validClients = useMemo(() => {
+        return clients.filter(c => c.latitude && c.longitude)
+    }, [clients])
+
+    const filteredClients = useMemo(() => {
+        return statusFilter === 'all'
+            ? validClients
+            : validClients.filter(client => client.status === statusFilter)
+    }, [validClients, statusFilter])
+
+    // 지도 범위 조정
+    useEffect(() => {
+        if (map && isLoaded) {
+            const bounds = new window.google.maps.LatLngBounds()
+
+            // Add HQ
+            if (hqLocation) {
+                bounds.extend(hqLocation)
+            }
+
+            // Add Clients
+            if (filteredClients.length > 0) {
+                filteredClients.forEach(client => {
+                    bounds.extend({ lat: client.latitude, lng: client.longitude })
+                })
+            }
+
+            if (!bounds.isEmpty()) {
+                map.fitBounds(bounds)
+            }
+        }
+    }, [map, filteredClients, hqLocation, isLoaded])
+
+    const statusOptions = ['all', '신규', '거래중', '휴면']
+
+    if (loadError) return <div className="text-red-500 p-10">지도를 불러올 수 없습니다.</div>
+    if (!isLoaded) return <div className="p-10 text-gray-500">지도를 불러오는 중...</div>
+
+    return (
+        <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
+            <div className="max-w-[1600px] mx-auto flex flex-col h-[calc(100vh-120px)] space-y-4">
+
+                {/* Page Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
+                    <div>
+                        <h1 className="text-xl font-bold text-oem-blue tracking-tight flex items-center gap-2">
+                            Customer Location Map
+                            <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">FORM: MAP_DIST_01</span>
+                        </h1>
+                        <p className="text-[11px] text-oem-text-secondary mt-1 font-medium italic overflow-hidden whitespace-nowrap overflow-ellipsis">
+                            Geospatial distribution of enterprise assets and client locations.
+                            <span className="ml-2 font-bold text-oem-blue underline italic">{validClients.length} identified location(s)</span>
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            onClick={handleSyncAddresses}
+                            disabled={isSyncing}
+                            className="oem-btn-secondary h-8 py-1.5 flex items-center gap-2"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                            {isSyncing ? 'GEO_SYNCING...' : 'SYNC_COORDINATES'}
+                        </button>
+
+                        <div className="flex items-center gap-2 bg-white border border-oem-border rounded-oem px-3 py-1 h-8">
+                            <Filter className="w-3.5 h-3.5 text-oem-text-secondary" />
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent text-[11px] font-bold text-oem-text-primary outline-none uppercase"
+                            >
+                                {statusOptions.map(status => (
+                                    <option key={status} value={status}>
+                                        {status === 'all' ? 'ALL_STATUS' : status}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Map Context Utility */}
+                <div className="oem-panel bg-white shadow-sm overflow-hidden flex-1 flex flex-col border-l-4 border-l-oem-blue">
+                    <div className="oem-panel-header shrink-0">
+                        <span>SPATIAL_INTELLIGENCE_ENGINE</span>
+                        <div className="flex items-center gap-3 text-[10px] uppercase font-bold text-oem-text-secondary">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-black"></span> HQ</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]"></span> CLIENTS</span>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 relative m-1 rounded-oem overflow-hidden border border-oem-border shadow-inner">
+                        <GoogleMap
+                            mapContainerStyle={containerStyle}
+                            center={defaultCenter}
+                            zoom={10}
+                            onLoad={onLoad}
+                            onUnmount={onUnmount}
+                            options={{
+                                streetViewControl: false,
+                                mapTypeControl: false,
+                                gestureHandling: 'greedy',
+                                styles: [
+                                    { featureType: 'administrative', elementType: 'labels.text.fill', stylers: [{ color: '#444444' }] },
+                                    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#f2f2f2' }] },
+                                    { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
+                                    { featureType: 'road', elementType: 'all', stylers: [{ saturation: -100 }, { lightness: 45 }] },
+                                    { featureType: 'water', elementType: 'all', stylers: [{ color: '#0076ce' }, { visibility: 'on' }, { opacity: 0.1 }] }
+                                ]
+                            }}
+                        >
+                            {/* HQ Marker */}
+                            {hqLocation && (
+                                <Marker
+                                    position={hqLocation}
+                                    title="CORE_OPERATIONS_CENTER"
+                                    icon={{
+                                        path: "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z",
+                                        fillColor: "#000000", // Changed to Black for contrast
+                                        fillOpacity: 1,
+                                        strokeColor: "#FFFFFF",
+                                        strokeWeight: 2,
+                                        scale: 2.2,
+                                        anchor: new window.google.maps.Point(12, 12),
+                                    }}
+                                    zIndex={999}
+                                />
+                            )}
+
+                            {/* Client Markers */}
+                            {filteredClients.map(client => {
+                                const revenue = Number(client.last_year_revenue || 0);
+                                // 크기 대폭 축소 (기존 거대 핀 -> 심플한 점)
+                                let scale = 5; // 기본 크기 (픽셀 단위 유사)
+                                if (revenue > 10000000) scale = 8;
+                                else if (revenue > 5000000) scale = 6.5;
+                                else if (revenue > 1000000) scale = 5.5;
+
+                                return (
+                                    <Marker
+                                        key={client.id}
+                                        position={{ lat: client.latitude, lng: client.longitude }}
+                                        onClick={() => setSelectedClient(client)}
+                                        icon={{
+                                            // 단순한 원형(Dot) 마커로 변경
+                                            path: window.google.maps.SymbolPath.CIRCLE,
+                                            fillColor: client.status === '휴면' ? '#9CA3AF' : '#d90000', // Oracle Red for visibility
+                                            fillOpacity: 0.9,
+                                            strokeColor: '#FFFFFF',
+                                            strokeWeight: 1.5,
+                                            scale: scale,
+                                        }}
+                                        zIndex={Math.floor(revenue / 10000)}
+                                    />
+                                );
+                            })}
+
+                            {/* InfoWindow */}
+                            {selectedClient && (
+                                <InfoWindow
+                                    position={{ lat: selectedClient.latitude, lng: selectedClient.longitude }}
+                                    onCloseClick={() => setSelectedClient(null)}
+                                >
+                                    <div className="p-1 min-w-[240px] font-['Noto_Sans_KR',sans-serif]">
+                                        <div className="border-b border-oem-border pb-1.5 mb-2">
+                                            <h3 className="text-sm font-bold text-oem-blue leading-tight truncate">{selectedClient.company}</h3>
+                                            <p className="text-[10px] text-oem-text-secondary mt-0.5 tracking-tighter uppercase font-bold">Client Metadata Record</p>
+                                        </div>
+
+                                        <p className="text-[11px] text-oem-text-primary mb-3 font-medium flex items-start gap-1">
+                                            <MapPin className="w-3 h-3 text-oem-blue shrink-0 mt-0.5" />
+                                            {selectedClient.address}
+                                        </p>
+
+                                        {selectedClient.nextSchedule ? (
+                                            <div className="bg-oem-bg-header/40 p-2.5 rounded-oem border border-oem-border border-l-4 border-l-oem-blue">
+                                                <div className="flex items-center gap-1.5 mb-1.5">
+                                                    <Calendar className="w-3 h-3 text-oem-blue" />
+                                                    <p className="text-[9px] font-bold text-oem-blue uppercase tracking-widest">
+                                                        Next Engagement Scheduled
+                                                    </p>
+                                                </div>
+                                                <p className="text-[12px] font-bold text-oem-text-primary leading-tight mb-1">
+                                                    {selectedClient.nextSchedule.detail || 'Context Pending'}
+                                                </p>
+                                                <div className="text-[10px] text-oem-text-secondary font-bold italic">
+                                                    {selectedClient.nextSchedule.date}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-between pt-1">
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${selectedClient.status === '매출'
+                                                    ? 'bg-oem-green/10 text-oem-green border-oem-green/20'
+                                                    : 'bg-oem-bg-header text-oem-text-secondary border-oem-border'
+                                                    }`}>
+                                                    {selectedClient.status?.toUpperCase() || 'UNKNOWN'}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </InfoWindow>
+                            )}
+                        </GoogleMap>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default Map

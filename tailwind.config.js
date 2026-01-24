@@ -7,56 +7,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Linear-inspired dark palette (tuned to linear.app)
-        background: {
-          page: '#080808',      // 전체 페이지 배경
-          content: '#0D0F12',   // 콘텐츠 영역 배경
+        oem: {
+          bg: {
+            app: '#ffffff',
+            panel: '#f8f9fa',
+            header: '#eff2f5',
+          },
+          border: '#dce1e7',
+          blue: '#0076ce',
+          green: '#4caf50',
+          red: '#f44336',
+          text: {
+            primary: '#333333',
+            secondary: '#666666',
+            link: '#0076ce',
+          }
         },
-        text: {
-          primary: '#FAFAFA',   // 제목
-          body: '#A1A1AA',      // 본문
-          secondary: '#71717A', // 보조 텍스트
-        },
-        brand: {
-          green: '#3CCF91',      // Linear-like green
-          blue: '#5E6AD2',       // Linear-like indigo
-          'green-hover': '#2FBB7D',
-          'blue-hover': '#4E58C2',
-        },
-        border: {
-          light: '#27272A',      // 기본 테두리
-          input: '#27272A',      // 입력창 테두리
-        },
-        // 기존 primary는 호환성을 위해 유지하되 brand로 매핑
         primary: {
           50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#317AE2',
-          600: '#2563D1',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-        },
-        'primary-teal': '#6CB8B0',
-        'accent-peach': '#F1B59D',
-        'accent-green': '#8CC7A6',
-        'accent-purple': '#B4A1DE',
-        'pastel-teal': '#D9F2EF',
-        'pastel-peach': '#F9E3D7',
-        'pastel-green': '#DDEFE5',
-        'pastel-purple': '#E7E0F4',
-        'pastel-neutral': '#E7EDF3',
-        'ink-teal': '#2F6F6A',
-        'ink-peach': '#A8644D',
-        'ink-green': '#2E6F5A',
-        'ink-purple': '#5C4A8C',
+          // ... (keep existing primary for back-compat if needed, but we will mostly use oem)
+          500: '#0076ce',
+        }
       },
       borderRadius: {
-        'button': '10px',
-        'card': '12px',
+        'oem': '2px', // Nearly square with slight curve
       },
       boxShadow: {
         'subtle': '0 1px 2px rgba(0,0,0,0.25)',

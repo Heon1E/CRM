@@ -8,51 +8,215 @@ import { showConfirm } from '../utils/alert'
 import { PIPELINE_STATUSES, isPipelineCandidate, normalizeStatus, coerceClientStatus } from '../utils/clientStatus'
 
 const PipelineBoard = () => {
-  const { clients, loading, updateClient, addSale } = useData()
+  const { clients, loading, updateClient, addSale, sales } = useData()
   const [toast, setToast] = useState(null)
 
-  // 영업 단계 정의 (거래중 제외)
+  // 영업 단계 정의
+  const mainStages = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
+  const endStages = ['거래 종료', '영업 대기']
   const stages = PIPELINE_STATUSES
 
-  // 파이프라인 대상자 필터링: '신규' 또는 '단절' 상태인 거래처만 포함
-  // '활성' 상태인 거래처는 파이프라인에서 제외
+  // 파이프라인 대상자 필터링 & 매출 데이터 결합
   const activeClients = useMemo(() => {
     if (!clients || !Array.isArray(clients)) return []
-    return clients.filter((client) => isPipelineCandidate(client.status))
-  }, [clients])
 
-  // 기존 데이터 자동 동기화: '신규' 또는 '단절' 상태인 거래처를 첫 번째 단계('잠재고객')로 자동 설정
-  useEffect(() => {
-    if (loading || !clients || !Array.isArray(clients)) return
-    
-    const syncNewClients = async () => {
-      // '신규' 또는 '단절' 상태인 거래처 중 파이프라인 단계에 없는 것들 찾기
-      const newOrInactiveClients = clients.filter((client) => {
-        const status = normalizeStatus(client.status)
-        return (status === '신규' || status === '단절') && !PIPELINE_STATUSES.includes(status)
-      })
-
-      // 각 거래처를 '잠재고객' 단계로 자동 설정
-      for (const client of newOrInactiveClients) {
-        try {
-          await updateClient(client.id, {
-            ...client,
-            status: '잠재고객',
-          })
-        } catch (error) {
-          console.error(`거래처 자동 동기화 오류 (${client.company || client.id}):`, error)
+    // 각 거래처별 매출 계산
+    const clientRevenueMap = new Map()
+    if (sales && Array.isArray(sales)) {
+      sales.forEach(sale => {
+        const clientId = sale.clientId || sale.client_id
+        if (clientId) {
+          const amount = Number(sale.totalAmount || sale.total_amount || 0)
+          clientRevenueMap.set(String(clientId), (clientRevenueMap.get(String(clientId)) || 0) + amount)
         }
-      }
+      })
     }
 
-    syncNewClients()
-  }, [clients, loading, updateClient])
+    return clients
+      .filter((client) => {
+        const status = normalizeStatus(client.status)
+        return stages.includes(status)
+      })
+      .map(client => ({
+        ...client,
+        revenue: clientRevenueMap.get(String(client.id)) || client.orderAmount || 0
+      }))
+  }, [clients, stages, sales])
 
-  // 단계별로 클라이언트 그룹화
+  // 수동 휴면 VIP 발굴 함수
+  const handleDiscoverDormantVIPs = async () => {
+    try {
+      setToast('휴면 VIP 고객을 검색하는 중...')
+
+      const now = new Date()
+      const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+      const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0]
+
+      console.log('[Pipeline Discovery] Dormant period threshold (1 year):', oneYearAgoStr)
+
+      // 1. 전체 매출 데이터 조회 (페이지네이션으로 모든 데이터 가져오기)
+      let allSales = []
+      let hasMore = true
+      let page = 0
+      const pageSize = 1000
+
+      while (hasMore) {
+        const { data: salesPage, error: salesError } = await supabase
+          .from('sales')
+          .select('client_id, sale_date, total_amount')
+          .order('sale_date', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+
+        if (salesError) throw salesError
+
+        if (salesPage && salesPage.length > 0) {
+          allSales = allSales.concat(salesPage)
+          page++
+          // 마지막 페이지인지 확인
+          if (salesPage.length < pageSize) {
+            hasMore = false
+          }
+        } else {
+          hasMore = false
+        }
+      }
+
+
+      if (!allSales || allSales.length === 0) {
+        setToast('매출 데이터가 없습니다.')
+        return
+      }
+
+      console.log('[Pipeline Discovery] Total sales records:', allSales.length)
+
+      // 가장 오래된 매출 날짜 확인
+      const oldestSale = allSales[allSales.length - 1]
+      const newestSale = allSales[0]
+      console.log('[Pipeline Discovery] Date range:', {
+        oldest: oldestSale?.sale_date,
+        newest: newestSale?.sale_date
+      })
+
+      // 2. 거래처별로 매출 집계 (누적 매출 & 마지막 거래일)
+      const clientStatsMap = new Map()
+
+      allSales.forEach(sale => {
+        const clientId = sale.client_id
+        if (!clientId) return
+
+        const amount = Number(sale.total_amount || 0)
+        const saleDate = sale.sale_date
+
+        if (!clientStatsMap.has(clientId)) {
+          clientStatsMap.set(clientId, {
+            clientId: clientId,
+            totalRevenue: 0,
+            lastOrderDate: null
+          })
+        }
+
+        const stats = clientStatsMap.get(clientId)
+        stats.totalRevenue += amount
+
+        // 마지막 거래일 갱신
+        if (saleDate) {
+          if (!stats.lastOrderDate || saleDate > stats.lastOrderDate) {
+            stats.lastOrderDate = saleDate
+          }
+        }
+      })
+
+      console.log('[Pipeline Discovery] Unique clients with sales:', clientStatsMap.size)
+
+      // 마지막 거래일 분포 확인
+      const lastOrderDates = Array.from(clientStatsMap.values())
+        .map(s => s.lastOrderDate)
+        .filter(d => d)
+        .sort()
+
+      console.log('[Pipeline Discovery] Last order date distribution:', {
+        oldest: lastOrderDates[0],
+        newest: lastOrderDates[lastOrderDates.length - 1],
+        sample: lastOrderDates.slice(0, 10)
+      })
+
+      // 3. 휴면 고객 필터링 (최근 1년 주문 없음 + 누적 매출 있음)
+      const dormantCandidates = Array.from(clientStatsMap.values()).filter(stats => {
+        // 조건 1: 누적 매출이 있어야 함
+        if (stats.totalRevenue <= 0) return false
+
+        // 조건 2: 마지막 주문일이 1년 이전이어야 함
+        if (!stats.lastOrderDate) return false
+        if (stats.lastOrderDate >= oneYearAgoStr) return false
+
+        return true
+      })
+
+      console.log('[Pipeline Discovery] Dormant candidates found:', dormantCandidates.length)
+      console.log('[Pipeline Discovery] Sample dormant clients:', dormantCandidates.slice(0, 3))
+
+      if (dormantCandidates.length === 0) {
+        setToast('발굴 가능한 휴면 VIP 고객이 없습니다.')
+        return
+      }
+
+      // 4. 누적 매출 기준 내림차순 정렬 후 상위 10개 선정
+      const top10VIPs = dormantCandidates
+        .sort((a, b) => b.totalRevenue - a.totalRevenue)
+        .slice(0, 10)
+
+      console.log('[Pipeline Discovery] Top 10 VIPs:', top10VIPs)
+
+      // 5. 기존 '잠재고객' 상태인 클라이언트를 '활성'으로 초기화
+      const { data: currentPotentials, error: potentialsError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('status', '잠재고객')
+
+      if (potentialsError) throw potentialsError
+
+      const idsToReset = (currentPotentials || []).map(c => c.id)
+
+      // 6. 새로운 Top 10을 '잠재고객'으로 설정
+      const idsToSet = top10VIPs.map(stats => stats.clientId)
+
+      // 7. Bulk Update 실행
+      if (idsToReset.length > 0) {
+        const { error: resetError } = await supabase
+          .from('clients')
+          .update({ status: '활성' })
+          .in('id', idsToReset)
+        if (resetError) throw resetError
+      }
+
+      if (idsToSet.length > 0) {
+        const { error: setError } = await supabase
+          .from('clients')
+          .update({ status: '잠재고객' })
+          .in('id', idsToSet)
+        if (setError) throw setError
+      }
+
+      setToast(`${top10VIPs.length}개의 휴면 VIP 고객을 발굴했습니다. 잠시 후 자동으로 새로고침됩니다.`)
+
+      // 데이터 새로고침을 위해 페이지 리로드
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000)
+
+    } catch (error) {
+      console.error('[Discover Dormant VIPs Error]', error)
+      setToast('휴면 VIP 발굴 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 단계별로 클라이언트 그룹화 및 매출액 순 정렬
   const clientsByStage = useMemo(() => {
     const grouped = {}
     stages.forEach((stage) => {
-      grouped[stage] = activeClients.filter((client) => normalizeStatus(client.status) === stage)
+      grouped[stage] = activeClients
+        .filter((client) => normalizeStatus(client.status) === stage)
+        .sort((a, b) => b.revenue - a.revenue) // 매출액 높은 순 정렬
     })
     return grouped
   }, [activeClients, stages])
@@ -61,10 +225,7 @@ const PipelineBoard = () => {
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result
 
-    // 드롭 위치가 없으면 무시
     if (!destination) return
-
-    // 같은 위치면 무시
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
@@ -73,83 +234,54 @@ const PipelineBoard = () => {
     }
 
     const clientId = draggableId
-    const client = activeClients.find((c) => c.id === clientId)
+    const client = clients.find((c) => c.id === clientId) // activeClients 대신 전체 clients에서 검색 (안전장치)
 
     if (!client) return
 
     try {
-      // '계약 성사' 영역으로 드롭한 경우
+      // '계약 성사' 영역으로 드롭
       if (destination.droppableId === 'win-zone') {
-        // 사용자 확인
         const confirmed = await showConfirm(
           '계약이 완료되었습니다. 해당 거래처를 \'매출\' 상태로 전환하고 매출 실적에 반영하시겠습니까?',
           '축하합니다! 계약 성사',
           '매출 상태 전환',
           '취소',
           'success',
-          '#10b981' // 녹색 (green-500)
+          '#4f46e5' // Indigo-600
         )
 
-        if (!confirmed) {
-          // 취소하면 드래그 취소
-          return
-        }
+        if (!confirmed) return
 
-        // 1. 거래처 status를 '매출'로 변경 (DB enum 기준)
+        // 1. 상태 변경
         await updateClient(clientId, {
           ...client,
           status: coerceClientStatus('매출'),
         })
 
-        // 2. 매출 테이블에 새 데이터 추가 (날짜: 오늘, 거래처: 해당 거래처, 금액: 0 또는 기본값)
+        // 2. 매출 등록
         const today = new Date().toISOString().split('T')[0]
         try {
           await addSale({
             rows: [{
               clientId: clientId,
               sale_date: today,
-              item_name: '계약 완료',
+              item_name: '신규 계약', // 기본 품목명
               quantity: 1,
               unitPrice: 0,
-              totalAmount: 0,
-              notes: '파이프라인에서 계약 완료로 자동 등록',
+              totalAmount: 0, // 금액은 나중에 수정하도록 0으로
+              notes: '파이프라인 계약 성사',
             }]
           })
         } catch (saleError) {
           console.error('매출 등록 오류:', saleError)
-          // 매출 등록 실패해도 거래처 상태 변경은 유지
         }
 
-        // 토스트 메시지 표시
         setToast('계약이 성사되어 \'매출\' 상태로 전환되었습니다')
         return
       }
 
-      // 일반 단계로 드롭한 경우
+      // 일반 단계 이동
       const newStatus = destination.droppableId
-      const oldStatus = client.status || ''
-
-      // 이전 단계로 되돌리는 경우 확인 (활성 -> 파이프라인 단계로 되돌리는 경우)
-      if (oldStatus === '매출' && stages.includes(newStatus)) {
-        const confirmed = window.confirm(
-          '이미 \'매출\' 상태인 고객을 파이프라인 단계로 되돌리시겠습니까?\n\n' +
-          '상태를 \'신규\'로 변경하시겠습니까? (취소 시 현재 상태 유지)'
-        )
-        if (confirmed) {
-          // 사용자가 확인하면 '신규'로 변경
-          await updateClient(clientId, {
-            ...client,
-            status: '신규',
-          })
-          setToast('고객 상태가 \'신규\'로 변경되었습니다')
-          return
-        } else {
-          // 취소하면 상태 유지 (드래그 취소)
-          return
-        }
-      }
-
-      // 유효한 단계인지 확인
       if (stages.includes(newStatus)) {
         await updateClient(clientId, {
           ...client,
@@ -162,195 +294,239 @@ const PipelineBoard = () => {
     }
   }
 
+  // 로딩 상태
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-300">데이터를 불러오는 중...</div>
+      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <div className="text-oem-text-secondary text-sm animate-pulse">데이터를 불러오는 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
-          <h1 className="text-2xl md:text-3xl font-semibold text-white flex items-center space-x-2">
-            <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-gray-300" />
-            <span>영업 파이프라인</span>
-          </h1>
-          <p className="text-gray-300 mt-1.5 text-sm md:text-base">
-            총 {activeClients.length}건의 영업 기회
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+      <div className="max-w-[1800px] mx-auto space-y-6">
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex gap-6 overflow-x-auto pb-4">
-          {/* 영업 단계 컬럼들 */}
-          {stages.map((stage) => {
-            const stageClients = clientsByStage[stage] || []
-            return (
-              <div
-                key={stage}
-                className="flex-shrink-0 w-72 bg-[#1E1E1E] border border-gray-800 rounded-2xl p-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all hover:border-gray-700 hover:bg-white/5"
-                style={{ minHeight: '600px' }}
-              >
-                {/* 컬럼 헤더 */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-white mb-1">
-                    {stage}
-                  </h3>
-                  <div className="text-xs text-gray-300">
-                    {stageClients.length}건
-                  </div>
-                </div>
-
-                {/* 드롭 영역 */}
-                <Droppable droppableId={stage}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`space-y-3 min-h-[500px] ${
-                        snapshot.isDraggingOver ? 'bg-white/5 rounded-lg' : ''
-                      }`}
-                    >
-                      {stageClients.map((client, index) => (
-                        <Draggable
-                          key={client.id}
-                          draggableId={client.id}
-                          index={index}
-                        >
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className={`card p-4 cursor-move transition-all bg-[#1E1E1E] border-gray-800 rounded-xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ${
-                                snapshot.isDragging
-                                  ? 'rotate-2'
-                                  : 'hover:bg-white/5 hover:border-gray-700'
-                              }`}
-                            >
-                              <div className="space-y-2">
-                                <h4 className="font-semibold text-white text-sm">
-                                  {client.company || '-'}
-                                </h4>
-                                {client.contact_person && (
-                                  <p className="text-xs text-gray-300">
-                                    담당자: {client.contact_person}
-                                  </p>
-                                )}
-                                {client.phone && (
-                                  <p className="text-xs text-gray-300">
-                                    {client.phone}
-                                  </p>
-                                )}
-                                {client.email && (
-                                  <p className="flex items-center gap-1 text-xs text-gray-300 truncate">
-                                    <Mail className="w-3.5 h-3.5 text-gray-300" />
-                                    <span className="truncate">{client.email}</span>
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </div>
-            )
-          })}
-
-          {/* 계약 성사 영역 */}
-          <div className="flex-shrink-0 w-72">
-            <Droppable droppableId="win-zone">
-              {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className={`bg-[#1E1E1E] rounded-2xl p-4 border-2 border-dashed shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all ${
-                    snapshot.isDraggingOver
-                      ? 'border-blue-400/40 bg-blue-500/10'
-                      : 'border-gray-800 hover:border-gray-700 hover:bg-white/5'
-                  }`}
-                  style={{ minHeight: '600px' }}
-                >
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <div
-                      className={`mb-4 ${
-                        snapshot.isDraggingOver ? 'scale-110' : ''
-                      } transition-transform`}
-                    >
-                      <CheckCircle2
-                        className={`w-12 h-12 ${
-                          snapshot.isDraggingOver
-                            ? 'text-blue-300'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    </div>
-                    <h3
-                      className={`text-lg font-bold mb-2 ${
-                        snapshot.isDraggingOver
-                          ? 'text-blue-300'
-                          : 'text-white'
-                      }`}
-                    >
-                      계약 성사 (Win)
-                    </h3>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <ArrowRight className="w-4 h-4 text-gray-300" />
-                      <p
-                        className={`text-sm text-center ${
-                          snapshot.isDraggingOver
-                            ? 'text-blue-300 font-semibold'
-                            : 'text-gray-300'
-                        }`}
-                      >
-                        협상중 단계의 카드를
-                      </p>
-                    </div>
-                    <p
-                      className={`text-sm text-center mb-4 ${
-                        snapshot.isDraggingOver
-                          ? 'text-blue-300 font-semibold'
-                          : 'text-gray-300'
-                      }`}
-                    >
-                      여기로 끌어다 놓으세요
-                    </p>
-                    {snapshot.isDraggingOver && (
-                      <div className="mt-4 text-blue-300 font-semibold animate-pulse text-lg">
-                        놓으세요! 🎉
-                      </div>
-                    )}
-                    {!snapshot.isDraggingOver && (
-                      <div className="text-xs text-gray-300 text-center mt-4">
-                        드롭존
-                      </div>
-                    )}
-                  </div>
-                  {provided.placeholder}
-                </div>
-              )}
-            </Droppable>
+        {/* Page Title Section */}
+        <div className="flex items-center justify-between border-b border-oem-border pb-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
+              Pipeline Status
+              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">Sales Opportunities</span>
+            </h1>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] text-oem-text-secondary font-medium">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-oem-green rounded-full"></span> System Healthy</span>
+            <span>Total Opportunities: {activeClients.length}</span>
           </div>
         </div>
-      </DragDropContext>
 
-      {/* 토스트 메시지 */}
-      {toast && (
-        <Toast
-          message={toast}
-          onClose={() => setToast(null)}
-          duration={3000}
-        />
-      )}
+        {/* Pipeline Board */}
+        <div className="overflow-x-auto pb-6">
+          <div className="min-w-[1200px]">
+            <DragDropContext onDragEnd={handleDragEnd}>
+              {/* Main Pipeline Row */}
+              <div className="flex gap-4 items-start mb-6">
+                {mainStages.map((stage) => {
+                  const stageClients = clientsByStage[stage] || []
+                  return (
+                    <div
+                      key={stage}
+                      className="flex-shrink-0 w-72 flex flex-col bg-white border border-oem-border rounded-oem shadow-sm"
+                      style={{ minHeight: '600px' }}
+                    >
+                      {/* Column Header */}
+                      <div className="p-3 border-b border-oem-border bg-oem-bg-header/50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-bold text-sm text-oem-text-primary">{stage}</h3>
+                          <span className="bg-oem-blue/10 text-oem-blue text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {stageClients.length}
+                          </span>
+                        </div>
+                        {stage === '잠재고객' && (
+                          <button
+                            onClick={handleDiscoverDormantVIPs}
+                            className="w-full px-2 py-1.5 bg-white border border-oem-border hover:border-oem-blue text-oem-text-primary text-[10px] font-bold rounded flex items-center justify-center gap-1 transition-colors"
+                          >
+                            <TrendingUp className="w-3 h-3 text-oem-blue" />
+                            휴면 VIP 발굴
+                          </button>
+                        )}
+                        <div className="h-0.5 w-full bg-oem-border mt-2 rounded-full overflow-hidden">
+                          <div className="h-full bg-oem-blue w-full opacity-50" />
+                        </div>
+                      </div>
+
+                      {/* Droppable Area */}
+                      <Droppable droppableId={stage}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-oem-blue/5' : ''
+                              }`}
+                          >
+                            {stageClients.map((client, index) => (
+                              <Draggable
+                                key={client.id}
+                                draggableId={client.id}
+                                index={index}
+                              >
+                                {(provided, snapshot) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className={`bg-white p-3 rounded border border-oem-border hover:border-oem-blue transition-all cursor-grab active:cursor-grabbing group relative ${snapshot.isDragging ? 'shadow-lg rotate-1 border-oem-blue z-50' : ''
+                                      }`}
+                                    style={{ ...provided.draggableProps.style }}
+                                  >
+                                    <div className="flex justify-between items-start mb-1">
+                                      <h4 className="font-bold text-sm text-oem-text-primary group-hover:text-oem-blue transition-colors break-words w-[90%]">
+                                        {client.company}
+                                      </h4>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between text-[11px] text-oem-text-secondary">
+                                        <span>{client.contact_person || '-'}</span>
+                                      </div>
+
+                                      {client.revenue > 0 && (
+                                        <div className="text-[11px] text-oem-text-primary font-bold mt-2 pt-1 border-t border-oem-border/50 flex justify-between items-center">
+                                          <span className="text-oem-text-secondary font-normal text-[10px]">누적 매출</span>
+                                          <span>₩{client.revenue.toLocaleString()}</span>
+                                        </div>
+                                      )}
+
+                                      {client.lastOrder && (
+                                        <div className="text-[10px] text-oem-text-secondary text-right pt-0.5">
+                                          {client.lastOrder.split('T')[0]}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
+                    </div>
+                  )
+                })}
+
+                {/* Win Zone */}
+                <div className="flex-shrink-0 w-64 pt-8">
+                  <Droppable droppableId="win-zone">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`h-[400px] rounded-oem border-2 border-dashed flex flex-col items-center justify-center p-6 transition-all ${snapshot.isDraggingOver
+                          ? 'border-oem-green bg-oem-green/5'
+                          : 'border-oem-border bg-oem-bg-app hover:border-oem-green/50'
+                          }`}
+                      >
+                        <div className={`p-3 rounded-full mb-3 transition-colors ${snapshot.isDraggingOver ? 'bg-oem-green/20' : 'bg-oem-bg-header'
+                          }`}>
+                          <CheckCircle2 className={`w-6 h-6 ${snapshot.isDraggingOver ? 'text-oem-green' : 'text-oem-text-secondary'
+                            }`} />
+                        </div>
+                        <h3 className={`font-bold text-sm mb-1 ${snapshot.isDraggingOver ? 'text-oem-green' : 'text-oem-text-secondary'
+                          }`}>
+                          계약 성사 (Win)
+                        </h3>
+                        <p className="text-[10px] text-center text-oem-text-secondary leading-relaxed">
+                          협상이 완료된 카드를<br />여기로 드롭하세요
+                        </p>
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              </div>
+
+              {/* End Stages Row */}
+              <div className="flex gap-4 items-start border-t border-oem-border pt-6 mt-6">
+                <div className="w-full">
+                  <h2 className="text-sm font-bold text-oem-text-secondary mb-4 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-oem-text-secondary rounded-full"></span>
+                    종료 및 대기 단계
+                  </h2>
+                  <div className="flex gap-4">
+                    {endStages.map((stage) => {
+                      const stageClients = clientsByStage[stage] || []
+                      return (
+                        <div
+                          key={stage}
+                          className="flex-shrink-0 w-72 flex flex-col bg-oem-bg-app border border-oem-border rounded-oem opacity-70 hover:opacity-100 transition-opacity"
+                          style={{ minHeight: '300px' }}
+                        >
+                          <div className="p-3 border-b border-oem-border bg-oem-bg-header/30">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-bold text-sm text-oem-text-secondary">{stage}</h3>
+                              <span className="bg-oem-border text-oem-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                {stageClients.length}
+                              </span>
+                            </div>
+                          </div>
+
+                          <Droppable droppableId={stage}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.droppableProps}
+                                className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
+                                  }`}
+                              >
+                                {stageClients.map((client, index) => (
+                                  <Draggable
+                                    key={client.id}
+                                    draggableId={client.id}
+                                    index={index}
+                                  >
+                                    {(provided, snapshot) => (
+                                      <div
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                        className="bg-white p-3 rounded border border-oem-border shadow-sm"
+                                        style={{ ...provided.draggableProps.style }}
+                                      >
+                                        <h4 className="font-bold text-sm text-oem-text-secondary mb-1">
+                                          {client.company}
+                                        </h4>
+                                        <div className="text-[10px] text-oem-text-secondary">
+                                          {client.contact_person || '-'}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                ))}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </DragDropContext>
+          </div>
+        </div>
+
+        {toast && (
+          <Toast
+            message={toast}
+            onClose={() => setToast(null)}
+            duration={3000}
+          />
+        )}
+      </div>
     </div>
   )
 }

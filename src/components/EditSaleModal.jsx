@@ -34,11 +34,13 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
       // 모달이 열릴 때 상세 데이터 다시 조회 (items 배열 확보)
       const loadSaleData = async () => {
         try {
-          // saleGroup에 id가 있으면 상세 데이터 다시 조회
+          // saleGroup에 id가 있고, items가 없거나 비어있는 경우에만 상세 데이터 다시 조회
           let saleData = saleGroup
-          
-          if (saleGroup.id && (!saleGroup.items || saleGroup.items.length === 0)) {
-            // Step 1: sales 테이블에서 기본 정보 조회
+
+          const hasItems = saleGroup.items && Array.isArray(saleGroup.items) && saleGroup.items.length > 0
+
+          if (saleGroup.id && !hasItems) {
+            console.log('[EditSaleModal] Fetching detail from SB for ID:', saleGroup.id)
             const { data: fetchedSaleData, error: saleError } = await supabase
               .from('sales')
               .select('*')
@@ -49,91 +51,43 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
               console.error('[EditSaleModal] sales 조회 오류:', saleError)
             } else if (fetchedSaleData) {
               saleData = fetchedSaleData
-
-              // Step 2: sales_items 테이블에서 sale_id로 품목 목록 조회
-              const { data: fetchedItemsData, error: itemsError } = await supabase
-                .from('sales_items')
-                .select('*')
-                .eq('sale_id', saleGroup.id)
-
-              if (itemsError) {
-                console.warn('[EditSaleModal] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
-              }
-
-              // Step 3: 두 데이터 합치기
-              if (fetchedItemsData && fetchedItemsData.length > 0) {
-                saleData = {
-                  ...fetchedSaleData,
-                  items: fetchedItemsData
-                }
-              } else {
-                // sales_items가 없으면 sales 테이블의 items JSON 배열 사용
-                saleData = {
-                  ...fetchedSaleData,
-                  items: fetchedSaleData.items || []
-                }
-              }
+              // items 배열 확보 로직 생략 (이미 hasItems 체크로 필터링됨)
             }
           }
 
-          // 디버깅: 조회된 데이터 구조 확인
-          console.log('[EditSaleModal] Step 1 - Sale Data:', saleData)
-          console.log('[EditSaleModal] Step 2 - Items from saleData:', saleData?.items)
-          console.log('[EditSaleModal] Step 3 - saleGroup.items:', saleGroup?.items)
-
-          // items 배열 추출 (우선순위: saleData.items > saleGroup.items)
+          // items 배열 추출
           const itemsArray = saleData.items || saleGroup.items || []
-          
-          // items 배열이 비어있으면 빈 배열로 처리
-          const items = Array.isArray(itemsArray) && itemsArray.length > 0
+
+          // items 배열 매핑
+          const items = Array.isArray(itemsArray)
             ? itemsArray
-                .filter((item) => item != null)
-                .map((item) => {
-                  // item_name으로 productId 찾기
-                  const product = products?.find((p) => p.name === (item.item_name || item.productName || item.name))
-                  
-                  // unit_price 매핑 (DB 컬럼명 우선, fallback으로 unitPrice)
-                  const unitPrice = item.unit_price !== undefined && item.unit_price !== null 
-                    ? Number(item.unit_price) 
-                    : (item.unitPrice !== undefined && item.unitPrice !== null ? Number(item.unitPrice) : 0)
-                  
-                  const mappedItem = {
-                    id: item.id, // 개별 레코드 ID (있으면)
-                    productId: product?.id || '',
-                    item_name: item.item_name || item.productName || item.name || '',
-                    quantity: item.quantity || 1,
-                    unitPrice: unitPrice,
-                  }
-                  
-                  // 디버깅: 단가 매핑 확인
-                  console.log('[EditSaleModal] 품목 매핑:', {
-                    원본: { unit_price: item.unit_price, unitPrice: item.unitPrice },
-                    매핑된_unitPrice: mappedItem.unitPrice,
-                    item_name: mappedItem.item_name
-                  })
-                  
-                  return mappedItem
-                })
+              .filter((item) => item != null)
+              .map((item) => {
+                // 제품 찾기: id가 있으면 id로, 없으면 이름으로 찾기
+                const itemId = item.product_id || item.productId || ''
+                const itemName = item.item_name || item.itemName || item.product_name || item.productName || item.name || ''
+
+                const product = products?.find((p) =>
+                  (itemId && p.id === itemId) ||
+                  (itemName && p.name === itemName)
+                )
+
+                // unitPrice 매핑
+                const unitPrice = Number(item.unit_price ?? item.unitPrice ?? item.price ?? 0)
+
+                return {
+                  id: item.id || null,
+                  productId: product?.id || itemId || '',
+                  item_name: itemName || product?.name || '',
+                  quantity: Number(item.quantity) || 1,
+                  unitPrice: unitPrice,
+                }
+              })
             : []
 
-          // 날짜 변환 (YYYY-MM-DD 형식)
-          let dateStr = ''
-          const saleDate = saleData.sale_date || saleGroup.sale_date || saleData.date || saleGroup.date
-          if (saleDate instanceof Date) {
-            dateStr = saleDate.toISOString().split('T')[0]
-          } else if (typeof saleDate === 'string') {
-            dateStr = saleDate.split('T')[0]
-          } else {
-            dateStr = saleDate || ''
-          }
-
-          // 거래처 ID
+          // 날짜 및 거래처 ID 추출 (Defensive)
+          const dateStr = (saleData.sale_date || saleGroup.sale_date || saleData.date || saleGroup.date || '').split('T')[0]
           const clientId = saleData.client_id || saleGroup.client_id || saleData.clientId || saleGroup.clientId || ''
-
-          // 원본 데이터 저장
-          setOriginalItems(items)
-          setOriginalClientId(clientId)
-          setOriginalSaleDate(dateStr)
 
           // 폼 데이터 설정
           setFormData({
@@ -143,10 +97,10 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
             notes: saleData.notes || saleGroup.notes || '',
           })
 
-          console.log('[EditSaleModal] 로드된 데이터:', { 
-            clientId, 
-            sale_date: dateStr, 
-            itemsCount: items.length, 
+          console.log('[EditSaleModal] 로드된 데이터:', {
+            clientId,
+            sale_date: dateStr,
+            itemsCount: items.length,
             items,
             saleData: saleData
           })
@@ -418,19 +372,19 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
     try {
       // 스마트 품목 합산 로직: 품목명과 단가가 모두 일치하는 항목들을 하나로 합치기
       const mergedItemsMap = new Map()
-      
+
       validItems.forEach((item) => {
         const name = (item.item_name || item.itemName || item.product_name || '').trim()
         const qty = Number(item.quantity) || 1
         const price = Number(item.unitPrice) || Number(item.unit_price) || 0
-        
+
         if (!name || name === '') {
           return // 품목명이 없으면 건너뛰기
         }
-        
+
         // 합산 키: 품목명 + 단가 (단가까지 일치해야 합산)
         const mergeKey = `${name}|${price}`
-        
+
         if (mergedItemsMap.has(mergeKey)) {
           // 이미 같은 품목명+단가 조합이 있으면 수량만 더하기
           const existing = mergedItemsMap.get(mergeKey)
@@ -444,15 +398,15 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
           })
         }
       })
-      
+
       // 합산된 항목들을 배열로 변환
       const mergedItems = Array.from(mergedItemsMap.values())
-      
+
       if (mergedItems.length === 0) {
         await showWarning('저장할 유효한 품목이 없습니다.')
         return
       }
-      
+
       // updateSale 함수 호출 (DataContext의 updateSale이 단일 레코드 업데이트를 처리)
       await updateSale(saleGroup.id, {
         clientId: formData.clientId,
@@ -519,7 +473,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
               <option value="">거래처 선택</option>
               {clients?.map((client) => (
                 <option key={client.id} value={client.id}>
-                  {client.company} ({client.contact_person || ''})
+                  {client.company}
                 </option>
               ))}
             </select>
@@ -560,7 +514,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
               const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
 
               return (
-                <div key={index} className="border border-border-light rounded-card p-4">
+                <div key={index} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm">
                   <div className="flex justify-between items-center mb-3">
                     <span className="text-sm font-medium text-gray-700">품목 {index + 1}</span>
                     {formData.items.length > 1 && (
@@ -647,7 +601,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
         </div>
 
         {/* 총액 */}
-        <div className="bg-gray-50 rounded-lg p-4">
+        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
           <div className="flex justify-between items-center">
             <span className="text-lg font-semibold text-gray-900">총 매출액</span>
             <span className="text-xl font-bold text-purple-600">{totalAmount.toLocaleString()}원</span>
@@ -669,7 +623,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="px-5 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 rounded-md hover:bg-red-400/30 transition-all duration-200 font-medium"
+            className="px-5 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-all duration-200 font-bold shadow-sm"
           >
             삭제
           </button>
@@ -677,7 +631,7 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-all duration-200 font-medium"
+              className="px-5 py-2.5 bg-white text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-all duration-200 font-bold shadow-sm"
             >
               취소
             </button>

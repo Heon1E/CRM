@@ -1,7 +1,7 @@
 export const CLIENT_STATUS_OPTIONS = ['매출', '신규', '단절']
 export const CLIENT_STATUS_SET = new Set(CLIENT_STATUS_OPTIONS)
 
-export const PIPELINE_STATUSES = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
+export const PIPELINE_STATUSES = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중', '거래 종료', '영업 대기']
 
 export const ACTIVE_STATUSES = ['매출']
 

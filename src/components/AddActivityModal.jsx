@@ -20,6 +20,7 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
     clientId: '',
     type: '미팅',
     activity_date: new Date().toISOString().split('T')[0],
+    activity_time: '',
     user: '',
     description: '',
     status: '완료',
@@ -65,6 +66,7 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
         clientId: '',
         type: '미팅',
         activity_date: new Date().toISOString().split('T')[0],
+        activity_time: '',
         user: '',
         description: '',
         status: '완료',
@@ -112,7 +114,7 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   // AI 글 다듬기 기능
   const handleAIPolish = async () => {
     const currentText = formData.description.trim()
-    
+
     if (!currentText) {
       await showWarning('정리할 내용을 먼저 입력해주세요.')
       return
@@ -175,10 +177,10 @@ ${currentText}`
       }
 
       const data = await response.json()
-      
+
       // 데이터 파싱 안전장치
       const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text
-      
+
       if (aiText) {
         // 정리된 텍스트를 입력창에 반영 (3000자 제한 확인)
         const finalText = aiText.length > 3000 ? aiText.substring(0, 3000) : aiText
@@ -215,7 +217,7 @@ ${currentText}`
     try {
       // 참석자 배열을 콤마로 구분된 문자열로 변환하여 user 필드에 저장
       const userString = attendees.length > 0 ? attendees.join(', ') : ''
-      
+
       // 오프라인 상태 확인 및 처리
       if (!isOnline) {
         toast.warning('현재 오프라인 상태입니다. 데이터는 로컬에 저장되며, 연결 시 자동으로 업로드됩니다.', {
@@ -223,7 +225,7 @@ ${currentText}`
           icon: '⚠️'
         })
       }
-      
+
       // 영업 활동 등록 (오프라인 지원 - addActivity 내부에서 처리됨)
       const activity = await addActivity({
         ...formData,
@@ -234,7 +236,7 @@ ${currentText}`
       if (registerAsIssue) {
         const selectedClient = clients.find(c => c.id === formData.clientId)
         const issueTitle = `${selectedClient?.company || '고객'} - ${formData.type}`
-        
+
         try {
           await addIssue({
             title: issueTitle,
@@ -243,7 +245,7 @@ ${currentText}`
             target_date: formData.activity_date,
             date: formData.activity_date
           })
-          
+
           if (isOnline) {
             toast.success('활동 내역이 추가되었고, 이슈로도 등록되었습니다.', {
               duration: 4000,
@@ -287,7 +289,7 @@ ${currentText}`
       onClose()
     } catch (error) {
       console.error('활동 등록 오류:', error)
-      
+
       // 오프라인 상태이거나 네트워크 에러인 경우 특별 처리
       if (!isOnline || error.message?.includes('network') || error.message?.includes('fetch')) {
         toast.warning('오프라인 상태로 전환되었습니다. 데이터는 로컬에 저장되었으며, 연결 복구 시 자동으로 업로드됩니다.', {
@@ -361,17 +363,31 @@ ${currentText}`
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            날짜 <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="date"
-            value={formData.activity_date}
-            onChange={(e) => setFormData({ ...formData, activity_date: e.target.value })}
-            className="input-field"
-            required
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              날짜 <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="date"
+              value={formData.activity_date}
+              onChange={(e) => setFormData({ ...formData, activity_date: e.target.value })}
+              className="input-field"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              시간
+            </label>
+            <input
+              type="time"
+              value={formData.activity_time}
+              onChange={(e) => setFormData({ ...formData, activity_time: e.target.value })}
+              className="input-field"
+              placeholder="예: 14:00"
+            />
+          </div>
         </div>
 
         {/* 다음 일정 섹션 */}

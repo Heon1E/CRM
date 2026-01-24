@@ -36,21 +36,26 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-semibold text-slate-900">
-          {appTitle}
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-500">
-          Google 계정으로 시작하세요
-        </p>
-      </div>
+    <div className="min-h-screen bg-oem-bg-app flex items-center justify-center p-6 font-['Noto_Sans_KR',sans-serif]">
+      <div className="max-w-[420px] w-full oem-panel bg-white shadow-xl overflow-hidden border-t-4 border-t-oem-blue">
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white rounded-2xl shadow-sm py-8 px-4 sm:px-10">
+        {/* Login Branding */}
+        <div className="p-10 space-y-8">
+          <div className="text-center space-y-3">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-oem-bg-header rounded-xl mb-2">
+              <span className="text-2xl font-black text-oem-blue">IND</span>
+            </div>
+            <h2 className="text-2xl font-bold text-oem-text-primary tracking-tight">
+              {appTitle}
+            </h2>
+            <p className="text-[12px] text-oem-text-secondary font-medium uppercase tracking-widest">
+              Enterprise Management Console
+            </p>
+          </div>
+
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded mb-6">
-              {error}
+            <div className="bg-oem-red/10 border border-oem-red/20 text-oem-red px-4 py-3 rounded-oem text-[11px] font-bold">
+              AUTH_ERROR: {error}
             </div>
           )}
 
@@ -59,9 +64,9 @@ const Login = () => {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full flex justify-center items-center py-3 px-4 border border-slate-200 rounded-lg text-base font-medium text-slate-800 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-200 disabled:opacity-50 transition-colors"
+              className="w-full flex items-center justify-center gap-3 bg-white border border-oem-border py-2.5 rounded-oem hover:bg-oem-bg-header hover:border-oem-blue transition-all group active:scale-[0.98]"
             >
-              <svg className="w-6 h-6 mr-3" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -79,13 +84,26 @@ const Login = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              {loading ? '로그인 중...' : 'Google로 시작하기'}
+              <span className="text-[13px] font-bold text-oem-text-primary group-hover:text-oem-blue">
+                {loading ? 'AUTHENTICATING...' : 'Sign in with Google Account'}
+              </span>
             </button>
 
-            <p className="text-xs text-center text-slate-500 mt-4">
-              로그인 시 Google 캘린더 연동 권한이 함께 요청됩니다.
-            </p>
+            <div className="pt-6 border-t border-oem-border text-center">
+              <p className="text-[11px] text-oem-text-secondary leading-relaxed font-medium">
+                Authorized personnel only. Interaction logs are recorded for compliance and security auditing.
+              </p>
+            </div>
           </div>
+        </div>
+
+        {/* Footer Ribbon */}
+        <div className="bg-oem-bg-header/50 border-t border-oem-border px-6 py-3 flex justify-between items-center text-[10px] text-oem-text-secondary font-bold uppercase tracking-tighter">
+          <span>Version 13.5.0.0.0</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-oem-green"></span>
+            Service Node: IND_PROD_ASIA_01
+          </span>
         </div>
       </div>
     </div>

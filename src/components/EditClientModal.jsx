@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
+import { useJsApiLoader } from '@react-google-maps/api'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,11 +10,16 @@ import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert
 import { formatKoreanPhone } from '../utils/phoneFormatter'
 import { CLIENT_STATUS_OPTIONS } from '../utils/clientStatus'
 
-const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
+const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+  })
   const { clients, updateClient, deleteClient, products, fetchClientContacts } = useData()
   const { user } = useAuth()
-  const client = clients?.find((c) => c?.id === clientId)
+  // Use provided client prop if available, otherwise find in context
+  const client = clientProp || clients?.find((c) => c?.id === clientId)
   const formRef = useRef(null)
 
   const [formData, setFormData] = useState({
@@ -21,7 +27,12 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
     phone: '',
     email: '',
     status: '신규',
-    sales_rep: '', // Sales Rep 필드 추가
+    sales_rep: '',
+    address: '',
+    address_detail: '',
+    postal_code: '',
+    latitude: null,
+    longitude: null,
     contract_prices: [],
   })
 
@@ -48,6 +59,11 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
           email: client?.email || '',
           status: client?.status || '신규',
           sales_rep: client?.sales_rep || '',
+          address: client?.address || '',
+          address_detail: client?.address_detail || '',
+          postal_code: client?.postal_code || '',
+          latitude: client?.latitude || null,
+          longitude: client?.longitude || null,
           contract_prices: Array.isArray(client?.contract_prices) ? client.contract_prices : [],
         })
         // 계약 단가 입력 필드도 초기화
@@ -69,7 +85,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
             const contactPerson = client?.contact_person
             const clientPhone = client?.phone
             const clientEmail = client?.email
-            
+
             if (contactPerson && (contactPerson.trim() || clientPhone || clientEmail)) {
               try {
                 const userId = user?.id || (await supabase.auth.getUser()).data?.user?.id
@@ -85,7 +101,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
                       is_primary: true,
                       created_by: userId
                     }])
-                  
+
                   if (!migrationError) {
                     // 마이그레이션 성공 후 다시 담당자 목록 불러오기
                     const migratedContacts = await fetchClientContacts(clientId)
@@ -136,7 +152,8 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
     }
 
     loadClientData()
-  }, [client, clientId, isOpen, fetchClientContacts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, clientId, isOpen])
 
   // 전역 엔터 네비게이션 적용
   useEnterMove({ formRef, enabled: isOpen })
@@ -162,7 +179,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
   // 담당자 정보 업데이트
   const handleContactChange = (index, field, value) => {
     const updatedContacts = [...contacts]
-    
+
     // Key-man 체크박스 처리: 한 명만 Key-man이 될 수 있도록
     if (field === 'is_primary' && value === true) {
       // 다른 모든 담당자의 is_primary를 false로 설정
@@ -172,7 +189,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
         }
       })
     }
-    
+
     updatedContacts[index] = { ...updatedContacts[index], [field]: value }
     setContacts(updatedContacts)
   }
@@ -185,6 +202,54 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
       handleContactChange(index, 'phone', formatted)
     }
   }
+
+  // 카카오 주소 검색 (Daum Postcode는 독립적)
+  const handleAddressSearch = () => {
+    if (!window.daum || !window.daum.Postcode) {
+      alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    new window.daum.Postcode({
+      oncomplete: function (data) {
+        const fullAddress = data.userSelectedType === 'R' ? data.roadAddress : data.jibunAddress
+
+        console.log('[Address Search] Selected:', fullAddress, data.zonecode)
+
+        setFormData(prev => ({
+          ...prev,
+          address: fullAddress,
+          postal_code: data.zonecode,
+        }))
+
+        // Google Geocoding API 사용
+        if (isLoaded && window.google && window.google.maps) {
+          try {
+            const geocoder = new window.google.maps.Geocoder()
+            geocoder.geocode({ address: fullAddress }, (results, status) => {
+              if (status === 'OK' && results[0]) {
+                const location = results[0].geometry.location
+                console.log('[Geocoding] Success:', location.lat(), location.lng())
+
+                setFormData(prev => ({
+                  ...prev,
+                  latitude: location.lat(),
+                  longitude: location.lng(),
+                }))
+              } else {
+                console.warn('[Geocoding] Failed:', status)
+              }
+            })
+          } catch (error) {
+            console.error('[Geocoding] Error:', error)
+          }
+        } else {
+          console.warn('[Geocoding] Google Maps SDK not loaded')
+        }
+      }
+    }).open()
+  }
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -201,20 +266,25 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
     try {
       // 담당자 목록에서 이름이 있는 것만 필터링
       const validContacts = contacts.filter(contact => contact.name.trim())
-      
+
       // DB 스키마와 일치하는 데이터 객체 생성 (snake_case 확인)
       const clientData = {
         company: formData.company || '',
         status: formData.status || '신규',
-        sales_rep: formData.sales_rep || null, // Sales Rep 필드 추가
+        sales_rep: formData.sales_rep || null,
+        address: formData.address || null,
+        address_detail: formData.address_detail || null,
+        postal_code: formData.postal_code || null,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         contract_prices: Array.isArray(formData.contract_prices) ? formData.contract_prices : [],
-        contacts: validContacts, // 담당자 목록 전달 (별도 처리)
+        contacts: validContacts,
       }
-      
+
       // 디버깅: 전송 전 최종 확인
       console.log('[EditClientModal] 전송될 데이터 (최종 검증):', clientData)
       console.log('[EditClientModal] 담당자 데이터:', validContacts)
-      
+
       await updateClient(clientId, clientData)
       await showSuccess('고객 정보가 수정되었습니다.')
       onClose()
@@ -300,36 +370,36 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
   // 이미 등록된 제품 ID 목록
   const currentPrices = Array.isArray(formData.contract_prices) ? formData.contract_prices : []
   const registeredProductIds = currentPrices.map((cp) => cp?.productId).filter(Boolean)
-  const availableProducts = Array.isArray(products) 
+  const availableProducts = Array.isArray(products)
     ? products.filter((p) => p?.id && !registeredProductIds.includes(p.id))
     : []
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="고객 정보 수정" size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title={`CLIENT_DETAILS: ${client?.company || 'NEW_RECORD'}`} size="lg">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              회사명 <span className="text-red-400">*</span>
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-black uppercase tracking-tight">
+              COMPANY_NAME:
             </label>
             <input
               type="text"
               value={formData.company || ''}
               onChange={(e) => setFormData({ ...formData, company: e.target.value || '' })}
-              className="input-field"
+              className="oracle-sunken px-2 py-0.5"
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              담당자 (Sales Rep)
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-black uppercase tracking-tight">
+              SALES_REP_ID:
             </label>
             <select
               value={formData.sales_rep || ''}
               onChange={(e) => setFormData({ ...formData, sales_rep: e.target.value })}
-              className="input-field"
+              className="oracle-sunken px-2 py-0.5"
             >
-              <option value="">선택 안 함</option>
+              <option value="">(None)</option>
               {SALES_REP_OPTIONS.map((rep) => (
                 <option key={rep} value={rep}>
                   {rep}
@@ -337,105 +407,137 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
               ))}
             </select>
           </div>
+
+          {/* 주소 입력 섹션 */}
+          <div className="col-span-1 md:col-span-2 oracle-raised bg-[#d0d0d0] p-2 space-y-2">
+            <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">LOCATION_INFO</label>
+            <div className="flex gap-2 items-center">
+              <label className="w-20">POSTAL_CODE:</label>
+              <input
+                type="text"
+                value={formData.postal_code}
+                className="oracle-sunken w-24 bg-gray-100"
+                readOnly
+              />
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                className="oracle-raised bg-gray-200 px-3 py-0.5 hover:bg-gray-100"
+              >
+                BROWSE...
+              </button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <label className="w-20">ADDRESS_1:</label>
+              <input
+                type="text"
+                value={formData.address}
+                className="oracle-sunken flex-1 bg-gray-100"
+                readOnly
+              />
+            </div>
+            <div className="flex gap-2 items-center">
+              <label className="w-20">ADDRESS_2:</label>
+              <input
+                type="text"
+                value={formData.address_detail}
+                onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })}
+                className="oracle-sunken flex-1"
+              />
+            </div>
+          </div>
         </div>
 
         {/* 담당자 관리 섹션 */}
-        <div className="border-t border-gray-200 pt-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-semibold text-gray-700">담당자</label>
+        <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
+          <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
+            <label className="font-bold text-black uppercase tracking-tight">CONTACT_PERSONS_SUBFORM</label>
             <button
               type="button"
               onClick={handleAddContact}
-              className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+              className="oracle-raised bg-gray-200 px-2 py-0.5 flex items-center gap-1"
             >
-              <Plus className="w-4 h-4" />
-              <span>담당자 추가</span>
+              <Plus className="w-3 h-3" />
+              <span>ADD_CONTACT</span>
             </button>
           </div>
 
-          <div className="space-y-3">
-            {contacts.map((contact, index) => (
-              <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="text-xs font-medium text-gray-600">담당자 {index + 1}</span>
-                  {contacts.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveContact(index)}
-                          className="text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                <div className="mb-3">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={contact.is_primary || false}
-                      onChange={(e) => handleContactChange(index, 'is_primary', e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <span className="text-xs font-medium text-indigo-600">Key-man (주요 연락처)</span>
-                  </label>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">이름</label>
-                    <input
-                      type="text"
-                      value={contact.name || ''}
-                      onChange={(e) => handleContactChange(index, 'name', e.target.value)}
-                      className="input-field text-sm"
-                      placeholder="이름"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">부서/직책</label>
-                    <input
-                      type="text"
-                      value={contact.department_role || ''}
-                      onChange={(e) => handleContactChange(index, 'department_role', e.target.value)}
-                      className="input-field text-sm"
-                      placeholder="부서/직책"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">연락처</label>
-                    <input
-                      type="tel"
-                      value={contact.phone || ''}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d-]/g, '')
-                        handleContactChange(index, 'phone', value)
-                      }}
-                      onBlur={() => handleContactPhoneBlur(index)}
-                      className="input-field text-sm"
-                      placeholder="예: 010-1234-5678"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">이메일</label>
-                    <input
-                      type="email"
-                      value={contact.email || ''}
-                      onChange={(e) => handleContactChange(index, 'email', e.target.value)}
-                      className="input-field text-sm"
-                      placeholder="이메일"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="space-y-1 max-h-[160px] overflow-auto oracle-sunken bg-white p-1">
+            <table className="w-full text-[10px] border-collapse">
+              <thead className="bg-gray-200 sticky top-0">
+                <tr>
+                  <th className="w-6">KM</th>
+                  <th>NAME</th>
+                  <th>ROLE</th>
+                  <th>PHONE</th>
+                  <th>EMAIL</th>
+                  <th className="w-6">DEL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contacts.map((contact, index) => (
+                  <tr key={index} className="border-b border-gray-100">
+                    <td className="p-1 text-center">
+                      <input
+                        type="checkbox"
+                        checked={contact.is_primary || false}
+                        onChange={(e) => handleContactChange(index, 'is_primary', e.target.checked)}
+                      />
+                    </td>
+                    <td className="p-1">
+                      <input
+                        type="text"
+                        value={contact.name || ''}
+                        onChange={(e) => handleContactChange(index, 'name', e.target.value)}
+                        className="w-full border-none outline-none bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <input
+                        type="text"
+                        value={contact.department_role || ''}
+                        onChange={(e) => handleContactChange(index, 'department_role', e.target.value)}
+                        className="w-full border-none outline-none bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <input
+                        type="tel"
+                        value={contact.phone || ''}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d-]/g, '')
+                          handleContactChange(index, 'phone', value)
+                        }}
+                        onBlur={() => handleContactPhoneBlur(index)}
+                        className="w-full border-none outline-none bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <input
+                        type="email"
+                        value={contact.email || ''}
+                        onChange={(e) => handleContactChange(index, 'email', e.target.value)}
+                        className="w-full border-none outline-none bg-transparent"
+                      />
+                    </td>
+                    <td className="p-1 text-center">
+                      {contacts.length > 1 && (
+                        <button type="button" onClick={() => handleRemoveContact(index)} className="text-red-600 font-bold">×</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+        <div className="flex flex-col gap-1">
+          <label className="font-bold text-black uppercase tracking-tight">CLIENT_STATUS:</label>
           <select
             value={formData.status || '신규'}
             onChange={(e) => setFormData({ ...formData, status: e.target.value || '신규' })}
-            className="input-field"
+            className="oracle-sunken px-2 py-0.5"
           >
             {CLIENT_STATUS_OPTIONS.map((status) => (
               <option key={status} value={status}>{status}</option>
@@ -444,20 +546,19 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
         </div>
 
         {/* 계약 단가 관리 섹션 */}
-        <div className="border-t border-gray-200 pt-4 mt-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">계약 단가 관리</h3>
-          
-          {/* 계약 단가 추가 */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-4">
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">제품 선택</label>
+        <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
+          <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">CONTRACT_PRICES_CANVAS</label>
+
+          <div className="bg-white p-2 oracle-sunken space-y-2">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="block text-[9px] font-bold">SELECT_PRODUCT</label>
                 <select
                   value={newContractPrice.productId || ''}
                   onChange={(e) => setNewContractPrice({ ...newContractPrice, productId: e.target.value || '' })}
-                  className="input-field text-sm"
+                  className="w-full border border-gray-300 outline-none h-6 px-1"
                 >
-                  <option value="">제품 선택</option>
+                  <option value="">-- Choose --</option>
                   {Array.isArray(availableProducts) && availableProducts.map((product) => (
                     <option key={product?.id} value={product?.id || ''}>
                       {product?.name || ''}
@@ -465,91 +566,70 @@ const EditClientModal = ({ isOpen, onClose, clientId, onDelete }) => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">단가 (원)</label>
+              <div className="w-24">
+                <label className="block text-[9px] font-bold">UNIT_PRICE</label>
                 <input
                   type="number"
                   value={newContractPrice.price || ''}
                   onChange={(e) => setNewContractPrice({ ...newContractPrice, price: e.target.value || '' })}
-                  className="input-field text-sm"
-                  placeholder="단가 입력"
+                  className="w-full border border-gray-300 outline-none h-6 px-1"
                   min="0"
                 />
               </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={handleAddContractPrice}
-                  className="btn-success flex items-center justify-center space-x-1 text-sm px-4 py-2 h-full"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleAddContractPrice}
+                className="oracle-raised bg-gray-200 px-3 h-6 text-[10px] uppercase font-bold"
+              >
+                Add
+              </button>
             </div>
-          </div>
 
-          {/* 등록된 계약 단가 리스트 */}
-          {currentPrices.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-700 mb-2">등록된 계약 단가</p>
-              {Array.isArray(currentPrices) && currentPrices
-                .filter((cp) => cp != null && cp?.productId) // null/undefined 제거
-                .map((cp) => {
-                  if (!cp?.productId) return null
-                  const product = Array.isArray(products) 
-                    ? products.find((p) => p?.id === cp?.productId)
-                    : null
+            {currentPrices.length > 0 && (
+              <div className="mt-2 border-t border-gray-200 pt-2 space-y-1">
+                {currentPrices.filter(cp => cp?.productId).map((cp) => {
+                  const product = Array.isArray(products) ? products.find((p) => p?.id === cp?.productId) : null
                   return (
-                    <div key={cp?.productId} className="flex items-center justify-between bg-white border border-border-light rounded-card p-3">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{product?.name || '알 수 없음'}</p>
-                      </div>
-                      <div className="flex items-center space-x-3">
+                    <div key={cp?.productId} className="flex items-center justify-between border-b border-gray-100 pb-1">
+                      <span className="font-bold w-40 truncate">{product?.name || 'UNKNOWN'}</span>
+                      <div className="flex items-center gap-2">
                         <input
                           type="number"
                           value={cp?.price || 0}
                           onChange={(e) => handleUpdateContractPrice(cp?.productId, e.target.value || '0')}
-                          className="w-32 px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-sm"
-                          min="0"
+                          className="w-16 border border-gray-300 outline-none px-1 text-right"
                         />
-                        <span className="text-sm text-gray-500">원</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveContractPrice(cp?.productId)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        <button type="button" onClick={() => handleRemoveContractPrice(cp?.productId)} className="text-red-600 font-bold px-1">×</button>
                       </div>
                     </div>
                   )
                 })}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex justify-between pt-4">
+        <div className="flex justify-between pt-2 border-t border-gray-400">
           <button
             type="button"
             onClick={handleDelete}
-            className="btn px-4 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 hover:bg-red-400/30 font-medium"
+            className="oracle-raised bg-[#808080] text-red-100 px-3 py-1 font-bold hover:bg-red-800"
           >
-            삭제
+            DELETE_RECORD
           </button>
-          <div className="space-x-3">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary px-4 py-2.5 font-medium"
+              className="oracle-raised bg-gray-200 px-4 py-1 hover:bg-gray-100"
             >
-              Cancel
+              EXIT
             </button>
             <button
               type="submit"
-              className="btn px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 font-medium"
+              className="oracle-raised bg-blue-800 text-white px-6 py-1 font-bold hover:bg-blue-700"
             >
-              Save
+              SAVE / COMMIT
             </button>
           </div>
         </div>

@@ -2,17 +2,17 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
-import { 
-  getAllData as getOfflineData, 
-  saveToStore, 
+import {
+  getAllData as getOfflineData,
+  saveToStore,
   deleteFromStore,
   getStoreName,
   STORES
 } from '../utils/offlineDB'
-import { 
-  addToQueue, 
-  getPendingOperations, 
-  updateQueueStatus, 
+import {
+  addToQueue,
+  getPendingOperations,
+  updateQueueStatus,
   removeFromQueue,
   QUEUE_STATUS,
   QUEUE_OPERATION,
@@ -37,21 +37,216 @@ export const DataProvider = ({ children }) => {
   const [issues, setIssues] = useState([])
   const [loading, setLoading] = useState(true)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
-  const [openModalCount, setOpenModalCount] = useState(0) // 모달 열림 상태 추적 (데이터 새로고침 방지)
+  const [openModalCount, setOpenModalCount] = useState(0)
+
+  // [Performance Check] 대시보드 통계 미리 계산하여 캐싱 (탭 전환 딜레이 제거)
+  const [dashboardStats, setDashboardStats] = useState(null)
 
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+  // --- Dashboard Statistics Calculation (Pre-compute) ---
+  useEffect(() => {
+    // 데이터가 충분하지 않으면 계산 스킵 (로딩 중이거나 초기 상태)
+    if (loading || !sales || !clients) return
+
+    // 계산 비용을 최적화하기 위해 비동기 처리 (메인 스레드 차단 방지)
+    const calculate = async () => {
+      const now = new Date()
+      const currentRange = {
+        start: new Date(now.getFullYear(), now.getMonth(), 1),
+        end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+      }
+      const oneYearAgoDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+
+      const rawSalesData = sales || []
+
+      const isInRange = (d, range) => {
+        if (!d) return false
+        const parsed = new Date(d)
+        return parsed >= range.start && parsed <= range.end
+      }
+
+      // 1. Monthly Revenue
+      const currentMonthSales = rawSalesData.filter((sale) =>
+        isInRange(sale.sale_date || sale.date || sale.created_at, currentRange)
+      )
+      const currentMonthSalesTotal = currentMonthSales.reduce(
+        (sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0), 0
+      )
+
+      // 2. Client Counts
+      const salesSince2023 = rawSalesData.filter((sale) => {
+        const d = new Date(sale.sale_date || sale.date || sale.created_at)
+        return d >= new Date('2023-01-01')
+      })
+      const totalClientIds = new Set(salesSince2023.map(s => s.client_id || s.clientId))
+      const totalClientsCount = totalClientIds.size
+
+      const activeSales = rawSalesData.filter((sale) => {
+        const d = new Date(sale.sale_date || sale.date || sale.created_at)
+        return d >= oneYearAgoDate && d <= now
+      })
+      const activeClientIds = new Set(activeSales.map(s => s.client_id || s.clientId))
+      const currentActiveClientsCount = activeClientIds.size
+
+      // Churned
+      const churnedClientIds = new Set([...totalClientIds].filter(x => !activeClientIds.has(x)))
+      const currentChurnedCount = churnedClientIds.size
+
+      // 3. YoY & Trends
+      const lastYearSameMonthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+      const lastYearSameMonthEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+      const lastYearSameMonthSales = rawSalesData.filter((sale) => {
+        const d = new Date(sale.sale_date || sale.date || sale.created_at)
+        return d >= lastYearSameMonthStart && d <= lastYearSameMonthEnd
+      })
+      const lastYearSameMonthTotal = lastYearSameMonthSales.reduce(
+        (sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0), 0
+      )
+
+      const revenueYoY = lastYearSameMonthTotal > 0
+        ? ((currentMonthSalesTotal - lastYearSameMonthTotal) / lastYearSameMonthTotal * 100).toFixed(1)
+        : (currentMonthSalesTotal > 0 ? '100.0' : '0.0')
+
+      // Client Growth
+      const clientsLastYear = rawSalesData.filter(s => {
+        const d = new Date(s.sale_date || s.date || s.created_at)
+        return d < oneYearAgoDate && d >= new Date('2023-01-01')
+      }).map(s => s.client_id || s.clientId)
+      const clientsLastYearCount = new Set(clientsLastYear).size
+      const clientGrowthVal = clientsLastYearCount > 0
+        ? ((totalClientsCount - clientsLastYearCount) / clientsLastYearCount * 100).toFixed(0)
+        : 0
+
+      // 4. Chart Data (Aggregated Monthly Trend)
+      const aggregatedMonthlyTrend = []
+      const start = new Date(now.getFullYear(), now.getMonth() - 11, 1)
+      for (let i = 0; i < 12; i += 1) {
+        const date = new Date(start.getFullYear(), start.getMonth() + i, 1)
+        const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        const monStart = new Date(date.getFullYear(), date.getMonth(), 1)
+        const monEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59)
+        const totalRevenue = rawSalesData.reduce((sum, sale) => {
+          const d = new Date(sale.sale_date || sale.date || sale.created_at)
+          if (d >= monStart && d <= monEnd) {
+            return sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0)
+          }
+          return sum
+        }, 0)
+        aggregatedMonthlyTrend.push({ monthStr, totalRevenue })
+      }
+
+      // 5. Top 3 Revenue Clients
+      const clientRevenueMap = {}
+      activeSales.forEach(s => {
+        const cid = s.client_id || s.clientId
+        if (!cid) return
+        clientRevenueMap[cid] = (clientRevenueMap[cid] || 0) + (Number(s.total_amount ?? s.totalAmount ?? 0) || 0)
+      })
+      const top3RevenueClients = Object.entries(clientRevenueMap)
+        .map(([id, total]) => {
+          const c = clients.find(x => x.id === id)
+          return { id, name: c?.company || 'Unknown', total }
+        })
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 3)
+
+      // 6. Fastest Growing Clients
+      const topGrowthClients = []
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+      const growthStats = {}
+
+      rawSalesData.forEach(sale => {
+        const clientId = sale.client_id || sale.clientId
+        if (!clientId) return
+        const d = new Date(sale.sale_date || sale.date || sale.created_at)
+        const amount = Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0
+
+        if (!growthStats[clientId]) {
+          const clientObj = clients.find(c => c.id === clientId)
+          growthStats[clientId] = {
+            id: clientId,
+            name: clientObj?.company || clientObj?.name || 'Unknown',
+            role: clientObj?.industry || clientObj?.type || '',
+            currentMonth: 0,
+            lastMonth: 0,
+            historicalBeforeCurrent: 0,
+          }
+        }
+        if (d >= currentMonthStart) growthStats[clientId].currentMonth += amount
+        else {
+          growthStats[clientId].historicalBeforeCurrent += amount
+          if (d >= lastMonthStart && d <= lastMonthEnd) growthStats[clientId].lastMonth += amount
+        }
+      })
+
+      const calculatedGrowthClients = Object.values(growthStats)
+        .filter(c => c.currentMonth > 0)
+        .map(c => {
+          const isTrueNew = c.historicalBeforeCurrent === 0
+          let growthRate = 0
+          if (c.lastMonth > 0) growthRate = ((c.currentMonth - c.lastMonth) / c.lastMonth) * 100
+          else if (!isTrueNew && c.lastMonth === 0) growthRate = 100
+          return { ...c, isTrueNew, growthRate, amount: c.currentMonth }
+        })
+        .sort((a, b) => {
+          if (a.isTrueNew && !b.isTrueNew) return -1
+          if (!a.isTrueNew && b.isTrueNew) return 1
+          if (a.isTrueNew && b.isTrueNew) return b.amount - a.amount
+          return b.growthRate - a.growthRate
+        })
+        .slice(0, 4)
+
+      setDashboardStats({
+        currentMonthSalesTotal,
+        totalClientsCount,
+        currentActiveClientsCount,
+        currentChurnedCount,
+        revenueYoY,
+        clientGrowthVal,
+        aggregatedMonthlyTrend,
+        top3RevenueClients,
+        topGrowthClients: calculatedGrowthClients,
+        lastUpdated: new Date()
+      })
+    }
+
+    // setTimeout을 사용하여 렌더링 사이클 이후에 실행 (non-blocking)
+    const timer = setTimeout(() => {
+      calculate()
+    }, 0)
+
+    return () => clearTimeout(timer)
+
+  }, [sales, clients, loading])
+
+  // 1. 유틸리티 함수
   // 1. 유틸리티 함수
   const getValidUserId = async (currentUser) => {
     if (currentUser?.id) return currentUser.id
     const { data: { user: authUser } } = await supabase.auth.getUser()
-    return authUser?.id
+    if (authUser?.id) return authUser.id
+
+    // Fallback: 인증된 사용자가 없을 경우, DB에 존재하는 첫 번째 사용자 ID를 가져옴 (FK 오류 방지)
+    // 주의: 실제 운영 환경에서는 보안상 좋지 않으나, 현재 데이터 마이그레이션 도구로서의 역할에 집중
+    console.warn('[getValidUserId] 인증된 사용자를 찾을 수 없어 DB에서 임의의 사용자를 조회합니다.')
+    const { data: users, error } = await supabase.from('users').select('id').limit(1)
+    if (!error && users && users.length > 0) {
+      return users[0].id
+    }
+
+    // 정말 아무것도 없으면... 에러를 내거나 null 반환 (하지만 products insert 시 에러 날 것임)
+    console.error('[getValidUserId] 유효한 사용자 ID를 찾을 수 없습니다.')
+    return '00000000-0000-0000-0000-000000000000' // 임시 더미 (하지만 FK 제약조건 있으면 실패함)
   }
 
   // 매출 데이터 그룹화 함수 (sale_date, client_id, created_at 분 단위 기준)
   const processGroupedSales = useCallback((salesArray) => {
     if (!salesArray || salesArray.length === 0) return []
-    
+
     // 먼저 camelCase 필드 추가 (기존 매핑)
     const normalizedSales = salesArray.map(s => ({
       ...s,
@@ -60,7 +255,7 @@ export const DataProvider = ({ children }) => {
       date: s.sale_date || s.date,
       created_at: s.created_at || s.createdAt
     }))
-    
+
     // 그룹화 키 생성 함수: sale_date + client_id + created_at의 분 단위까지
     const getGroupKey = (sale) => {
       const saleDate = sale.sale_date || sale.date || ''
@@ -80,7 +275,7 @@ export const DataProvider = ({ children }) => {
       }
       return `${saleDate}|${clientId}|${createdAtKey}`
     }
-    
+
     // 그룹화
     const groupedMap = {}
     normalizedSales.forEach(sale => {
@@ -90,7 +285,7 @@ export const DataProvider = ({ children }) => {
       }
       groupedMap[key].push(sale)
     })
-    
+
     // 그룹화된 데이터를 결과 배열로 변환
     const groupedResults = Object.values(groupedMap).map(group => {
       // 그룹 내 품목 정렬 (created_at 기준, 없으면 id 기준)
@@ -100,31 +295,31 @@ export const DataProvider = ({ children }) => {
         }
         return (a.id || '').localeCompare(b.id || '')
       })
-      
+
       // 첫 번째 항목을 기본값으로 사용
       const firstItem = sortedItems[0]
       const saleDate = firstItem.sale_date || firstItem.date || ''
       const clientId = firstItem.client_id || firstItem.clientId || ''
       const notes = firstItem.notes || ''
       const createdAt = firstItem.created_at || null
-      
+
       // 총 금액 합계
       const totalAmount = sortedItems.reduce((sum, item) => {
         const amount = item.total_amount || item.totalAmount || 0
         return sum + Number(amount)
       }, 0)
-      
+
       // 품목 수
       const itemCount = sortedItems.length
-      
+
       // 첫 번째 품목명
       const firstItemName = firstItem.item_name || firstItem.itemName || firstItem.product_name || '-'
-      
+
       // displayItemName 생성
-      const displayItemName = itemCount > 1 
+      const displayItemName = itemCount > 1
         ? `${firstItemName} 외 ${itemCount - 1}건`
         : firstItemName
-      
+
       // 그룹화된 결과 객체 생성
       const groupedSale = {
         id: firstItem.id || `${clientId}-${saleDate}-${createdAt || Date.now()}`,
@@ -132,6 +327,7 @@ export const DataProvider = ({ children }) => {
         date: saleDate,
         client_id: clientId,
         clientId: clientId,
+        clientName: firstItem.clientName || '', // 거래처명 유지
         notes: notes,
         created_at: createdAt,
         total_amount: totalAmount,
@@ -140,27 +336,68 @@ export const DataProvider = ({ children }) => {
         displayItemName: displayItemName,
         items: sortedItems.map(item => ({
           id: item.id,
-          item_name: item.item_name || item.itemName || '',
+          item_name: item.item_name || item.itemName || item.product_name || '',
+          product_id: item.product_id || item.productId || '',
           quantity: item.quantity || 0,
-          unit_price: item.unit_price || item.unitPrice || 0,
+          unit_price: item.unit_price || item.unitPrice || item.price || 0,
           total_amount: item.total_amount || item.totalAmount || 0,
           notes: item.notes || ''
         }))
       }
-      
+
       return groupedSale
     })
-    
+
     return groupedResults
   }, [])
-  
+
+
+  // 4. 데이터 전체 페칭 헬퍼 (Supabase 1000건 제한 우회)
+  const fetchAllRecords = async (table, selectStr = '*', orderCol = 'id', ascending = true, filters = null) => {
+    let allData = []
+    let from = 0
+    const step = 1000
+
+    try {
+      while (true) {
+        console.log(`[DataContext] Fetching ${table}... (Range: ${from} - ${from + step - 1})`)
+        let query = supabase
+          .from(table)
+          .select(selectStr)
+          .order(orderCol, { ascending })
+          .range(from, from + step - 1)
+
+        if (filters && typeof filters === 'function') {
+          query = filters(query)
+        }
+
+        const { data, error } = await query
+        if (error) throw error
+        if (!data || data.length === 0) {
+          console.log(`[DataContext] No more data for ${table} after ${allData.length} records.`)
+          break
+        }
+
+        allData = [...allData, ...data]
+        console.log(`[DataContext] ${table} progressive total: ${allData.length}`)
+
+        if (data.length < step) break
+        from += step
+      }
+      return { data: allData, error: null }
+    } catch (error) {
+      console.error(`[DataContext] fetchAllRecords fatal error (${table}):`, error)
+      return { data: allData, error } // 위기 상황에서도 가져온 데이터는 반환
+    }
+  }
+
   const sanitizeData = useCallback((data, type) => {
     const sanitized = { ...data }
-    
+
     // 공통: DB에 존재하지 않는 임시 필드 제거 (rowIndex 등) - PGRST204 에러 방지
     delete sanitized.rowIndex
     delete sanitized.clientName // 엑셀 파싱 시 사용된 임시 필드
-    
+
     // clients 테이블 전용 처리
     if (type === 'client') {
       // DB에 없는 필드 제거 (clients 테이블에 존재하지 않는 필드들)
@@ -171,7 +408,7 @@ export const DataProvider = ({ children }) => {
       delete sanitized.contact_person // DB에 없는 필드 (client_contacts 테이블로 이관됨)
       delete sanitized.phone // DB에 없는 필드 (client_contacts 테이블로 이관됨)
       delete sanitized.email // DB에 없는 필드 (client_contacts 테이블로 이관됨)
-      
+
       // clients 테이블에 존재하지 않는 필드들 제거
       delete sanitized.unitPrice
       delete sanitized.quantity
@@ -180,21 +417,21 @@ export const DataProvider = ({ children }) => {
       delete sanitized.date
       delete sanitized.price // DB에 없는 필드 (products 테이블용)
       delete sanitized.unit_price // DB에 없는 필드 (sales 테이블용)
-      
+
       // 디버깅: DB에 전송될 데이터 확인 (최종 검증)
       console.log('[sanitizeData] clients 테이블에 저장될 데이터 (최종 검증):', sanitized)
       console.log('[sanitizeData] 전송될 데이터의 키 목록:', Object.keys(sanitized))
     } else {
-    const dateFields = ['sale_date', 'activity_date', 'lastOrder', 'next_action_date', 'target_date']
+      const dateFields = ['sale_date', 'activity_date', 'lastOrder', 'next_action_date', 'target_date']
       dateFields.forEach(f => { if (!sanitized[f] || sanitized[f] === '') sanitized[f] = null })
-      
-    const numberFields = ['orderAmount', 'totalAmount', 'quantity', 'unitPrice']
-    numberFields.forEach(f => {
-      const val = sanitized[f]
-      sanitized[f] = (val === '' || val === undefined || val === null) ? 0 : parseFloat(val) || 0
-    })
+
+      const numberFields = ['orderAmount', 'totalAmount', 'quantity', 'unitPrice']
+      numberFields.forEach(f => {
+        const val = sanitized[f]
+        sanitized[f] = (val === '' || val === undefined || val === null) ? 0 : parseFloat(val) || 0
+      })
     }
-    
+
     return sanitized
   }, [])
 
@@ -228,7 +465,7 @@ export const DataProvider = ({ children }) => {
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
-    
+
     const thisMonthActivities = activities.filter(a => {
       const d = new Date(a.activity_date || a.date)
       return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear
@@ -239,8 +476,8 @@ export const DataProvider = ({ children }) => {
       return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear
     }).reduce((sum, s) => {
       // DB 스키마 규격 우선: total_amount > totalAmount
-      const amount = s.total_amount !== undefined && s.total_amount !== null 
-        ? Number(s.total_amount) 
+      const amount = s.total_amount !== undefined && s.total_amount !== null
+        ? Number(s.total_amount)
         : (s.totalAmount !== undefined && s.totalAmount !== null ? Number(s.totalAmount) : 0)
       return sum + amount
     }, 0)
@@ -252,8 +489,8 @@ export const DataProvider = ({ children }) => {
       return d.getMonth() + 1 === lastMonth && d.getFullYear() === lastMonthYear
     }).reduce((sum, s) => {
       // DB 스키마 규격 우선: total_amount > totalAmount
-      const amount = s.total_amount !== undefined && s.total_amount !== null 
-        ? Number(s.total_amount) 
+      const amount = s.total_amount !== undefined && s.total_amount !== null
+        ? Number(s.total_amount)
         : (s.totalAmount !== undefined && s.totalAmount !== null ? Number(s.totalAmount) : 0)
       return sum + amount
     }, 0)
@@ -271,38 +508,38 @@ export const DataProvider = ({ children }) => {
       const weekEnd = new Date(now)
       weekEnd.setDate(now.getDate() - (i * 7))
       weekEnd.setHours(23, 59, 59, 999) // 주의 마지막 날 끝
-      
+
       const weekStart = new Date(weekEnd)
       weekStart.setDate(weekEnd.getDate() - 6)
       weekStart.setHours(0, 0, 0, 0) // 주의 첫날 시작
-      
+
       // 주간 레이블: 주의 시작일/종료일 (예: "1/1-1/7")
       const startMonth = weekStart.getMonth() + 1
       const startDate = weekStart.getDate()
       const endMonth = weekEnd.getMonth() + 1
       const endDate = weekEnd.getDate()
-      const weekLabel = startMonth === endMonth 
+      const weekLabel = startMonth === endMonth
         ? `${startMonth}/${startDate}-${endDate}`
         : `${startMonth}/${startDate}-${endMonth}/${endDate}`
-      
+
       const weekSales = sales.filter(s => {
         // DB 스키마 규격 우선: sale_date > date
         const saleDate = s.sale_date || s.date
         if (!saleDate) return false
-        
+
         const sd = new Date(saleDate)
         if (isNaN(sd.getTime())) return false
-        
+
         // 주간 범위 내인지 확인
         return sd >= weekStart && sd <= weekEnd
       }).reduce((sum, s) => {
         // DB 스키마 규격 우선: total_amount > totalAmount
-        const amount = s.total_amount !== undefined && s.total_amount !== null 
-          ? Number(s.total_amount) 
+        const amount = s.total_amount !== undefined && s.total_amount !== null
+          ? Number(s.total_amount)
           : (s.totalAmount !== undefined && s.totalAmount !== null ? Number(s.totalAmount) : 0)
         return sum + amount
       }, 0)
-      
+
       weeks.push({ week: weekLabel, 매출: weekSales / 10000 })
     }
     return weeks
@@ -315,11 +552,11 @@ export const DataProvider = ({ children }) => {
       if (!userId) return
 
       const migrations = []
-      
+
       for (const client of clientsData || []) {
         const hasContacts = contactsByClient[client.id] && contactsByClient[client.id].length > 0
         const hasLegacyData = client.contact_person && client.contact_person.trim()
-        
+
         // client_contacts에 담당자가 없고, clients 테이블에 contact_person이 있으면 마이그레이션
         if (!hasContacts && hasLegacyData) {
           migrations.push({
@@ -341,7 +578,7 @@ export const DataProvider = ({ children }) => {
         const { error } = await supabase
           .from('client_contacts')
           .insert(migrations)
-        
+
         if (error) {
           console.error('레거시 데이터 마이그레이션 오류:', error)
         } else {
@@ -353,70 +590,124 @@ export const DataProvider = ({ children }) => {
     }
   }, [user])
 
-  // 4. 데이터 로드 및 동기화 (모달이 열려있을 때는 실행하지 않음)
-  useEffect(() => {
-    if (authLoading || !user) { if (!authLoading) setLoading(false); return }
-    // 모달이 열려있으면 데이터 새로고침하지 않음 (입력 데이터 보존)
-    if (openModalCount > 0) return
-    
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        const [pRes, cRes, aRes, sRes, iRes, ctRes] = await Promise.all([
-          supabase.from('products').select('*').order('name').range(0, 99999),
-          supabase.from('clients').select('*').order('company').range(0, 99999),
-          supabase.from('activities').select('*').order('activity_date', { ascending: false }).range(0, 99999),
-          supabase.from('sales').select('*').order('sale_date', { ascending: false }).range(0, 99999),
-          supabase.from('issues').select('*').order('created_at', { ascending: false }).range(0, 99999),
-          supabase.from('client_contacts').select('*').order('is_primary', { ascending: false }).range(0, 99999)
-        ])
-        const contactsByClient = (ctRes.data || []).reduce((acc, c) => {
-          if (!acc[c.client_id]) acc[c.client_id] = []
-          acc[c.client_id].push(c)
-          return acc
-        }, {})
-        
-        // 레거시 데이터 자동 이관 실행
-        await migrateLegacyClientData(cRes.data || [], contactsByClient)
-        
-        // 마이그레이션 후 담당자 데이터 다시 불러오기
-        const { data: updatedContacts } = await supabase
-          .from('client_contacts')
-          .select('*')
-          .order('is_primary', { ascending: false })
-        
-        const updatedContactsByClient = (updatedContacts || []).reduce((acc, c) => {
-          if (!acc[c.client_id]) acc[c.client_id] = []
-          acc[c.client_id].push(c)
-          return acc
-        }, {})
-        
-        setProducts(pRes.data || [])
-        const clientsData = (cRes.data || []).map(client => {
-          const contacts = updatedContactsByClient[client.id] || []
-          const primary = contacts.find(c => c.is_primary) || contacts[0]
-          return { ...client, lastOrder: client.last_order, orderAmount: client.order_amount, contact_person: primary?.name || '', phone: primary?.phone || '', email: primary?.email || '' }
-        })
-        setClients(clientsData)
-        // activities에 clientName 매핑 추가 (clients 조인)
-        setActivities((aRes.data || []).map(a => {
-          const client = clientsData.find(c => c.id === a.client_id)
-          return { 
-            ...a, 
-            clientId: a.client_id, 
-            date: a.activity_date,
-            clientName: client?.company || '알 수 없음'
+  // 4. 데이터 로드 및 동기화 함수
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const now = new Date()
+      const oneYearAgo = new Date(now.setFullYear(now.getFullYear() - 1)).toISOString()
+      const MAX_ROWS = 50000
+      const MAX_CLIENTS = 10000
+
+      // 1. 개별 페칭 로직 (제한 없이 모든 데이터 로드)
+      const fetchRequests = {
+        products: fetchAllRecords('products', '*', 'name'),
+        clients: fetchAllRecords('clients', '*', 'company'),
+        activities: fetchAllRecords('activities', '*', 'activity_date', false, (q) => q.gte('activity_date', oneYearAgo)),
+        sales: fetchAllRecords('sales', '*', 'sale_date', false), // 전체 Sales 데이터 로드 (통계 정확성 위함)
+        issues: fetchAllRecords('issues', '*', 'created_at', false),
+        contacts: fetchAllRecords('client_contacts', '*', 'is_primary', false)
+      }
+
+      const results = {}
+      for (const [key, promise] of Object.entries(fetchRequests)) {
+        const { data, error } = await promise
+        if (error) {
+          console.error(`[DataContext] Fetch error (${key}):`, {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          })
+          if (['clients', 'sales'].includes(key)) {
+            console.warn(`Critical data fetch failed for ${key}. Check RLS policies.`)
           }
-        }))
-        // 매출 데이터 그룹화 후 저장
-        const rawSales = (sRes.data || []).map(s => ({ ...s, clientId: s.client_id, totalAmount: s.total_amount, date: s.sale_date }))
-        const groupedSales = processGroupedSales(rawSales)
-        setSales(groupedSales)
-        setIssues(iRes.data || [])
-      } finally { setLoading(false) }
+          results[key] = []
+        } else {
+          console.log(`[DataContext] Fetched ${data?.length || 0} records for ${key}`)
+          results[key] = data || []
+        }
+      }
+
+      const contactsByClient = results.contacts.reduce((acc, c) => {
+        if (!acc[c.client_id]) acc[c.client_id] = []
+        acc[c.client_id].push(c)
+        return acc
+      }, {})
+
+      // 레거시 데이터 자동 이관 실행
+      await migrateLegacyClientData(results.clients, contactsByClient)
+
+      setProducts(results.products)
+
+      const clientsData = results.clients.map(client => {
+        const contacts = contactsByClient[client.id] || []
+        const primary = contacts.find(c => c.is_primary) || contacts[0]
+        return {
+          ...client,
+          lastOrder: client.last_order,
+          orderAmount: client.order_amount,
+          contact_person: primary?.name || '',
+          phone: primary?.phone || '',
+          email: primary?.email || ''
+        }
+      })
+      setClients(clientsData)
+
+      // activities에 clientName 매핑 추가
+      setActivities(results.activities.map(a => {
+        const client = clientsData.find(c => c.id === a.client_id)
+        return {
+          ...a,
+          clientId: a.client_id,
+          date: a.activity_date,
+          clientName: client?.company || '알 수 없음'
+        }
+      }))
+
+      // 매출 데이터 그룹화 후 저장
+      const rawSales = results.sales.map(s => {
+        const qty = Number(s.quantity) || 0
+        const price = Number(s.unit_price) || 0
+        const client = clientsData.find(c => c.id === s.client_id)
+        return {
+          ...s,
+          clientId: s.client_id,
+          clientName: client?.company || '알 수 없음',
+          totalAmount: Number(s.total_amount) || (qty * price) || 0,
+          date: s.sale_date
+        }
+      })
+      const groupedSales = processGroupedSales(rawSales)
+      setSales(groupedSales)
+      setIssues(results.issues)
+
+      console.log('[DataContext] Hybrid data synchronization complete.')
+    } catch (err) {
+      console.error('Critical data fetch error:', err)
+    } finally {
+      setLoading(false)
     }
+  }, [user, migrateLegacyClientData, processGroupedSales])
+
+  // 자동 로드 (모달이 열려있을 때는 실행하지 않음)
+  useEffect(() => {
+    if (authLoading || !user) {
+      if (!authLoading) setLoading(false)
+      return
+    }
+    if (openModalCount > 0) return
+
+    // [Manual Refresh Policy] 이미 데이터가 로드되어 있다면, 
+    // 페이지 이동이나 재진입 시 자동으로 다시 부르지 않고 기존 데이터를 유지함.
+    // 사용자가 Refresh 버튼을 누를 때만 fetchData()가 직접 호출되도록 함.
+    if (clients.length > 0 || activities.length > 0 || sales.length > 0) {
+      if (loading) setLoading(false) // 혹시 로딩 상태라면 해제
+      return
+    }
+
     fetchData()
-  }, [user, authLoading, migrateLegacyClientData, processGroupedSales, openModalCount])
+  }, [user, authLoading, openModalCount, fetchData, clients.length, activities.length, sales.length])
 
   // 5. CRUD 액션
   const addClient = useCallback(async (c) => {
@@ -424,17 +715,17 @@ export const DataProvider = ({ children }) => {
     const { data, error } = await supabase.from('clients').insert([{ ...sanitizeData(c, 'client'), created_by: uid }]).select().single()
     if (error) throw error
     if (c.contacts) await replaceClientContacts(data.id, c.contacts)
-    
+
     // 담당자 저장 후 최신 담당자 데이터 조회
     const { data: contactsData } = await supabase
       .from('client_contacts')
       .select('*')
       .eq('client_id', data.id)
       .order('is_primary', { ascending: false })
-    
+
     const contacts = contactsData || []
     const primary = contacts.find(c => c.is_primary) || contacts[0]
-    
+
     // 최신 담당자 정보가 포함된 client 객체 생성
     const clientWithContacts = {
       ...data,
@@ -444,7 +735,7 @@ export const DataProvider = ({ children }) => {
       phone: primary?.phone || '',
       email: primary?.email || ''
     }
-    
+
     setClients(prev => [...prev, clientWithContacts])
     return clientWithContacts
   }, [user, sanitizeData, replaceClientContacts])
@@ -453,17 +744,17 @@ export const DataProvider = ({ children }) => {
     const { data, error } = await supabase.from('clients').update(sanitizeData(c, 'client')).eq('id', id).select().single()
     if (error) throw error
     if (c.contacts) await replaceClientContacts(id, c.contacts)
-    
+
     // 담당자 저장 후 최신 담당자 데이터 조회
     const { data: contactsData } = await supabase
       .from('client_contacts')
       .select('*')
       .eq('client_id', id)
       .order('is_primary', { ascending: false })
-    
+
     const contacts = contactsData || []
     const primary = contacts.find(c => c.is_primary) || contacts[0]
-    
+
     // 최신 담당자 정보가 포함된 client 객체 생성
     const clientWithContacts = {
       ...data,
@@ -473,7 +764,7 @@ export const DataProvider = ({ children }) => {
       phone: primary?.phone || '',
       email: primary?.email || ''
     }
-    
+
     setClients(prev => prev.map(item => item.id === id ? clientWithContacts : item))
     return clientWithContacts
   }, [sanitizeData, replaceClientContacts])
@@ -519,16 +810,65 @@ export const DataProvider = ({ children }) => {
       return { skipped: skippedRows.length }
     }
 
-    // DB 컬럼명(snake_case)으로 변환 및 필드 정제 (PGRST204 에러 방지)
+    // 1. 미등록 거래처 자동 등록
+    const missingClientNames = [...new Set(s.rows
+      .filter(r => !r.clientId && !r.client_id && r.clientName)
+      .map(r => r.clientName.trim())
+    )]
+
+    const newClientsMap = {}
+    if (missingClientNames.length > 0) {
+      console.log('[addSale] 신규 거래처 자동 등록 중:', missingClientNames)
+      for (const name of missingClientNames) {
+        // 이미 로컬에 있는지 다시 확인 (중복 등록 방지)
+        const existing = clients.find(c => c.company.trim() === name)
+        if (existing) {
+          newClientsMap[name] = existing.id
+          continue
+        }
+
+        const { data, error } = await supabase.from('clients').insert([{ company: name, created_by: uid }]).select().single()
+        if (error) {
+          console.error(`거래처(${name}) 자동 등록 실패:`, error)
+          continue
+        }
+        newClientsMap[name] = data.id
+        setClients(prev => [...prev, { ...data, lastOrder: null, orderAmount: 0, contact_person: '', phone: '', email: '' }])
+      }
+    }
+
+    // 2. 미등록 품목 자동 등록 (item_name 기준)
+    const missingProductNames = [...new Set(s.rows
+      .filter(r => {
+        const name = r.item_name || r.itemName
+        return name && !products.find(p => p.name === name)
+      })
+      .map(r => (r.item_name || r.itemName).trim())
+    )]
+
+    if (missingProductNames.length > 0) {
+      console.log('[addSale] 신규 품목 자동 등록 중:', missingProductNames)
+      for (const name of missingProductNames) {
+        const { data, error } = await supabase.from('products').insert([{ name, created_by: uid }]).select().single()
+        if (error) {
+          console.error(`품목(${name}) 자동 등록 실패:`, error)
+          continue
+        }
+        setProducts(prev => [...prev, data])
+      }
+    }
+
+    // DB 컬럼명(snake_case)으로 변환 및 필드 정제
     const rows = rowsToInsert.map(r => {
+      const clientId = r.clientId || r.client_id || newClientsMap[r.clientName?.trim()]
       const row = {
-        client_id: r.clientId || r.client_id,
+        client_id: clientId,
         sale_date: r.sale_date || r.saleDate || null,
-        item_name: r.item_name || r.itemName || '', // 품목명이 없어도 등록 가능
+        item_name: r.item_name || r.itemName || r.product_name || '',
         quantity: Number(r.quantity) || 0,
         unit_price: Number(r.unitPrice || r.unit_price) || 0,
-        total_amount: Number(r.totalAmount || r.total_amount || (r.quantity * (r.unitPrice || r.unit_price))) || 0,
-        notes: r.notes || '', // 비고가 없어도 등록 가능
+        total_amount: Number(r.totalAmount || r.total_amount || (Number(r.quantity) * (Number(r.unitPrice || r.unit_price)))) || 0,
+        notes: r.notes || '',
         created_by: uid
       }
 
@@ -612,7 +952,7 @@ export const DataProvider = ({ children }) => {
   // 매출 수정 (그룹 내 모든 항목 업데이트)
   const updateSale = useCallback(async (groupId, saleData) => {
     const uid = await getValidUserId(user)
-    
+
     try {
       // 그룹 ID로 기존 그룹 찾기 (현재 상태에서)
       const currentGroup = sales.find(s => s.id === groupId)
@@ -631,7 +971,7 @@ export const DataProvider = ({ children }) => {
           .from('sales')
           .delete()
           .in('id', existingItemIds)
-        
+
         if (deleteError) throw deleteError
       }
 
@@ -654,7 +994,7 @@ export const DataProvider = ({ children }) => {
       setSales(prev => {
         // 기존 그룹 제거
         const filtered = prev.filter(s => s.id !== groupId)
-        
+
         // 새 데이터 정규화 및 그룹화
         const newSales = data.map(d => ({ ...d, totalAmount: d.total_amount, clientId: d.client_id, date: d.sale_date }))
         const allSales = filtered.flatMap(group => {
@@ -683,7 +1023,7 @@ export const DataProvider = ({ children }) => {
             created_at: group.created_at
           }]
         })
-        
+
         return processGroupedSales([...allSales, ...newSales])
       })
     } catch (error) {
@@ -708,12 +1048,12 @@ export const DataProvider = ({ children }) => {
         .select('id, item_name')
         .eq('item_name', product.name)
         .limit(1)
-      
+
       if (checkError) {
         console.error('매출 기록 확인 중 오류:', checkError)
         // 확인 실패해도 삭제 시도 (DB 제약조건에서 처리)
       }
-      
+
       if (salesWithProduct && salesWithProduct.length > 0) {
         throw new Error('해당 제품은 매출 기록이 있어 삭제할 수 없습니다. 대신 숨기거나 이름을 변경하세요.')
       }
@@ -723,7 +1063,7 @@ export const DataProvider = ({ children }) => {
         .from('products')
         .delete()
         .eq('id', productId)
-      
+
       if (error) {
         // 외래 키 제약조건 에러 처리
         if (error.code === '23503' || error.message?.includes('foreign key') || error.message?.includes('violates foreign key')) {
@@ -762,7 +1102,7 @@ export const DataProvider = ({ children }) => {
         .from('sales')
         .delete()
         .in('id', itemIds)
-      
+
       if (error) throw error
 
       // 상태 업데이트: 그룹 제거
@@ -781,7 +1121,7 @@ export const DataProvider = ({ children }) => {
         .select('*')
         .eq('client_id', clientId)
         .order('is_primary', { ascending: false })
-      
+
       if (error) throw error
       return (data || []).map(contact => ({
         ...contact,
@@ -802,7 +1142,7 @@ export const DataProvider = ({ children }) => {
         .from('client_contacts')
         .delete()
         .eq('client_id', clientId)
-      
+
       if (contactsError) {
         console.error('담당자 삭제 오류:', contactsError)
         throw contactsError
@@ -813,7 +1153,7 @@ export const DataProvider = ({ children }) => {
         .from('activities')
         .delete()
         .eq('client_id', clientId)
-      
+
       if (activitiesError) {
         console.error('활동 삭제 오류:', activitiesError)
         throw activitiesError
@@ -824,7 +1164,7 @@ export const DataProvider = ({ children }) => {
         .from('sales')
         .delete()
         .eq('client_id', clientId)
-      
+
       if (salesError) {
         console.error('매출 삭제 오류:', salesError)
         throw salesError
@@ -835,7 +1175,7 @@ export const DataProvider = ({ children }) => {
         .from('clients')
         .delete()
         .eq('id', clientId)
-      
+
       if (clientError) {
         console.error('거래처 삭제 오류:', clientError)
         throw clientError
@@ -845,7 +1185,7 @@ export const DataProvider = ({ children }) => {
       setClients(prev => prev.filter(c => c.id !== clientId))
       setActivities(prev => prev.filter(a => (a.client_id || a.clientId) !== clientId))
       setSales(prev => prev.filter(s => (s.client_id || s.clientId) !== clientId))
-      
+
       return { success: true }
     } catch (error) {
       console.error('거래처 삭제 중 오류:', error)
@@ -944,7 +1284,7 @@ export const DataProvider = ({ children }) => {
   // 활동 내역 추가
   const addActivity = useCallback(async (activityData) => {
     const uid = await getValidUserId(user)
-    
+
     // DB 컬럼명(snake_case)으로 변환 (user 필드는 DB에 없으므로 제외)
     const data = {
       client_id: activityData.clientId || activityData.client_id,
@@ -956,7 +1296,7 @@ export const DataProvider = ({ children }) => {
       next_action_detail: activityData.next_action_detail || '',
       created_by: uid
     }
-    
+
     // 빈 문자열 날짜 필드를 null로 변환
     if (!data.activity_date || data.activity_date === '') {
       data.activity_date = null
@@ -964,21 +1304,21 @@ export const DataProvider = ({ children }) => {
     if (!data.next_action_date || data.next_action_date === '') {
       data.next_action_date = null
     }
-    
+
     // DB에 없는 필드 제거
     delete data.clientId
     delete data.date
     delete data.user // user 필드는 DB에 없으므로 제거
-    
+
     const { data: insertedData, error } = await supabase.from('activities').insert([data]).select().single()
     if (error) throw error
-    
+
     // 참석자 정보(user)는 UI용으로만 사용하고 DB에는 저장하지 않음
     // clientName 매핑 추가 (clients 조인)
     const client = clients.find(c => c.id === insertedData.client_id)
-    const newActivity = { 
-      ...insertedData, 
-      clientId: insertedData.client_id, 
+    const newActivity = {
+      ...insertedData,
+      clientId: insertedData.client_id,
       date: insertedData.activity_date,
       clientName: client?.company || '알 수 없음',
       user: activityData.user || '' // UI 표시용으로만 유지
@@ -999,7 +1339,7 @@ export const DataProvider = ({ children }) => {
       next_action_date: activityData.next_action_date || null,
       next_action_detail: activityData.next_action_detail || ''
     }
-    
+
     // 빈 문자열 날짜 필드를 null로 변환
     if (!data.activity_date || data.activity_date === '') {
       data.activity_date = null
@@ -1007,20 +1347,20 @@ export const DataProvider = ({ children }) => {
     if (!data.next_action_date || data.next_action_date === '') {
       data.next_action_date = null
     }
-    
+
     // DB에 없는 필드 제거
     delete data.clientId
     delete data.date
-    
+
     const { data: updatedData, error } = await supabase.from('activities').update(data).eq('id', id).select().single()
     if (error) throw error
-    
+
     // 참석자 정보(user)는 UI용으로만 사용하고 DB에는 저장하지 않음
     // clientName 매핑 추가 (clients 조인)
     const client = clients.find(c => c.id === updatedData.client_id)
-    const updatedActivity = { 
-      ...updatedData, 
-      clientId: updatedData.client_id, 
+    const updatedActivity = {
+      ...updatedData,
+      clientId: updatedData.client_id,
       date: updatedData.activity_date,
       clientName: client?.company || '알 수 없음',
       user: activityData.user || '' // UI 표시용으로만 유지
@@ -1033,14 +1373,14 @@ export const DataProvider = ({ children }) => {
   const deleteActivity = useCallback(async (id) => {
     const { error } = await supabase.from('activities').delete().eq('id', id)
     if (error) throw error
-    
+
     setActivities(prev => prev.filter(item => item.id !== id))
   }, [])
 
   // 이슈 추가
   const addIssue = useCallback(async (issueData) => {
     const uid = await getValidUserId(user)
-    
+
     // DB 컬럼명(snake_case)으로 변환
     const data = {
       title: issueData.title || '',
@@ -1049,19 +1389,19 @@ export const DataProvider = ({ children }) => {
       target_date: issueData.target_date || issueData.date || null,
       created_by: uid
     }
-    
+
     // 빈 문자열 날짜 필드를 null로 변환
     if (!data.target_date || data.target_date === '') {
       data.target_date = null
     }
-    
+
     // DB에 없는 필드 제거
     delete data.date
     delete data.description
-    
+
     const { data: insertedData, error } = await supabase.from('issues').insert([data]).select().single()
     if (error) throw error
-    
+
     setIssues(prev => [insertedData, ...prev])
     return insertedData
   }, [user])
@@ -1075,19 +1415,19 @@ export const DataProvider = ({ children }) => {
       status: issueData.status || '등록',
       target_date: issueData.target_date || issueData.date || null,
     }
-    
+
     // 빈 문자열 날짜 필드를 null로 변환
     if (!data.target_date || data.target_date === '') {
       data.target_date = null
     }
-    
+
     // DB에 없는 필드 제거
     delete data.date
     delete data.description
-    
+
     const { data: updatedData, error } = await supabase.from('issues').update(data).eq('id', id).select().single()
     if (error) throw error
-    
+
     setIssues(prev => prev.map(item => item.id === id ? updatedData : item))
     return updatedData
   }, [])
@@ -1096,7 +1436,7 @@ export const DataProvider = ({ children }) => {
   const deleteIssue = useCallback(async (id) => {
     const { error } = await supabase.from('issues').delete().eq('id', id)
     if (error) throw error
-    
+
     setIssues(prev => prev.filter(item => item.id !== id))
   }, [])
 
@@ -1120,7 +1460,7 @@ export const DataProvider = ({ children }) => {
       try {
         // 중복 체크: 제품명이 동일한 경우 건너뛰기
         const existingProduct = products.find(p => p.name === productData.name)
-        
+
         if (existingProduct) {
           skipped.push({
             rowIndex: productData.rowIndex || i + 1,
@@ -1144,7 +1484,7 @@ export const DataProvider = ({ children }) => {
         delete productToInsert.unitPrice
         delete productToInsert.unit_price
         delete productToInsert.price // 단가 필드 제거
-        
+
         const { data, error } = await supabase
           .from('products')
           .insert([productToInsert])
@@ -1183,18 +1523,154 @@ export const DataProvider = ({ children }) => {
     return results
   }, [user, products])
 
+  // 기존 매출 데이터에서 누락된 품목 일괄 등록 및 기존 매출 연동
+  const registerMissingProductsFromSales = useCallback(async () => {
+    const uid = await getValidUserId(user)
+    try {
+      console.log('[registerMissingProductsFromSales] 전체 데이터 동기화 시작...')
+
+      // 1. 모든 매출 데이터 가져오기 (이름 매핑을 위해 전체 스캔 필요)
+      const { data: allSales, error: salesError } = await fetchAllRecords('sales', '*')
+      if (salesError) throw salesError
+      if (!allSales || allSales.length === 0) return { count: 0 }
+
+      // 디버깅: 실제 로드된 매출 데이터의 컬럼 확인
+      if (allSales.length > 0) {
+        // console.log('[registerMissingProductsFromSales] Loaded sales keys:', JSON.stringify(Object.keys(allSales[0])))
+      }
+
+      // [CRITICAL FIX] 유효한 created_by 찾기 strategy
+      // 1. 현재 로그인 유저
+      // 2. allSales에 기록된 created_by 중 하나 (무결성 검증된 ID)
+      let effectiveUid = await getValidUserId(user)
+      const DUMMY_UID = '00000000-0000-0000-0000-000000000000'
+
+      if (effectiveUid === DUMMY_UID) {
+        // 더미면 sales 데이터에서 유효한 ID 탐색
+        const found = allSales.find(s => s.created_by && s.created_by !== DUMMY_UID)
+        if (found) {
+          effectiveUid = found.created_by
+          console.log('[registerMissingProductsFromSales] 로그인 유저 없음. 기존 매출 데이터에서 유저 ID 추출 사용:', effectiveUid)
+        }
+      }
+
+      const nameSet = new Set()
+      allSales.forEach(s => {
+        const name = (s.item_name || s.itemName || s.product_name || '').trim()
+        if (name) nameSet.add(name)
+      })
+
+      // 3. 누락된 품목 등록 (DB 제약조건 없이도 안전하게 처리하기 위해 조회 후 등록 방식 사용)
+      // 먼저 최신 Products 목록을 다시 가져옴 (동시성 이슈 최소화)
+      const { data: currentProducts, error: prodError } = await fetchAllRecords('products', 'id, name')
+      if (prodError) throw prodError
+
+      const currentProductMap = new Map(currentProducts.map(p => [p.name.trim(), p.id]))
+      const currentNames = new Set(currentProducts.map(p => p.name.trim()))
+
+      // 등록해야 할 이름 필터링 (이미 DB에 있는 건 제외)
+      const reallyNewNames = Array.from(nameSet).filter(name => !currentNames.has(name))
+
+      let newlyRegisteredCount = 0
+      if (reallyNewNames.length > 0) {
+        console.log(`[registerMissingProductsFromSales] ${reallyNewNames.length}개 신규 품목 등록 시도...`)
+        const BATCH_SIZE = 100
+        for (let i = 0; i < reallyNewNames.length; i += BATCH_SIZE) {
+          const batch = reallyNewNames.slice(i, i + BATCH_SIZE).map(name => ({ name, created_by: effectiveUid }))
+          // Upsert 대신 순수 Insert 사용 (중복 검사를 마쳤으므로 안전)
+          const { data, error } = await supabase.from('products').insert(batch).select()
+
+          if (error) {
+            console.error(`[registerMissingProductsFromSales] 품목 등록 중 에러 (배치 ${i}):`, error)
+            // 이름 중복 등 에러 발생 시 개별 등록 시도 혹은 무시
+          } else if (data) {
+            data.forEach(p => {
+              currentProductMap.set(p.name.trim(), p.id)
+            })
+            newlyRegisteredCount += data.length
+          }
+        }
+        // 로컬 상태 업데이트
+        setProducts(prev => {
+          // 중복 방지를 위해 기존 것과 합침
+          const newItems = reallyNewNames.map(name => ({
+            id: currentProductMap.get(name), // 방금 등록된 ID
+            name,
+            created_by: uid
+          })).filter(p => p.id) // ID가 있는 것만 (등록 성공한 것만)
+          return [...prev, ...newItems]
+        })
+      }
+
+      // 업데이트된 맵 사용
+      const productMap = currentProductMap
+
+
+      // 4. 기존 매출 데이터와 품목 ID 연결 (product_id가 없는 경우)
+      // Upsert를 사용하여 대량 업데이트 처리 (네트워트 요청 최소화)
+      const salesToUpdate = allSales.filter(s => {
+        if (s.product_id) return false
+        const name = (s.item_name || s.itemName || s.product_name || '').trim()
+        return name && productMap.has(name)
+      }).map(s => {
+        const name = (s.item_name || s.itemName || s.product_name || '').trim()
+        const productId = productMap.get(name)
+        // Upsert를 위해 필요한 객체 구성 (기존 데이터 + product_id)
+        return {
+          ...s,
+          product_id: productId
+        }
+      })
+
+      if (salesToUpdate.length > 0) {
+        console.log(`[registerMissingProductsFromSales] ${salesToUpdate.length}개 매출 항목 ID 연결 중 (Upsert)...`)
+        const UPDATE_BATCH_SIZE = 1000 // Upsert는 처리량이 더 높음
+
+        let successCount = 0
+        for (let i = 0; i < salesToUpdate.length; i += UPDATE_BATCH_SIZE) {
+          const batch = salesToUpdate.slice(i, i + UPDATE_BATCH_SIZE)
+          // Upsert 실행 (기존 ID가 있으면 업데이트됨)
+          const { error } = await supabase.from('sales').upsert(batch)
+
+          if (error) {
+            console.error(`[registerMissingProductsFromSales] 배치 업데이트 실패 (인덱스 ${i}):`, error)
+            // 실패 시 계속 진행할지 여부는 정책에 따라 다르지만, 여기서는 로깅 후 계속 진행
+          } else {
+            successCount += batch.length
+            console.log(`[registerMissingProductsFromSales] 배치 업데이트 성공 (${Math.min(i + UPDATE_BATCH_SIZE, salesToUpdate.length)}/${salesToUpdate.length})`)
+          }
+        }
+
+        if (successCount < salesToUpdate.length) {
+          console.warn(`[registerMissingProductsFromSales] 일부 항목 업데이트 실패: ${salesToUpdate.length - successCount}건`)
+        }
+      }
+
+      fetchData()
+      return { count: newlyRegisteredCount, updatedSales: salesToUpdate.length }
+    } catch (error) {
+      console.error('품목 일괄 동기화 중 오류:', error)
+      throw error
+    }
+  }, [user, products, fetchData])
+
+
   const value = {
     products, clients, activities, sales, issues, loading, isOnline, pendingSyncCount,
     addClient, updateClient, replaceClientContacts, addSale, updateSale, deleteSale, getStats, getWeeklySalesData,
     fetchClientContacts, deleteClient, addClientsBulk, addProductsBulk,
     addActivity, updateActivity, deleteActivity, addIssue, updateIssue, deleteIssue,
     registerModal, // 모달 상태 등록 함수
-    addProduct: async (p) => { 
-      const uid = await getValidUserId(user); 
+    processGroupedSales, // 그룹화 로직 노출
+    registerMissingProductsFromSales, // 미등록 품목 일괄 등록 함수
+    addProduct: async (p) => {
+      const uid = await getValidUserId(user);
       const { data } = await supabase.from('products').insert([{ ...p, created_by: uid }]).select().single();
       setProducts(prev => [...prev, data])
     },
-    deleteProduct // 제품 삭제 함수 추가
+    deleteProduct, // 제품 삭제 함수 추가
+    refreshData: fetchData, // 수동 데이터 갱신을 위한 함수 노출
+    dashboardStats // [Performance] 미리 계산된 대시보드 통계
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

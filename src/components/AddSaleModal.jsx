@@ -15,10 +15,10 @@ const AddSaleModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     clientId: '',
     sale_date: new Date().toISOString().split('T')[0],
-    items: [{ 
-      productId: '', 
+    items: [{
+      productId: '',
       item_name: '',  // DB 컬럼명과 일치
-      quantity: 1, 
+      quantity: 1,
       unitPrice: 0,   // DB 컬럼명과 일치 (unit_price)
     }],
     notes: '',
@@ -28,8 +28,8 @@ const AddSaleModal = ({ isOpen, onClose }) => {
   const unitPriceInputRefs = useRef({})
 
 
-  useEnterMove({ 
-    formRef, 
+  useEnterMove({
+    formRef,
     enabled: isOpen,
     skipSelectors: ['textarea', '[data-combobox] input', '.combobox-input']
   })
@@ -39,7 +39,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
     if (!productId || !clientId) return 0
 
     const client = clients?.find((c) => c.id === clientId)
-    
+
     // 1순위: 계약 단가
     if (client?.contract_prices?.length > 0) {
       const contractPrice = client.contract_prices.find((cp) => cp.productId === productId)
@@ -72,7 +72,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
 
     // 입력 즉시 데이터 표준화: DB 컬럼명과 일치하는 형태로 즉시 저장
     const unitPrice = getUnitPrice(productId, formData.clientId)
-    
+
     setFormData((prev) => {
       const newItems = [...prev.items]
       newItems[index] = {
@@ -122,7 +122,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
       const newItems = [...prev.items]
       const currentItem = newItems[index] || {}
       const quantity = currentItem.quantity || 0
-      
+
       if (quantity === '' || quantity === 0) {
         newItems[index] = {
           ...currentItem,
@@ -161,7 +161,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
       const newItems = [...prev.items]
       const currentItem = newItems[index] || {}
       const unitPrice = currentItem.unitPrice || 0
-      
+
       if (unitPrice === '') {
         newItems[index] = {
           ...currentItem,
@@ -175,13 +175,13 @@ const AddSaleModal = ({ isOpen, onClose }) => {
   // 품목 추가
   const addItem = (focusToNewRow = false) => {
     setFormData((prev) => {
-      const newItems = [...prev.items, { 
-        productId: '', 
-        item_name: '', 
-        quantity: 1, 
-        unitPrice: 0 
+      const newItems = [...prev.items, {
+        productId: '',
+        item_name: '',
+        quantity: 1,
+        unitPrice: 0
       }]
-      
+
       if (focusToNewRow) {
         setTimeout(() => {
           const newIndex = newItems.length - 1
@@ -192,7 +192,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
           }
         }, 150)
       }
-      
+
       return { ...prev, items: newItems }
     })
   }
@@ -246,19 +246,19 @@ const AddSaleModal = ({ isOpen, onClose }) => {
   // 저장 로직: 모든 키 전송 전략 (snake_case와 camelCase 모두 포함)
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     // 기본 유효성 검사
     if (!formData.clientId) {
       await showWarning('거래처를 선택해주세요.')
       return
     }
-    
+
     // 1. 데이터 정제: 유효한 품목만 필터링 (품목명이 있는 항목만)
     const validItems = formData.items.filter((item) => {
       const name = item.item_name || item.itemName || item.product_name || ''
       return name && name.trim() !== ''
     })
-    
+
     if (validItems.length === 0) {
       await showWarning('저장할 유효한 품목이 없습니다.')
       return
@@ -267,23 +267,23 @@ const AddSaleModal = ({ isOpen, onClose }) => {
     try {
       // 2. 스마트 품목 합산 로직: 품목명과 단가가 모두 일치하는 항목들을 하나로 합치기
       const mergedItemsMap = new Map()
-      
+
       validItems.forEach((item) => {
         // 숫자 변환 (안전장치)
         const qty = Number(item.quantity) || 1
         // 단가: unitPrice 변수에서 가져오되, 없으면 0
         const price = Number(item.unitPrice) || Number(item.unit_price) || 0
-        
+
         // 품목명: 여러 변수명 중 값 있는 것 찾기
         const name = (item.item_name || item.product_name || item.itemName || '').trim()
-        
+
         if (!name || name === '') {
           return // 품목명이 없으면 건너뛰기
         }
-        
+
         // 합산 키: 품목명 + 단가 (단가까지 일치해야 합산)
         const mergeKey = `${name}|${price}`
-        
+
         if (mergedItemsMap.has(mergeKey)) {
           // 이미 같은 품목명+단가 조합이 있으면 수량만 더하기
           const existing = mergedItemsMap.get(mergeKey)
@@ -299,15 +299,15 @@ const AddSaleModal = ({ isOpen, onClose }) => {
           })
         }
       })
-      
+
       // 합산된 항목들을 배열로 변환
       const mergedItems = Array.from(mergedItemsMap.values())
-      
+
       if (mergedItems.length === 0) {
         await showWarning('저장할 유효한 품목이 없습니다.')
         return
       }
-      
+
       // 3. Payload 구성: 확인된 실제 DB 컬럼명으로 정확히 매핑
       const rowsToInsert = mergedItems.map((item) => {
         // DB 컬럼명(snake_case)으로 정확히 매핑
@@ -327,14 +327,14 @@ const AddSaleModal = ({ isOpen, onClose }) => {
       const payload = {
         rows: rowsToInsert,  // 모든 키가 포함된 행 배열
       }
-      
+
       // 디버깅: 전송 전 최종 확인
       console.log('[AddSaleModal] 전송될 데이터 (최종 검증):', payload)
       console.log('[AddSaleModal] 각 행의 키 목록:', rowsToInsert.map(r => Object.keys(r)))
 
       await addSale(payload)
       await showSuccess('매출이 추가되었습니다.')
-      
+
       // 폼 초기화
       setFormData({
         clientId: '',
@@ -350,183 +350,156 @@ const AddSaleModal = ({ isOpen, onClose }) => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="매출 추가" size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+    <Modal isOpen={isOpen} onClose={onClose} title="RECORD_ENTRY: SALES_TRANS" size="lg">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              거래처 <span className="text-red-400">*</span>
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-black uppercase tracking-tight">
+              CLIENT_ID: <span className="text-red-600">*</span>
             </label>
             <select
               value={formData.clientId}
               onChange={(e) => handleClientChange(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white"
+              className="oracle-sunken px-2 py-0.5 bg-white"
               required
             >
-              <option value="">거래처 선택</option>
+              <option value="">-- Select Client --</option>
               {clients?.map((client) => (
                 <option key={client.id} value={client.id}>
-                  {client.company} ({client.contact_person || ''})
+                  {client.company}
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              날짜 <span className="text-red-400">*</span>
+          <div className="flex flex-col gap-1">
+            <label className="font-bold text-black uppercase tracking-tight">
+              TRANS_DATE: <span className="text-red-600">*</span>
             </label>
             <input
               type="date"
               value={formData.sale_date}
               onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+              className="oracle-sunken px-2 py-0.5"
               required
             />
           </div>
         </div>
 
         {/* 품목 리스트 */}
-        <div>
-          <div className="flex justify-between items-center mb-3">
-            <label className="block text-sm font-semibold text-gray-700">
-              품목 <span className="text-red-400">*</span>
-            </label>
+        <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
+          <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
+            <label className="font-bold text-black uppercase tracking-tight">LINE_ITEMS_SUBFORM</label>
             <button
               type="button"
               onClick={addItem}
-              className="px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-medium flex items-center space-x-1 rounded-md transition-colors duration-200"
+              className="oracle-raised bg-gray-200 px-2 py-0.5 flex items-center gap-1"
             >
-              <Plus className="w-4 h-4" />
-              <span>품목 추가</span>
+              <Plus className="w-3 h-3" />
+              <span>ADD_LINE</span>
             </button>
           </div>
 
-          <div className="space-y-3">
-            {formData.items.map((item, index) => {
-              const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-              
-              return (
-                <div key={index} className="border border-gray-200 rounded-md p-4 bg-gray-50">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-semibold text-gray-700">품목 {index + 1}</span>
-                    {formData.items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-400/10 p-1 rounded transition-colors duration-200"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="relative z-50" data-product-index={index}>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">품목명</label>
-                      <ProductCombobox
-                        products={products || []}
-                        value={item.productId || ''}
-                        onSelect={(productId) => handleProductSelect(index, productId)}
-                        placeholder={formData.clientId ? "품목을 검색하세요..." : "먼저 거래처를 선택하세요"}
-                        disabled={!formData.clientId}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">수량</label>
-                      <input
-                        ref={(el) => {
-                          if (el) quantityInputRefs.current[`quantity-${index}`] = el
-                        }}
-                        type="number"
-                        value={item.quantity === '' ? '' : item.quantity}
-                        onChange={(e) => handleQuantityChange(index, e.target.value)}
-                        onBlur={() => handleQuantityBlur(index)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            const unitPriceInput = unitPriceInputRefs.current[`unitPrice-${index}`]
-                            if (unitPriceInput) {
-                              unitPriceInput.focus()
-                              unitPriceInput.select()
-                            }
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-sm"
-                        min="1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">단가 (원)</label>
-                      <input
-                        ref={(el) => {
-                          if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el
-                        }}
-                        type="number"
-                        value={item.unitPrice === '' ? '' : item.unitPrice}
-                        onChange={(e) => handleUnitPriceChange(index, e.target.value)}
-                        onBlur={() => handleUnitPriceBlur(index)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            addItem(true)
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 text-sm"
-                        min="0"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-right">
-                    <span className="text-sm font-semibold text-gray-900">
-                      공급가액: {itemTotal.toLocaleString()}원
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="space-y-1 max-h-[300px] overflow-auto oracle-sunken bg-white p-1">
+            <table className="w-full text-[10px] border-collapse">
+              <thead className="bg-[#c0c0c0] sticky top-0">
+                <tr>
+                  <th className="border-r border-b border-gray-400 w-8">ITEM</th>
+                  <th className="border-r border-b border-gray-400">PRODUCT_NAME / SEARCH</th>
+                  <th className="border-r border-b border-gray-400 w-16">QTY</th>
+                  <th className="border-r border-b border-gray-400 w-24 text-right">UNIT_PRICE</th>
+                  <th className="border-r border-b border-gray-400 w-24 text-right">TOTAL</th>
+                  <th className="border-b border-gray-400 w-6">DEL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.items.map((item, index) => {
+                  const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+                  return (
+                    <tr key={index} className="border-b border-gray-100">
+                      <td className="text-center bg-gray-50">{index + 1}</td>
+                      <td className="p-1" data-product-index={index}>
+                        <ProductCombobox
+                          products={products || []}
+                          value={item.productId || ''}
+                          onSelect={(productId) => handleProductSelect(index, productId)}
+                          placeholder={formData.clientId ? "Search product..." : "(Select Client First)"}
+                          disabled={!formData.clientId}
+                          className="border-none shadow-none"
+                        />
+                      </td>
+                      <td className="p-1">
+                        <input
+                          ref={(el) => { if (el) quantityInputRefs.current[`quantity-${index}`] = el }}
+                          type="number"
+                          value={item.quantity === '' ? '' : item.quantity}
+                          onChange={(e) => handleQuantityChange(index, e.target.value)}
+                          onBlur={() => handleQuantityBlur(index)}
+                          className="w-full border-none outline-none text-center bg-transparent"
+                          min="1"
+                          required
+                        />
+                      </td>
+                      <td className="p-1">
+                        <input
+                          ref={(el) => { if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el }}
+                          type="number"
+                          value={item.unitPrice === '' ? '' : item.unitPrice}
+                          onChange={(e) => handleUnitPriceChange(index, e.target.value)}
+                          onBlur={() => handleUnitPriceBlur(index)}
+                          className="w-full border-none outline-none text-right bg-transparent"
+                          min="0"
+                          required
+                        />
+                      </td>
+                      <td className="p-1 text-right font-bold text-blue-800">
+                        {itemTotal.toLocaleString()}
+                      </td>
+                      <td className="p-1 text-center">
+                        {formData.items.length > 1 && (
+                          <button type="button" onClick={() => removeItem(index)} className="text-red-700 font-bold">×</button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* 총액 */}
-        <div className="bg-indigo-50 rounded-md p-4 border border-indigo-100">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-gray-900">총 매출액</span>
-            <span className="text-xl font-bold text-indigo-600">
-              {totalAmount.toLocaleString()}원
-            </span>
-          </div>
+        <div className="oracle-raised bg-[#808080] p-1 flex justify-between items-center text-white font-bold px-4">
+          <span className="uppercase text-[10px]">Grand Total (Commit Amount):</span>
+          <span className="text-sm">
+            {totalAmount.toLocaleString()} KRW
+          </span>
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">비고</label>
+        <div className="flex flex-col gap-1">
+          <label className="font-bold text-black uppercase tracking-tight">TRANSACTION_NOTES:</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            rows={3}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 resize-none"
-            placeholder="비고 사항을 입력하세요"
+            rows={2}
+            className="oracle-sunken px-2 py-1 bg-white resize-none"
+            placeholder="System notes..."
           />
         </div>
 
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end gap-2 pt-2 border-t border-gray-400">
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary px-4 py-2.5 font-medium"
+            className="oracle-raised bg-gray-200 px-6 py-1 font-bold hover:bg-gray-100"
           >
-            Cancel
+            EXIT / CANCEL
           </button>
           <button
             type="submit"
-            className="btn px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 font-medium"
+            className="oracle-raised bg-blue-800 text-white px-8 py-1 font-bold hover:bg-blue-700"
           >
-            Save
+            COMMIT_SALE
           </button>
         </div>
       </form>

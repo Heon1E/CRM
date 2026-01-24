@@ -10,10 +10,10 @@ import { Edit, Trash2 } from 'lucide-react'
  * @param {Function} props.onDelete - 삭제 버튼 클릭 핸들러
  * @param {boolean} props.enabled - 스와이프 활성화 여부 (기본값: true)
  */
-const SwipeableListItem = ({ 
-  children, 
-  onEdit, 
-  onDelete, 
+const SwipeableListItem = ({
+  children,
+  onEdit,
+  onDelete,
   enabled = true,
   editLabel = '수정',
   deleteLabel = '삭제'
@@ -24,7 +24,7 @@ const SwipeableListItem = ({
   const [startY, setStartY] = useState(0)
   const [currentX, setCurrentX] = useState(0)
   const containerRef = useRef(null)
-  
+
   // 액션 버튼 전체 너비 계산 (수정 + 삭제)
   const actionWidth = (onEdit ? 80 : 0) + (onDelete ? 80 : 0)
 
@@ -41,16 +41,16 @@ const SwipeableListItem = ({
   // 터치 이동
   const handleTouchMove = (e) => {
     if (!enabled) return
-    
+
     const touch = e.touches[0]
     const diffX = touch.clientX - startX
     const diffY = Math.abs(touch.clientY - startY)
-    
+
     // 가로 이동이 세로 이동보다 크면 스와이프로 인식 (10px 이상 차이)
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
       setIsDragging(true)
       e.preventDefault() // 가로 스와이프일 때만 스크롤 방지
-      
+
       // 왼쪽으로 스와이프만 허용 (오른쪽은 제한)
       if (diffX < 0) {
         const newTranslateX = Math.max(-actionWidth, diffX)
@@ -64,14 +64,14 @@ const SwipeableListItem = ({
       // 세로 스크롤이 더 크면 스와이프 취소
       setIsDragging(false)
     }
-    
+
     setCurrentX(touch.clientX)
   }
 
   // 터치 종료
   const handleTouchEnd = () => {
     if (!enabled) return
-    
+
     // 스와이프 거리에 따라 열기/닫기 결정
     const threshold = actionWidth * 0.3 // 30% 이상 스와이프하면 열기
     if (translateX < -threshold) {
@@ -79,7 +79,7 @@ const SwipeableListItem = ({
     } else {
       setTranslateX(0) // 닫기
     }
-    
+
     setIsDragging(false)
     setStartX(0)
     setStartY(0)
@@ -98,7 +98,7 @@ const SwipeableListItem = ({
     if (!enabled || !isDragging) return
     const diffX = e.clientX - startX
     setCurrentX(e.clientX)
-    
+
     if (diffX < 0) {
       const newTranslateX = Math.max(-actionWidth, diffX)
       setTranslateX(newTranslateX)
@@ -153,15 +153,19 @@ const SwipeableListItem = ({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative overflow-hidden touch-manipulation"
       style={{ WebkitTapHighlightColor: 'transparent' }}
     >
       {/* 액션 버튼 (배경) */}
-      <div 
-        className="absolute top-0 right-0 bottom-0 flex"
-        style={{ width: `${actionWidth}px`, zIndex: 1 }}
+      <div
+        className="absolute top-0 right-0 bottom-0 flex transition-opacity duration-200"
+        style={{
+          width: `${actionWidth}px`,
+          zIndex: 1,
+          opacity: translateX !== 0 || isDragging ? 1 : 0
+        }}
       >
         {onEdit && (
           <button
@@ -169,7 +173,7 @@ const SwipeableListItem = ({
               e.stopPropagation()
               handleActionClick('edit')
             }}
-            className="flex-1 bg-[#1E1E1E] text-white border border-gray-800 hover:bg-white/5 active:bg-white/10 flex items-center justify-center font-medium transition-colors touch-manipulation"
+            className="flex-1 bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 flex items-center justify-center font-medium transition-colors touch-manipulation"
             style={{ minWidth: '80px', minHeight: '44px', WebkitTapHighlightColor: 'transparent' }}
             aria-label={editLabel}
           >
@@ -182,7 +186,7 @@ const SwipeableListItem = ({
               e.stopPropagation()
               handleActionClick('delete')
             }}
-            className="flex-1 bg-red-400/20 hover:bg-red-400/30 active:bg-red-400/40 flex items-center justify-center text-red-200 font-medium transition-colors touch-manipulation border border-red-400/30"
+            className="flex-1 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 font-medium transition-colors touch-manipulation border border-red-100"
             style={{ minWidth: '80px', minHeight: '44px', WebkitTapHighlightColor: 'transparent' }}
             aria-label={deleteLabel}
           >
@@ -193,7 +197,7 @@ const SwipeableListItem = ({
 
       {/* 리스트 항목 (앞면) */}
       <div
-        className="relative bg-[#1E1E1E] transition-transform duration-300 ease-out"
+        className="relative bg-transparent transition-transform duration-300 ease-out"
         style={{
           transform: `translateX(${translateX}px)`,
           touchAction: isDragging ? 'none' : 'pan-y pan-x', // 드래그 중이 아닐 때만 스크롤 허용

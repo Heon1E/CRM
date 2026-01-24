@@ -103,16 +103,28 @@ const AgentChatWindow = () => {
       // 로컬 개발 환경: 직접 Gemini API 호출
       if (import.meta.env.DEV && apiKey) {
         console.log('🔧 Development mode: Calling Gemini API directly')
-        
+
+        // 현재 날짜 정보
+        const today = new Date()
+        const todayStr = today.toISOString().split('T')[0]
+        const tomorrowStr = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
         const systemPrompt = `당신은 CRM 비서 AI입니다. 사용자의 입력을 분석하여 다음 작업을 수행합니다:
+
+**현재 날짜:**
+- 오늘: ${todayStr}
+- 내일: ${tomorrowStr}
 
 **1. 명함 인식 (이미지가 있을 때)**
 - 명함에서 정보를 추출하여 JSON 형식으로 반환
 - 형식: {"action": "add_client", "client": {"company": "회사명", "contact_person": "담당자", "phone": "전화번호", "email": "이메일", "address": "주소"}}
 
 **2. 활동내역 등록 (텍스트 입력)**
-- "오늘 A사 방문", "B사 김대리와 미팅" 등을 파싱
-- 형식: {"action": "add_activity", "activity": {"title": "활동명", "client_name": "거래처명", "activity_type": "미팅|전화|방문|이메일", "notes": "내용", "activity_date": "YYYY-MM-DD"}}
+- "오늘 A사 방문", "내일 삼두 미팅 오후 2시" 등을 파싱
+- 형식: {"action": "add_activity", "activity": {"title": "활동명", "client_name": "거래처명", "type": "미팅|전화|방문|이메일", "description": "내용", "activity_date": "YYYY-MM-DD", "activity_time": "HH:MM"}}
+- **중요**: "오늘"은 ${todayStr}, "내일"은 ${tomorrowStr}로 변환
+- **시간 변환**: "오후 2시" → "14:00", "오전 9시" → "09:00", "오후 3시 30분" → "15:30" (24시간 형식)
+- 시간 정보가 없으면 activity_time은 null
 
 **3. 일반 대화**
 - 위 두 가지에 해당하지 않으면 친절하게 대화
@@ -122,7 +134,7 @@ const AgentChatWindow = () => {
         // Gemini 포맷으로 변환 (이미지 포함)
         const contents = conversationHistory.map((msg, idx) => {
           const parts = [{ text: msg.content }]
-          
+
           // 이미지가 있으면 추가 (base64 inline_data 형식)
           if (msg.role === 'user' && currentImagePreview) {
             const base64Data = currentImagePreview.split(',')[1]
@@ -134,7 +146,7 @@ const AgentChatWindow = () => {
               }
             })
           }
-          
+
           return {
             role: msg.role === 'user' ? 'user' : 'model',
             parts: parts
@@ -170,16 +182,16 @@ const AgentChatWindow = () => {
 
         const data = await response.json()
         assistantText = data.candidates?.[0]?.content?.parts?.[0]?.text || '응답을 생성할 수 없습니다.'
-        
+
         // DB 저장 시도
         await processAndSaveData(assistantText, inputValue, currentImagePreview)
-      } 
+      }
       // 프로덕션 환경: Serverless Function 사용
       else {
         console.log('🚀 Production mode: Using serverless function')
-        
+
         const apiEndpoint = import.meta.env.VITE_AGENT_API_URL || '/api/chat-agent'
-        
+
         const response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
@@ -198,7 +210,7 @@ const AgentChatWindow = () => {
 
         const data = await response.json()
         assistantText = data.content?.[0]?.text || '응답을 생성할 수 없습니다.'
-        
+
         // DB 저장 시도
         await processAndSaveData(assistantText, inputValue, currentImagePreview)
       }
@@ -213,7 +225,7 @@ const AgentChatWindow = () => {
       setMessages(prev => [...prev, agentResponse])
     } catch (error) {
       console.error('Agent API 오류:', error)
-      
+
       const errorResponse = {
         id: messages.length + 2,
         type: 'agent',
@@ -304,7 +316,7 @@ const AgentChatWindow = () => {
       if (!jsonMatch) return false
 
       const parsedData = JSON.parse(jsonMatch[1] || jsonMatch[0])
-      
+
       if (parsedData.action === 'add_client' && parsedData.client) {
         // 거래처 등록
         const { data, error } = await supabase
@@ -329,31 +341,94 @@ const AgentChatWindow = () => {
       }
 
       if (parsedData.action === 'add_activity' && parsedData.activity) {
-        // 활동내역 등록
+        // 거래처명으로 client_id 조회
+        let clientId = null
+
+        if (parsedData.activity.client_name) {
+          const { data: clientData, error: clientError } = await supabase
+            .from('clients')
+            .select('id, company')
+            .ilike('company', `%${parsedData.activity.client_name}%`)
+            .limit(1)
+            .maybeSingle()
+
+          if (clientError && clientError.code !== 'PGRST116') {
+            console.error('Client lookup error:', clientError)
+            throw clientError
+          }
+
+          if (!clientData) {
+            const errorMsg = {
+              id: messages.length + 1,
+              type: 'agent',
+              content: `⚠️ 거래처 "${parsedData.activity.client_name}"를 찾을 수 없습니다.\n먼저 거래처를 등록해주세요.`,
+              timestamp: new Date()
+            }
+            setMessages(prev => [...prev, errorMsg])
+            return false
+          }
+
+          clientId = clientData.id
+        }
+
+        if (!clientId) {
+          const errorMsg = {
+            id: messages.length + 1,
+            type: 'agent',
+            content: `⚠️ 거래처 정보가 필요합니다.\n"[거래처명]과 미팅" 형식으로 입력해주세요.`,
+            timestamp: new Date()
+          }
+          setMessages(prev => [...prev, errorMsg])
+          return false
+        }
+
+        // 활동내역 등록 (Supabase snake_case 스키마에 맞게)
+        const activityData = {
+          client_id: clientId,
+          type: parsedData.activity.type || '미팅',
+          activity_date: parsedData.activity.activity_date || new Date().toISOString().split('T')[0],
+          activity_time: parsedData.activity.activity_time || null,
+          // user: parsedData.activity.attendees || '',  // 임시로 제거 - DB 스키마 확인 필요
+          description: parsedData.activity.description || parsedData.activity.title || '',
+          status: '완료',
+          next_action_date: parsedData.activity.next_action_date || null,
+          next_action_detail: parsedData.activity.next_action_detail || null,
+          created_by: user?.id
+        }
+
         const { data, error } = await supabase
           .from('activities')
-          .insert({
-            ...parsedData.activity,
-            created_by: user?.id,
-            activity_date: parsedData.activity.activity_date || new Date().toISOString()
-          })
+          .insert(activityData)
           .select()
 
-        if (error) throw error
+        if (error) {
+          console.error('Activity insert error:', error)
+          throw error
+        }
 
         const successMsg = {
           id: messages.length + 1,
           type: 'agent',
-          content: `✅ 활동내역 등록 완료!\n\n${parsedData.activity.title}\n일시: ${parsedData.activity.activity_date}\n내용: ${parsedData.activity.notes || '-'}`,
+          content: `✅ 일정이 등록되었습니다!\n\n**${parsedData.activity.title || '활동'}**\n거래처: ${parsedData.activity.client_name}\n일시: ${parsedData.activity.activity_date}\n내용: ${parsedData.activity.notes || '-'}`,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, successMsg])
+
+        // 데이터 새로고침 이벤트 발생
+        window.dispatchEvent(new Event('dataUpdated'))
         return true
       }
 
       return false
     } catch (error) {
       console.error('Data processing error:', error)
+      const errorMsg = {
+        id: messages.length + 1,
+        type: 'agent',
+        content: `❌ 등록 중 오류가 발생했습니다: ${error.message}`,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMsg])
       return false
     }
   }
@@ -372,7 +447,7 @@ const AgentChatWindow = () => {
           aria-label="Open AI Agent Chat"
         >
           <Terminal className="w-7 h-7 mx-auto" />
-          
+
           {/* Tooltip */}
           <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-slate-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
             AI Developer Agent
@@ -432,31 +507,29 @@ const AgentChatWindow = () => {
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                message.type === 'user'
-                  ? 'bg-gradient-to-br from-primary-teal to-primary-teal-dark text-white'
-                  : 'bg-white border border-slate-200 text-slate-800 shadow-sm'
-              }`}
+              className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${message.type === 'user'
+                ? 'bg-gradient-to-br from-primary-teal to-primary-teal-dark text-white'
+                : 'bg-white border border-slate-200 text-slate-800 shadow-sm'
+                }`}
             >
               {message.image && (
-                <img 
-                  src={message.image} 
-                  alt="첨부 이미지" 
+                <img
+                  src={message.image}
+                  alt="첨부 이미지"
                   className="max-w-full rounded-lg mb-2 max-h-48 object-contain"
                 />
               )}
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
               <p
-                className={`text-xs mt-1 ${
-                  message.type === 'user' ? 'text-white/70' : 'text-slate-400'
-                }`}
+                className={`text-xs mt-1 ${message.type === 'user' ? 'text-white/70' : 'text-slate-400'
+                  }`}
               >
                 {formatTime(message.timestamp)}
               </p>
             </div>
           </div>
         ))}
-        
+
         {/* 로딩 인디케이터 */}
         {isLoading && (
           <div className="flex justify-start">
@@ -468,7 +541,7 @@ const AgentChatWindow = () => {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -477,9 +550,9 @@ const AgentChatWindow = () => {
         {/* 이미지 미리보기 */}
         {imagePreview && (
           <div className="mb-3 relative inline-block">
-            <img 
-              src={imagePreview} 
-              alt="미리보기" 
+            <img
+              src={imagePreview}
+              alt="미리보기"
               className="max-h-32 rounded-lg border border-slate-200"
             />
             <button
@@ -491,7 +564,7 @@ const AgentChatWindow = () => {
             </button>
           </div>
         )}
-        
+
         <div className="flex items-end gap-2">
           {/* 이미지 첨부 버튼 */}
           <input
@@ -513,11 +586,10 @@ const AgentChatWindow = () => {
           {/* 음성 녹음 버튼 */}
           <button
             onClick={toggleRecording}
-            className={`flex-shrink-0 w-10 h-10 rounded-xl transition-all ${
-              isRecording 
-                ? 'bg-red-500 text-white animate-pulse' 
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
+            className={`flex-shrink-0 w-10 h-10 rounded-xl transition-all ${isRecording
+              ? 'bg-red-500 text-white animate-pulse'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
             aria-label="음성 녹음"
             title={isRecording ? '녹음 중지' : '음성 입력'}
           >
@@ -527,7 +599,7 @@ const AgentChatWindow = () => {
               <Mic className="w-5 h-5 mx-auto" />
             )}
           </button>
-          
+
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -551,8 +623,8 @@ const AgentChatWindow = () => {
           </button>
         </div>
         <p className="text-xs text-slate-400 mt-2">
-          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs">Enter</kbd> to send, 
-          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs ml-1">Shift+Enter</kbd> for new line, 
+          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs">Enter</kbd> to send,
+          <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs ml-1">Shift+Enter</kbd> for new line,
           <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-xs ml-1">Ctrl+V</kbd> to paste image
         </p>
       </div>

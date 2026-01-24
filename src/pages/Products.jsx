@@ -95,7 +95,6 @@ const Products = () => {
           <p className="text-gray-300 mt-1.5 text-sm md:text-base">총 {totalCount} 제품</p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <ProductExcelUpload />
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="btn-primary flex items-center justify-center gap-2 touch-manipulation min-h-[44px] px-4 py-3 w-full sm:w-auto"

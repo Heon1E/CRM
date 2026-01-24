@@ -308,358 +308,255 @@ const ClientDetail = () => {
   }
 
   return (
-    <div className="space-y-8">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Link
-            to="/clients"
-            className="text-gray-300 hover:text-white transition-all rounded-lg p-2 hover:bg-white/5"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
-            <h1 className="text-2xl md:text-3xl font-semibold text-white">
-              {primaryContact?.company || '거래처 정보'}
-            </h1>
-            <p className="text-gray-300 mt-1 text-sm">
-              Customer 360 View
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+      <div className="max-w-[1200px] mx-auto space-y-6">
 
-      {/* 2컬럼 레이아웃 */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* 좌측 패널: 기본 정보 (1/4) */}
-        <div className="lg:col-span-1 space-y-4">
-          {/* 기본 정보 카드 */}
-          <div className="card p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <div className="space-y-4">
-              {/* 회사명 */}
-              <div>
-                <div className="flex items-center space-x-2 mb-2">
-                  <Building2 className="w-5 h-5 text-gray-300" />
-                  <h2 className="text-lg font-bold text-white">
-                    {primaryContact?.company || '-'}
-                  </h2>
-                </div>
-                {companyClients.length > 1 && (
-                  <p className="text-xs text-gray-300">
-                    담당자 {companyClients.length}명
-                  </p>
-                )}
-              </div>
-
-              {/* 담당자 목록 */}
-              {companyClients.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-gray-300 uppercase">
-                    담당자 목록
-                  </h3>
-                  {companyClients.map((client, idx) => (
-                    <div
-                      key={client.id}
-                      className={`p-2 rounded border border-gray-800 ${
-                        idx === 0 ? 'bg-white/5' : 'bg-[#1E1E1E]'
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-white">
-                        {client.contact_person || '-'}
-                        {idx === 0 && (
-                          <span className="ml-2 text-xs text-gray-300">
-                            (대표)
-                          </span>
-                        )}
-                      </p>
-                      {client.phone && (
-                        <p className="text-xs text-gray-300 mt-1">
-                          {client.phone}
-                        </p>
-                      )}
-                      {client.email && (
-                        <p className="flex items-center gap-1 text-xs text-gray-300 truncate">
-                          <Mail className="w-3.5 h-3.5 text-gray-300" />
-                          <span className="truncate">{client.email}</span>
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* 연락처 정보 */}
-              <div className="space-y-2 pt-4 border-t border-gray-800">
-                {primaryContact?.phone && (
-                  <div className="group flex items-center space-x-2">
-                    <span className="w-10 h-10 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
-                      <Phone className="w-4 h-4" />
-                    </span>
-                    <span className="text-sm text-gray-300">
-                      {primaryContact.phone}
-                    </span>
-                  </div>
-                )}
-                {primaryContact?.email && (
-                  <div className="group flex items-center space-x-2">
-                    <span className="w-10 h-10 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
-                      <Mail className="w-4 h-4" />
-                    </span>
-                    <span className="text-sm text-gray-300 truncate">
-                      {primaryContact.email}
-                    </span>
-                  </div>
-                )}
-                {primaryContact?.status && (
-                  <div className="group flex items-center space-x-2">
-                    <span className="w-10 h-10 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
-                      <Activity className="w-4 h-4" />
-                    </span>
-                    <span className="text-sm text-gray-300">
-                      {coerceClientStatus(primaryContact.status, '-')}
-                    </span>
-                  </div>
-                )}
-              </div>
+        {/* Page Header */}
+        <div className="flex items-center justify-between border-b border-oem-border pb-3">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/clients"
+              className="p-2 -ml-2 text-oem-text-secondary hover:text-oem-blue hover:bg-oem-blue/5 rounded-full transition-all"
+              title="Back to List"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <p className="text-oem-blue text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Customer Profile</p>
+              <h1 className="text-2xl font-bold tracking-tight text-oem-text-primary flex items-center gap-2">
+                {primaryContact?.company || '거래처 정보'}
+              </h1>
+              <p className="text-[11px] text-oem-text-secondary mt-1 font-medium">
+                Customer 360 View & Transaction History
+              </p>
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${primaryContact?.status === '매출' ? 'bg-oem-green/10 border-oem-green/20 text-oem-green' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>
+              {coerceClientStatus(primaryContact?.status, 'Unknown')}
+            </span>
+          </div>
+        </div>
 
-          {/* 매출 통계 카드 */}
-          <div className="card p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase mb-4">
-              매출 통계
-            </h3>
-            <div className="space-y-4">
-              {/* 이번 달 매출 */}
-              <div>
-                <p className="text-xs text-gray-300 mb-1">이번 달 매출</p>
-                <p className="text-2xl font-semibold text-white">
-                  {formatCurrency(thisMonthSales || 0)}
-                </p>
+        {/* 2-Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* Left Column (Info Panel) - 4 cols */}
+          <div className="lg:col-span-4 space-y-6">
+
+            {/* Basic Info Card */}
+            <div className="oem-panel">
+              <div className="oem-panel-header">
+                <h3 className="text-xs font-bold uppercase tracking-tight flex items-center gap-2">
+                  <Building2 className="w-3.5 h-3.5" /> Company Information
+                </h3>
               </div>
-
-              {/* 올해 누적 매출 */}
-              <div className="pt-3 border-t border-gray-800">
-                <p className="text-xs text-gray-300 mb-1">올해 누적 매출 (YTD)</p>
-                <p className="text-lg font-semibold text-white">
-                  {formatCurrency(ytdSales || 0)}
-                </p>
-              </div>
-
-              {/* 전년 동기 대비 성장률 */}
-              <div className="pt-3 border-t border-gray-800">
-                <p className="text-xs text-gray-300 mb-1">작년 대비 성장</p>
-                <div className="flex items-center space-x-2">
-                  {yoyGrowth.value === null ? (
-                    <>
-                      <Minus className="w-4 h-4 text-gray-300" />
-                      <p className="text-lg font-semibold text-gray-300">
-                        {yoyGrowth.label}
-                      </p>
-                    </>
-                  ) : yoyGrowth.isPositive ? (
-                    <>
-                      <TrendingUp className="w-4 h-4 text-red-300" />
-                      <p className="text-lg font-semibold text-red-300">
-                        ▲ {yoyGrowth.label}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown className="w-4 h-4 text-blue-300" />
-                      <p className="text-lg font-semibold text-blue-300">
-                        ▼ {yoyGrowth.label}
-                      </p>
-                    </>
+              <div className="p-4 space-y-4">
+                <div>
+                  <h2 className="text-lg font-bold text-oem-text-primary mb-1">{primaryContact?.company || '-'}</h2>
+                  {companyClients.length > 1 && (
+                    <span className="text-[10px] bg-oem-bg-app border border-oem-border text-oem-text-secondary px-2 py-0.5 rounded-full">
+                      {companyClients.length} Contacts
+                    </span>
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* 우측 패널: 상세 이력 (3/4) */}
-        <div className="lg:col-span-3 space-y-8">
-          {/* 활동 타임라인 */}
-          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <Activity className="w-5 h-5 text-gray-300" />
-                <span>활동 내역</span>
-              </h2>
-              <span className="text-sm text-gray-300">
-                총 {sortedActivities.length}건
-              </span>
-            </div>
-
-            {sortedActivities.length > 0 ? (
-              <div className="space-y-4">
-                {sortedActivities.map((activity, index) => {
-                  const activityDate = activity.activity_date || activity.date
-                  const dateStr = activityDate
-                    ? new Date(activityDate).toLocaleDateString('ko-KR', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
-                    : '-'
-
-                  return (
-                    <div key={activity.id} className="relative pl-8">
-                      {/* 타임라인 라인 */}
-                      {index < sortedActivities.length - 1 && (
-                        <div className="absolute left-3 top-8 bottom-0 w-0.5 bg-gray-800"></div>
-                      )}
-
-                      {/* 타임라인 포인트 */}
-                      <div className="absolute left-0 top-1 w-6 h-6 bg-[#1E1E1E] rounded-full border border-gray-800 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-zinc-400/70 rounded-full"></div>
+                <div className="space-y-3 pt-3 border-t border-oem-border">
+                  {/* Primary Contact */}
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-oem-text-secondary mb-1">Primary Contact</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-oem-blue/10 flex items-center justify-center text-oem-blue font-bold text-xs">
+                        {primaryContact?.contact_person?.[0] || '?'}
                       </div>
-
-                      {/* 활동 내용 */}
-                      <div className="group bg-[#1E1E1E] rounded-lg p-4 border border-gray-800 hover:bg-white/5 transition-colors">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="flex items-center space-x-2 mb-1">
-                              <span className="w-8 h-8 rounded-xl bg-[#1E1E1E] text-gray-300 flex items-center justify-center transition-all duration-300 ease-out group-hover:bg-blue-500/15 group-hover:text-blue-200 group-hover:scale-110">
-                                <Calendar className="w-4 h-4" />
-                              </span>
-                              <span className="text-sm font-semibold text-white">
-                                {dateStr}
-                              </span>
-                            </div>
-                            <p className="text-sm font-medium text-gray-300">
-                              {activity.type || '활동'}
-                            </p>
-                          </div>
-                          {activity.status && (
-                            <span className="text-xs px-2 py-1 bg-white/5 text-gray-300 rounded border border-gray-800">
-                              {activity.status}
-                            </span>
-                          )}
-                        </div>
-                        {activity.description && (
-                          <p className="text-sm text-gray-300 mt-2">
-                            {activity.description}
-                          </p>
-                        )}
-                        {activity.user && (
-                          <p className="text-xs text-gray-300 mt-2">
-                            담당: {activity.user}
-                          </p>
-                        )}
+                      <div>
+                        <p className="text-sm font-bold text-oem-text-primary">{primaryContact?.contact_person || 'N/A'}</p>
+                        <p className="text-[11px] text-oem-text-secondary">{primaryContact?.role || 'Representative'}</p>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-300">
-                활동 내역이 없습니다.
-              </div>
-            )}
-          </div>
+                  </div>
 
-          {/* 구매 이력 */}
-          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <DollarSign className="w-5 h-5 text-gray-300" />
-                <span>구매 이력</span>
-              </h2>
-              <div className="text-right">
-                <p className="text-xs text-gray-300">올해 누적 매출액</p>
-                <p className="text-xl font-semibold text-white">
-                  {formatCurrency(ytdSales || 0)}
-                </p>
+                  {/* Contact Details */}
+                  <div className="space-y-2">
+                    {primaryContact?.phone && (
+                      <div className="flex items-center gap-2 text-sm text-oem-text-primary">
+                        <Phone className="w-3.5 h-3.5 text-oem-text-secondary" />
+                        {primaryContact.phone}
+                      </div>
+                    )}
+                    {primaryContact?.email && (
+                      <div className="flex items-center gap-2 text-sm text-oem-text-primary truncate">
+                        <Mail className="w-3.5 h-3.5 text-oem-text-secondary" />
+                        <span className="truncate" title={primaryContact.email}>{primaryContact.email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Other Contacts */}
+                {companyClients.length > 1 && (
+                  <div className="pt-3 border-t border-oem-border">
+                    <p className="text-[10px] uppercase font-bold text-oem-text-secondary mb-2">Other Contacts</p>
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
+                      {companyClients.slice(1).map(client => (
+                        <div key={client.id} className="p-2 bg-oem-bg-app border border-oem-border rounded-sm text-xs">
+                          <p className="font-bold text-oem-text-primary">{client.contact_person}</p>
+                          <p className="text-oem-text-secondary">{client.email}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {sortedSales.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full table-compact divide-y divide-gray-800">
-                  <thead className="bg-[#161616]">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                        날짜
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                        품목
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                        수량
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                        금액
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                        비고
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-transparent divide-y divide-gray-800">
-                    {sortedSales.map((sale) => {
-                      const saleDate = sale.sale_date || sale.date
-                      const dateStr = saleDate
-                        ? new Date(saleDate).toLocaleDateString('ko-KR', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                          })
-                        : '-'
+            {/* Sales Stats Card */}
+            <div className="oem-panel">
+              <div className="oem-panel-header">
+                <h3 className="text-xs font-bold uppercase tracking-tight flex items-center gap-2">
+                  <DollarSign className="w-3.5 h-3.5" /> Financial Overview
+                </h3>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-oem-text-secondary mb-1">Current Month Sales</p>
+                  <p className="text-2xl font-bold text-oem-blue">{formatCurrency(thisMonthSales || 0)}</p>
+                </div>
+                <div className="pt-3 border-t border-oem-border">
+                  <p className="text-[10px] uppercase font-bold text-oem-text-secondary mb-1">YTD Sales (Year-to-Date)</p>
+                  <p className="text-lg font-bold text-oem-text-primary">{formatCurrency(ytdSales || 0)}</p>
+                </div>
+                <div className="pt-3 border-t border-oem-border">
+                  <p className="text-[10px] uppercase font-bold text-oem-text-secondary mb-1">YoY Growth</p>
+                  <div className="flex items-center gap-2">
+                    {yoyGrowth.value === null ? (
+                      <span className="text-sm font-bold text-oem-text-secondary">N/A (New)</span>
+                    ) : (
+                      <span className={`text-lg font-bold flex items-center gap-1 ${yoyGrowth.isPositive ? 'text-oem-green' : 'text-oem-red'}`}>
+                        {yoyGrowth.isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                        {yoyGrowth.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                      // items에서 품목 정보 추출
-                      const items = sale.items || []
-                      const firstItem = items[0] || {}
-                      const itemName =
-                        firstItem.item_name ||
-                        firstItem.productName ||
-                        firstItem.name ||
-                        '-'
+          </div>
+
+          {/* Right Column (Timeline & History) - 8 cols */}
+          <div className="lg:col-span-8 space-y-6">
+
+            {/* Activity Timeline */}
+            <div className="oem-panel min-h-[400px]">
+              <div className="oem-panel-header flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-oem-text-secondary" />
+                  <span className="text-xs font-bold uppercase tracking-tight">Recent Activities</span>
+                </div>
+                <span className="bg-oem-bg-app border border-oem-border px-2 py-0.5 rounded-full text-[10px] font-bold text-oem-text-secondary">
+                  {sortedActivities.length} Records
+                </span>
+              </div>
+              <div className="p-0">
+                {sortedActivities.length > 0 ? (
+                  <div className="relative pl-6 py-4 space-y-6">
+                    {/* Vertical Line */}
+                    <div className="absolute left-[34px] top-6 bottom-6 w-px bg-oem-border z-0"></div>
+
+                    {sortedActivities.map((activity, index) => {
+                      const dateObj = new Date(activity.activity_date || activity.date)
+                      const dateStr = dateObj.toLocaleDateString()
 
                       return (
-                        <tr
-                          key={sale.id}
-                          className="hover:bg-white/5 transition-colors"
-                        >
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {dateStr}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-gray-300">
-                            {itemName}
-                            {items.length > 1 && (
-                              <span className="text-xs text-gray-300 ml-1">
-                                외 {items.length - 1}건
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {items.reduce(
-                              (sum, item) => sum + (item.quantity || 0),
-                              0
-                            )}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-white text-right">
-                            {formatCurrency(sale.totalAmount || 0)}
-                          </td>
-                          <td className="px-4 py-4 text-sm text-gray-300">
-                            <div className="max-w-xs truncate">
-                              {sale.notes || '-'}
+                        <div key={activity.id} className="relative z-10 pl-8 pr-4 group">
+                          {/* Dot */}
+                          <div className={`absolute left-[29px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ring-oem-border ${activity.status === '완료' ? 'bg-oem-green' : 'bg-amber-400'}`}></div>
+
+                          <div className="bg-white border border-oem-border rounded-sm p-3 hover:border-oem-blue transition-colors shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-oem-text-primary px-1.5 py-0.5 bg-oem-bg-app rounded-sm border border-oem-border">{activity.type}</span>
+                                <span className="text-xs text-oem-text-secondary">{dateStr}</span>
+                              </div>
+                              {activity.user && <span className="text-[10px] text-oem-text-secondary bg-oem-bg-app px-1.5 rounded">by {activity.user}</span>}
                             </div>
-                          </td>
-                        </tr>
+                            <p className="text-sm text-oem-text-primary whitespace-pre-line leading-relaxed">
+                              {activity.description}
+                            </p>
+                          </div>
+                        </div>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-oem-text-secondary">
+                    <Activity className="w-8 h-8 mb-2 opacity-20" />
+                    <p className="text-xs">No activity records found.</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-gray-300">
-                구매 이력이 없습니다.
+            </div>
+
+            {/* Purchase History */}
+            <div className="oem-panel">
+              <div className="oem-panel-header flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-3.5 h-3.5 text-oem-text-secondary" />
+                  <span className="text-xs font-bold uppercase tracking-tight">Purchase History</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-oem-text-secondary mr-2">Total YTD:</span>
+                  <span className="text-xs font-bold text-oem-text-primary">{formatCurrency(ytdSales || 0)}</span>
+                </div>
               </div>
-            )}
+              <div className="p-0 overflow-hidden">
+                {sortedSales.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="oem-table min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="pl-4 py-2 text-left">DATE</th>
+                          <th className="py-2 text-left">ITEM</th>
+                          <th className="py-2 text-center">QTY</th>
+                          <th className="py-2 text-right">AMOUNT</th>
+                          <th className="py-2 text-left pr-4">NOTES</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedSales.map((sale) => {
+                          const dateStr = new Date(sale.sale_date || sale.date).toLocaleDateString()
+                          const items = sale.items || []
+                          const itemName = items[0]?.item_name || items[0]?.name || '-'
+                          const qty = items.reduce((acc, cur) => acc + (cur.quantity || 0), 0)
+
+                          return (
+                            <tr key={sale.id}>
+                              <td className="pl-4 py-3 text-xs font-medium text-oem-text-secondary">{dateStr}</td>
+                              <td className="py-3 text-xs font-bold text-oem-text-primary">
+                                {itemName}
+                                {items.length > 1 && <span className="ml-1 text-[10px] text-oem-text-secondary">(+{items.length - 1})</span>}
+                              </td>
+                              <td className="py-3 text-xs text-center text-oem-text-secondary">{qty}</td>
+                              <td className="py-3 text-xs font-bold text-right text-oem-text-primary">{formatCurrency(sale.totalAmount || 0)}</td>
+                              <td className="py-3 text-xs text-oem-text-secondary pr-4 truncate max-w-[150px]" title={sale.notes}>{sale.notes || '-'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-oem-text-secondary">
+                    <DollarSign className="w-8 h-8 mb-2 opacity-20" />
+                    <p className="text-xs">No purchase history found.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
+
         </div>
       </div>
     </div>

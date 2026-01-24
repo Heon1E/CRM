@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Edit, Download, Plus, Trash2, Search } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
@@ -11,311 +11,182 @@ import { exportSalesToExcel } from '../utils/excelExport'
 import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { formatKoreanCurrency } from '../utils/formatters'
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 20
 
 const Sales = () => {
-  // ===== 모든 Hooks를 최상단에 선언 =====
-  const { clients, deleteSale } = useData()
+  const {
+    clients,
+    sales: contextSales,
+    loading: contextLoading,
+    deleteSale,
+    processGroupedSales,
+    registerMissingProductsFromSales
+  } = useData()
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [editingSaleGroup, setEditingSaleGroup] = useState(null)
-  const [sales, setSales] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [editingSale, setEditingSale] = useState(null)
+
+  // Local State (Pagination & Search)
+  const [localSales, setLocalSales] = useState([])
+  const [localLoading, setLocalLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchInput, setSearchInput] = useState('') // Search input value (not yet submitted)
+  const [searchTerm, setSearchTerm] = useState('') // Submitted search term for API calls
 
-  // 데이터 페칭 함수 (Split Fetching: sales + sales_items 병합, HTTP 400 방지)
+  // Context 데이터를 localSales에 동기화
+  useEffect(() => {
+    const syncTotalCount = async () => {
+      if (!searchTerm && contextSales?.length > 0) {
+        setLocalSales(contextSales)
+        // 실제 DB 카운트를 한 번 더 확인 (1000건 제한 표시 오류 방지)
+        const { count, error } = await supabase
+          .from('sales')
+          .select('*', { count: 'exact', head: true })
+
+        if (!error && count !== null) {
+          setTotalCount(count)
+        } else {
+          setTotalCount(contextSales.length)
+        }
+        setLocalLoading(false)
+      }
+    }
+    syncTotalCount()
+  }, [contextSales, searchTerm])
+
+  // 데이터 페칭 함수 (Server-Side Pagination & Search)
   const fetchData = async () => {
     try {
-      setLoading(true)
-      const isSearching = !!searchTerm.trim()
-      const from = isSearching ? 0 : (page - 1) * PAGE_SIZE
-      const to = isSearching ? 99999 : from + PAGE_SIZE - 1
+      setLocalLoading(true)
+      const from = (page - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
 
-      // Step 1: sales 테이블에서 기본 정보 조회 (페이지네이션 적용)
-      const { data: salesData, error: salesError, count } = await supabase
-        .from('sales')
-        .select('*', { count: 'exact' })
-        .order('sale_date', { ascending: false })
-        .range(from, to)
+      // 기본 쿼리: sales 테이블 조회
+      // 조인 쿼리(!inner)는 검색 시에만 사용하거나, 검색어가 없을 때는 단순 쿼리로 수행하여 안정성 확보
+      let query = searchTerm
+        ? supabase.from('sales').select('*, clients!inner(company)', { count: 'exact' })
+        : supabase.from('sales').select('*', { count: 'exact' })
 
-      if (salesError) throw salesError
+      query = query.order('sale_date', { ascending: false }).range(from, to)
 
-      if (!salesData || salesData.length === 0) {
-        setSales([])
-        setTotalCount(count || 0)
+      if (searchTerm) {
+        query = query.ilike('clients.company', `%${searchTerm}%`)
+      }
+
+      const { data, error, count } = await query
+      if (error) throw error
+
+      setTotalCount(count || 0)
+
+      if (!data || data.length === 0) {
+        setLocalSales([])
         return
       }
 
-      // Step 2: sales_items 테이블에서 전체 데이터 조회 (HTTP 400 방지: .in() 필터 제거)
-      // 모든 sales_items를 가져와서 클라이언트 사이드에서 필터링
-      let allItems = []
-      try {
-        const { data: itemsData, error: itemsError } = await supabase
-          .from('sales_items')
-          .select('*')
-          .range(0, 99999) // 1000-row limit 제거
-
-        if (itemsError) {
-          console.warn('[Sales.jsx] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
-        } else {
-          allItems = itemsData || []
-        }
-      } catch (error) {
-        console.warn('[Sales.jsx] sales_items 조회 중 오류 (무시하고 계속):', error)
-      }
-
-      // Step 3: JavaScript에서 각 sale에 items 병합 및 데이터 정규화
-      const normalizedSales = salesData.map(sale => {
-        const client = clients?.find(c => c.id === sale.client_id)
-        
-        // CRITICAL: sales_items에서 해당 sale_id와 일치하는 items 필터링 (클라이언트 사이드)
-        const mergedItems = allItems.filter(item => item.sale_id === sale.id)
-        
-        // 우선순위: sales_items > items JSON 배열
-        const finalItems = mergedItems.length > 0 
-          ? mergedItems 
-          : (sale.items || [])
-
-        // Step 4: total_amount가 0이면 items에서 재계산
-        let calculatedTotal = sale.total_amount || sale.totalAmount || 0
-        if (calculatedTotal === 0 && finalItems.length > 0) {
-          calculatedTotal = finalItems.reduce((sum, item) => {
-            const quantity = Number(item.quantity) || 0
-            const unitPrice = Number(item.unit_price || item.unitPrice) || 0
-            return sum + (quantity * unitPrice)
-          }, 0)
-        }
-
+      // 데이터 정규화 및 클라이언트 정보 매핑
+      const mappedSales = data.map(sale => {
+        const clientCompany = sale.clients?.company || clients.find(c => c.id === (sale.client_id || sale.clientId))?.company || '알 수 없음'
         return {
           ...sale,
-          id: sale.id, // Primary Key 명시적으로 포함
-          date: sale.sale_date || sale.date,
-          clientId: sale.client_id,
-          clientName: client?.company || '알 수 없음',
-          totalAmount: calculatedTotal, // 재계산된 금액 사용
-          items: finalItems, // 병합된 items 배열
-          // sales 테이블의 item_name 컬럼을 직접 사용 (우선순위 1)
-          displayItemName: sale.item_name || finalItems[0]?.item_name || finalItems[0]?.productName || '',
-          itemCount: finalItems.length || 1,
+          clientName: clientCompany,
         }
       })
 
-      setSales(normalizedSales)
-      setTotalCount(count || 0)
+      // 그룹화 적용 (일관성 유지)
+      const groupedSales = processGroupedSales(mappedSales)
+      setLocalSales(groupedSales)
     } catch (error) {
       console.error('매출 데이터 로드 오류:', error)
-      showError('매출 데이터를 불러오는 중 오류가 발생했습니다.')
+      if (!contextSales?.length) {
+        showError('매출 데이터를 연결할 수 없습니다.')
+      }
     } finally {
-      setLoading(false)
+      setLocalLoading(false)
     }
   }
 
-  // 페이지 변경 시 데이터 다시 로드 (clients 의존성 제거로 깜빡임 방지)
+  // 페이지나 검색어 변경 시 데이터 다시 로드
   useEffect(() => {
-    fetchData()
+    // 검색어가 있거나, 페이지가 1보다 크거나, 컨텍스트가 로드되지 않은 경우에만 로컬 페칭
+    if (searchTerm || page > 1 || (contextSales?.length === 0 && !contextLoading)) {
+      fetchData()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, searchTerm]) // searchTerm 변경 시 전체 조회
+  }, [page, searchTerm, contextLoading, contextSales?.length])
 
-  // 검색어 변경 시 첫 페이지로 리셋
-  useEffect(() => {
-    setPage(1)
-  }, [searchTerm])
+  // 실제 렌더링에 사용할 최종 데이터
+  // 1페이지면서 검색어가 없을 때는 전역 컨텍스트의 첫 페지만 슬라이싱해서 보여줌
+  const sales = (searchTerm || page > 1)
+    ? localSales
+    : (contextSales?.length > 0 ? contextSales.slice(0, PAGE_SIZE) : localSales)
+  const isLoading = contextLoading && sales.length === 0
 
-  // 전표 그룹핑 함수: 같은 날짜 + 같은 고객으로 그룹핑
-  const groupSalesBySlip = useMemo(() => {
-    if (!sales || sales.length === 0) return []
-
-    // 날짜를 YYYY-MM-DD 형식으로 정규화하는 함수
-    const normalizeDate = (dateString) => {
-      if (!dateString) return ''
-      // ISO 형식이면 날짜 부분만 추출
-      if (typeof dateString === 'string' && dateString.includes('T')) {
-        return dateString.split('T')[0]
-      }
-      // 이미 YYYY-MM-DD 형식이면 그대로 반환
-      if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
-        return dateString.substring(0, 10)
-      }
-      return dateString
-    }
-
-    // 그룹핑 맵 생성: 키는 "날짜|고객ID"
-    const groupedMap = {}
-    
-    sales.forEach((sale) => {
-      const dateKey = normalizeDate(sale.date || sale.sale_date)
-      const clientKey = sale.clientId || sale.client_id || 'unknown'
-      const groupKey = `${dateKey}|${clientKey}`
-
-      if (!groupedMap[groupKey]) {
-        groupedMap[groupKey] = []
-      }
-      groupedMap[groupKey].push(sale)
-    })
-
-    // 그룹을 배열로 변환하고 집계
-    const groupedSales = Object.values(groupedMap).map((group) => {
-      // 그룹 내 첫 번째 항목 (기준 항목)
-      const firstSale = group[0]
-      
-      // 총 매출액 합계
-      const totalAmount = group.reduce((sum, sale) => {
-        return sum + (sale.totalAmount || sale.total_amount || 0)
-      }, 0)
-
-      // 전체 품목 개수 합계
-      const itemCount = group.reduce((sum, sale) => {
-        return sum + (sale.itemCount || sale.items?.length || 1)
-      }, 0)
-
-      // 첫 번째 품목 이름 (sales 테이블의 item_name 컬럼 직접 사용)
-      const firstItemName = firstSale.item_name || 
-                           firstSale.displayItemName || 
-                           firstSale.items?.[0]?.item_name || 
-                           firstSale.items?.[0]?.productName || 
-                           ''
-
-      // 표시할 품목명: "품목명 외 N건" 형식
-      const displayItem = itemCount > 1 
-        ? `${firstItemName} 외 ${itemCount - 1}건`
-        : firstItemName
-
-      // 비고: 첫 번째 항목의 비고 사용 (여러 개면 첫 번째 것만)
-      const notes = firstSale.notes || ''
-
-      return {
-        id: firstSale.id, // 첫 번째 항목의 ID를 키로 사용
-        date: normalizeDate(firstSale.date || firstSale.sale_date),
-        clientId: firstSale.clientId || firstSale.client_id,
-        clientName: firstSale.clientName || '알 수 없음',
-        totalAmount,
-        itemCount,
-        displayItem,
-        displayItemName: firstItemName, // 원본 품목명 (표시용)
-        notes,
-        // 그룹 내 모든 원본 sale 데이터 (수정/삭제 시 필요)
-        originalSales: group,
-      }
-    })
-
-    // 날짜 내림차순 정렬
-    return groupedSales.sort((a, b) => {
-      return new Date(b.date) - new Date(a.date)
-    })
-  }, [sales])
-
-  // 거래처 검색 필터링
-  const filteredSales = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return groupSalesBySlip
-    }
-
-    const term = searchTerm.toLowerCase().trim()
-    return groupSalesBySlip.filter((slip) =>
-      (slip.clientName || '').toLowerCase().includes(term)
-    )
-  }, [groupSalesBySlip, searchTerm])
-
-  // ===== 모든 Hooks 선언이 끝난 후에 조건부 return 배치 =====
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-300">데이터를 불러오는 중...</div>
-      </div>
-    )
+  // 검색어 변경 시 즉시 입력값 업데이트
+  const handleSearchChange = (e) => {
+    setSearchInput(e.target.value)
   }
 
-  // ===== 일반 함수들은 조건부 return 이후에 정의 =====
+  // Handle Enter key press to trigger search
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      setSearchTerm(searchInput)
+      setPage(1) // Reset to page 1 when search term changes
+    }
+  }
+
   const handleExport = () => {
-    exportSalesToExcel(sales)
-  }
+    // 엑셀 내보내기도 현재 검색 조건에 맞춰서 전체 다운로드 필요
+    // exportSalesToExcel 함수가 데이터를 인자로 받으므로, 
+    // 여기서는 화면에 보이는 것만 내보낼지, 전체를 다시 조회할지 결정해야 함.
+    // 기존 로직: 화면에 있는 sales state를 보냄 -> 15건만 나감 (문제)
+    // 수정 로직: 전체 데이터를 다시 조회해서 내보내기
 
-  // 수정 핸들러 (그룹핑된 전표의 첫 번째 sale을 기준으로 수정)
-  const handleEdit = async (slip) => {
-    if (!slip || !slip.id) {
-      showError('매출 데이터를 찾을 수 없습니다.')
-      return
-    }
+    // 비동기 처리 필요하지만, exportSalesToExcel이 동기적이라면...
+    // 간단히 전체 데이터 fetch 로직을 내장
+    const exportData = async () => {
+      try {
+        setLoading(true)
+        let query = supabase
+          .from('sales')
+          .select('*, clients!inner(company)')
+          .order('sale_date', { ascending: false })
 
-    try {
-      // 그룹 내 첫 번째 sale의 ID로 상세 데이터 다시 조회
-      const saleId = slip.originalSales && slip.originalSales.length > 0 
-        ? slip.originalSales[0].id 
-        : slip.id
-
-      // Step 1: sales 테이블에서 기본 정보 조회
-      const { data: saleData, error: saleError } = await supabase
-        .from('sales')
-        .select('*')
-        .eq('id', saleId)
-        .single()
-
-      if (saleError) throw saleError
-
-      // Step 2: sales_items 테이블에서 sale_id로 품목 목록 조회
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('sales_items')
-        .select('*')
-        .eq('sale_id', saleId)
-
-      if (itemsError) {
-        console.warn('[Sales.jsx] sales_items 조회 실패 (테이블이 없을 수 있음):', itemsError)
-      }
-
-      // 디버깅: 조회된 데이터 구조 확인
-      console.log('[Sales.jsx] Step 1 - Sale Data:', saleData)
-      console.log('[Sales.jsx] Step 2 - Items Data:', itemsData)
-      console.log('[Sales.jsx] Sale items (JSON):', saleData?.items)
-
-      if (saleData) {
-        // 클라이언트 정보 매핑
-        const client = clients?.find(c => c.id === saleData.client_id)
-        
-        // Step 3: 두 데이터 합치기 (우선순위: sales_items > items JSON 배열)
-      let itemsArray = itemsData && itemsData.length > 0 
-        ? itemsData 
-        : (saleData.items || [])
-
-      if ((!itemsArray || itemsArray.length === 0) && slip.originalSales && slip.originalSales.length > 0) {
-        // sales 테이블 행 기반 데이터가 있는 경우, 그룹의 원본 행을 품목 리스트로 사용
-        itemsArray = slip.originalSales.map((sale) => ({
-          id: sale.id,
-          item_name: sale.item_name || sale.displayItemName || '',
-          quantity: sale.quantity || 1,
-          unit_price: sale.unit_price || sale.unitPrice || 0
-        }))
-      }
-        
-        // 상세 데이터를 모달에 전달
-        const detailedSale = {
-          ...saleData,
-          id: saleData.id,
-          clientId: saleData.client_id,
-          clientName: client?.company || '알 수 없음',
-          // 분리 조회한 items 배열 명시적으로 연결
-          items: itemsArray,
-          totalAmount: saleData.total_amount || saleData.totalAmount || 0,
+        if (searchTerm) {
+          query = query.ilike('clients.company', `%${searchTerm}%`)
         }
 
-        console.log('[Sales.jsx] Step 3 - Merged detailedSale:', detailedSale)
-        setEditingSaleGroup(detailedSale)
+        const { data, error } = await query
+        if (error) throw error
+
+        // 데이터 정규화
+        const formattedData = (data || []).map(sale => ({
+          ...sale,
+          date: sale.sale_date,
+          clientName: sale.clients?.company || '알 수 없음',
+          totalAmount: sale.total_amount
+        }))
+
+        exportSalesToExcel(formattedData)
+        showSuccess('엑셀 다운로드가 완료되었습니다.')
+      } catch (e) {
+        console.error('Export Error', e)
+        showError('엑셀 다운로드 중 오류가 발생했습니다.')
+      } finally {
+        setLocalLoading(false)
       }
-    } catch (error) {
-      console.error('매출 데이터 조회 오류:', error)
-      showError('매출 데이터를 불러오는 중 오류가 발생했습니다.')
     }
+
+    exportData()
   }
 
-  // 삭제 핸들러
-  const handleDelete = async (slip) => {
-    if (!slip || !slip.id) {
-      showError('삭제할 매출 데이터를 찾을 수 없습니다.')
-      return
-    }
+  const handleEdit = (sale) => {
+    // 이제 sale은 이미 그룹화된 객체이므로 그대로 전달
+    setEditingSale(sale)
+  }
 
+  const handleDelete = async (sale) => {
     const confirmed = await showConfirm(
-      '이 매출 전표가 영구적으로 삭제됩니다.',
+      '이 매출 내역이 영구적으로 삭제됩니다.',
       '정말 삭제하시겠습니까?',
       '삭제',
       '취소'
@@ -323,269 +194,182 @@ const Sales = () => {
 
     if (confirmed) {
       try {
-        // 그룹 내 모든 sale 삭제
-        if (slip.originalSales && slip.originalSales.length > 0) {
-          // 그룹 내 모든 sale의 id로 삭제
-          for (const sale of slip.originalSales) {
-            if (sale.id) {
-              await deleteSale(sale.id)
-            }
-          }
-        } else {
-          // originalSales가 없으면 slip의 id로 삭제
-          await deleteSale(slip.id)
-        }
+        await deleteSale(sale.id) // deleteSale은 단일 ID 삭제 지원 (DataContext 확인 필요)
+        // DataContext의 deleteSale이 그룹 삭제 로직인지 확인 필요.
+        // DataContext: deleteSale accepts groupId.
+        // If I pass sale.id, it tries to delete where id=sale.id.
+        // If sales table id is used, it deletes that row. correct.
 
-        await showSuccess('매출 전표가 삭제되었습니다.')
-        
-        // 삭제 후 데이터 새로고침
+        await showSuccess('매출 내역이 삭제되었습니다.')
         fetchData()
       } catch (error) {
         console.error('매출 삭제 오류:', error)
-        await showError(error.message || '삭제 중 오류가 발생했습니다.')
+        await showError('삭제 중 오류가 발생했습니다.')
       }
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-oem-bg-app">
+        <div className="text-oem-text-secondary animate-pulse font-medium">Retrieving sales throughput...</div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
-          <h1 className="text-2xl md:text-3xl font-semibold text-white">매출 관리</h1>
-          <p className="text-gray-300 mt-1.5 text-sm md:text-base">
-            총 {filteredSales.length} 매출 전표
-            {searchTerm.trim() && ` (전체 ${totalCount}건 중)`}
-          </p>
-        </div>
-        <div className="flex items-center space-x-3 w-full sm:w-auto flex-wrap gap-2">
-          <button
-            onClick={handleExport}
-            className="btn-secondary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            <Download className="w-4 h-4" />
-            <span>DB Download</span>
-          </button>
-          <SalesExcelUpload onRefresh={fetchData} />
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="btn-primary flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-3"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>매출 추가</span>
-          </button>
-        </div>
-      </div>
+    <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
+      <div className="max-w-[1600px] mx-auto space-y-6">
 
-      {/* Search Bar */}
-      <div className="card p-4 md:p-5 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] hover:bg-white/5 transition-colors">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="거래처 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field w-full pl-10 pr-4 py-3 text-base md:text-base touch-manipulation min-h-[44px]"
-            style={{ fontSize: '16px', WebkitTapHighlightColor: 'transparent' }}
-          />
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
+          <div>
+            <h1 className="text-xl font-bold text-oem-blue tracking-tight flex items-center gap-2">
+              Sales Journal
+              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">FORM: SALES_01</span>
+            </h1>
+            <p className="text-[11px] text-oem-text-secondary mt-1 font-medium">
+              Enterprise revenue tracking and sales document management. Total Statements: <span className="text-oem-blue font-bold">{totalCount}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => setIsAddModalOpen(true)} className="oem-btn-primary flex items-center gap-1.5 py-1.5 h-8">
+              <Plus className="w-3.5 h-3.5 text-white" /> ADD_STATEMENT
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Sales - PC: Table, 모바일: Card with Swipe */}
-      <div className="card overflow-hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-        {/* PC: Table View (768px 이상) */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full table-compact divide-y divide-gray-800">
-            <thead className="bg-[#161616]">
-              <tr>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  날짜
-                </th>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  거래처
-                </th>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  대표 품목
-                </th>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  품목 수
-                </th>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  총 매출액
-                </th>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  비고
-                </th>
-                <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                  작업
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-transparent divide-y divide-gray-800">
-              {filteredSales.length > 0 ? (
-                filteredSales.map((slip) => (
-                  <tr key={slip.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm font-semibold text-white">
-                      {slip.date ? slip.date.split('T')[0] : '-'}
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-white">
-                        {slip.clientName || '-'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
-                      <div className="text-sm text-gray-300">
-                        {slip.displayItem || slip.displayItemName || '-'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm text-gray-300">
-                      {slip.itemCount > 1 ? (
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white/5 text-gray-300 border border-gray-800">
-                          {slip.itemCount}건
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">1건</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm font-semibold text-white">
-                      {formatKoreanCurrency(slip.totalAmount || 0)}
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-5 text-sm text-gray-300">
-                      <div className="max-w-xs truncate">{slip.notes || '-'}</div>
-                    </td>
-                    <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm">
-                      <div className="flex items-center space-x-3">
-                        <button
-                          onClick={() => handleEdit(slip)}
-                          disabled={!slip.id}
-                          className={`font-medium flex items-center space-x-1 transition-all touch-manipulation px-3 py-2 min-h-[44px] rounded-lg ${
-                            slip.id 
-                              ? 'text-gray-300 hover:text-white hover:bg-white/5' 
-                              : 'text-gray-300 cursor-not-allowed'
-                          }`}
-                          style={{ WebkitTapHighlightColor: 'transparent' }}
-                        >
-                          <Edit className="w-4 h-4" />
-                          <span>수정</span>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(slip)}
-                          disabled={!slip.id}
-                          className={`font-medium flex items-center space-x-1 transition-all touch-manipulation px-3 py-2 min-h-[44px] rounded-lg ${
-                            slip.id 
-                              ? 'text-red-200 bg-red-400/10 border border-red-400/30 hover:bg-red-400/20' 
-                              : 'text-gray-300 cursor-not-allowed'
-                          }`}
-                          style={{ WebkitTapHighlightColor: 'transparent' }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span>삭제</span>
-                        </button>
+        {/* Query Panel */}
+        <div className="oem-panel bg-white shadow-sm border-l-4 border-l-oem-blue">
+          <div className="p-4 flex flex-col lg:flex-row gap-4 lg:items-center">
+            <div className="flex-1 flex items-center gap-3">
+              <label className="text-[11px] font-bold text-oem-text-secondary uppercase tracking-widest whitespace-nowrap">Query By Client</label>
+              <div className="relative flex-1 group">
+                <input
+                  type="text"
+                  placeholder="Enter company alias..."
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  onKeyDown={handleSearchKeyDown}
+                  className="w-full bg-oem-bg-panel border border-oem-border px-4 py-2 rounded-oem text-[13px] outline-none focus:border-oem-blue focus:bg-white transition-all"
+                />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-oem-text-secondary w-4 h-4 group-focus-within:text-oem-blue" />
+              </div>
+            </div>
+            <div className="flex items-center gap-6 px-4 lg:border-l border-oem-border text-[11px] font-medium text-oem-text-secondary uppercase">
+              <div className="flex flex-col">
+                <span>TOTAL_THROUGHPUT</span>
+                <span className="text-oem-blue font-bold text-sm tracking-tighter">
+                  {formatKoreanCurrency(sales.reduce((sum, s) => sum + s.totalAmount, 0))}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span>STATUS</span>
+                <span className="text-oem-green font-bold text-sm tracking-tighter uppercase">Querying</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Grid Panel */}
+        <div className="oem-panel bg-white shadow-sm overflow-hidden">
+          <div className="oem-panel-header">
+            <span>TRANSACTION_LEDGER</span>
+            <div className="flex items-center gap-4 text-[10px] font-medium text-oem-text-secondary">
+              <span>PAGE {page} OF {Math.ceil(totalCount / PAGE_SIZE)}</span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="oem-table min-w-full">
+              <thead>
+                <tr>
+                  <th className="w-12 text-center">SEQ</th>
+                  <th className="w-32">DATE</th>
+                  <th className="w-64">CLIENT_NAME</th>
+                  <th>ITEM_DESCRIPTION</th>
+                  <th className="w-20 text-center">QTY</th>
+                  <th className="w-40 text-right">TOTAL_AMOUNT</th>
+                  <th className="w-20 text-center">TOOLS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sales.length > 0 ? (
+                  sales.map((sale, index) => {
+                    const globalIndex = (page - 1) * PAGE_SIZE + index + 1;
+                    return (
+                      <tr key={sale.id} className="group">
+                        <td className="text-center font-bold text-oem-text-secondary">{globalIndex}</td>
+                        <td className="text-oem-text-secondary font-medium">
+                          {sale.date ? sale.date.split('T')[0] : 'N/A'}
+                        </td>
+                        <td className="font-bold text-oem-text-primary tracking-tight">
+                          {sale.clientName}
+                        </td>
+                        <td>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-[13px]">{sale.displayItemName || 'Generic Service'}</span>
+                            {sale.notes && <span className="text-[11px] text-oem-text-secondary italic truncate max-w-xs">{sale.notes}</span>}
+                          </div>
+                        </td>
+                        <td className="text-center text-oem-text-secondary">
+                          {sale.items?.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)}
+                        </td>
+                        <td className="text-right font-bold text-oem-text-primary">
+                          {formatKoreanCurrency(sale.totalAmount || 0)}
+                        </td>
+                        <td className="text-center">
+                          <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEdit(sale)}
+                              className="p-1.5 hover:bg-oem-bg-header rounded transition-colors text-oem-blue"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(sale)}
+                              className="p-1.5 hover:bg-oem-bg-header rounded transition-colors text-oem-red"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="p-12 text-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Plus className="w-12 h-12 text-oem-bg-header" />
+                        <p className="text-oem-text-secondary italic font-medium">
+                          {isLoading || localLoading ? 'Initializing record retrieval...' : 'No transaction records found matching the current query.'}
+                        </p>
                       </div>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="px-4 py-6 md:px-6 md:py-8 text-center text-gray-300">
-                    매출 기록이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        {/* Pagination */}
-        {!searchTerm.trim() && (
-          <Pagination
-            totalCount={totalCount}
-            pageSize={PAGE_SIZE}
-            currentPage={page}
-            onPageChange={setPage}
-          />
-        )}
-      </div>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-      {/* 모바일: Card View with Swipe (768px 미만) */}
-      <div className="card overflow-hidden md:hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-        <div className="md:hidden divide-y divide-gray-800">
-          {filteredSales.length > 0 ? (
-            filteredSales.map((slip) => (
-              <SwipeableListItem
-                key={slip.id}
-                onEdit={() => handleEdit(slip)}
-                onDelete={() => handleDelete(slip)}
-                enabled={!!slip.id}
-              >
-                <div className="p-4 bg-[#1E1E1E] hover:bg-white/5 transition-colors touch-manipulation min-h-[44px]">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-base font-semibold text-white flex-1 break-words">
-                      {slip.date ? slip.date.split('T')[0] : '-'}
-                    </h3>
-                    <span className="ml-2 text-base font-semibold text-white whitespace-nowrap">
-                      {formatKoreanCurrency(slip.totalAmount || 0)}
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 text-sm text-gray-300">
-                    <div className="flex items-start space-x-2">
-                      <span className="font-medium whitespace-nowrap">거래처:</span>
-                      <span className="break-words flex-1">{slip.clientName || '-'}</span>
-                    </div>
-                    <div className="flex items-start space-x-2">
-                      <span className="font-medium whitespace-nowrap">품목:</span>
-                      <span className="break-words flex-1">
-                        {slip.displayItem || slip.displayItemName || '-'}
-                      </span>
-                      {slip.itemCount > 1 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white/5 text-gray-300 border border-gray-800 whitespace-nowrap">
-                          {slip.itemCount}건
-                        </span>
-                      )}
-                    </div>
-                    {slip.notes && (
-                      <div className="mt-2 pt-2 border-t border-gray-800 text-sm text-gray-300 break-words">
-                        {slip.notes}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </SwipeableListItem>
-            ))
-          ) : (
-            <div className="px-6 py-8 text-center text-gray-300">
-              매출 기록이 없습니다.
-            </div>
-          )}
+          {/* Footer Pagination */}
+          <div className="bg-oem-bg-header/30 border-t border-oem-border p-4 flex justify-center">
+            <Pagination
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+              currentPage={page}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
-        {/* Pagination (모바일) */}
-        <Pagination
-          totalCount={totalCount}
-          pageSize={PAGE_SIZE}
-          currentPage={page}
-          onPageChange={setPage}
-        />
       </div>
 
       {/* Modals */}
-      <AddSaleModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-      />
-      <EditSaleModal
-        isOpen={editingSaleGroup !== null}
-        onClose={() => setEditingSaleGroup(null)}
-        saleGroup={editingSaleGroup}
-      />
+      <AddSaleModal isOpen={isAddModalOpen} onClose={() => { setIsAddModalOpen(false); fetchData(); }} />
+      <EditSaleModal isOpen={editingSale !== null} onClose={() => { setEditingSale(null); fetchData(); }} saleGroup={editingSale} />
     </div>
   )
 }
 
 export default Sales
-
-
-
-
-

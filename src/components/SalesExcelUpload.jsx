@@ -102,11 +102,11 @@ const SalesExcelUpload = ({ onRefresh }) => {
       )
 
       const clientMap = new Map()
-      ;(fetchedClients || []).forEach((c) => {
-        buildClientKeys(c.company).forEach((key) => {
-          if (!clientMap.has(key)) clientMap.set(key, c)
+        ; (fetchedClients || []).forEach((c) => {
+          buildClientKeys(c.company).forEach((key) => {
+            if (!clientMap.has(key)) clientMap.set(key, c)
+          })
         })
-      })
 
       setUploadProgress({ current: 0, total: salesData.length, stage: '거래처 매칭 중' })
 
@@ -116,19 +116,18 @@ const SalesExcelUpload = ({ onRefresh }) => {
         if (!sale.clientName || sale.clientName.trim() === '') {
           continue
         }
-        
+
         const clientKeys = buildClientKeys(sale.clientName)
         const client = clientKeys.map((key) => clientMap.get(key)).find(Boolean)
-        if (!client) {
-          errors.push(`${sale.rowIndex || '알 수 없음'}번째 행: 거래처 "${sale.clientName}"를 찾을 수 없습니다.`)
-          continue
-        }
+
+        // 거래처가 없어도 오류로 처리하지 않고 신규 등록 대상으로 포함
+        const clientId = client ? client.id : null
 
         // 총액 계산
         const totalAmount = (sale.quantity || 0) * (sale.unitPrice || 0)
 
         validatedSales.push({
-          clientId: client.id,
+          clientId: clientId,
           clientName: sale.clientName,
           sale_date: sale.sale_date,
           item_name: sale.item_name,
@@ -158,7 +157,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
 
       // Step 2: 엑셀 파일에 있는 날짜들 추출
       const excelDates = [...new Set(validatedSales.map(s => s.sale_date).filter(Boolean))]
-      
+
       if (excelDates.length === 0) {
         await showWarning('유효한 날짜가 없습니다.')
         setIsUploading(false)
@@ -198,7 +197,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       let dedupeCount = 0
       for (const excelSale of validatedSales) {
         const matchKey = `${excelSale.sale_date}|${excelSale.clientId}|${excelSale.totalAmount || 0}`
-        
+
         // 사용되지 않은 정확한 매칭 찾기
         const matchedRecord = dbRecordsPool.find(
           record => !record.used && record.matchKey === matchKey
@@ -271,7 +270,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       // Step 5: 결과 알림
       const totalRows = validatedSales.length
       const resultMessage = `Total ${totalRows} rows: ${insertedCount} inserted, ${duplicateCount} duplicates skipped.`
-      
+
       if (insertedCount > 0) {
         await showSuccess(resultMessage)
       } else if (duplicateCount > 0) {
@@ -298,12 +297,12 @@ const SalesExcelUpload = ({ onRefresh }) => {
   // Delete All 핸들러
   const handleDeleteAll = async () => {
     const confirmed = window.confirm('Are you sure you want to delete ALL sales data? This cannot be undone.')
-    
+
     if (!confirmed) return
 
     try {
       setIsDeleting(true)
-      
+
       // 모든 sales 레코드 삭제
       const { error } = await supabase
         .from('sales')
@@ -313,7 +312,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       if (error) throw error
 
       await showSuccess('모든 매출 데이터가 삭제되었습니다.')
-      
+
       // 리스트 즉시 새로고침 (부모 컴포넌트의 fetchData 호출)
       if (onRefresh) {
         await onRefresh()
@@ -347,9 +346,8 @@ const SalesExcelUpload = ({ onRefresh }) => {
         />
         <label
           htmlFor="sales-excel-upload"
-          className={`px-4 py-2.5 bg-white text-black rounded-xl hover:bg-zinc-100 transition-all duration-200 flex items-center justify-center space-x-2 font-semibold cursor-pointer ${
-            isUploading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className={`px-4 py-2.5 bg-white text-black rounded-xl hover:bg-zinc-100 transition-all duration-200 flex items-center justify-center space-x-2 font-semibold cursor-pointer ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
         >
           {isUploading ? (
             <>
@@ -386,11 +384,10 @@ const SalesExcelUpload = ({ onRefresh }) => {
       <button
         onClick={handleDeleteAll}
         disabled={isDeleting || isUploading}
-        className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${
-          isDeleting || isUploading
+        className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${isDeleting || isUploading
             ? 'opacity-50 cursor-not-allowed bg-[#1E1E1E] text-gray-300 border border-gray-800'
             : 'bg-red-400/20 hover:bg-red-400/30 text-red-200 border border-red-400/30'
-        }`}
+          }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         {isDeleting ? (

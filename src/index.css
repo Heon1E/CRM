@@ -1,137 +1,196 @@
-/* 1. Typography: Inter + Pretendard fallback */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+/* =========================================
+   Oracle Enterprise Manager (OEM) Style
+   ========================================= */
+
+:root {
+  --oem-bg-app: #ffffff;
+  --oem-bg-panel: #f8f9fa;
+  --oem-bg-header: #eff2f5;
+  --oem-border-color: #dce1e7;
+  --oem-text-primary: #333333;
+  --oem-text-secondary: #666666;
+  --oem-text-link: #0076ce;
+  --oem-blue: #0076ce;
+  --oem-green: #4caf50;
+  --oem-red: #f44336;
+}
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* =========================================
-   [최종 솔루션: 프리텐다드 단일 적용 + 숫자 고정폭]
-   모든 글꼴을 깔끔한 'Pretendard'로 통일하되,
-   숫자(Numbers)는 개발 도구처럼 반듯하게 줄이 맞도록 설정합니다.
-   ========================================= */
-
-/* 모든 요소에 강력하게 적용 */
-html, body, div, span, applet, object, iframe,
-h1, h2, h3, h4, h5, h6, p, blockquote, pre,
-a, abbr, acronym, address, big, cite, code,
-del, dfn, em, img, ins, kbd, q, s, samp,
-small, strike, strong, sub, sup, tt, var,
-b, u, i, center,
-dl, dt, dd, ol, ul, li,
-fieldset, form, label, legend,
-table, caption, tbody, tfoot, thead, tr, th, td,
-article, aside, canvas, details, embed,
-figure, figcaption, footer, header, hgroup,
-menu, nav, output, ruby, section, summary,
-time, mark, audio, video, button, input, select, textarea {
-  /* 1. 폰트 패밀리 */
-  font-family: "Inter", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif !important;
-  
-  /* 2. ★핵심★: 숫자를 고정폭(Monospace)처럼 가지런히 배열 */
-  font-variant-numeric: tabular-nums !important;
-  /* font-feature-settings: "tnum" !important; (구형 브라우저 호환용, 필요시 주석 해제) */
-
-  /* 기타 렌더링 설정 */
-  letter-spacing: -0.01em !important; /* Linear 느낌에 맞춘 아주 미세한 자간 */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* 제목 및 강조 텍스트 두께 설정 */
-h1, h2, h3, h4, h5, h6, .font-bold, strong, b, th {
-  font-weight: 700 !important; /* 프리텐다드 Bold */
-}
-
+/* 1. Global Reset & Typography */
+html,
 body {
-    font-weight: 400 !important; /* 기본 본문 Regular */
+  background-color: var(--oem-bg-app);
+  color: var(--oem-text-primary);
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Noto Sans KR', 'Roboto', 'Arial', sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
 }
 
-
-@layer base {
-  body {
-    margin: 0;
-    background-color: #FAFAF8;
-    color: #1F2937;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    background-image: none;
-  }
+h1,
+h2,
+h3,
+h4 {
+  color: var(--oem-text-primary);
+  font-weight: 600;
 }
 
+a {
+  color: var(--oem-text-link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 2. OEM Components */
 @layer components {
-  /* =========================================
-     Linear-inspired UI primitives
-     ========================================= */
-  .card, .bg-white, .shadow-sm, .rounded-lg, [class*="bg-white"], .rbc-month-view {
-    box-shadow: 0 10px 30px -10px rgba(30, 58, 138, 0.1), 0 4px 12px -4px rgba(30, 58, 138, 0.05) !important;
-    border: 1px solid transparent !important;
-    border-radius: 20px !important;
-  }
-  .shadow-card {
-    box-shadow: 0 10px 30px -10px rgba(30, 58, 138, 0.1), 0 4px 12px -4px rgba(30, 58, 138, 0.05) !important;
-  }
-  .card:not([class*="bg-"]), .bg-white:not([class*="bg-"]) { background-color: #FFFCF9; }
 
-  .btn, button, [role="button"] {
-    border-radius: 12px !important;
-    box-shadow: none !important;
-    font-weight: 500 !important;
-    transition: all 0.15s ease;
-    min-height: 40px;
-  }
-  .btn-primary { @apply text-white bg-primary-teal hover:bg-primary-teal/90 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed; border: 1px solid transparent !important; }
-  .btn-secondary { @apply bg-transparent text-slate-500 hover:text-slate-800 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed; border: 1px solid transparent !important; }
-  .btn-success { @apply text-white bg-emerald-600 hover:bg-emerald-500 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed; border: 1px solid transparent !important; }
-  .btn-danger { @apply text-red-600 bg-red-50 hover:bg-red-100 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed; border: 1px solid rgba(248,113,113,0.35) !important; }
-
-  input, select, textarea, .input-field {
-    background-color: #FFFFFF;
-    border-radius: 10px !important;
-    border: 1px solid #E2E8F0 !important;
-    box-shadow: none !important;
-    padding: 0.5rem 0.75rem;
-    color: #1F2937;
-  }
-  input:focus, select:focus, textarea:focus {
-    outline: none;
-    border-color: #93C5FD !important;
-    box-shadow: 0 0 0 3px rgba(59,130,246,0.18) !important;
+  /* Panels */
+  .oem-panel {
+    background-color: var(--oem-bg-panel);
+    border: 1px solid var(--oem-border-color);
+    border-radius: 2px;
+    overflow: hidden;
   }
 
-  input::placeholder,
-  textarea::placeholder {
-    color: #94A3B8 !important;
-    opacity: 1;
+  .oem-panel-header {
+    background-color: var(--oem-bg-header);
+    border-bottom: 1px solid var(--oem-border-color);
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--oem-text-primary);
   }
 
-  table, th, td { border-color: #E2E8F0 !important; }
-  th {
-    background-color: #F1F5F9 !important;
-    color: #475569 !important;
+  .oem-panel-content {
+    padding: 12px;
   }
-  .table-compact th,
-  .table-compact td {
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.75rem !important;
+
+  /* Global Header */
+  .oem-header {
+    background-color: #ffffff;
+    border-bottom: 3px solid var(--oem-blue);
+    height: 50px;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    justify-content: space-between;
+  }
+
+  /* Buttons */
+  .oem-btn-primary {
+    background-color: var(--oem-blue);
+    color: #ffffff;
+    padding: 4px 12px;
+    border-radius: 2px;
+    font-weight: 500;
+    font-size: 12px;
+    transition: background-color 0.2s;
+  }
+
+  .oem-btn-primary:hover {
+    background-color: #005fa6;
+  }
+
+  .oem-btn-secondary {
+    background-color: #ffffff;
+    color: var(--oem-text-primary);
+    border: 1px solid var(--oem-border-color);
+    padding: 4px 12px;
+    border-radius: 2px;
+    font-weight: 500;
+    font-size: 12px;
+  }
+
+  /* KPI Cards inside Summary */
+  .oem-kpi-item {
+    display: flex;
+    flex-direction: column;
+    padding: 0 20px;
+    border-right: 1px solid var(--oem-border-color);
+  }
+
+  .oem-kpi-item:last-child {
+    border-right: none;
+  }
+
+  .oem-kpi-label {
+    font-size: 11px;
+    color: var(--oem-text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .oem-kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--oem-text-primary);
+  }
+
+  /* Tables */
+  .oem-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .oem-table th {
+    background-color: var(--oem-bg-header);
+    border-bottom: 2px solid var(--oem-border-color);
+    padding: 8px;
+    text-align: left;
+    color: var(--oem-text-secondary);
+  }
+
+  .oem-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--oem-border-color);
+    color: var(--oem-text-primary);
+  }
+
+  .oem-table tr:hover {
+    background-color: #f1f3f5;
   }
 }
 
-@media (max-width: 768px) {
-  .btn, button, [role="button"] {
-    min-height: 44px;
-  }
+/* 3. Utilities */
+.text-oem-green {
+  color: var(--oem-green);
 }
 
-/* 캘린더 스타일 유지 */
-.rbc-calendar { border: none !important; }
-.rbc-header { padding: 8px 4px; border-bottom: 1px solid #1F2430 !important; background-color: #0F1117; color: #E5E7EB; }
-.rbc-day-bg { border-color: #1F2430 !important; }
-.rbc-today { background-color: #1B2338 !important; }
-.rbc-date-number { padding: 4px 8px; font-size: 0.9rem; }
-.rbc-event { border-radius: 3px !important; padding: 2px 5px !important; font-size: 12px !important; box-shadow: none !important; border: none !important; margin-bottom: 2px !important; }
-.rbc-event-content { font-size: 12px !important; }
-.rbc-toolbar button { border: 1px solid #2B3242 !important; border-radius: 4px !important; box-shadow: none !important; color: #E5E7EB !important; background-color: #0F1117 !important; }
-.rbc-toolbar button.rbc-active { background-color: #1B2338 !important; }
-.rbc-toolbar button:hover { background-color: #151A2A !important; }
+.text-oem-red {
+  color: var(--oem-red);
+}
+
+.bg-oem-blue {
+  background-color: var(--oem-blue);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bbb;
+}

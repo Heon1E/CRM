@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Download, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -8,16 +8,35 @@ import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
 import ClientExcelUpload from '../components/ClientExcelUpload'
 import SalesExcelUpload from '../components/SalesExcelUpload'
-import { showSuccess, showError, showConfirm } from '../utils/alert'
+import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
+import { exportClientsToExcel } from '../utils/excelExport'
+import { exportSalesToExcel } from '../utils/excelExport'
+
+const DEMO_USER_ID = '00000000-0000-0000-0000-000000000000'
+
+// --- UI Components ---
+const Panel = ({ title, children, className = "" }) => (
+  <div className={`oem-panel ${className} mb-6`}>
+    <div className="oem-panel-header">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-oem-text-secondary">▼</span>
+        <span className="uppercase tracking-tight">{title}</span>
+      </div>
+    </div>
+    <div className="oem-panel-content p-4">
+      {children}
+    </div>
+  </div>
+)
 
 const Settings = () => {
-  const { products, deleteProduct, loading } = useData()
+  const { products, deleteProduct, loading, registerMissingProductsFromSales } = useData()
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('general') // 'general' or 'products'
   const [editingProductId, setEditingProductId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [settingsLoading, setSettingsLoading] = useState(true)
-  
+
   // 설정 상태
   const [settings, setSettings] = useState({
     company_name: '',
@@ -35,23 +54,34 @@ const Settings = () => {
     }
 
     const loadSettings = async () => {
+      // [수정] 데모 사용자일 경우 DB 연동 스킵 (FK 에러 방지)
+      if (user.id === DEMO_USER_ID) {
+        setSettings({
+          company_name: 'Xavian CRM (Demo)',
+          email: 'demo@example.com',
+          email_notification: true,
+          new_client_notification: true,
+          sales_goal_notification: false,
+        })
+        setSettingsLoading(false)
+        return
+      }
+
       try {
         // 먼저 데이터 조회 시도
         const { data, error } = await supabase
           .from('settings')
           .select('*')
           .eq('user_id', user.id)
-          .maybeSingle()  // .single() 대신 .maybeSingle() 사용 (데이터 없으면 null 반환, 에러 없음)
+          .maybeSingle()
 
         if (error) {
-          console.error('❌ [loadSettings] 설정 불러오기 오류:', error)
-          // 에러가 있어도 기본값 사용
+          console.warn('⚠️ [loadSettings] 설정 조회 실패 (기본값 사용):', error.message)
           setSettingsLoading(false)
           return
         }
 
         if (data) {
-          // 데이터가 있으면 설정에 반영
           setSettings({
             company_name: data.company_name || '',
             email: data.email || '',
@@ -60,7 +90,7 @@ const Settings = () => {
             sales_goal_notification: data.sales_goal_notification === true,
           })
         } else {
-          // 데이터가 없으면 기본값을 DB에 insert하고 다시 불러오기
+          // 데이터가 없으면 기본값 INSERT 시도
           const defaultSettings = {
             user_id: user.id,
             company_name: 'Xavian CRM',
@@ -77,8 +107,14 @@ const Settings = () => {
             .single()
 
           if (insertError) {
-            console.error('❌ [loadSettings] 기본 설정 생성 실패:', insertError)
-            // 기본값 생성 실패해도 기본값으로 화면 표시
+            // 409 Conflict 또는 23505 Unique Violation은 무시 (이미 존재함)
+            if (insertError.code === '23505' || insertError.status === 409) {
+              console.log('ℹ️ [loadSettings] 기본 설정이 이미 존재합니다. (Insert Skipped)')
+            } else {
+              console.error('❌ [loadSettings] 기본 설정 생성 실패:', insertError)
+            }
+
+            // UI는 기본값으로 표시
             setSettings({
               company_name: 'Xavian CRM',
               email: '',
@@ -87,7 +123,6 @@ const Settings = () => {
               sales_goal_notification: false,
             })
           } else {
-            // 생성된 데이터를 설정에 반영
             setSettings({
               company_name: insertData.company_name || 'Xavian CRM',
               email: insertData.email || '',
@@ -98,15 +133,7 @@ const Settings = () => {
           }
         }
       } catch (error) {
-        console.error('❌ [loadSettings] 설정 불러오기 예외:', error)
-        // 예외 발생 시에도 기본값으로 화면 표시
-        setSettings({
-          company_name: 'Xavian CRM',
-          email: '',
-          email_notification: true,
-          new_client_notification: true,
-          sales_goal_notification: false,
-        })
+        console.error('❌ [loadSettings] 예외 발생:', error)
       } finally {
         setSettingsLoading(false)
       }
@@ -115,39 +142,67 @@ const Settings = () => {
     loadSettings()
   }, [user])
 
-  // 저장 핸들러
+  // 저장 핸들러 (Update First Strategy)
   const handleSave = async () => {
     if (!user) {
-      alert('로그인이 필요합니다.')
+      await showWarning('Login required.')
+      return
+    }
+
+    // [수정] 데모 사용자일 경우 DB 저장 흉내 (FK 에러 방지)
+    if (user.id === DEMO_USER_ID) {
+      setSettingsLoading(true)
+      await new Promise(resolve => setTimeout(resolve, 500)) // Fake network delay
+      window.dispatchEvent(new Event('settingsUpdated'))
+      await showSuccess('Configuration saved locally (Demo Mode).')
+      setSettingsLoading(false)
       return
     }
 
     try {
       setSettingsLoading(true)
-      
-      // Supabase에 upsert (있으면 업데이트, 없으면 삽입)
-      const { error } = await supabase
-        .from('settings')
-        .upsert({
-          user_id: user.id,
-          company_name: settings.company_name || null,
-          email: settings.email || null,
-          email_notification: settings.email_notification,
-          new_client_notification: settings.new_client_notification,
-          sales_goal_notification: settings.sales_goal_notification,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        })
 
-      if (error) throw error
+      const payload = {
+        user_id: user.id,
+        company_name: settings.company_name || null,
+        email: settings.email || null,
+        email_notification: settings.email_notification,
+        new_client_notification: settings.new_client_notification,
+        sales_goal_notification: settings.sales_goal_notification,
+        updated_at: new Date().toISOString()
+      }
+
+      // 1. 무조건 Update 먼저 시도 (User ID 기준)
+      const { data: updatedData, error: updateError } = await supabase
+        .from('settings')
+        .update(payload)
+        .eq('user_id', user.id)
+        .select()
+
+      if (updateError) throw updateError
+
+      // 2. 업데이트된 행이 없다면? -> Insert 시도
+      if (!updatedData || updatedData.length === 0) {
+        console.log('ℹ️ [handleSave] 업데이트 대상 없음. 신규 생성(Insert) 시도...')
+        const { error: insertError } = await supabase
+          .from('settings')
+          .insert([payload])
+
+        if (insertError) {
+          if (insertError.code === '23505' || insertError.status === 409) {
+            console.log('ℹ️ [handleSave] Insert 중 중복 발견. 이미 저장된 것으로 간주.')
+          } else {
+            throw insertError
+          }
+        }
+      }
 
       // 회사명 변경 시 전역 상태 업데이트를 위한 이벤트 발생
       window.dispatchEvent(new Event('settingsUpdated'))
-      await showSuccess('설정이 저장되었습니다.')
+      await showSuccess('Configuration saved successfully.')
     } catch (error) {
       console.error('설정 저장 오류:', error)
-      await showError('설정 저장 중 오류가 발생했습니다.')
+      await showError('Failed to save configuration. Please try again.')
     } finally {
       setSettingsLoading(false)
     }
@@ -157,13 +212,25 @@ const Settings = () => {
   const handleCancel = async () => {
     if (!user) return
 
+    // 데모 사용자 처리
+    if (user.id === DEMO_USER_ID) {
+      setSettings({
+        company_name: 'Xavian CRM (Demo)',
+        email: 'demo@example.com',
+        email_notification: true,
+        new_client_notification: true,
+        sales_goal_notification: false,
+      })
+      return
+    }
+
     try {
       setSettingsLoading(true)
       const { data, error } = await supabase
         .from('settings')
         .select('*')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
       if (error && error.code !== 'PGRST116') {
         console.error('설정 불러오기 오류:', error)
@@ -210,266 +277,353 @@ const Settings = () => {
     }
   }
 
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-300">데이터를 불러오는 중...</div>
+      <div className="flex items-center justify-center h-screen bg-oem-bg-app">
+        <div className="text-oem-text-secondary text-sm">LOADING_SETTINGS_MODULE...</div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
-        <h1 className="text-2xl md:text-3xl font-semibold text-white">설정</h1>
-        <p className="text-gray-300 mt-1.5 text-sm md:text-base">시스템 설정 및 관리</p>
-      </div>
+    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+      <div className="max-w-[1200px] mx-auto space-y-6">
 
-      {/* 탭 메뉴 */}
-      <div className="card p-1 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-        <div className="flex space-x-2">
+        {/* Page Header */}
+        <div className="flex items-center justify-between border-b border-oem-border pb-3">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
+              SYSTEM CONFIGURATION
+              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">ADMIN_MODE</span>
+            </h1>
+            <p className="text-[11px] text-oem-text-secondary mt-1 font-medium italic">
+              Global system preferences and master data management.
+            </p>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-oem-border mb-4">
           <button
             onClick={() => setActiveTab('general')}
-            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'general'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-300 hover:bg-white/5'
-            }`}
+            className={`px-4 py-2 text-xs font-bold transition-colors border-b-2 ${activeTab === 'general'
+              ? 'border-oem-blue text-oem-blue'
+              : 'border-transparent text-oem-text-secondary hover:text-oem-text-primary'
+              }`}
           >
-            일반 설정
+            GENERAL_SETTINGS
           </button>
           <button
             onClick={() => setActiveTab('products')}
-            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-              activeTab === 'products'
-                ? 'bg-white/10 text-white'
-                : 'text-gray-300 hover:bg-white/5'
-            }`}
+            className={`px-4 py-2 text-xs font-bold transition-colors border-b-2 ${activeTab === 'products'
+              ? 'border-oem-blue text-oem-blue'
+              : 'border-transparent text-oem-text-secondary hover:text-oem-text-primary'
+              }`}
           >
-            제품 관리
+            PRODUCT_MASTER
           </button>
         </div>
-      </div>
 
-      {/* 일반 설정 탭 */}
-      {activeTab === 'general' && (
-        <>
-          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <h2 className="text-lg font-semibold text-white mb-5">일반 설정</h2>
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  회사명
-                </label>
-                <input
-                  type="text"
-                  placeholder="Xavian"
-                  value={settings.company_name}
-                  onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+        {/* Content Area */}
+        <div className="animate-fade-in">
+          {activeTab === 'general' && (
+            <>
+              <Panel title="General Preferences">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+                  <div>
+                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">Company Name</label>
+                    <input
+                      type="text"
+                      value={settings.company_name}
+                      onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-300"
+                      placeholder="ENTER_COMPANY_NAME"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">Primary Email</label>
+                    <input
+                      type="email"
+                      value={settings.email}
+                      onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-300"
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel title="Notification Rules">
+                <div className="space-y-3 max-w-lg">
+                  <label className="flex items-center gap-3 p-3 border border-oem-border rounded-sm hover:border-oem-blue/50 transition-colors cursor-pointer bg-white">
+                    <input
+                      type="checkbox"
+                      checked={settings.email_notification}
+                      onChange={(e) => setSettings({ ...settings, email_notification: e.target.checked })}
+                      className="rounded-sm border-gray-300 text-oem-blue focus:ring-oem-blue"
+                    />
+                    <span className="text-sm font-medium">Enable Email Notifications</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-oem-border rounded-sm hover:border-oem-blue/50 transition-colors cursor-pointer bg-white">
+                    <input
+                      type="checkbox"
+                      checked={settings.new_client_notification}
+                      onChange={(e) => setSettings({ ...settings, new_client_notification: e.target.checked })}
+                      className="rounded-sm border-gray-300 text-oem-blue focus:ring-oem-blue"
+                    />
+                    <span className="text-sm font-medium">Notify on New Client Registration</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-oem-border rounded-sm hover:border-oem-blue/50 transition-colors cursor-pointer bg-white">
+                    <input
+                      type="checkbox"
+                      checked={settings.sales_goal_notification}
+                      onChange={(e) => setSettings({ ...settings, sales_goal_notification: e.target.checked })}
+                      className="rounded-sm border-gray-300 text-oem-blue focus:ring-oem-blue"
+                    />
+                    <span className="text-sm font-medium">Notify on Sales Goal Achievement</span>
+                  </label>
+                </div>
+              </Panel>
+
+              <Panel title="Bulk Data Operations">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-oem-bg-app p-4 rounded-sm border border-oem-border">
+                    <h3 className="text-sm font-bold text-oem-text-primary mb-2 flex items-center gap-2">
+                      BATCH_CLIENT_IMPORT
+                    </h3>
+                    <p className="text-[11px] text-oem-text-secondary mb-4">
+                      Upload Excel/CSV to bulk register client profiles. Key personnel will be auto-assigned.
+                    </p>
+                    <ClientExcelUpload />
+                  </div>
+                  <div className="bg-oem-bg-app p-4 rounded-sm border border-oem-border">
+                    <h3 className="text-sm font-bold text-oem-text-primary mb-2 flex items-center gap-2">
+                      BATCH_SALES_IMPORT
+                    </h3>
+                    <p className="text-[11px] text-oem-text-secondary mb-4">
+                      Import transaction history via Excel. Ensures exact match on Client Name.
+                    </p>
+                    <SalesExcelUpload />
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel title="Data Export & Maintenance">
+                <div className="space-y-6">
+                  {/* Export Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-4 border border-oem-border rounded-sm flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-oem-text-primary">EXPORT CLIENT DATABASE</h4>
+                        <p className="text-[10px] text-oem-text-secondary mt-1">Download all registered client profiles as Excel.</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            setSettingsLoading(true)
+                            const { data, error } = await supabase.from('clients').select('*').order('company', { ascending: true })
+                            if (error) throw error
+                            exportClientsToExcel(data)
+                            showSuccess('Client database exported successfully.')
+                          } catch (e) {
+                            showError('Export failed.')
+                          } finally { setSettingsLoading(false) }
+                        }}
+                        className="oem-btn-secondary flex items-center gap-2 px-3 py-1.5"
+                      >
+                        <Download className="w-4 h-4" /> EXPORT_XLSX
+                      </button>
+                    </div>
+
+                    <div className="bg-white p-4 border border-oem-border rounded-sm flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-oem-text-primary">EXPORT SALES JOURNAL</h4>
+                        <p className="text-[10px] text-oem-text-secondary mt-1">Download complete transaction history.</p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            setSettingsLoading(true)
+                            const { data, error } = await supabase.from('sales').select('*').order('sale_date', { ascending: false })
+                            if (error) throw error
+                            exportSalesToExcel(data)
+                            showSuccess('Sales journal exported successfully.')
+                          } catch (e) {
+                            showError('Export failed.')
+                          } finally { setSettingsLoading(false) }
+                        }}
+                        className="oem-btn-secondary flex items-center gap-2 px-3 py-1.5"
+                      >
+                        <Download className="w-4 h-4" /> EXPORT_XLSX
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Maintenance Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-oem-border">
+                    <div className="bg-oem-bg-app p-4 border border-oem-border rounded-sm">
+                      <h4 className="text-sm font-bold text-amber-600 mb-2 flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4" /> PRODUCT SYNCHRONIZATION
+                      </h4>
+                      <p className="text-[10px] text-oem-text-secondary mb-3">
+                        Scans sales records for unregistered products and adds them to the Product Master. Backfills product IDs.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          if (settingsLoading) return
+                          setSettingsLoading(true)
+                          try {
+                            const { count, updatedSales } = await registerMissingProductsFromSales()
+                            let msg = ''
+                            if (count > 0) msg += `${count} products registered. `
+                            if (updatedSales > 0) msg += `${updatedSales} sales records linked. `
+                            if (!msg) msg = 'All products are already synchronized.'
+                            await showSuccess(msg)
+                          } catch (err) {
+                            showError('Sync failed.')
+                          } finally {
+                            setSettingsLoading(false)
+                          }
+                        }}
+                        className="oem-btn-secondary w-full justify-center"
+                        disabled={settingsLoading}
+                      >
+                        RUN_SYNC_PROCESS
+                      </button>
+                    </div>
+
+                    <div className="bg-red-50 p-4 border border-red-200 rounded-sm">
+                      <h4 className="text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
+                        <TriangleAlert className="w-4 h-4" /> DANGER ZONE
+                      </h4>
+                      <p className="text-[10px] text-red-800/70 mb-3">
+                        Permanently delete ALL client data, including related sales and activities. This action cannot be undone.
+                      </p>
+                      <button
+                        onClick={async () => {
+                          const confirmed = await showConfirm('Are you sure you want to delete ALL client data? This is irreversible.', 'CRITICAL WARNING', 'DELETE EVERYTHING', 'CANCEL')
+                          if (!confirmed) return
+                          try {
+                            setSettingsLoading(true)
+                            await supabase.from('client_contacts').delete().neq('id', 0)
+                            await supabase.from('activities').delete().neq('id', 0)
+                            await supabase.from('sales').delete().neq('id', 0)
+                            const { error } = await supabase.from('clients').delete().neq('id', 0)
+                            if (error) throw error
+                            showSuccess('All client data has been wiped.')
+                          } catch (error) {
+                            showError('Deletion failed.')
+                          } finally { setSettingsLoading(false) }
+                        }}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-sm transition-colors flex items-center justify-center gap-2"
+                        disabled={settingsLoading}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> DELETE_ALL_DATA
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+
+              <div className="flex justify-end gap-3 mt-6 border-t border-oem-border pt-4">
+                <button
+                  onClick={handleCancel}
+                  className="oem-btn-secondary px-4 py-2"
                   disabled={settingsLoading}
-                  className="input-field w-full disabled:bg-[#121212] disabled:cursor-not-allowed"
-                />
+                >
+                  DISCARD_CHANGES
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="oem-btn-primary px-6 py-2"
+                  disabled={settingsLoading}
+                >
+                  {settingsLoading ? 'SAVING...' : 'SAVE_CONFIGURATION'}
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  대표 이메일
-                </label>
-                <input
-                  type="email"
-                  placeholder="contact@xavian-crm.com"
-                  value={settings.email}
-                  onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                  disabled={settingsLoading}
-                  className="input-field w-full disabled:bg-[#121212] disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          </div>
+            </>
+          )}
 
-          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <h2 className="text-lg font-semibold text-white mb-5">알림 설정</h2>
-            <div className="space-y-4">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.email_notification}
-                  onChange={(e) => setSettings({ ...settings, email_notification: e.target.checked })}
-                  disabled={settingsLoading}
-                  className="rounded border-border-input text-white focus:ring-white/20 w-4 h-4 disabled:cursor-not-allowed"
-                />
-                <span className="ml-3 text-sm font-medium text-gray-300">이메일 알림 받기</span>
-              </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.new_client_notification}
-                  onChange={(e) => setSettings({ ...settings, new_client_notification: e.target.checked })}
-                  disabled={settingsLoading}
-                  className="rounded border-border-input text-white focus:ring-white/20 w-4 h-4 disabled:cursor-not-allowed"
-                />
-                <span className="ml-3 text-sm font-medium text-gray-300">새 고객 등록 알림</span>
-              </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={settings.sales_goal_notification}
-                  onChange={(e) => setSettings({ ...settings, sales_goal_notification: e.target.checked })}
-                  disabled={settingsLoading}
-                  className="rounded border-border-input text-white focus:ring-white/20 w-4 h-4 disabled:cursor-not-allowed"
-                />
-                <span className="ml-3 text-sm font-medium text-gray-300">매출 목표 달성 알림</span>
-              </label>
-            </div>
-          </div>
-
-          {/* 데이터 일괄 관리 섹션 */}
-          <div className="card p-5 md:p-6 bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <h2 className="text-lg font-semibold text-white mb-5">데이터 일괄 관리</h2>
-            <div className="space-y-6">
-              {/* 거래처 일괄 등록 */}
-              <div>
-                <h3 className="text-base font-semibold text-white mb-3">거래처 일괄 등록</h3>
-                <p className="text-sm text-gray-300 mb-4">
-                  엑셀 파일을 업로드하여 거래처를 일괄 등록할 수 있습니다. 담당자1은 자동으로 키맨으로 지정됩니다.
-                </p>
-                <ClientExcelUpload />
+          {activeTab === 'products' && (
+            <>
+              <div className="flex justify-end gap-2 mb-4">
+                <ProductExcelUpload />
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="oem-btn-primary flex items-center gap-2 px-3 py-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>ADD_PRODUCT</span>
+                </button>
               </div>
 
-              {/* 매출 일괄 등록 */}
-              <div>
-                <h3 className="text-base font-semibold text-white mb-3">매출 일괄 등록</h3>
-                <p className="text-sm text-gray-300 mb-4">
-                  엑셀 파일을 업로드하여 매출을 일괄 등록할 수 있습니다. 거래처명은 정확히 일치해야 합니다.
-                </p>
-                <SalesExcelUpload />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3">
-            <button
-              onClick={handleCancel}
-              disabled={settingsLoading}
-              className="btn-secondary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              취소
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={settingsLoading}
-              className="btn-primary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {settingsLoading ? '저장 중...' : '저장'}
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* 제품 관리 탭 */}
-      {activeTab === 'products' && (
-        <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <p className="text-gray-300 text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
-              <h2 className="text-xl md:text-2xl font-semibold text-white">제품 관리</h2>
-              <p className="text-gray-300 mt-1.5 text-sm md:text-base">총 {products.length} 제품</p>
-            </div>
-            <div className="flex items-center space-x-3 w-full sm:w-auto">
-              <ProductExcelUpload />
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="btn-primary w-full sm:w-auto flex items-center justify-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>제품 추가</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="card overflow-hidden bg-[#1E1E1E] border-gray-800 rounded-2xl shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
-            <div className="overflow-x-auto">
-              <table className="min-w-full table-compact divide-y divide-gray-800">
-                <thead className="bg-[#161616]">
-                  <tr>
-                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                      품목명
-                    </th>
-                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                      종류
-                    </th>
-                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                      규격
-                    </th>
-                    <th className="px-4 py-3 md:px-6 md:py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-[0.16em]">
-                      작업
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-transparent divide-y divide-gray-800">
-                  {products.length > 0 ? (
-                    products.map((product) => (
-                      <tr key={product.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-white">{product.name || '-'}</div>
-                        </td>
-                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
-                          <div className="text-sm text-gray-300">{product.type || '-'}</div>
-                        </td>
-                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap">
-                          <div className="text-sm text-gray-300">{product.standard || '-'}</div>
-                        </td>
-                        <td className="px-4 py-3 md:px-6 md:py-5 whitespace-nowrap text-sm">
-                          <div className="flex items-center space-x-3">
-                            <button
-                              onClick={() => setEditingProductId(product.id)}
-                              className="text-gray-300 hover:text-white font-medium flex items-center space-x-1 transition-all px-3 py-2 rounded-lg hover:bg-white/5"
-                            >
-                              <Edit className="w-4 h-4" />
-                              <span>수정</span>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(product.id)}
-                              className="text-red-200 font-medium flex items-center space-x-1 transition-all px-3 py-2 rounded-lg bg-red-400/10 border border-red-400/30 hover:bg-red-400/20"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              <span>삭제</span>
-                            </button>
-                          </div>
-                        </td>
+              <div className="bg-white border border-oem-border rounded-sm overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="oem-table min-w-full">
+                    <thead>
+                      <tr>
+                        <th className="pl-4 text-left">PRODUCT_NAME</th>
+                        <th className="text-left w-[20%]">TYPE</th>
+                        <th className="text-left w-[20%]">STANDARD</th>
+                        <th className="text-center w-[150px]">ACTIONS</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="px-4 py-6 md:px-6 md:py-8 text-center text-gray-300">
-                        등록된 제품이 없습니다.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </thead>
+                    <tbody>
+                      {products.length > 0 ? (
+                        products.map((product) => (
+                          <tr key={product.id}>
+                            <td className="pl-4 font-bold text-[12px] text-oem-text-primary">{product.name || '-'}</td>
+                            <td className="text-[11px] text-oem-text-secondary">{product.type || '-'}</td>
+                            <td className="text-[11px] text-oem-text-secondary">{product.standard || '-'}</td>
+                            <td className="text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  onClick={() => setEditingProductId(product.id)}
+                                  className="p-1 hover:bg-gray-100 rounded text-oem-blue transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(product.id)}
+                                  className="p-1 hover:bg-gray-100 rounded text-red-500 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="4" className="py-8 text-center text-xs text-oem-text-secondary italic">
+                            NO_PRODUCT_RECORDS_FOUND
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          {/* Modals */}
-          <AddProductModal
-            isOpen={isAddModalOpen}
-            onClose={() => setIsAddModalOpen(false)}
-          />
-          <EditProductModal
-            isOpen={editingProductId !== null}
-            onClose={() => setEditingProductId(null)}
-            productId={editingProductId}
-          />
+              {/* Modals */}
+              <AddProductModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+              />
+              <EditProductModal
+                isOpen={editingProductId !== null}
+                onClose={() => setEditingProductId(null)}
+                productId={editingProductId}
+              />
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
 export default Settings
-
-
-
-
-

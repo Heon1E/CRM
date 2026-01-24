@@ -12,13 +12,13 @@ const Toast = ({ message, onClose, duration = 3000 }) => {
   }, [duration, onClose])
 
   return (
-    <div className="fixed top-20 right-4 z-50 animate-slide-in">
-      <div className="bg-[#1E1E1E] rounded-lg border border-gray-800 p-4 flex items-center space-x-3 min-w-[300px]">
-        <CheckCircle2 className="w-5 h-5 text-emerald-200 flex-shrink-0" />
-        <p className="text-sm text-white flex-1">{message}</p>
+    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-slide-in">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-xl p-4 flex items-center space-x-3 min-w-[320px]">
+        <CheckCircle2 className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+        <p className="text-sm text-slate-800 flex-1 font-medium">{message}</p>
         <button
           onClick={onClose}
-          className="text-gray-300 hover:text-white transition-colors"
+          className="text-slate-400 hover:text-slate-600 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -28,6 +28,3 @@ const Toast = ({ message, onClose, duration = 3000 }) => {
 }
 
 export default Toast
-
-
-

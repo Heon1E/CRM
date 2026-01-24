@@ -1,7 +1,7 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { AuthProvider } from './contexts/AuthContext'
 import { DataProvider } from './contexts/DataContext'
 import { BackgroundTaskProvider } from './contexts/BackgroundTaskContext'
 import Layout from './components/Layout'
@@ -16,45 +16,34 @@ import Settings from './pages/Settings'
 import PipelineBoard from './pages/PipelineBoard'
 import Login from './pages/Login'
 import ShareProcessing from './pages/ShareProcessing'
+import Map from './pages/Map'
+import OrderEntry from './pages/OrderEntry'
 import AgentChatWindow from './components/AgentChatWindow'
+
+import ErrorBoundary from './components/ErrorBoundary'
 
 // 인증 상태에 따른 라우팅 컴포넌트
 const ProtectedRoutes = () => {
-  const { user, loading } = useAuth()
-
-  // [핵심] 인증 확인 중이면 로딩 화면만 표시
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <div className="text-center">
-          <div className="text-slate-500 mb-2">로그인 상태 확인 중...</div>
-          <div className="text-xs text-slate-400">잠시만 기다려주세요</div>
-        </div>
-      </div>
-    )
-  }
-
-  // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  // 로그인된 경우 메인 화면 표시
+  // Mock Auth provides user immediately, allowing us to render Layout directly
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/clients" element={<Clients />} />
-        <Route path="/clients/:id" element={<ClientDetail />} />
-        <Route path="/activities" element={<Activities />} />
-        <Route path="/sales" element={<Sales />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/issues" element={<Issues />} />
-        <Route path="/pipeline" element={<PipelineBoard />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/share-processing" element={<ShareProcessing />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/clients" element={<Clients />} />
+          <Route path="/clients/:id" element={<ClientDetail />} />
+          <Route path="/activities" element={<Activities />} />
+          <Route path="/sales" element={<Sales />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/issues" element={<Issues />} />
+          <Route path="/pipeline" element={<PipelineBoard />} />
+          <Route path="/map" element={<Map />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/share-processing" element={<ShareProcessing />} />
+          <Route path="/order-entry" element={<OrderEntry />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   )
 }
 
@@ -69,41 +58,41 @@ function App() {
               <Route path="/*" element={<ProtectedRoutes />} />
             </Routes>
           </Router>
-          {/* Toast 알림 컴포넌트 */}
           <Toaster
             position="top-center"
             toastOptions={{
               duration: 4000,
               style: {
-                background: '#FFFFFF',
-                color: '#1F2937',
-                borderRadius: '12px',
-                padding: '16px',
-                border: '1px solid #E2E8F0',
-                boxShadow: '0 6px 10px -6px rgba(15, 23, 42, 0.15)',
-                fontSize: '14px',
-                fontWeight: 500,
-                minWidth: '300px',
-                maxWidth: '500px'
+                background: '#ffffff',
+                color: '#333333',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                borderRadius: '2px', // Oracle-style slight rounding
+                fontSize: '12px',
+                fontWeight: 600,
+                fontFamily: '"Noto Sans KR", sans-serif',
+                padding: '10px 16px',
+                border: '1px solid #d9d9d9',
+                borderLeft: '4px solid #0076ce', // Oracle Blue
+                maxWidth: '450px'
               },
               success: {
                 iconTheme: {
-                  primary: '#10B981',
-                  secondary: '#FFFFFF'
+                  primary: '#10b981',
+                  secondary: '#ffffff',
                 },
                 style: {
-                  border: '1px solid rgba(16, 185, 129, 0.3)'
-                }
+                  borderLeft: '4px solid #10b981',
+                },
               },
               error: {
                 iconTheme: {
-                  primary: '#EF4444',
-                  secondary: '#FFFFFF'
+                  primary: '#ef4444',
+                  secondary: '#ffffff',
                 },
                 style: {
-                  border: '1px solid rgba(239, 68, 68, 0.3)'
-                }
-              }
+                  borderLeft: '4px solid #ef4444',
+                },
+              },
             }}
           />
           {/* AI Developer Agent Chat Interface */}

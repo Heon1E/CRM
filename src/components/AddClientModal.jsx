@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import Modal from './Modal'
+import { useJsApiLoader } from '@react-google-maps/api'
 import { useData } from '../contexts/DataContext'
 import useEnterMove from '../hooks/useEnterMove'
 import { showWarning, showSuccess, showError } from '../utils/alert'
@@ -17,6 +18,11 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
     email: '',
     status: '신규',
     sales_rep: '', // Sales Rep 필드 추가
+    address: '',
+    address_detail: '',
+    postal_code: '',
+    latitude: null,
+    longitude: null,
     contract_prices: [],
   })
 
@@ -42,9 +48,14 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         email: String(initialData.email || '').trim(),
         status: initialData.status || '신규',
         sales_rep: initialData.sales_rep || '',
+        address: String(initialData.address || '').trim(),
+        address_detail: String(initialData.address_detail || '').trim(),
+        postal_code: String(initialData.postal_code || '').trim(),
+        latitude: initialData.latitude || null,
+        longitude: initialData.longitude || null,
         contract_prices: Array.isArray(initialData.contract_prices) ? initialData.contract_prices : [],
       })
-      
+
       // 담당자 정보가 있으면 contacts에 추가, 없어도 빈 배열로 등록 가능
       if (initialData.contact_person || initialData.position) {
         setContacts([{
@@ -65,6 +76,11 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         phone: '',
         email: '',
         status: '신규',
+        address: '',
+        address_detail: '',
+        postal_code: '',
+        latitude: null,
+        longitude: null,
         contract_prices: [],
       })
       setContacts([{ name: '', department_role: '', phone: '', email: '', is_primary: false }])
@@ -86,7 +102,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
   // 담당자 정보 업데이트
   const handleContactChange = (index, field, value) => {
     const updatedContacts = [...contacts]
-    
+
     // Key-man 체크박스 처리: 한 명만 Key-man이 될 수 있도록
     if (field === 'is_primary' && value === true) {
       // 다른 모든 담당자의 is_primary를 false로 설정
@@ -96,7 +112,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         }
       })
     }
-    
+
     updatedContacts[index] = { ...updatedContacts[index], [field]: value }
     setContacts(updatedContacts)
   }
@@ -110,6 +126,61 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
     }
   }
 
+  // Google Maps SDK Load
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+  })
+
+  // 카카오 주소 검색 (Daum Postcode는 독립적)
+  const handleAddressSearch = () => {
+    if (!window.daum || !window.daum.Postcode) {
+      alert('주소 검색 서비스를 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
+      return
+    }
+
+    new window.daum.Postcode({
+      oncomplete: function (data) {
+        // 도로명 주소 또는 지번 주소 선택
+        const fullAddress = data.userSelectedType === 'R' ? data.roadAddress : data.jibunAddress
+
+        console.log('[Address Search] Selected:', fullAddress, data.zonecode)
+
+        setFormData(prev => ({
+          ...prev,
+          address: fullAddress,
+          postal_code: data.zonecode,
+        }))
+
+        // Google Geocoding API 사용
+        if (isLoaded && window.google && window.google.maps) {
+          try {
+            const geocoder = new window.google.maps.Geocoder()
+            geocoder.geocode({ address: fullAddress }, (results, status) => {
+              if (status === 'OK' && results[0]) {
+                const location = results[0].geometry.location
+                console.log('[Geocoding] Success:', location.lat(), location.lng())
+
+                setFormData(prev => ({
+                  ...prev,
+                  latitude: location.lat(),
+                  longitude: location.lng(),
+                }))
+              } else {
+                console.warn('[Geocoding] Failed:', status)
+              }
+            })
+          } catch (error) {
+            console.error('[Geocoding] Error:', error)
+          }
+        } else {
+          console.warn('[Geocoding] Google Maps SDK not loaded')
+        }
+      }
+    }).open()
+  }
+
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.company.trim()) {
@@ -120,20 +191,25 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
     try {
       // 담당자 목록에서 이름이 있는 것만 필터링
       const validContacts = contacts.filter(contact => contact.name.trim())
-      
+
       // DB 스키마와 일치하는 데이터 객체 생성 (snake_case 확인)
       const clientData = {
         company: formData.company || '',
         status: formData.status || '신규',
-        sales_rep: formData.sales_rep || null, // Sales Rep 필드 추가
+        sales_rep: formData.sales_rep || null,
+        address: formData.address || null,
+        address_detail: formData.address_detail || null,
+        postal_code: formData.postal_code || null,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         contract_prices: Array.isArray(formData.contract_prices) ? formData.contract_prices : [],
-        contacts: validContacts, // 담당자 목록 전달 (별도 처리)
+        contacts: validContacts,
       }
-      
+
       // 디버깅: 전송 전 최종 확인
       console.log('[AddClientModal] 전송될 데이터 (최종 검증):', clientData)
       console.log('[AddClientModal] 담당자 데이터:', validContacts)
-      
+
       await addClient(clientData)
 
       await showSuccess('고객이 추가되었습니다.')
@@ -142,6 +218,11 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         phone: '',
         email: '',
         status: '신규',
+        address: '',
+        address_detail: '',
+        postal_code: '',
+        latitude: null,
+        longitude: null,
         contract_prices: [],
       })
       setContacts([{ name: '', department_role: '', phone: '', email: '', is_primary: false }])
@@ -184,6 +265,43 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* 주소 입력 섹션 */}
+        <div className="border-t border-gray-200 pt-4">
+          <label className="block text-sm font-semibold text-gray-700 mb-2">주소</label>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={formData.postal_code}
+                onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                placeholder="우편번호"
+                className="input-field w-32"
+              />
+              <button
+                type="button"
+                onClick={handleAddressSearch}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+              >
+                주소 검색
+              </button>
+            </div>
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="기본 주소"
+              className="input-field"
+            />
+            <input
+              type="text"
+              value={formData.address_detail}
+              onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })}
+              placeholder="상세 주소 (건물명, 층, 호수 등)"
+              className="input-field"
+            />
           </div>
         </div>
 

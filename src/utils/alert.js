@@ -3,20 +3,22 @@ import withReactContent from 'sweetalert2-react-content'
 
 const ReactSwal = withReactContent(Swal)
 
-// 공통 설정
+// 공통 설정 (Light Theme)
 const commonConfig = {
-  confirmButtonColor: '#FFFFFF',
-  cancelButtonColor: '#3F3F46',
-  background: '#1E1E1E',
-  color: '#FAFAFA',
+  confirmButtonColor: '#4F46E5', // Indigo-600
+  cancelButtonColor: '#FFFFFF', // White
+  background: '#FFFFFF',
+  color: '#1E293B', // Slate-800
   buttonsStyling: true,
   allowOutsideClick: false,
   allowEscapeKey: true,
   customClass: {
-    popup: 'rounded-lg border border-gray-800',
-    confirmButton: 'px-4 py-2 rounded-md font-medium',
-    cancelButton: 'px-4 py-2 rounded-md font-medium',
-    htmlContainer: 'text-left break-words whitespace-normal text-gray-300',
+    popup: 'rounded-xl border border-slate-100 shadow-xl', // Soft shadow & borders
+    title: 'text-xl font-bold text-slate-900',
+    confirmButton: 'px-5 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:bg-indigo-700 transition-colors',
+    cancelButton: 'px-5 py-2.5 rounded-lg font-bold text-sm text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors', // Outlined style
+    htmlContainer: 'text-sm text-slate-600 leading-relaxed text-center', // Clean text
+    actions: 'gap-3 mt-4',
   },
 }
 
