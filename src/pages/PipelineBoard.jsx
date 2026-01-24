@@ -16,6 +16,10 @@ const PipelineBoard = () => {
   const endStages = ['거래 종료', '영업 대기']
   const stages = PIPELINE_STATUSES
 
+  // 모바일 탭 상태
+  const [currentMobileStage, setCurrentMobileStage] = useState(mainStages[0])
+  const mobileTabs = [...mainStages, '계약 성사', ...endStages]
+
   // 파이프라인 대상자 필터링 & 매출 데이터 결합
   const activeClients = useMemo(() => {
     if (!clients || !Array.isArray(clients)) return []
@@ -304,35 +308,53 @@ const PipelineBoard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
-      <div className="max-w-[1800px] mx-auto space-y-6">
+    <div className="min-h-screen bg-oem-bg-app p-4 md:p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+      <div className="max-w-[1800px] mx-auto space-y-4 md:space-y-6">
 
         {/* Page Title Section */}
         <div className="flex items-center justify-between border-b border-oem-border pb-3">
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
+            <h1 className="text-lg md:text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
               Pipeline Status
-              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">Sales Opportunities</span>
+              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal hidden md:inline-block">Sales Opportunities</span>
             </h1>
           </div>
-          <div className="flex items-center gap-4 text-[11px] text-oem-text-secondary font-medium">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-oem-green rounded-full"></span> System Healthy</span>
-            <span>Total Opportunities: {activeClients.length}</span>
+          <div className="flex items-center gap-2 md:gap-4 text-[10px] md:text-[11px] text-oem-text-secondary font-medium">
+            <span className="hidden md:flex items-center gap-1"><span className="w-2 h-2 bg-oem-green rounded-full"></span> System Healthy</span>
+            <span>Total: {activeClients.length}</span>
           </div>
+        </div>
+
+        {/* Mobile Tab Navigation (Visible only on small screens) */}
+        <div className="md:hidden flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 no-scrollbar">
+          {mobileTabs.map((stage) => (
+            <button
+              key={stage}
+              onClick={() => setCurrentMobileStage(stage)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${currentMobileStage === stage
+                  ? 'bg-oem-blue text-white border-oem-blue'
+                  : 'bg-white text-oem-text-secondary border-oem-border'
+                }`}
+            >
+              {stage}
+            </button>
+          ))}
         </div>
 
         {/* Pipeline Board */}
         <div className="overflow-x-auto pb-6">
-          <div className="min-w-[1200px]">
+          <div className="md:min-w-[1200px]">
             <DragDropContext onDragEnd={handleDragEnd}>
               {/* Main Pipeline Row */}
-              <div className="flex gap-4 items-start mb-6">
+              <div className="flex flex-col md:flex-row gap-4 items-start mb-6">
+
+                {/* Stages Loop */}
                 {mainStages.map((stage) => {
-                  const stageClients = clientsByStage[stage] || []
                   return (
                     <div
                       key={stage}
-                      className="flex-shrink-0 w-72 flex flex-col bg-white border border-oem-border rounded-oem shadow-sm"
+                      className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-white border border-oem-border rounded-oem shadow-sm ${currentMobileStage === stage ? 'block' : 'hidden md:flex'
+                        }`}
                       style={{ minHeight: '600px' }}
                     >
                       {/* Column Header */}
@@ -340,7 +362,7 @@ const PipelineBoard = () => {
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="font-bold text-sm text-oem-text-primary">{stage}</h3>
                           <span className="bg-oem-blue/10 text-oem-blue text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {stageClients.length}
+                            {(clientsByStage[stage] || []).length}
                           </span>
                         </div>
                         {stage === '잠재고객' && (
@@ -366,7 +388,7 @@ const PipelineBoard = () => {
                             className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-oem-blue/5' : ''
                               }`}
                           >
-                            {stageClients.map((client, index) => (
+                            {(clientsByStage[stage] || []).map((client, index) => (
                               <Draggable
                                 key={client.id}
                                 draggableId={client.id}
@@ -418,7 +440,8 @@ const PipelineBoard = () => {
                 })}
 
                 {/* Win Zone */}
-                <div className="flex-shrink-0 w-64 pt-8">
+                <div className={`flex-shrink-0 w-full md:w-64 md:pt-8 ${currentMobileStage === '계약 성사' ? 'block' : 'hidden md:block'
+                  }`}>
                   <Droppable droppableId="win-zone">
                     {(provided, snapshot) => (
                       <div
@@ -448,20 +471,23 @@ const PipelineBoard = () => {
                 </div>
               </div>
 
-              {/* End Stages Row */}
-              <div className="flex gap-4 items-start border-t border-oem-border pt-6 mt-6">
+              {/* End Stages Row (Reused for Mobile Tab) */}
+              <div className="flex flex-col md:flex-row gap-4 items-start md:border-t md:border-oem-border md:pt-6 md:mt-6">
                 <div className="w-full">
-                  <h2 className="text-sm font-bold text-oem-text-secondary mb-4 flex items-center gap-2">
+                  <h2 className="hidden md:flex text-sm font-bold text-oem-text-secondary mb-4 items-center gap-2">
                     <span className="w-1.5 h-1.5 bg-oem-text-secondary rounded-full"></span>
                     종료 및 대기 단계
                   </h2>
                   <div className="flex gap-4">
                     {endStages.map((stage) => {
+                      const isActive = currentMobileStage === stage
                       const stageClients = clientsByStage[stage] || []
+
                       return (
                         <div
                           key={stage}
-                          className="flex-shrink-0 w-72 flex flex-col bg-oem-bg-app border border-oem-border rounded-oem opacity-70 hover:opacity-100 transition-opacity"
+                          className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-oem-bg-app border border-oem-border rounded-oem opacity-70 hover:opacity-100 transition-opacity ${isActive ? 'block' : 'hidden md:flex'
+                            }`}
                           style={{ minHeight: '300px' }}
                         >
                           <div className="p-3 border-b border-oem-border bg-oem-bg-header/30">
@@ -532,6 +558,3 @@ const PipelineBoard = () => {
 }
 
 export default PipelineBoard
-
-
-

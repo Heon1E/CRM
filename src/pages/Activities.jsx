@@ -198,8 +198,8 @@ const Activities = () => {
                       <span className="text-[10px] font-bold text-oem-text-secondary">{dateActivities.length} RECS</span>
                     </div>
 
-                    {/* Timeline Interaction Table */}
-                    <table className="oem-table min-w-full">
+                    {/* Timeline Interaction Table (Desktop) */}
+                    <table className="oem-table min-w-full hidden md:table">
                       <tbody>
                         {dateActivities.map((activity) => (
                           <tr key={activity.id} onClick={() => setEditingActivityId(activity.id)} className="group cursor-pointer">
@@ -232,6 +232,39 @@ const Activities = () => {
                         ))}
                       </tbody>
                     </table>
+
+                    {/* Timeline Interaction List (Mobile) */}
+                    <div className="md:hidden divide-y divide-oem-border">
+                      {dateActivities.map((activity) => (
+                        <div key={activity.id} onClick={() => setEditingActivityId(activity.id)} className="p-4 bg-white active:bg-gray-50 transition-colors cursor-pointer">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${activity.status === '완료'
+                                ? 'bg-oem-bg-header text-oem-text-secondary'
+                                : 'bg-oem-red/10 text-oem-red border-oem-red/20'
+                                }`}>
+                                {activity.status === '완료' ? 'DONE' : 'PEND'}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-oem-blue"></span>
+                                <span className="text-[11px] font-bold text-oem-text-secondary">{activity.type}</span>
+                              </div>
+                            </div>
+                            <button className="text-oem-text-secondary">
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <h3 className="font-bold text-oem-text-primary text-sm mb-1">
+                            {activity.clientName || 'UNASSIGNED_CLIENT'}
+                          </h3>
+
+                          <p className="text-sm text-oem-text-primary/90 font-medium leading-snug break-words">
+                            {activity.title || activity.description || '(No context provided)'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )
               })

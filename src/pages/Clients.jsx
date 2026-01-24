@@ -265,12 +265,12 @@ const Clients = () => {
             <table className="oem-table min-w-full">
               <thead>
                 <tr>
-                  <th className="w-12 text-center">SEQ</th>
+                  <th className="w-12 text-center hidden md:table-cell">SEQ</th>
                   <th className="w-80">COMPANY_NAME</th>
-                  <th>CONTACT_METADATA</th>
+                  <th className="hidden md:table-cell">CONTACT_METADATA</th>
                   <th className="w-32">STATUS</th>
-                  <th className="w-32">LAST_TX_DATE</th>
-                  <th className="w-40 text-right">HISTORICAL_REV</th>
+                  <th className="w-32 hidden md:table-cell">LAST_TX_DATE</th>
+                  <th className="w-40 text-right hidden md:table-cell">HISTORICAL_REV</th>
                   <th className="w-20 text-center">TOOLS</th>
                 </tr>
               </thead>
@@ -285,7 +285,7 @@ const Clients = () => {
 
                     return (
                       <tr key={company} className="group">
-                        <td className="text-center font-bold text-oem-text-secondary">{index}</td>
+                        <td className="text-center font-bold text-oem-text-secondary hidden md:table-cell">{index}</td>
                         <td>
                           <Link
                             to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
@@ -293,8 +293,12 @@ const Clients = () => {
                           >
                             {company}
                           </Link>
+                          {/* Mobile-only sub-info */}
+                          <div className="md:hidden text-[11px] text-oem-text-secondary mt-1">
+                            {primaryContact?.contact_person || 'UNASSIGNED'}
+                          </div>
                         </td>
-                        <td>
+                        <td className="hidden md:table-cell">
                           <div className="flex flex-col gap-0.5">
                             <span className="font-medium">{primaryContact?.contact_person || 'UNASSIGNED'}</span>
                             <span className="text-[11px] text-oem-text-secondary italic">{primaryContact?.email || 'no-email@system'}</span>
@@ -308,10 +312,10 @@ const Clients = () => {
                             {primaryContact?.status?.toUpperCase() || 'UNKNOWN'}
                           </span>
                         </td>
-                        <td className="text-oem-text-secondary font-medium">
+                        <td className="text-oem-text-secondary font-medium hidden md:table-cell">
                           {stats.lastOrder ? stats.lastOrder.split('T')[0] : 'NO_RECORDS'}
                         </td>
-                        <td className="text-right font-bold text-oem-text-primary">
+                        <td className="text-right font-bold text-oem-text-primary hidden md:table-cell">
                           {stats.totalAmount === 0 ? '₩ 0' : formatKoreanCurrency(stats.totalAmount || 0)}
                         </td>
                         <td className="text-center">
