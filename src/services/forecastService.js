@@ -70,12 +70,17 @@ export const ForecastService = {
             if (saveError) {
                 // If table doesn't exist, just return the result without caching (Fail gracefully)
                 console.warn('Failed to cache forecast (Table might be missing):', saveError.message)
-                return result
+                // Add current time as created_at for UI display
+                return {
+                    ...result,
+                    created_at: new Date().toISOString()
+                }
             }
 
             return {
                 ...saved,
-                monthlyData: saved.monthly_data
+                monthlyData: saved.monthly_data,
+                created_at: saved.created_at || new Date().toISOString() // Ensure date exists
             }
 
         } catch (e) {

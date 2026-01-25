@@ -100,7 +100,12 @@ const RevenueForecastPanel = () => {
                         </span>
                     </div>
                     <p className="text-[11px] text-oem-text-secondary">
-                        Calculated: {new Date(data.created_at).toLocaleDateString()} {new Date(data.created_at).toLocaleTimeString()}
+                        Calculated: {(() => {
+                            const d = new Date(data.created_at)
+                            return !isNaN(d.getTime())
+                                ? `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`
+                                : 'Just now'
+                        })()}
                     </p>
                 </div>
                 <div className="text-right">

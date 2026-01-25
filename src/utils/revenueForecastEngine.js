@@ -97,37 +97,56 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
     const forecastGrowthRate = (ytdGrowthRate * 0.7) + (rawGrowthRate * 0.3)
 
     // 4. Generate Monthly Projections
-    const finalMonthlyData = monthlyActuals.map((data, idx) => {
-        // Past months: use Actuals
+    // 4. Generate Monthly Projections
+    const finalMonthlyData = []
+
+    for (let idx = 0; idx < 12; idx++) {
+        const data = monthlyActuals[idx] // { thisYear, lastYear }
+
+        // Past months: Use Actuals
         if (idx <= currentMonth) {
-            return {
+            finalMonthlyData.push({
                 month: idx + 1,
                 actual: data.thisYear,
-                forecast: data.thisYear, // Past forecast = actual
+                forecast: data.thisYear,
                 isForecast: false
+            })
+            continue
+        }
+
+        // Future months: Project Revenue
+        let projected = 0
+
+        // Strategy A: YoY Growth (Preferred if history exists)
+        if (data.lastYear > 0) {
+            projected = data.lastYear * (1 + forecastGrowthRate)
+        }
+        // Strategy B: Moving Average (Fallback for new business/missing history)
+        else {
+            // Get last 3 months (can be actuals or previous forecasts)
+            const prev1 = finalMonthlyData[idx - 1]?.forecast || 0
+            const prev2 = finalMonthlyData[idx - 2]?.forecast || 0
+            const prev3 = finalMonthlyData[idx - 3]?.forecast || 0
+
+            // Calculate average of available months
+            const availablePoints = [prev1, prev2, prev3].filter(v => v > 0)
+            const sum = availablePoints.reduce((a, b) => a + b, 0)
+
+            if (availablePoints.length > 0) {
+                projected = sum / availablePoints.length
+            } else {
+                // Last resort: if absolutely no recent data (e.g. Jan 1st of new biz), use 0 or minimal baseline
+                projected = 0
             }
         }
 
-        // Future months: Project based on Last Year's same month * Growth Rate
-        // Fallback: If last year was 0, use average of last 3 months
-        let projected = 0
-        if (data.lastYear > 0) {
-            projected = data.lastYear * (1 + forecastGrowthRate)
-        } else {
-            // Simple Moving Average of recent 3 months if no history
-            const prev1 = monthlyActuals[idx - 1]?.thisYear || 0
-            const prev2 = monthlyActuals[idx - 2]?.thisYear || 0
-            const prev3 = monthlyActuals[idx - 3]?.thisYear || 0 // Warning: might grab last year's dec if idx is low, but simplified for now
-            projected = (prev1 + prev2 + prev3) / 3
-        }
-
-        return {
+        finalMonthlyData.push({
             month: idx + 1,
-            actual: 0, // No actual yet
+            actual: 0,
             forecast: Math.round(projected),
             isForecast: true
-        }
-    })
+        })
+    }
 
     const totalForecast = finalMonthlyData.reduce((sum, m) => sum + m.forecast, 0)
 
