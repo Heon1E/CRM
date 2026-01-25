@@ -5,7 +5,8 @@ import {
 } from 'recharts'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  Users, Store, DollarSign, BarChart2
+  Users, Store, DollarSign, BarChart2,
+  Phone, Mail, FileText, CheckCircle
 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useDashboardData } from '../hooks/useDashboardData'
@@ -352,24 +353,72 @@ const Dashboard = () => {
               </button>
             </Panel>
 
-            {/* My Activities Timeline */}
             <Panel title="My Activities (Timeline)">
-              <div className="relative pl-6 space-y-4 py-2 border-l border-oem-border ml-2 mt-2">
-                {(activities || []).slice(0, 5).map((act, idx) => (
-                  <div key={act.id} className="relative cursor-pointer group" onClick={() => setEditingActivityId(act.id)}>
-                    {/* Timeline Dot */}
-                    <div className={`absolute -left-[31px] top-1.5 w-3 h-3 rounded-full border-2 border-white ring-2 ring-oem-border transition-all ${act.status === 'Done' ? 'bg-oem-text-secondary group-hover:bg-oem-green' : 'bg-oem-red ring-oem-red/20'
-                      }`}></div>
+              <div className="space-y-4 py-2 mt-2">
+                {(activities || [])
+                  .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by date descending
+                  .slice(0, 5)
+                  .map((act) => {
+                    // Icon Mapping
+                    let Icon = Users
+                    let iconBg = 'bg-blue-100'
+                    let iconColor = 'text-blue-600'
 
-                    <div className="flex flex-col">
-                      <span className="text-[11px] text-oem-text-secondary font-medium">{new Date(act.date).toLocaleDateString()}</span>
-                      <p className="text-sm font-bold text-oem-text-primary group-hover:text-oem-blue transition-colors mt-0.5">{act.title}</p>
-                      <p className="text-[12px] text-oem-text-secondary mt-1 italic">@{act.clientName}</p>
-                    </div>
+                    switch (act.type) {
+                      case '전화': Icon = Phone; iconBg = 'bg-green-100'; iconColor = 'text-green-600'; break;
+                      case '이메일': Icon = Mail; iconBg = 'bg-purple-100'; iconColor = 'text-purple-600'; break;
+                      case '제안서': Icon = FileText; iconBg = 'bg-orange-100'; iconColor = 'text-orange-600'; break;
+                      case '견적': Icon = DollarSign; iconBg = 'bg-amber-100'; iconColor = 'text-amber-600'; break;
+                      case '계약': Icon = CheckCircle; iconBg = 'bg-teal-100'; iconColor = 'text-teal-600'; break;
+                      default: break; // '미팅' defaults
+                    }
+
+                    return (
+                      <div
+                        key={act.id}
+                        className="relative flex gap-3 group cursor-pointer p-2 rounded hover:bg-gray-50 transition-colors border-l-2 border-transparent hover:border-l-oem-blue pl-2"
+                        onClick={() => setEditingActivityId(act.id)}
+                      >
+                        {/* Icon Box */}
+                        <div className={`mt-0.5 w-8 h-8 rounded flex-shrink-0 flex items-center justify-center ${iconBg} ${iconColor}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <span className="text-[10px] font-bold text-oem-text-secondary uppercase tracking-wider bg-gray-100 px-1.5 py-0.5 rounded">
+                              {act.type || 'Activity'}
+                            </span>
+                            <span className="text-[10px] text-oem-text-secondary whitespace-nowrap ml-2">
+                              {new Date(act.date).toLocaleDateString()}
+                            </span>
+                          </div>
+
+                          <p className="text-sm font-bold text-oem-text-primary mt-1 line-clamp-1 group-hover:text-oem-blue transition-colors">
+                            {act.title || act.clientName}
+                          </p>
+
+                          {/* Client Name & Desc */}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[11px] text-oem-text-secondary font-medium truncate">@{act.clientName}</span>
+                          </div>
+
+                          <p className="text-[11px] text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
+                            {act.description || "No details provided."}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                {(activities || []).length === 0 && (
+                  <div className="text-center py-8 text-gray-400 text-xs italic">
+                    No recent activities found.
                   </div>
-                ))}
+                )}
               </div>
-              <Link to="/activities" className="block text-center text-[11px] font-bold text-oem-text-link mt-6 hover:underline">
+              <Link to="/activities" className="block text-center text-[11px] font-bold text-oem-text-link mt-4 pt-4 border-t border-dashed border-gray-200 hover:underline">
                 OPEN_FULL_TIMELINE →
               </Link>
             </Panel>
