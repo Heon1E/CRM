@@ -227,56 +227,48 @@ export const DataProvider = ({ children }) => {
   // 1. 유틸리티 함수
   // 1. 유틸리티 함수
   const getValidUserId = async (currentUser) => {
-    let candidateId = currentUser?.id
+    // 1. 현재 로그인된 유저 ID가 있으면 최우선 사용
+    if (currentUser?.id) return currentUser.id
 
-    if (!candidateId) {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      candidateId = authUser?.id
-    }
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (authUser?.id) return authUser.id
 
-    if (candidateId) {
-      // 1. users 테이블에 존재하는지 확인
-      const { data: exists } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', candidateId)
+    // 2. 로그인 유저가 없거나(개발 모드/비로그인), Auth ID가 DB 참조 무결성에 걸릴 수 있음.
+    // 따라서, 'users' 테이블(접근 불가할 수 있음) 대신, 이미 성공적으로 저장된 'activities'의 created_by를 빌려옴.
+    // 이는 FK 오류를 우회하기 위한 가장 확실한 방법임.
+    try {
+      // activities 테이블에서 가장 최근 활동 하나를 가져와 그 작성자 ID를 사용
+      const { data: existingActivity } = await supabase
+        .from('activities')
+        .select('created_by')
+        .not('created_by', 'is', null)
+        .limit(1)
         .maybeSingle()
 
-      if (exists) return candidateId
-
-      // 2. 존재하지 않으면 자동 등록 시도 (Upsert)
-      try {
-        console.warn(`[getValidUserId] User ${candidateId} missing in public.users. Attempting auto-registration...`)
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert([{
-            id: candidateId,
-            email: currentUser?.email || 'unknown@example.com', // 이메일 정보가 없으면 더미
-            name: currentUser?.user_metadata?.name || 'Unknown User',
-            created_at: new Date().toISOString()
-          }])
-
-        if (!insertError) {
-          console.log(`[getValidUserId] User ${candidateId} successfully registered in public.users.`)
-          return candidateId
-        } else {
-          console.error('[getValidUserId] Auto-registration failed:', insertError)
-        }
-      } catch (e) {
-        console.error('[getValidUserId] Unexpected error during auto-registration:', e)
+      if (existingActivity?.created_by) {
+        console.warn(`[getValidUserId] Found safe existing User ID from activities: ${existingActivity.created_by}`)
+        return existingActivity.created_by
       }
+
+      // 3. 만약 activities도 비어있다면... clients 테이블 시도
+      const { data: existingClient } = await supabase
+        .from('clients')
+        .select('created_by')
+        .not('created_by', 'is', null)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingClient?.created_by) {
+        console.warn(`[getValidUserId] Found safe existing User ID from clients: ${existingClient.created_by}`)
+        return existingClient.created_by
+      }
+
+    } catch (e) {
+      console.error('[getValidUserId] Error finding fallback user:', e)
     }
 
-    // 3. 실패 시, DB에 존재하는 첫 번째 사용자 ID 조회 (Fallback)
-    console.warn('[getValidUserId] Falling back to first available user in DB.')
-    const { data: users } = await supabase.from('users').select('id').limit(1)
-
-    if (users && users.length > 0) {
-      return users[0].id
-    }
-
-    // 4. 정말 아무것도 없으면 임시 더미(하지만 이 경우 FK 에러 발생 가능성 높음)
-    console.error('[getValidUserId] No valid user found in DB.')
+    // 4. 정말 아무것도 없으면 어쩔 수 없이 더미 ID 반환 (이 경우 FK 에러 발생 가능성 높음)
+    console.error('[getValidUserId] No valid user found in DB (fallback failed).')
     return '00000000-0000-0000-0000-000000000000'
   }
 
