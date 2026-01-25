@@ -443,7 +443,7 @@ const AgentChatWindow = () => {
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => setIsExpanded(true)}
-          className="group relative w-16 h-16 bg-gradient-to-br from-primary-teal to-primary-teal-dark text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+          className="group relative w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
           aria-label="Open AI Agent Chat"
         >
           <Terminal className="w-7 h-7 mx-auto" />
@@ -468,7 +468,7 @@ const AgentChatWindow = () => {
   return (
     <div className="fixed bottom-6 right-6 z-50 w-[768px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-primary-teal to-primary-teal-dark text-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-700 text-white">
         <div className="flex items-center gap-2">
           <Terminal className="w-5 h-5" />
           <div>
@@ -508,7 +508,7 @@ const AgentChatWindow = () => {
           >
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${message.type === 'user'
-                ? 'bg-gradient-to-br from-primary-teal to-primary-teal-dark text-white'
+                ? 'bg-gradient-to-br from-teal-500 to-teal-700 text-white'
                 : 'bg-white border border-slate-200 text-slate-800 shadow-sm'
                 }`}
             >
@@ -519,9 +519,9 @@ const AgentChatWindow = () => {
                   className="max-w-full rounded-lg mb-2 max-h-48 object-contain"
                 />
               )}
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+              <p className="text-base leading-relaxed whitespace-pre-wrap">{message.content}</p>
               <p
-                className={`text-xs mt-1 ${message.type === 'user' ? 'text-white/70' : 'text-slate-400'
+                className={`text-sm mt-1 ${message.type === 'user' ? 'text-white/70' : 'text-slate-400'
                   }`}
               >
                 {formatTime(message.timestamp)}
@@ -535,7 +535,7 @@ const AgentChatWindow = () => {
           <div className="flex justify-start">
             <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
               <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-primary-teal" />
+                <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
                 <span className="text-sm text-slate-500">Agent가 생각 중입니다...</span>
               </div>
             </div>
@@ -606,13 +606,13 @@ const AgentChatWindow = () => {
             onKeyPress={handleKeyPress}
             onPaste={handlePaste}
             placeholder="Type a command or paste a screenshot (Ctrl+V)..."
-            className="flex-1 resize-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-teal/50 focus:border-primary-teal transition-all"
+            className="flex-1 resize-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-base text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
             rows="2"
           />
           <button
             onClick={handleSendMessage}
             disabled={(!inputValue.trim() && !selectedImage) || isLoading}
-            className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-primary-teal to-primary-teal-dark text-white rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+            className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-700 text-white rounded-xl hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
             aria-label="Send"
           >
             {isLoading ? (
