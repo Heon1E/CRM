@@ -232,56 +232,56 @@ ${currentText}`
         user: userString,
       })
 
-      // 이슈로 등록 체크박스가 체크되어 있으면 이슈도 함께 등록 (오프라인 지원)
-      if (registerAsIssue) {
+      // [SMART LOGIC] Issue 등록 여부 판단
+      // 1. 체크박스가 체크되어 있거나
+      // 2. 'Follow-up Action Detail'이 입력되어 있는 경우
+      const hasFollowUp = formData.next_action_detail && formData.next_action_detail.trim().length > 0
+      const shouldRegisterIssue = registerAsIssue || hasFollowUp
+
+      if (shouldRegisterIssue) {
         const selectedClient = clients.find(c => c.id === formData.clientId)
-        const issueTitle = `${selectedClient?.company || '고객'} - ${formData.type}`
+
+        // 이슈 제목
+        const issueTitle = hasFollowUp
+          ? `${selectedClient?.company || '고객'} - 후속 조치`
+          : `${selectedClient?.company || '고객'} - ${formData.type}`
+
+        // 이슈 내용
+        const issueContent = hasFollowUp
+          ? formData.next_action_detail
+          : formData.description
+
+        // 목표일
+        const issueTargetDate = (hasFollowUp && formData.next_action_date)
+          ? formData.next_action_date
+          : formData.activity_date
 
         try {
           await addIssue({
             title: issueTitle,
-            content: formData.description,
+            content: issueContent,
             status: '등록',
-            target_date: formData.activity_date,
+            target_date: issueTargetDate,
             date: formData.activity_date
           })
 
           if (isOnline) {
-            toast.success('활동 내역이 추가되었고, 이슈로도 등록되었습니다.', {
+            toast.success(hasFollowUp ? '후속 조치 → 이슈 자동 등록됨!' : '활동 내역 → 이슈 등록됨!', {
               duration: 4000,
               icon: '✅'
             })
           } else {
-            toast.success('활동 내역과 이슈가 로컬에 저장되었습니다. 연결 시 자동으로 업로드됩니다.', {
-              duration: 5000,
-              icon: '💾'
-            })
+            toast.success('활동과 이슈가 로컬에 저장되었습니다.', { duration: 5000, icon: '💾' })
           }
         } catch (issueError) {
-          console.error('이슈 등록 중 오류:', issueError)
-          if (!isOnline) {
-            toast.info('활동 내역은 저장되었지만, 이슈 등록은 연결 복구 후 재시도됩니다.', {
-              duration: 5000,
-              icon: 'ℹ️'
-            })
-          } else {
-            toast.error('활동 내역은 추가되었지만, 이슈 등록에 실패했습니다.', {
-              duration: 5000,
-              icon: '❌'
-            })
-          }
+          console.error('[AddActivityModal] Issue Registration Failed', issueError)
+          toast.error(`이슈 등록 실패: ${issueError.message}`, { duration: 5000, icon: '❌' })
         }
       } else {
         if (isOnline) {
-          toast.success('활동 내역이 추가되었습니다.', {
-            duration: 3000,
-            icon: '✅'
-          })
+          toast.success('활동 내역이 추가되었습니다.', { duration: 3000, icon: '✅' })
         } else {
-          toast.success('활동 내역이 로컬에 저장되었습니다. 연결 시 자동으로 업로드됩니다.', {
-            duration: 5000,
-            icon: '💾'
-          })
+          toast.success('활동 내역이 로컬에 저장되었습니다.', { duration: 5000, icon: '💾' })
         }
       }
 

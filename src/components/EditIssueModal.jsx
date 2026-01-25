@@ -79,7 +79,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
     try {
       // date (등록일): 기존 issue의 date를 유지하거나 오늘 날짜로 설정 (NOT NULL 컬럼)
       let dateValue = issue?.date || ''
-      
+
       // dateValue가 없으면 오늘 날짜로 설정
       if (!dateValue || dateValue.trim() === '') {
         const today = new Date()
@@ -108,10 +108,10 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           }
         }
       }
-      
+
       // target_date (목표일): 사용자가 선택한 날짜 또는 null
       let targetDateValue = formData.target_date || formData.targetDate || ''
-      
+
       // target_date가 있으면 YYYY-MM-DD 형식으로 변환
       if (targetDateValue && targetDateValue.trim() !== '') {
         // 이미 YYYY-MM-DD 형식인지 확인
@@ -137,7 +137,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
       } else {
         targetDateValue = null // 목표일이 없으면 null
       }
-      
+
       // payload 생성: DB 컬럼명(snake_case)에 맞게 변환
       const payload = {
         title: formData.title.trim(),
@@ -145,9 +145,9 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
         target_date: targetDateValue, // 목표일 (사용자가 선택한 날짜 또는 null)
         status: formData.status || '등록', // 상태 필드 (DB의 status 컬럼과 정확히 매핑)
       }
-      
+
       // date 필드는 등록일이므로 수정 시 변경하지 않음 (DB에서 자동으로 updated_at이 갱신됨)
-      
+
       await updateIssue(issueId, payload)
       await showSuccess('ISSUE가 수정되었습니다.')
       onClose()
@@ -180,89 +180,90 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="ISSUE 수정" size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            제목 <span className="text-red-400">*</span>
+          <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+            TITLE <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="input-field"
+            className="oem-input w-full"
             required
             maxLength={200}
+            placeholder="Issue Title"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            내용
+          <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+            CONTENT
           </label>
           <textarea
             value={formData.content}
             onChange={handleContentChange}
             rows={6}
-            className="input-field"
-            placeholder="ISSUE 내용을 입력하세요 (최대 1000자)"
+            className="oem-input w-full resize-none"
+            placeholder="Describe the issue..."
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-sm text-gray-300">
+          <div className="mt-1 text-right text-[10px] text-gray-400 font-mono">
             {charCount}/1000
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              목표일
+            <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+              TARGET DATE
             </label>
             <input
               type="date"
               value={formData.target_date}
               onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-              className="input-field"
+              className="oem-input w-full"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              상태 <span className="text-red-400">*</span>
+            <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+              STATUS <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="input-field"
+              className="oem-input w-full"
               required
             >
-              <option value="등록">등록</option>
-              <option value="진행">진행</option>
-              <option value="완료">완료</option>
+              <option value="등록">Registered</option>
+              <option value="진행">In Progress</option>
+              <option value="완료">Completed</option>
             </select>
           </div>
         </div>
 
-        <div className="flex justify-between pt-4">
+        <div className="flex justify-between pt-4 border-t border-oem-border mt-2">
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2.5 bg-red-400/20 text-red-200 border border-red-400/30 rounded-xl hover:bg-red-400/30 transition-all duration-200 font-semibold"
+            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition-colors text-[11px] font-bold uppercase"
           >
-            삭제
+            DELETE_ISSUE
           </button>
-          <div className="space-x-3">
+          <div className="space-x-2">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary"
+              className="oem-btn-secondary px-4 py-2"
             >
-              Cancel
+              CANCEL
             </button>
             <button
               type="submit"
-              className="btn-primary"
+              className="oem-btn-primary px-4 py-2"
             >
-              Save
+              UPDATE
             </button>
           </div>
         </div>

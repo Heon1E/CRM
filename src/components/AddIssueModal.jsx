@@ -41,10 +41,10 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       const month = String(today.getMonth() + 1).padStart(2, '0')
       const day = String(today.getDate()).padStart(2, '0')
       const dateValue = `${year}-${month}-${day}` // 등록일은 항상 오늘
-      
+
       // target_date (목표일): 사용자가 선택한 날짜 또는 null
       let targetDateValue = formData.target_date || formData.targetDate || ''
-      
+
       // target_date가 있으면 YYYY-MM-DD 형식으로 변환
       if (targetDateValue && targetDateValue.trim() !== '') {
         // 이미 YYYY-MM-DD 형식인지 확인
@@ -70,7 +70,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       } else {
         targetDateValue = null // 목표일이 없으면 null
       }
-      
+
       // payload 생성: date와 target_date 컬럼에 명시적으로 할당
       const payload = {
         title: formData.title.trim(),
@@ -79,9 +79,9 @@ const AddIssueModal = ({ isOpen, onClose }) => {
         target_date: targetDateValue, // 목표일 (사용자가 선택한 날짜 또는 null)
         status: formData.status || '등록',
       }
-      
+
       // 전송 직전에 데이터 확인
-      
+
       await addIssue(payload)
       await showSuccess('ISSUE가 추가되었습니다.')
       setFormData({
@@ -100,81 +100,82 @@ const AddIssueModal = ({ isOpen, onClose }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="ISSUE 추가" size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            제목 <span className="text-red-400">*</span>
+          <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+            TITLE <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="input-field"
+            className="oem-input w-full"
             required
             maxLength={200}
+            placeholder="Issue Title"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
-            내용
+          <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+            CONTENT
           </label>
           <textarea
             value={formData.content}
             onChange={handleContentChange}
             rows={6}
-            className="input-field"
-            placeholder="ISSUE 내용을 입력하세요 (최대 1000자)"
+            className="oem-input w-full resize-none"
+            placeholder="Describe the issue..."
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-sm text-gray-300">
+          <div className="mt-1 text-right text-[10px] text-gray-400 font-mono">
             {charCount}/1000
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              목표일
+            <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+              TARGET DATE
             </label>
             <input
               type="date"
               value={formData.target_date}
               onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
-              className="input-field"
+              className="oem-input w-full"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              상태 <span className="text-red-400">*</span>
+            <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+              STATUS <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="input-field"
+              className="oem-input w-full"
               required
             >
-              <option value="등록">등록</option>
-              <option value="진행">진행</option>
-              <option value="완료">완료</option>
+              <option value="등록">Registered</option>
+              <option value="진행">In Progress</option>
+              <option value="완료">Completed</option>
             </select>
           </div>
         </div>
 
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end space-x-2 pt-4 border-t border-oem-border mt-2">
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary"
+            className="oem-btn-secondary px-4 py-2"
           >
-            Cancel
+            CANCEL
           </button>
           <button
             type="submit"
-            className="btn-primary"
+            className="oem-btn-primary px-4 py-2"
           >
-            Save
+            SAVE ISSUE
           </button>
         </div>
       </form>

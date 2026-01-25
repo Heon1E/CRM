@@ -59,7 +59,7 @@ const IssueTracker = ({ maxItems = null }) => {
   // 상태 변경 핸들러 (리스트에서 바로 변경)
   const handleStatusChange = async (issueId, newStatus) => {
     try {
-      await updateIssue(issueId, { 
+      await updateIssue(issueId, {
         status: newStatus,
         updated_at: new Date().toISOString() // 상태 변경 시 업데이트 시간 갱신
       })
@@ -71,89 +71,75 @@ const IssueTracker = ({ maxItems = null }) => {
   }
 
   return (
-    <div className="bg-[#1E1E1E] rounded-xl border border-gray-800 p-5 md:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={() => navigate('/issues')}
-          className="text-lg md:text-xl font-semibold text-white flex items-center space-x-2 hover:text-white/80 transition-colors cursor-pointer"
-        >
-          <AlertCircle className="w-5 h-5 text-gray-300" />
-          <span>ISSUE 트래커</span>
-        </button>
+    <div className="space-y-3">
+      {/* Header removed as it will be handled by Parent Panel */}
+
+      <div className="flex justify-between items-center mb-2 px-1">
+        <h4 className="text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight">Active Issues ({activeIssues.length})</h4>
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="btn-primary px-3 py-1.5 flex items-center space-x-1 text-sm font-medium"
+          className="oem-btn-secondary px-2 py-0.5 text-[10px] flex items-center gap-1"
         >
-          <Plus className="w-4 h-4" />
-          <span>추가</span>
+          <Plus className="w-3 h-3" />
+          <span>ADD_ISSUE</span>
         </button>
       </div>
 
       {activeIssues.length > 0 ? (
-        <div className={`space-y-3 ${maxItems ? 'max-h-96 overflow-y-auto pr-2' : ''}`}>
+        <div className={`space-y-2 ${maxItems ? 'max-h-96 overflow-y-auto pr-1' : ''}`}>
           {activeIssues.map((issue) => {
-            // 경과 일수 계산 (시각적 표시용)
+            // 경과 일수 계산
             const baseDate = issue.date || issue.created_at
-            const daysDiff = baseDate 
+            const daysDiff = baseDate
               ? Math.floor((new Date() - new Date(baseDate)) / (1000 * 60 * 60 * 24))
               : 0
-            
+
             return (
               <div
                 key={issue.id}
-                className={`border rounded-lg p-4 transition-all duration-200 ${getIssueColor(issue)}`}
+                className="bg-white border border-oem-border rounded-sm p-3 hover:border-oem-blue transition-colors group relative"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-2 flex-wrap">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(issue.status)}`}>
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      <span className={`px-1.5 py-0.5 rounded-[2px] text-[10px] font-bold border ${issue.status === '완료' ? 'bg-gray-100 text-gray-500 border-gray-200' :
+                          issue.status === '진행' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                            'bg-yellow-50 text-amber-600 border-amber-100'
+                        }`}>
                         {issue.status}
                       </span>
                       {issue.target_date && (
-                      <span className="text-xs text-gray-300">
-                          목표일: {new Date(issue.target_date).toLocaleDateString('ko-KR')}
+                        <span className="text-[10px] text-oem-text-secondary">
+                          D-{Math.ceil((new Date(issue.target_date) - new Date()) / (1000 * 60 * 60 * 24))}
                         </span>
                       )}
                       {daysDiff > 0 && (
-                      <span className="text-xs text-gray-300">
-                          ({daysDiff}일 경과)
+                        <span className="text-[10px] text-oem-text-secondary">
+                          ({daysDiff}d ago)
                         </span>
                       )}
                     </div>
-                    <h4 className="font-semibold text-white mb-1 break-words">{issue.title}</h4>
+                    <h4 className="font-bold text-oem-text-primary text-xs mb-1 break-words group-hover:text-oem-blue transition-colors">{issue.title}</h4>
                     {issue.content && (
-                      <p className="text-sm text-gray-300 mb-2 line-clamp-2 break-words">
+                      <p className="text-[11px] text-gray-600 mb-1.5 line-clamp-2 break-words leading-relaxed">
                         {issue.content}
                       </p>
                     )}
-                    <p className="text-xs text-gray-300">
-                      등록일: {new Date(issue.created_at || issue.date).toLocaleDateString('ko-KR')}
+                    <p className="text-[10px] text-gray-400">
+                      Registered: {new Date(issue.created_at || issue.date).toLocaleDateString('ko-KR')}
                     </p>
                   </div>
-                  <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                    {/* 상태 변경 드롭다운 */}
-                    <select
-                      value={issue.status}
-                      onChange={(e) => {
-                        e.stopPropagation()
-                        handleStatusChange(issue.id, e.target.value)
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className={`px-2 py-1 rounded text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer ${getStatusColor(issue.status)}`}
-                    >
-                      <option value="등록">등록</option>
-                      <option value="진행">진행</option>
-                      <option value="완료">완료</option>
-                    </select>
+
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         setEditingIssueId(issue.id)
                       }}
-                      className="text-gray-300 hover:text-white transition-colors"
-                      title="수정"
+                      className="p-1 text-gray-400 hover:text-oem-blue hover:bg-blue-50 rounded"
+                      title="Edit"
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -162,8 +148,8 @@ const IssueTracker = ({ maxItems = null }) => {
           })}
         </div>
       ) : (
-        <div className="text-center py-8 text-gray-300 text-sm">
-          등록된 ISSUE가 없습니다.
+        <div className="text-center py-6 border border-dashed border-gray-200 rounded-sm bg-gray-50">
+          <p className="text-[11px] text-gray-400 font-medium">No active issues found.</p>
         </div>
       )}
 

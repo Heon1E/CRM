@@ -13,6 +13,7 @@ import { useDashboardData } from '../hooks/useDashboardData'
 import EditActivityModal from '../components/EditActivityModal'
 import RevenueForecastPanel from '../components/RevenueForecastPanel'
 import AppInstallGuide from '../components/AppInstallGuide'
+import IssueTracker from '../components/IssueTracker'
 import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
 const Dashboard = () => {
@@ -351,6 +352,13 @@ const Dashboard = () => {
               <button onClick={() => navigate('/clients')} className="w-full mt-4 oem-btn-secondary text-[11px] font-bold py-1.5 hover:bg-oem-bg-header transition-colors">
                 VIEW_ALL_CLIENTS
               </button>
+            </Panel>
+
+            {/* [NEW] Issue Tracker Panel */}
+            <Panel title="Issue Tracker">
+              <div className="pt-2">
+                <IssueTracker maxItems={3} />
+              </div>
             </Panel>
 
             <Panel title="My Activities (Timeline)">
