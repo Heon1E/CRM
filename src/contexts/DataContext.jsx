@@ -234,9 +234,9 @@ export const DataProvider = ({ children }) => {
       candidateId = authUser?.id
     }
 
-    // [Fix] FK Constraint Error 방지: public.users에 실제로 존재하는지 확인
     if (candidateId) {
-      const { data: exists, error } = await supabase
+      // 1. users 테이블에 존재하는지 확인
+      const { data: exists } = await supabase
         .from('users')
         .select('id')
         .eq('id', candidateId)
@@ -244,19 +244,40 @@ export const DataProvider = ({ children }) => {
 
       if (exists) return candidateId
 
-      console.warn(`[getValidUserId] User ${candidateId} authenticated but not found in public.users. Falling back.`)
+      // 2. 존재하지 않으면 자동 등록 시도 (Upsert)
+      try {
+        console.warn(`[getValidUserId] User ${candidateId} missing in public.users. Attempting auto-registration...`)
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: candidateId,
+            email: currentUser?.email || 'unknown@example.com', // 이메일 정보가 없으면 더미
+            name: currentUser?.user_metadata?.name || 'Unknown User',
+            created_at: new Date().toISOString()
+          }])
+
+        if (!insertError) {
+          console.log(`[getValidUserId] User ${candidateId} successfully registered in public.users.`)
+          return candidateId
+        } else {
+          console.error('[getValidUserId] Auto-registration failed:', insertError)
+        }
+      } catch (e) {
+        console.error('[getValidUserId] Unexpected error during auto-registration:', e)
+      }
     }
 
-    // Fallback: 인증된 사용자가 없거나 DB에 없을 경우, DB에 존재하는 첫 번째 사용자 ID를 가져옴
-    console.warn('[getValidUserId] 유효한 사용자 ID를 찾을 수 없어 DB에서 임의의 사용자를 조회합니다.')
+    // 3. 실패 시, DB에 존재하는 첫 번째 사용자 ID 조회 (Fallback)
+    console.warn('[getValidUserId] Falling back to first available user in DB.')
     const { data: users } = await supabase.from('users').select('id').limit(1)
 
     if (users && users.length > 0) {
       return users[0].id
     }
 
-    console.error('[getValidUserId] 유효한 사용자 ID를 찾을 수 없습니다.')
-    return '00000000-0000-0000-0000-000000000000' // 임시 더미
+    // 4. 정말 아무것도 없으면 임시 더미(하지만 이 경우 FK 에러 발생 가능성 높음)
+    console.error('[getValidUserId] No valid user found in DB.')
+    return '00000000-0000-0000-0000-000000000000'
   }
 
   // 매출 데이터 그룹화 함수 (sale_date, client_id, created_at 분 단위 기준)

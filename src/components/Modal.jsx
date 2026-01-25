@@ -22,24 +22,22 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 
         {/* Modal Window */}
         <div
-          className={`relative z-50 inline-block oracle-raised text-left overflow-hidden transform shadow-none ${sizeClasses[size]} w-full`}
+          className={`relative z-50 inline-block bg-white text-left overflow-hidden transform shadow-xl border border-oem-border rounded-sm ${sizeClasses[size]} w-full`}
         >
           {/* Header / Title Bar */}
-          <div className="oracle-title-bar h-7 mb-0">
-            <h3 className="text-[11px] font-bold text-white px-2 tracking-tight">{title}</h3>
-            <div className="flex gap-1 pr-1">
-              <button
-                onClick={onClose}
-                className="w-5 h-4 flex items-center justify-center bg-gray-300 border border-white font-bold text-[10px] text-black"
-                title="Close"
-              >
-                ×
-              </button>
-            </div>
+          <div className="flex items-center justify-between px-4 py-3 bg-oem-bg-header border-b border-oem-border">
+            <h3 className="text-sm font-bold text-oem-text-primary uppercase tracking-tight">{title}</h3>
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Content Area */}
-          <div className="px-4 py-4 modal-content bg-[#c0c0c0]">{children}</div>
+          <div className="px-6 py-6 modal-content bg-white">{children}</div>
         </div>
       </div>
     </div>
