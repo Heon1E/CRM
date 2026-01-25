@@ -42,13 +42,27 @@ export const ForecastService = {
      */
     async generateAndCacheForecast(userId) {
         try {
-            // 1. Fetch raw sales data (Heavy query - fetch 3 years for cohort analysis)
-            const { data: sales, error } = await supabase
-                .from('sales')
-                .select('sale_date, total_amount, client_id')
-                .gte('sale_date', `${new Date().getFullYear() - 3}-01-01`) // Fetch last 3 years
+            // 1. Fetch raw sales data (Heavy query - fetch 3 years with pagination)
+            let allSales = []
+            let page = 0
+            const pageSize = 1000
 
-            if (error) throw error
+            while (true) {
+                const { data: salesChunk, error } = await supabase
+                    .from('sales')
+                    .select('sale_date, total_amount, client_id')
+                    .gte('sale_date', `${new Date().getFullYear() - 3}-01-01`)
+                    .range(page * pageSize, (page + 1) * pageSize - 1)
+
+                if (error) throw error
+                if (!salesChunk || salesChunk.length === 0) break
+
+                allSales = [...allSales, ...salesChunk]
+                if (salesChunk.length < pageSize) break
+                page++
+            }
+
+            const sales = allSales // Assign to variable used by engine
 
             // 2. Run Engine
             const result = calculateRevenueForecast(sales)
