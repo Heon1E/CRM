@@ -1,17 +1,17 @@
 /**
- * AI Revenue Forecast Logic Engine (Advanced v4 - Robust)
- * 
- * Revisions:
- * - v4: Added "Missing Data Imputation" for current month.
- *       If current month's actual is 0 (likely data delay), we estimate it to prevent crash.
+ * AI Revenue Forecast Logic Engine (Customer-Level Bottom-Up v5.0)
  * 
  * Strategy:
- * - Strategy A (Seasonality): Data >= 12 months.
- * - Strategy B (Damped Linear): Data 4-11 months.
- * - Strategy C (Moving Avg): Data < 4 months.
+ * 1. Bottom-Up: Analyze each client's history (2023-2025) to classify into segments.
+ * 2. Segment Forecast: Apply specific growth/churn logic per segment.
+ * 3. Calibration: Adjust theoretical forecast using 2026 YTD actuals (with missing data guardrails).
  */
 
-// Helper: Calculate Linear Regression
+// --- Helpers ---
+const sum = (arr) => arr.reduce((a, b) => a + b, 0)
+const avg = (arr) => arr.length > 0 ? sum(arr) / arr.length : 0
+
+// Linear Regression Helper
 const calculateLinearRegression = (yValues) => {
     const n = yValues.length
     if (n < 2) return { slope: 0, intercept: yValues[0] || 0 }
@@ -34,204 +34,238 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
     const currentMonthIndex = today.getMonth()
     const currentDay = today.getDate()
 
-    // 1. Data Structuring
-    const sales = salesData.map(s => ({
-        date: new Date(s.sale_date || s.date),
-        amount: Number(s.totalAmount || s.total_amount || 0)
-    })).sort((a, b) => a.date - b.date)
+    // --- Step 1: Data Aggregation (Client x Year x Month) ---
+    // Structure: { clientId: { '2023': [0...0], '2024': [...], '2025': [...], '2026': [...] } }
+    const clientMap = {}
+    const years = [currentYear - 3, currentYear - 2, currentYear - 1, currentYear] // e.g., 2023, 2024, 2025, 2026
 
-    const thisYear = currentYear
-    const lastYear = currentYear - 1
+    // Pre-fill helper
+    const initClient = () => {
+        const obj = {}
+        years.forEach(y => obj[y] = Array(12).fill(0))
+        return obj
+    }
 
-    // Buckets
-    const monthlyActuals = Array(12).fill(0).map(() => ({ thisYear: 0, lastYear: 0 }))
-    let totalLastYearFull = 0
+    salesData.forEach(s => {
+        const d = new Date(s.sale_date || s.date)
+        const y = d.getFullYear()
+        const m = d.getMonth()
+        const amt = Number(s.totalAmount || s.total_amount || 0)
+        const cid = s.clientId || s.client_id || 'unknown'
 
-    sales.forEach(s => {
-        const year = s.date.getFullYear()
-        const month = s.date.getMonth()
-        if (year === thisYear) monthlyActuals[month].thisYear += s.amount
-        else if (year === lastYear) {
-            monthlyActuals[month].lastYear += s.amount
-            totalLastYearFull += s.amount
+        if (years.includes(y)) {
+            if (!clientMap[cid]) clientMap[cid] = initClient()
+            clientMap[cid][y][m] += amt
         }
     })
 
-    // --- v4 Fix: Missing Data Imputation ---
-    // If current month has 0 actual revenue, but we have historical data, 
-    // it's likely a data sync delay, not a business collapse.
-    // We IMPUTE the missing current month data to allow proper forecasting.
-    let imputedMessage = ""
-    if (monthlyActuals[currentMonthIndex].thisYear === 0 && totalLastYearFull > 0) {
-        // Method: Use Last Year Same Month * 1.0 (Neutral assumption) 
-        // Or if last year same month is 0, use Last Month's actual.
-        let imputedValue = monthlyActuals[currentMonthIndex].lastYear
-
-        if (imputedValue === 0) {
-            // Fallback to last month (Dec of last year) or Nov
-            imputedValue = monthlyActuals[(currentMonthIndex + 11) % 12].lastYear
-        }
-
-        // Apply imputation only for calculation purposes
-        if (imputedValue > 0) {
-            monthlyActuals[currentMonthIndex].thisYear = imputedValue
-            imputedMessage = " (Note: Current month data missing, estimated based on history)"
-        }
+    // --- Step 2: Client Segmentation & Base Forecast ---
+    let segmentForecasts = {
+        Growing: { count: 0, amount: 0, monthly: Array(12).fill(0) },
+        Stable: { count: 0, amount: 0, monthly: Array(12).fill(0) },
+        Declining: { count: 0, amount: 0, monthly: Array(12).fill(0) },
+        Churned: { count: 0, amount: 0, monthly: Array(12).fill(0) },
+        New: { count: 0, amount: 0, monthly: Array(12).fill(0) }
     }
 
-    // 2. Calculate Prorated Recalculation after Imputation
-    let ytdThisYearProrated = 0
-    let ytdLastYearProrated = 0
+    const yearPrev = currentYear - 1 // 2025
+    const yearPrior = currentYear - 2 // 2024
 
-    // Re-scan buckets to calc YTD (faster than re-scanning raw sales)
-    for (let m = 0; m <= currentMonthIndex; m++) {
-        const isCurrentMonth = m === currentMonthIndex
+    // Aggregates for final stats
+    let predictedTotalBase = 0
+    let predictedMonthlyBase = Array(12).fill(0)
 
-        // This Year YTD
-        if (isCurrentMonth) {
-            // If we imputed, we assume it's "Full Month Equivalent" roughly, 
-            // but to be safe for proration, if it's day 25, we should scale it? 
-            // No, simpler: if we imputed, we treat it as "up to now" value matches "last year up to now".
-            // Actually, if we imputed using "Full Last Year Month", we should adjust for day.
-            // Imputation Strategy B: Just use Last Year Prorated value as This Year Prorated Value.
-            if (imputedMessage) {
-                // Force match to neutralize distortion
-                // But we need to calculate Last Year Prorated first.
+    Object.entries(clientMap).forEach(([cid, data]) => {
+        const total2024 = sum(data[yearPrior])
+        const total2025 = sum(data[yearPrev])
+        const actives2025 = data[yearPrev].filter(v => v > 0).length
+
+        let segment = 'Stable'
+        let clientForecastYear = 0
+        let clientForecastMonthly = Array(12).fill(0)
+
+        // Logic A: New Client? (No revenue in 2023/2024, appeared in 2025 or late 2024)
+        // Definition: Total 2024 < 100k AND Total 2025 > 0
+        if (total2024 < 100000 && total2025 > 0) {
+            segment = 'New'
+            // Forecast: Extrapolate run-rate or use avg
+            const monthsActive = actives2025
+            if (monthsActive >= 4) {
+                // Damped Linear
+                const vals = data[yearPrev]
+                // Find first non-zero month index
+                const startIdx = vals.findIndex(v => v > 0)
+                const activeVals = vals.slice(startIdx)
+                const { slope, intercept } = calculateLinearRegression(activeVals)
+                // Project 12 months for next year
+                // Start level = last month of 2025 value
+                let currentLvl = activeVals[activeVals.length - 1]
+                for (let i = 0; i < 12; i++) {
+                    currentLvl += (slope * Math.pow(0.9, i + 1)) // Damping
+                    clientForecastMonthly[i] = Math.max(0, currentLvl)
+                }
             } else {
-                ytdThisYearProrated += monthlyActuals[m].thisYear
+                // Simple Avg
+                const avgVal = total2025 / monthsActive
+                clientForecastMonthly.fill(avgVal)
             }
-        } else {
-            ytdThisYearProrated += monthlyActuals[m].thisYear
+        }
+        // Logic B: Churned? (Revenue exist in past, but near zero in 2025 H2?)
+        else if (total2025 < 100000 && total2024 > 100000) {
+            segment = 'Churned'
+            // Forecast: 0
+        }
+        // Logic C: Established (Growing/Stable/Declining)
+        else {
+            const growthRate = total2024 > 0 ? (total2025 - total2024) / total2024 : 0
+
+            // Base seasonality pattern (2025 pattern)
+            // Normalize to ratio array (sum = 1.0)
+            const seasonality = total2025 > 0 ? data[yearPrev].map(v => v / total2025) : Array(12).fill(1 / 12)
+
+            if (growthRate >= 0.10) {
+                segment = 'Growing'
+                // Conservative growth cap: +50%
+                const appliedRate = Math.min(growthRate, 0.5)
+                clientForecastYear = total2025 * (1 + appliedRate)
+            } else if (growthRate <= -0.10) {
+                segment = 'Declining'
+                // Floor decline at -20%
+                const appliedRate = Math.max(growthRate, -0.2)
+                clientForecastYear = total2025 * (1 + appliedRate)
+            } else {
+                segment = 'Stable'
+                // Average of 24/25 levels
+                clientForecastYear = (total2024 + total2025) / 2
+            }
+
+            // Distribute monthly
+            for (let i = 0; i < 12; i++) {
+                clientForecastMonthly[i] = clientForecastYear * seasonality[i]
+            }
         }
 
-        // Last Year YTD Comparison
-        if (isCurrentMonth) {
-            // For Last Year, we need day-level granularity.
-            // Since we aggregated to months, we can estimate proration: (Total / DaysInMonth) * CurrentDay
-            // This is an approximation but robust enough.
-            const daysInMonth = new Date(lastYear, m + 1, 0).getDate()
-            const ratio = Math.min(currentDay / daysInMonth, 1.0)
-            ytdLastYearProrated += (monthlyActuals[m].lastYear * ratio)
-
-            if (imputedMessage) {
-                // If we imputed, set this year's prorated to match last year's prorated * 1.0
-                // ensuring ratio is 1.0 for this month, preventing drop.
-                ytdThisYearProrated += (monthlyActuals[m].lastYear * ratio)
-            }
-        } else {
-            ytdLastYearProrated += monthlyActuals[m].lastYear
+        // Aggregate to Segment
+        const cTotal = sum(clientForecastMonthly)
+        segmentForecasts[segment].count++
+        segmentForecasts[segment].amount += cTotal
+        for (let i = 0; i < 12; i++) {
+            segmentForecasts[segment].monthly[i] += clientForecastMonthly[i]
+            predictedMonthlyBase[i] += clientForecastMonthly[i]
         }
+        predictedTotalBase += cTotal
+    })
+
+    // --- Step 3: Top-Down Calibration (Using 2026 YTD Actuals) ---
+
+    // Calculate YTD Target (Expected from Base Forecast)
+    // IMPORTANT: Prorated Day-level target for current month
+    let ytdTarget = 0
+    let ytdActual = 0
+    let calibrationMessage = ""
+
+    // Calculate Actual YTD (2026)
+    // We iterate client map again? No, just iterate salesData for this year is easier or use clientMap
+    // Use clientMap aggregated 2026
+    Object.values(clientMap).forEach(data => {
+        // Full months before current
+        for (let m = 0; m < currentMonthIndex; m++) ytdActual += data[currentYear][m]
+        // Current month (prorated? No, actual is actual)
+        ytdActual += data[currentYear][currentMonthIndex]
+    })
+
+    // Calculate Expected Target YTD
+    for (let m = 0; m < currentMonthIndex; m++) {
+        ytdTarget += predictedMonthlyBase[m]
+    }
+    // Prorate Target for current month
+    const daysInMonth = new Date(currentYear, currentMonthIndex + 1, 0).getDate()
+    const prorationRatio = Math.min(Math.max(currentDay / daysInMonth, 0.05), 1.0) // min 5% to avoid div/0 issues
+    ytdTarget += (predictedMonthlyBase[currentMonthIndex] * prorationRatio)
+
+    // Calculate Scale Factor
+    let scaleFactor = 1.0
+    // GUARDRAIL 1: Missing Data Check
+    // If YTD Actual is unexpectedly low (e.g. < 10% of Target), assume Data Missing
+    if (ytdTarget > 10000000 && ytdActual < (ytdTarget * 0.1)) {
+        scaleFactor = 1.0
+        calibrationMessage = "Detected missing YTD data. Ignoring 2026 drop."
+    } else {
+        scaleFactor = ytdTarget > 0 ? ytdActual / ytdTarget : 1.0
     }
 
-
-    // 3. Select Strategy
-    let strategy = 'Moving Average'
-    if (totalLastYearFull > 0) strategy = 'Seasonal Ratio'
-    else if ((currentMonthIndex + 1) >= 4) strategy = 'Damped Linear'
-
-    // 4. Execution
-    let finalMonthlyData = []
-    let forecastGrowthRate = 0
-    let analysisSummary = ""
-
-    // --- Strategy A: Seasonal Ratio ---
-    if (strategy === 'Seasonal Ratio') {
-        let scaleFactor = ytdLastYearProrated > 0 ? ytdThisYearProrated / ytdLastYearProrated : 1.0
-        scaleFactor = Math.min(Math.max(scaleFactor, 0.5), 2.0)
-
-        // Guardrail
-        if (totalLastYearFull > 10000000 && scaleFactor < 0.7) {
-            analysisSummary += `(Adjusted: Trend clamped to 0.8). `
-            scaleFactor = 0.8
-        }
-
-        forecastGrowthRate = (scaleFactor - 1).toFixed(3)
-        analysisSummary += `Based on YTD vs Last Year (x${scaleFactor.toFixed(2)}).` + imputedMessage
-
-        for (let idx = 0; idx < 12; idx++) {
-            const data = monthlyActuals[idx]
-
-            // Render Past
-            if (idx <= currentMonthIndex) {
-                // If it was imputed, show the IMPUTED value as forecast, but actual as 0?
-                // Or show imputed as actual?
-                // Showing 0 actual + Non-zero Forecast for current month is best UI.
-                const isImputedMonth = (idx === currentMonthIndex && imputedMessage !== "")
-
-                finalMonthlyData.push({
-                    month: idx + 1,
-                    actual: isImputedMonth ? 0 : data.thisYear, // Keep 0 if missing in DB
-                    forecast: data.thisYear, // Show what we think it is
-                    isForecast: isImputedMonth // Highlight as forecast
-                })
-                continue
-            }
-
-            // Future
-            let projected = 0
-            if (data.lastYear > 0) projected = data.lastYear * scaleFactor
-            else {
-                const context = finalMonthlyData.slice(-3).map(d => d.forecast)
-                projected = context.length > 0 ? context.reduce((a, b) => a + b, 0) / context.length : 0
-            }
-            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(projected), isForecast: true })
-        }
-    }
-    // --- Strategy B: Damped Linear --- 
-    else if (strategy === 'Damped Linear') {
-        // ... (Same logic, but respecting imputed values in regression)
-        const yValues = []
-        for (let i = 0; i <= currentMonthIndex; i++) yValues.push(monthlyActuals[i].thisYear)
-
-        const { slope, intercept } = calculateLinearRegression(yValues)
-        const phi = 0.9
-        analysisSummary = `Extrapolated damped trend.` + imputedMessage
-
-        let currentLevel = intercept + (slope * currentMonthIndex)
-        for (let idx = 0; idx < 12; idx++) {
-            if (idx <= currentMonthIndex) {
-                const isImputed = (idx === currentMonthIndex && imputedMessage !== "")
-                finalMonthlyData.push({ month: idx + 1, actual: isImputed ? 0 : monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: isImputed })
-                continue
-            }
-            const k = idx - currentMonthIndex
-            let accumulatedTrend = 0
-            for (let i = 1; i <= k; i++) accumulatedTrend += slope * Math.pow(phi, i)
-            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(Math.max(currentLevel + accumulatedTrend, 0)), isForecast: true })
-        }
-        const firstVal = finalMonthlyData[0].forecast || 1
-        const lastVal = finalMonthlyData[11].forecast
-        forecastGrowthRate = ((lastVal - firstVal) / firstVal).toFixed(3)
-    }
-    // --- Strategy C ---
-    else {
-        // ... (Same logic)
-        let sum = 0, count = 0
-        for (let i = 0; i <= currentMonthIndex; i++) { if (monthlyActuals[i].thisYear > 0) { sum += monthlyActuals[i].thisYear; count++ } }
-        const avg = count > 0 ? sum / count : 0
-        analysisSummary = `Conservative average.` + imputedMessage
-        forecastGrowthRate = 0
-        for (let idx = 0; idx < 12; idx++) {
-            if (idx <= currentMonthIndex) {
-                const isImputed = (idx === currentMonthIndex && imputedMessage !== "")
-                finalMonthlyData.push({ month: idx + 1, actual: isImputed ? 0 : monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: isImputed })
-                continue
-            }
-            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(avg), isForecast: true })
-        }
+    // GUARDRAIL 2: Clamp Extreme Scaling
+    // Established biz shouldn't swing +/- 20% just based on Jan partial data
+    scaleFactor = Math.min(Math.max(scaleFactor, 0.8), 1.2)
+    if (Math.abs(scaleFactor - 1.0) > 0.01 && !calibrationMessage) {
+        calibrationMessage = `Calibrated by YTD performance (x${scaleFactor.toFixed(2)}).`
     }
 
-    const totalForecast = finalMonthlyData.reduce((sum, m) => sum + m.forecast, 0)
-    const finalYoY = totalLastYearFull > 0
-        ? ((totalForecast - totalLastYearFull) / totalLastYearFull * 100).toFixed(1)
-        : (Number(forecastGrowthRate) * 100).toFixed(1)
+    // Apply Calibration
+    const finalMonthlyData = []
+    let totalForecastFinal = 0
+
+    for (let i = 0; i < 12; i++) {
+        const baseVal = predictedMonthlyBase[i]
+        const calibratedVal = baseVal * scaleFactor
+
+        // Past/Current: Use Actuals? 
+        // Spec says: "2026-01 is for correction only". But usually UI shows actuals for past.
+        // Let's show ACTUAL for full past months, and FORECAST for future.
+        // Current month: Show FORECAST (since actual might be partial) OR Adjusted Actual?
+        // User request: "2026-01 prioritize complete past data". 
+        // Let's show Forecast for current month to avoid "drop" visual.
+
+        let displayVal = Math.round(calibratedVal)
+        let isForecast = true
+        let actualVal = 0
+
+        if (i < currentMonthIndex) {
+            // Past full months -> Show Actuals
+            // We need to sum actuals for month i
+            let monthlyAct = 0
+            Object.values(clientMap).forEach(d => monthlyAct += d[currentYear][i])
+            actualVal = monthlyAct
+            displayVal = monthlyAct // Override with actual
+            isForecast = false
+        } else if (i === currentMonthIndex) {
+            // Current month -> Show Forecast (to be safe against partial data)
+            // But keep actual for tooltip
+            let monthlyAct = 0
+            Object.values(clientMap).forEach(d => monthlyAct += d[currentYear][i])
+            actualVal = monthlyAct
+            // displayVal stays as calibrated forecast
+        }
+
+        finalMonthlyData.push({
+            month: i + 1,
+            actual: actualVal,
+            forecast: displayVal,
+            isForecast: isForecast
+        })
+        totalForecastFinal += displayVal
+    }
+
+    // Growth Rate calculation (vs Total 2025)
+    let total2025All = 0
+    Object.values(clientMap).forEach(d => total2025All += sum(d[yearPrev]))
+
+    const growthRate = total2025All > 0
+        ? ((totalForecastFinal - total2025All) / total2025All * 100).toFixed(1)
+        : 0
+
+    const summary = `Analyzed ${Object.keys(clientMap).length} clients. ${calibrationMessage} Segments: Growing(${segmentForecasts.Growing.count}), Stable(${segmentForecasts.Stable.count}), New(${segmentForecasts.New.count}).`
 
     return {
         forecastYear: currentYear,
-        total_amount: totalForecast,
+        total_amount: totalForecastFinal,
         monthlyData: finalMonthlyData,
-        growth_rate: finalYoY,
-        analysis_summary: analysisSummary,
-        calculatedAt: new Date().toISOString()
+        growth_rate: growthRate,
+        analysis_summary: summary,
+        calculatedAt: new Date().toISOString(),
+        segments: { // Optional: return logic details for debug
+            growing: segmentForecasts.Growing.amount,
+            new: segmentForecasts.New.amount
+        }
     }
 }

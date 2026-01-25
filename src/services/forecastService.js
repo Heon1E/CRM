@@ -42,18 +42,17 @@ export const ForecastService = {
      */
     async generateAndCacheForecast(userId) {
         try {
-            // 1. Fetch raw sales data (Heavy query)
+            // 1. Fetch raw sales data (Heavy query - fetch 3 years for cohort analysis)
             const { data: sales, error } = await supabase
                 .from('sales')
                 .select('sale_date, total_amount, client_id')
-                .gte('sale_date', `${new Date().getFullYear() - 1}-01-01`) // Fetch Last Year + This Year
+                .gte('sale_date', `${new Date().getFullYear() - 3}-01-01`) // Fetch last 3 years
 
             if (error) throw error
 
             // 2. Run Engine
             const result = calculateRevenueForecast(sales)
 
-            // 3. Save to DB
             // 3. Save to DB
             const { data: saved, error: saveError } = await supabase
                 .from('revenue_forecasts')
@@ -69,8 +68,8 @@ export const ForecastService = {
                 .single()
 
             if (saveError) {
-                // If table doesn't exist, just return the result without caching (Fail gracefully)
-                console.warn('Failed to cache forecast (Table might be missing):', saveError.message)
+                // If table doesn't exist, return result without caching
+                console.warn('Failed to cache forecast:', saveError.message)
                 // Add current time as created_at for UI display
                 return {
                     ...result,
@@ -81,6 +80,7 @@ export const ForecastService = {
             return {
                 ...saved,
                 monthlyData: saved.monthly_data,
+                segments: result.segments, // Pass segment debug info to UI (even if not in DB)
                 created_at: saved.created_at || new Date().toISOString() // Ensure date exists
             }
 
