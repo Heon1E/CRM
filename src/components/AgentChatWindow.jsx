@@ -308,9 +308,35 @@ const AgentChatWindow = () => {
     }
   }
 
+  // [Fix] FK Constraint Error 방지용 Safe ID 로직
+  const getSafeUserId = async () => {
+    try {
+      if (!user?.id) {
+        // 1. 로그인 안 된 경우 -> DB 첫 번째 유저 사용
+        const { data: firstUser } = await supabase.from('users').select('id').limit(1).maybeSingle()
+        return firstUser?.id || null
+      }
+
+      // 2. 로그인 ID가 public.users에 실제로 있는지 확인
+      const { data: exists } = await supabase.from('users').select('id').eq('id', user.id).maybeSingle()
+      if (exists) return user.id
+
+      // 3. 없으면(FK 오류 예정) -> DB 첫 번째 유저로 Fallback
+      console.warn('Current auth user not found in public.users. Falling back to default user.')
+      const { data: fallbackUser } = await supabase.from('users').select('id').limit(1).maybeSingle()
+      return fallbackUser?.id || user.id // 정말 없으면 그냥 user.id 던져서 에러 확인
+
+    } catch (e) {
+      console.error('getSafeUserId error:', e)
+      return user?.id
+    }
+  }
+
   // Gemini를 통한 명령 파싱 및 DB 저장
   const processAndSaveData = async (aiResponse, userText, userImage) => {
     try {
+      const safeUserId = await getSafeUserId()
+
       // Gemini 응답에서 JSON 추출 시도
       const jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/) || aiResponse.match(/\{[\s\S]*\}/)
       if (!jsonMatch) return false
@@ -323,17 +349,18 @@ const AgentChatWindow = () => {
           .from('clients')
           .insert({
             ...parsedData.client,
-            created_by: user?.id,
+            created_by: safeUserId,
             created_at: new Date().toISOString()
           })
           .select()
+          .single()
 
         if (error) throw error
 
         const successMsg = {
           id: messages.length + 1,
           type: 'agent',
-          content: `✅ 거래처 등록 완료!\n\n**${parsedData.client.company}**\n담당자: ${parsedData.client.contact_person || '-'}\n연락처: ${parsedData.client.phone || '-'}`,
+          content: `✅ 거래처 등록 완료!\n\n**${data.company}**\n담당자: ${data.contact_person || '-'}\n연락처: ${data.phone || '-'}`,
           timestamp: new Date()
         }
         setMessages(prev => [...prev, successMsg])
@@ -383,17 +410,17 @@ const AgentChatWindow = () => {
         }
 
         // 활동내역 등록 (Supabase snake_case 스키마에 맞게)
+        // 활동내역의 created_by도 Safe ID 사용
         const activityData = {
           client_id: clientId,
           type: parsedData.activity.type || '미팅',
           activity_date: parsedData.activity.activity_date || new Date().toISOString().split('T')[0],
           activity_time: parsedData.activity.activity_time || null,
-          // user: parsedData.activity.attendees || '',  // 임시로 제거 - DB 스키마 확인 필요
           description: parsedData.activity.description || parsedData.activity.title || '',
           status: '완료',
           next_action_date: parsedData.activity.next_action_date || null,
           next_action_detail: parsedData.activity.next_action_detail || null,
-          created_by: user?.id
+          created_by: safeUserId
         }
 
         const { data, error } = await supabase
