@@ -161,6 +161,33 @@ a:hover {
   .oem-table tr:hover {
     background-color: #f1f3f5;
   }
+
+  /* Forms */
+  .oem-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--oem-border-color);
+    border-radius: 2px;
+    font-size: 13px;
+    color: var(--oem-text-primary);
+    background-color: #ffffff;
+    transition: all 0.2s;
+  }
+
+  .oem-input:focus {
+    outline: none;
+    border-color: var(--oem-blue);
+    box-shadow: 0 0 0 1px var(--oem-blue);
+  }
+
+  .oem-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--oem-text-secondary);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
 }
 
 /* 3. Utilities */

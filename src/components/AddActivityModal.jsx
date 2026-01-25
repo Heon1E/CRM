@@ -311,8 +311,8 @@ ${currentText}`
     <Modal isOpen={isOpen} onClose={onClose} title="활동 내역 추가" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            거래처 <span className="text-red-400">*</span>
+          <label className="oem-label">
+            CLIENT <span className="text-red-500">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -329,13 +329,13 @@ ${currentText}`
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              활동 유형 <span className="text-red-400">*</span>
+            <label className="oem-label">
+              ACTIVITY TYPE <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.type}
               onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="input-field"
+              className="oem-input"
               required
             >
               <option value="미팅">미팅</option>
@@ -348,13 +348,13 @@ ${currentText}`
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              상태 <span className="text-red-400">*</span>
+            <label className="oem-label">
+              STATUS <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              className="input-field"
+              className="oem-input"
               required
             >
               <option value="완료">완료</option>
@@ -365,27 +365,27 @@ ${currentText}`
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              날짜 <span className="text-red-400">*</span>
+            <label className="oem-label">
+              DATE <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
               value={formData.activity_date}
               onChange={(e) => setFormData({ ...formData, activity_date: e.target.value })}
-              className="input-field"
+              className="oem-input"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              시간
+            <label className="oem-label">
+              TIME
             </label>
             <input
               type="time"
               value={formData.activity_time}
               onChange={(e) => setFormData({ ...formData, activity_time: e.target.value })}
-              className="input-field"
-              placeholder="예: 14:00"
+              className="oem-input"
+              placeholder="e.g. 14:00"
             />
           </div>
         </div>
@@ -393,34 +393,34 @@ ${currentText}`
         {/* 다음 일정 섹션 */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              다음 일정 날짜
+            <label className="oem-label">
+              Target Date
             </label>
             <input
               type="date"
               value={formData.next_action_date}
               onChange={(e) => setFormData({ ...formData, next_action_date: e.target.value })}
-              className="input-field"
+              className="oem-input"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              다음 일정 내용
+            <label className="oem-label">
+              Action Detail
             </label>
             <input
               type="text"
               value={formData.next_action_detail}
               onChange={(e) => setFormData({ ...formData, next_action_detail: e.target.value })}
-              className="input-field"
-              placeholder="예: 견적서 발송"
+              className="oem-input"
+              placeholder="e.g. Send Quotation"
             />
           </div>
         </div>
 
         {/* 참석자 입력 섹션 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            참석자
+          <label className="oem-label">
+            ATTENDEES
           </label>
           <div className="flex gap-2 mb-2">
             <input
@@ -429,25 +429,25 @@ ${currentText}`
               value={attendeeInput}
               onChange={(e) => setAttendeeInput(e.target.value)}
               onKeyDown={handleAttendeeKeyDown}
-              className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-              placeholder="이름을 입력하고 Enter 또는 추가 버튼을 누르세요"
+              className="flex-1 oem-input"
+              placeholder="Type name and press Enter..."
             />
             <button
               type="button"
               onClick={handleAddAttendee}
-              className="px-4 py-2.5 bg-green-600 text-white border border-green-600 rounded-lg hover:bg-green-700 hover:border-green-700 transition-all duration-200 flex items-center justify-center space-x-1 font-medium h-[42px]"
+              className="px-3 py-1.5 bg-oem-blue text-white border border-oem-blue rounded-sm hover:bg-blue-700 hover:border-blue-700 transition-all duration-200 flex items-center justify-center space-x-1 h-[34px]"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3" />
               <span>Add</span>
             </button>
           </div>
           {/* 참석자 태그 표시 */}
           {attendees.length > 0 && (
-            <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-card border border-border-light min-h-[50px]">
+            <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-oem-border-color min-h-[50px] rounded-sm">
               {attendees.map((name, index) => (
                 <div
                   key={index}
-                  className="inline-flex items-center space-x-1 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
+                  className="inline-flex items-center space-x-1 px-2 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-sm text-xs font-bold"
                 >
                   <span>{name}</span>
                   <button
@@ -465,24 +465,24 @@ ${currentText}`
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">
-              내용 <span className="text-red-400">*</span>
+            <label className="oem-label">
+              DESCRIPTION <span className="text-red-500">*</span>
             </label>
             <button
               type="button"
               onClick={handleAIPolish}
               disabled={isAILoading || !formData.description.trim()}
-              className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-1 px-2 py-1 text-[10px] font-bold text-oem-blue border border-oem-blue rounded-sm hover:bg-oem-blue hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAILoading ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>정리 중...</span>
+                  <span>PROCESSING...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-3 h-3" />
-                  <span>✨ AI 자동 정리</span>
+                  <span>AI POLISH</span>
                 </>
               )}
             </button>
@@ -491,8 +491,8 @@ ${currentText}`
             value={formData.description}
             onChange={handleDescriptionChange}
             rows={6}
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-            placeholder="활동 내용을 입력하세요 (최대 3000자)"
+            className="oem-input"
+            placeholder="Enter activity details..."
             required
             disabled={isAILoading}
           />
@@ -524,23 +524,23 @@ ${currentText}`
           </div>
         )}
 
-        <div className="flex justify-end space-x-3 pt-4 px-6">
+        <div className="flex justify-end space-x-2 pt-4 px-0 border-t border-oem-border mt-6">
           <button
             type="button"
             onClick={onClose}
-            className="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 font-medium"
+            className="oem-btn-secondary"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 font-medium"
+            className="oem-btn-primary"
           >
             Save
           </button>
         </div>
       </form>
-    </Modal>
+    </Modal >
   )
 }
 
