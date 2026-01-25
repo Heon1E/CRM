@@ -1,17 +1,14 @@
 /**
- * AI Revenue Forecast Logic Engine (Advanced v2)
+ * AI Revenue Forecast Logic Engine (Advanced v3)
  * 
- * Uses "Seasonal Ratio", "Damped Linear Trend", and "Conservative Moving Average"
- * based on data availability.
+ * Revisions:
+ * - v3: Added "Day-level Proration" for current month comparisons to fix fake YTD drops.
+ * - v3: Added "Fall-from-Cliff Guardrail" to prevent unrealistic drops (>30%) for established biz.
  * 
- * Algorithm Specs:
- * - Strategy A (Seasonal): Data >= 12 months. Projects based on last year's patterns scaled by this year's performance.
- * - Strategy B (Damped Linear): Data 4-11 months. Fits a regression line with decay factor (phi=0.9).
- * - Strategy C (Moving Avg): Data < 4 months. Simple average, no growth assumption.
- * 
- * Safety:
- * - Growth Rate Capped at +100% (2x) and Floored at -50% (0.5x).
- * - Output snake_case keys for DB compatibility.
+ * Strategy:
+ * - Strategy A (Seasonality): Data >= 12 months.
+ * - Strategy B (Damped Linear): Data 4-11 months.
+ * - Strategy C (Moving Avg): Data < 4 months.
  */
 
 // Helper: Calculate Linear Regression (y = mx + c)
@@ -36,7 +33,17 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
         throw new Error('Insufficient data for analysis')
     }
 
-    // 1. Data Structuring & Monthly Aggregation
+    // Configuration
+    const today = new Date()
+    // For testing/simulation, we might override currentYear, but usually it matches today
+    // If currentYear is explicitly passed (e.g. simulation), we try to respect it, 
+    // but day-level logic relies on 'today's date within the month. 
+    // We assume currentYear == today.getFullYear() for the proration logic.
+    const currentMonthIndex = today.getMonth()
+    const currentDay = today.getDate()
+
+    // 1. Data Structuring
+    // salesData: { date, amount }
     const sales = salesData.map(s => ({
         date: new Date(s.sale_date || s.date),
         amount: Number(s.totalAmount || s.total_amount || 0)
@@ -44,32 +51,52 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
 
     const thisYear = currentYear
     const lastYear = currentYear - 1
-    const currentMonth = new Date().getMonth() // 0-indexed (0=Jan, 3=April)
 
-    // Buckets
+    // Monthly buckets for full stats
     const monthlyActuals = Array(12).fill(0).map(() => ({ thisYear: 0, lastYear: 0 }))
+
+    // For Day-Adjusted comparison of determining "Trend"
+    // We need to compare "This Year (Jan 1 ~ Current Day)" vs "Last Year (Jan 1 ~ Same Day)"
+    let ytdThisYearProrated = 0
+    let ytdLastYearProrated = 0
+    let totalLastYearFull = 0 // Full 12 months sum of last year
 
     sales.forEach(s => {
         const year = s.date.getFullYear()
         const month = s.date.getMonth()
-        if (year === thisYear) monthlyActuals[month].thisYear += s.amount
-        else if (year === lastYear) monthlyActuals[month].lastYear += s.amount
+        const day = s.date.getDate()
+
+        if (year === thisYear) {
+            monthlyActuals[month].thisYear += s.amount
+            // Ptd logic: simple accumulation for this year (since it is incomplete)
+            ytdThisYearProrated += s.amount
+        }
+        else if (year === lastYear) {
+            monthlyActuals[month].lastYear += s.amount
+            totalLastYearFull += s.amount
+
+            // Prorated Last Year Accumulation
+            // Include full months before current month
+            if (month < currentMonthIndex) {
+                ytdLastYearProrated += s.amount
+            }
+            // Include current month ONLY up to current day
+            else if (month === currentMonthIndex && day <= currentDay) {
+                ytdLastYearProrated += s.amount
+            }
+        }
     })
 
     // 2. Select Strategy
-    let strategy = 'Comparing'
-    const hasLastYearData = monthlyActuals.some(m => m.lastYear > 0)
-    // Count valid data points in current year (non-zero months up to current month)
-    // Note: We use 'currentMonth + 1' as approximate data count if we assume continuous operation.
-    // Better: count non-zero months if sparse? No, sticking to month index is safer for new biz context.
-    const dataMonthsCount = currentMonth + 1
+    let strategy = 'Moving Average'
+    const hasLastYearData = totalLastYearFull > 0
+    // Count active months in this year
+    const dataMonthsCount = currentMonthIndex + 1
 
     if (hasLastYearData) {
         strategy = 'Seasonal Ratio' // Strategy A
     } else if (dataMonthsCount >= 4) {
         strategy = 'Damped Linear' // Strategy B
-    } else {
-        strategy = 'Moving Average' // Strategy C
     }
 
     // 3. Execution
@@ -79,31 +106,45 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
 
     // --- Strategy A: Seasonal Ratio Projection ---
     if (strategy === 'Seasonal Ratio') {
-        // Calculate YTD Scale Factor
-        let ytdLastYear = 0
-        let ytdThisYear = 0
-        for (let i = 0; i <= currentMonth; i++) {
-            ytdLastYear += monthlyActuals[i].lastYear
-            ytdThisYear += monthlyActuals[i].thisYear
+        // Calculate Scale Factor using PRORATED values
+        // "How is this year performing compared to the EXACT same period last year?"
+
+        let scaleFactor = 1.0
+
+        // Edge Case: Very beginning of year (e.g. Jan 1st-5th) -> Prorated comparison is noisy.
+        // If we are in first 10 days of Jan, maybe rely on Last Q4 trend or just 1.0
+        if (currentMonthIndex === 0 && currentDay < 10) {
+            scaleFactor = 1.0
+            analysisSummary = "Early Year: Using neutral baseline. "
+        } else {
+            // Normal Prorated Logic
+            scaleFactor = ytdLastYearProrated > 0 ? ytdThisYearProrated / ytdLastYearProrated : 1.0
         }
 
-        // Scale Factor (Clamp to avoid explosion)
-        const rawScale = ytdLastYear > 0 ? ytdThisYear / ytdLastYear : 1
-        const scaleFactor = Math.min(Math.max(rawScale, 0.5), 2.0) // 0.5x ~ 2.0x
+        // Clamp scale: Max 2x, Min 0.5x
+        scaleFactor = Math.min(Math.max(scaleFactor, 0.5), 2.0)
+
+        // Additional Guardrail: Established Business shouldn't drop > 30% without reason
+        // If totalLastYearFull was substantial (> 10M KRW) and scaleFactor < 0.7, warn and clamp
+        if (totalLastYearFull > 10000000 && scaleFactor < 0.7) {
+            analysisSummary += `(Adjusted: Trend was ${scaleFactor.toFixed(2)}, clamped to 0.8 for safety). `
+            scaleFactor = 0.8
+        }
 
         forecastGrowthRate = (scaleFactor - 1).toFixed(3)
-        analysisSummary = `Applied seasonal patterns from last year (YTD Scale: x${scaleFactor.toFixed(2)}).`
+        analysisSummary += `Based on YTD performance vs same period last year (x${scaleFactor.toFixed(2)}).`
 
         // Generate Forecast
         for (let idx = 0; idx < 12; idx++) {
             const data = monthlyActuals[idx]
 
-            if (idx <= currentMonth) {
+            // Past
+            if (idx <= currentMonthIndex) {
                 finalMonthlyData.push({ month: idx + 1, actual: data.thisYear, forecast: data.thisYear, isForecast: false })
                 continue
             }
 
-            // Future: LastYear * ScaleFactor
+            // Future
             let projected = 0
             if (data.lastYear > 0) {
                 projected = data.lastYear * scaleFactor
@@ -116,67 +157,43 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
             finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(projected), isForecast: true })
         }
     }
-    // --- Strategy B: Damped Linear Trend ---
+    // --- Strategy B: Damped Linear ---
     else if (strategy === 'Damped Linear') {
-        // Extract existing monthly points
+        // ... (Same as v2.1)
         const yValues = []
-        for (let i = 0; i <= currentMonth; i++) {
-            yValues.push(monthlyActuals[i].thisYear)
-        }
-
+        for (let i = 0; i <= currentMonthIndex; i++) yValues.push(monthlyActuals[i].thisYear)
         const { slope, intercept } = calculateLinearRegression(yValues)
-        const phi = 0.9 // Damping Factor
+        const phi = 0.9
+        analysisSummary = `Extrapolated damped trend (Slope: ${Math.round(slope)}).`
 
-        analysisSummary = `Extrapolated damped linear trend (Slope: ${Math.round(slope)}, Damping: ${phi}).`
-
-        // Calculate annualized growth rate for info (rough estimate based on last projected vs first)
-        // We can't easily calc simple growth rate for linear model, so we'll calc it after projection loop.
-
-        // Generate Forecast
-        let currentLevel = intercept + (slope * currentMonth) // Start point for projection
-
+        let currentLevel = intercept + (slope * currentMonthIndex)
         for (let idx = 0; idx < 12; idx++) {
-            if (idx <= currentMonth) {
+            if (idx <= currentMonthIndex) {
                 finalMonthlyData.push({ month: idx + 1, actual: monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: false })
                 continue
             }
-
-            // Future: Damped Trend
-            // Forecast_t+k = Level_t + Sum(slope * phi^i)
-            const k = idx - currentMonth
+            const k = idx - currentMonthIndex
             let accumulatedTrend = 0
-            for (let i = 1; i <= k; i++) {
-                accumulatedTrend += slope * Math.pow(phi, i)
-            }
-
-            let projected = currentLevel + accumulatedTrend
-            projected = Math.max(projected, 0) // Floor at 0
-
+            for (let i = 1; i <= k; i++) accumulatedTrend += slope * Math.pow(phi, i)
+            let projected = Math.max(currentLevel + accumulatedTrend, 0)
             finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(projected), isForecast: true })
         }
-
-        // Metrics
         const firstVal = finalMonthlyData[0].forecast || 1
         const lastVal = finalMonthlyData[11].forecast
         forecastGrowthRate = ((lastVal - firstVal) / firstVal).toFixed(3)
     }
-    // --- Strategy C: Conservative Moving Average ---
+    // --- Strategy C: Moving Average ---
     else {
-        // Simple Average of available data
+        // ... (Same as v2)
         let sum = 0, count = 0
-        for (let i = 0; i <= currentMonth; i++) {
-            if (monthlyActuals[i].thisYear > 0) {
-                sum += monthlyActuals[i].thisYear
-                count++
-            }
+        for (let i = 0; i <= currentMonthIndex; i++) {
+            if (monthlyActuals[i].thisYear > 0) { sum += monthlyActuals[i].thisYear; count++ }
         }
         const average = count > 0 ? sum / count : 0
-
-        analysisSummary = `Used conservative 3-month average due to limited data (<4 months).`
-        forecastGrowthRate = 0 // Assume flat
-
+        analysisSummary = `Used recent average due to limited data.`
+        forecastGrowthRate = 0
         for (let idx = 0; idx < 12; idx++) {
-            if (idx <= currentMonth) {
+            if (idx <= currentMonthIndex) {
                 finalMonthlyData.push({ month: idx + 1, actual: monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: false })
                 continue
             }
@@ -187,16 +204,17 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
     // 4. Summarization
     const totalForecast = finalMonthlyData.reduce((sum, m) => sum + m.forecast, 0)
 
-    // Insight Text
-    if (Number(forecastGrowthRate) > 0.1) analysisSummary += " Expecting growth."
-    else if (Number(forecastGrowthRate) < -0.1) analysisSummary += " Consolidation phase."
+    // Final Growth Rate Calculation based on Total Forecast vs Total Actual Last Year
+    const finalYoY = totalLastYearFull > 0
+        ? ((totalForecast - totalLastYearFull) / totalLastYearFull * 100).toFixed(1)
+        : (Number(forecastGrowthRate) * 100).toFixed(1)
 
-    // 5. Output (Snake Case)
+    // 5. Output
     return {
         forecastYear: currentYear,
         total_amount: totalForecast,
         monthlyData: finalMonthlyData,
-        growth_rate: Number(forecastGrowthRate) * 100,
+        growth_rate: finalYoY,
         analysis_summary: analysisSummary,
         calculatedAt: new Date().toISOString()
     }
