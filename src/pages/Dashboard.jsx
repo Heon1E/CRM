@@ -10,6 +10,7 @@ import {
 import { useData } from '../contexts/DataContext'
 import { useDashboardData } from '../hooks/useDashboardData'
 import EditActivityModal from '../components/EditActivityModal'
+import RevenueForecastPanel from '../components/RevenueForecastPanel'
 import AppInstallGuide from '../components/AppInstallGuide'
 import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
@@ -238,6 +239,8 @@ const Dashboard = () => {
 
           {/* [Left Column - 50%] */}
           <div className="col-span-12 lg:col-span-6 space-y-6">
+
+            <RevenueForecastPanel />
 
             {/* Revenue Trend Chart (Changed to Bar Chart) */}
             <Panel title="Revenue Trend (Last 12 Months)">
