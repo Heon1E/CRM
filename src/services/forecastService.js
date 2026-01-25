@@ -45,9 +45,8 @@ export const ForecastService = {
             // 1. Fetch raw sales data (Heavy query - fetch 3 years for cohort analysis)
             const { data: sales, error } = await supabase
                 .from('sales')
-                .select('sale_date, total_amount, client_id, status')
+                .select('sale_date, total_amount, client_id')
                 .gte('sale_date', `${new Date().getFullYear() - 3}-01-01`) // Fetch last 3 years
-                .in('status', ['paid', 'completed', 'delivered', 'shipped']) // Strict status filter
 
             if (error) throw error
 
