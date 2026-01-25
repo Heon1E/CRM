@@ -69,10 +69,24 @@ export const ForecastService = {
 
             // DEBUG LOGGING
             if (result.debug) {
-                console.group('AI Forecast Debug Report')
+                console.group('AI Forecast Debug Report (v6.0)')
+                console.log('%c Revenue Audit', 'font-weight: bold; color: #4F46E5')
                 console.table(result.debug.audit)
-                console.table(result.debug.validationCounts)
-                console.log('Scale Factor:', result.debug.clampedScale, '(Raw:', result.debug.rawScale, ')')
+
+                console.log('%c Segment Contribution', 'font-weight: bold; color: #4F46E5')
+                console.table(result.debug.contribution)
+
+                if (result.debug.stoppedClients?.length > 0) {
+                    console.log('%c ⚠️ Stopped/Declining Clients (Sample)', 'color: #EF4444')
+                    console.table(result.debug.stoppedClients)
+                }
+
+                if (result.debug.highPotentialClients?.length > 0) {
+                    console.log('%c 🚀 High Potential New Clients (Sample)', 'color: #10B981')
+                    console.table(result.debug.highPotentialClients)
+                }
+
+                console.log(`Scale Factor: ${result.debug.clampedScale} (Raw: ${result.debug.scaleFactor})`)
                 console.groupEnd()
             }
 
