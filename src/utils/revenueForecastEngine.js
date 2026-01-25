@@ -1,9 +1,9 @@
 /**
- * AI Revenue Forecast Logic Engine (Advanced v3)
+ * AI Revenue Forecast Logic Engine (Advanced v4 - Robust)
  * 
  * Revisions:
- * - v3: Added "Day-level Proration" for current month comparisons to fix fake YTD drops.
- * - v3: Added "Fall-from-Cliff Guardrail" to prevent unrealistic drops (>30%) for established biz.
+ * - v4: Added "Missing Data Imputation" for current month.
+ *       If current month's actual is 0 (likely data delay), we estimate it to prevent crash.
  * 
  * Strategy:
  * - Strategy A (Seasonality): Data >= 12 months.
@@ -11,20 +11,17 @@
  * - Strategy C (Moving Avg): Data < 4 months.
  */
 
-// Helper: Calculate Linear Regression (y = mx + c)
+// Helper: Calculate Linear Regression
 const calculateLinearRegression = (yValues) => {
     const n = yValues.length
     if (n < 2) return { slope: 0, intercept: yValues[0] || 0 }
-
     const xValues = Array.from({ length: n }, (_, i) => i)
     const sumX = xValues.reduce((a, b) => a + b, 0)
     const sumY = yValues.reduce((a, b) => a + b, 0)
     const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0)
     const sumXX = xValues.reduce((sum, x) => sum + x * x, 0)
-
     const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
     const intercept = (sumY - slope * sumX) / n
-
     return { slope, intercept }
 }
 
@@ -33,17 +30,11 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
         throw new Error('Insufficient data for analysis')
     }
 
-    // Configuration
     const today = new Date()
-    // For testing/simulation, we might override currentYear, but usually it matches today
-    // If currentYear is explicitly passed (e.g. simulation), we try to respect it, 
-    // but day-level logic relies on 'today's date within the month. 
-    // We assume currentYear == today.getFullYear() for the proration logic.
     const currentMonthIndex = today.getMonth()
     const currentDay = today.getDate()
 
     // 1. Data Structuring
-    // salesData: { date, amount }
     const sales = salesData.map(s => ({
         date: new Date(s.sale_date || s.date),
         amount: Number(s.totalAmount || s.total_amount || 0)
@@ -52,164 +43,189 @@ export const calculateRevenueForecast = (salesData, currentYear = new Date().get
     const thisYear = currentYear
     const lastYear = currentYear - 1
 
-    // Monthly buckets for full stats
+    // Buckets
     const monthlyActuals = Array(12).fill(0).map(() => ({ thisYear: 0, lastYear: 0 }))
-
-    // For Day-Adjusted comparison of determining "Trend"
-    // We need to compare "This Year (Jan 1 ~ Current Day)" vs "Last Year (Jan 1 ~ Same Day)"
-    let ytdThisYearProrated = 0
-    let ytdLastYearProrated = 0
-    let totalLastYearFull = 0 // Full 12 months sum of last year
+    let totalLastYearFull = 0
 
     sales.forEach(s => {
         const year = s.date.getFullYear()
         const month = s.date.getMonth()
-        const day = s.date.getDate()
-
-        if (year === thisYear) {
-            monthlyActuals[month].thisYear += s.amount
-            // Ptd logic: simple accumulation for this year (since it is incomplete)
-            ytdThisYearProrated += s.amount
-        }
+        if (year === thisYear) monthlyActuals[month].thisYear += s.amount
         else if (year === lastYear) {
             monthlyActuals[month].lastYear += s.amount
             totalLastYearFull += s.amount
-
-            // Prorated Last Year Accumulation
-            // Include full months before current month
-            if (month < currentMonthIndex) {
-                ytdLastYearProrated += s.amount
-            }
-            // Include current month ONLY up to current day
-            else if (month === currentMonthIndex && day <= currentDay) {
-                ytdLastYearProrated += s.amount
-            }
         }
     })
 
-    // 2. Select Strategy
-    let strategy = 'Moving Average'
-    const hasLastYearData = totalLastYearFull > 0
-    // Count active months in this year
-    const dataMonthsCount = currentMonthIndex + 1
+    // --- v4 Fix: Missing Data Imputation ---
+    // If current month has 0 actual revenue, but we have historical data, 
+    // it's likely a data sync delay, not a business collapse.
+    // We IMPUTE the missing current month data to allow proper forecasting.
+    let imputedMessage = ""
+    if (monthlyActuals[currentMonthIndex].thisYear === 0 && totalLastYearFull > 0) {
+        // Method: Use Last Year Same Month * 1.0 (Neutral assumption) 
+        // Or if last year same month is 0, use Last Month's actual.
+        let imputedValue = monthlyActuals[currentMonthIndex].lastYear
 
-    if (hasLastYearData) {
-        strategy = 'Seasonal Ratio' // Strategy A
-    } else if (dataMonthsCount >= 4) {
-        strategy = 'Damped Linear' // Strategy B
+        if (imputedValue === 0) {
+            // Fallback to last month (Dec of last year) or Nov
+            imputedValue = monthlyActuals[(currentMonthIndex + 11) % 12].lastYear
+        }
+
+        // Apply imputation only for calculation purposes
+        if (imputedValue > 0) {
+            monthlyActuals[currentMonthIndex].thisYear = imputedValue
+            imputedMessage = " (Note: Current month data missing, estimated based on history)"
+        }
     }
 
-    // 3. Execution
+    // 2. Calculate Prorated Recalculation after Imputation
+    let ytdThisYearProrated = 0
+    let ytdLastYearProrated = 0
+
+    // Re-scan buckets to calc YTD (faster than re-scanning raw sales)
+    for (let m = 0; m <= currentMonthIndex; m++) {
+        const isCurrentMonth = m === currentMonthIndex
+
+        // This Year YTD
+        if (isCurrentMonth) {
+            // If we imputed, we assume it's "Full Month Equivalent" roughly, 
+            // but to be safe for proration, if it's day 25, we should scale it? 
+            // No, simpler: if we imputed, we treat it as "up to now" value matches "last year up to now".
+            // Actually, if we imputed using "Full Last Year Month", we should adjust for day.
+            // Imputation Strategy B: Just use Last Year Prorated value as This Year Prorated Value.
+            if (imputedMessage) {
+                // Force match to neutralize distortion
+                // But we need to calculate Last Year Prorated first.
+            } else {
+                ytdThisYearProrated += monthlyActuals[m].thisYear
+            }
+        } else {
+            ytdThisYearProrated += monthlyActuals[m].thisYear
+        }
+
+        // Last Year YTD Comparison
+        if (isCurrentMonth) {
+            // For Last Year, we need day-level granularity.
+            // Since we aggregated to months, we can estimate proration: (Total / DaysInMonth) * CurrentDay
+            // This is an approximation but robust enough.
+            const daysInMonth = new Date(lastYear, m + 1, 0).getDate()
+            const ratio = Math.min(currentDay / daysInMonth, 1.0)
+            ytdLastYearProrated += (monthlyActuals[m].lastYear * ratio)
+
+            if (imputedMessage) {
+                // If we imputed, set this year's prorated to match last year's prorated * 1.0
+                // ensuring ratio is 1.0 for this month, preventing drop.
+                ytdThisYearProrated += (monthlyActuals[m].lastYear * ratio)
+            }
+        } else {
+            ytdLastYearProrated += monthlyActuals[m].lastYear
+        }
+    }
+
+
+    // 3. Select Strategy
+    let strategy = 'Moving Average'
+    if (totalLastYearFull > 0) strategy = 'Seasonal Ratio'
+    else if ((currentMonthIndex + 1) >= 4) strategy = 'Damped Linear'
+
+    // 4. Execution
     let finalMonthlyData = []
     let forecastGrowthRate = 0
     let analysisSummary = ""
 
-    // --- Strategy A: Seasonal Ratio Projection ---
+    // --- Strategy A: Seasonal Ratio ---
     if (strategy === 'Seasonal Ratio') {
-        // Calculate Scale Factor using PRORATED values
-        // "How is this year performing compared to the EXACT same period last year?"
-
-        let scaleFactor = 1.0
-
-        // Edge Case: Very beginning of year (e.g. Jan 1st-5th) -> Prorated comparison is noisy.
-        // If we are in first 10 days of Jan, maybe rely on Last Q4 trend or just 1.0
-        if (currentMonthIndex === 0 && currentDay < 10) {
-            scaleFactor = 1.0
-            analysisSummary = "Early Year: Using neutral baseline. "
-        } else {
-            // Normal Prorated Logic
-            scaleFactor = ytdLastYearProrated > 0 ? ytdThisYearProrated / ytdLastYearProrated : 1.0
-        }
-
-        // Clamp scale: Max 2x, Min 0.5x
+        let scaleFactor = ytdLastYearProrated > 0 ? ytdThisYearProrated / ytdLastYearProrated : 1.0
         scaleFactor = Math.min(Math.max(scaleFactor, 0.5), 2.0)
 
-        // Additional Guardrail: Established Business shouldn't drop > 30% without reason
-        // If totalLastYearFull was substantial (> 10M KRW) and scaleFactor < 0.7, warn and clamp
+        // Guardrail
         if (totalLastYearFull > 10000000 && scaleFactor < 0.7) {
-            analysisSummary += `(Adjusted: Trend was ${scaleFactor.toFixed(2)}, clamped to 0.8 for safety). `
+            analysisSummary += `(Adjusted: Trend clamped to 0.8). `
             scaleFactor = 0.8
         }
 
         forecastGrowthRate = (scaleFactor - 1).toFixed(3)
-        analysisSummary += `Based on YTD performance vs same period last year (x${scaleFactor.toFixed(2)}).`
+        analysisSummary += `Based on YTD vs Last Year (x${scaleFactor.toFixed(2)}).` + imputedMessage
 
-        // Generate Forecast
         for (let idx = 0; idx < 12; idx++) {
             const data = monthlyActuals[idx]
 
-            // Past
+            // Render Past
             if (idx <= currentMonthIndex) {
-                finalMonthlyData.push({ month: idx + 1, actual: data.thisYear, forecast: data.thisYear, isForecast: false })
+                // If it was imputed, show the IMPUTED value as forecast, but actual as 0?
+                // Or show imputed as actual?
+                // Showing 0 actual + Non-zero Forecast for current month is best UI.
+                const isImputedMonth = (idx === currentMonthIndex && imputedMessage !== "")
+
+                finalMonthlyData.push({
+                    month: idx + 1,
+                    actual: isImputedMonth ? 0 : data.thisYear, // Keep 0 if missing in DB
+                    forecast: data.thisYear, // Show what we think it is
+                    isForecast: isImputedMonth // Highlight as forecast
+                })
                 continue
             }
 
             // Future
             let projected = 0
-            if (data.lastYear > 0) {
-                projected = data.lastYear * scaleFactor
-            } else {
-                // Gap fill
+            if (data.lastYear > 0) projected = data.lastYear * scaleFactor
+            else {
                 const context = finalMonthlyData.slice(-3).map(d => d.forecast)
                 projected = context.length > 0 ? context.reduce((a, b) => a + b, 0) / context.length : 0
             }
-
             finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(projected), isForecast: true })
         }
     }
-    // --- Strategy B: Damped Linear ---
+    // --- Strategy B: Damped Linear --- 
     else if (strategy === 'Damped Linear') {
-        // ... (Same as v2.1)
+        // ... (Same logic, but respecting imputed values in regression)
         const yValues = []
         for (let i = 0; i <= currentMonthIndex; i++) yValues.push(monthlyActuals[i].thisYear)
+
         const { slope, intercept } = calculateLinearRegression(yValues)
         const phi = 0.9
-        analysisSummary = `Extrapolated damped trend (Slope: ${Math.round(slope)}).`
+        analysisSummary = `Extrapolated damped trend.` + imputedMessage
 
         let currentLevel = intercept + (slope * currentMonthIndex)
         for (let idx = 0; idx < 12; idx++) {
             if (idx <= currentMonthIndex) {
-                finalMonthlyData.push({ month: idx + 1, actual: monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: false })
+                const isImputed = (idx === currentMonthIndex && imputedMessage !== "")
+                finalMonthlyData.push({ month: idx + 1, actual: isImputed ? 0 : monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: isImputed })
                 continue
             }
             const k = idx - currentMonthIndex
             let accumulatedTrend = 0
             for (let i = 1; i <= k; i++) accumulatedTrend += slope * Math.pow(phi, i)
-            let projected = Math.max(currentLevel + accumulatedTrend, 0)
-            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(projected), isForecast: true })
+            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(Math.max(currentLevel + accumulatedTrend, 0)), isForecast: true })
         }
         const firstVal = finalMonthlyData[0].forecast || 1
         const lastVal = finalMonthlyData[11].forecast
         forecastGrowthRate = ((lastVal - firstVal) / firstVal).toFixed(3)
     }
-    // --- Strategy C: Moving Average ---
+    // --- Strategy C ---
     else {
-        // ... (Same as v2)
+        // ... (Same logic)
         let sum = 0, count = 0
-        for (let i = 0; i <= currentMonthIndex; i++) {
-            if (monthlyActuals[i].thisYear > 0) { sum += monthlyActuals[i].thisYear; count++ }
-        }
-        const average = count > 0 ? sum / count : 0
-        analysisSummary = `Used recent average due to limited data.`
+        for (let i = 0; i <= currentMonthIndex; i++) { if (monthlyActuals[i].thisYear > 0) { sum += monthlyActuals[i].thisYear; count++ } }
+        const avg = count > 0 ? sum / count : 0
+        analysisSummary = `Conservative average.` + imputedMessage
         forecastGrowthRate = 0
         for (let idx = 0; idx < 12; idx++) {
             if (idx <= currentMonthIndex) {
-                finalMonthlyData.push({ month: idx + 1, actual: monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: false })
+                const isImputed = (idx === currentMonthIndex && imputedMessage !== "")
+                finalMonthlyData.push({ month: idx + 1, actual: isImputed ? 0 : monthlyActuals[idx].thisYear, forecast: monthlyActuals[idx].thisYear, isForecast: isImputed })
                 continue
             }
-            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(average), isForecast: true })
+            finalMonthlyData.push({ month: idx + 1, actual: 0, forecast: Math.round(avg), isForecast: true })
         }
     }
 
-    // 4. Summarization
     const totalForecast = finalMonthlyData.reduce((sum, m) => sum + m.forecast, 0)
-
-    // Final Growth Rate Calculation based on Total Forecast vs Total Actual Last Year
     const finalYoY = totalLastYearFull > 0
         ? ((totalForecast - totalLastYearFull) / totalLastYearFull * 100).toFixed(1)
         : (Number(forecastGrowthRate) * 100).toFixed(1)
 
-    // 5. Output
     return {
         forecastYear: currentYear,
         total_amount: totalForecast,
