@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Search, Check, ChevronsUpDown } from 'lucide-react'
 
-const ClientCombobox = ({ 
-  clients = [], 
-  value, 
-  onSelect, 
+const ClientCombobox = ({
+  clients = [],
+  value,
+  onSelect,
   placeholder = '거래처를 검색하세요...',
   disabled = false
 }) => {
@@ -34,9 +34,9 @@ const ClientCombobox = ({
   // 필터링된 거래처 목록
   const filteredClients = clients && Array.isArray(clients)
     ? clients.filter((client) =>
-        (client.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (client.contact_person || '').toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      (client.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (client.contact_person || '').toLowerCase().includes(searchTerm.toLowerCase())
+    )
     : []
 
   // 거래처 선택
@@ -90,7 +90,7 @@ const ClientCombobox = ({
   return (
     <div className="relative" ref={comboboxRef} data-combobox>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300 w-4 h-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-oem-text-secondary w-4 h-4" />
         <input
           ref={inputRef}
           type="text"
@@ -106,7 +106,7 @@ const ClientCombobox = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="input-field w-full pl-10 pr-10 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          className="oem-input pl-10 pr-10 disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="button"
@@ -114,7 +114,7 @@ const ClientCombobox = ({
             setIsOpen(!isOpen)
             inputRef.current?.focus()
           }}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-oem-text-secondary hover:text-oem-blue"
           disabled={disabled}
         >
           <ChevronsUpDown className="w-4 h-4" />
@@ -123,7 +123,7 @@ const ClientCombobox = ({
 
       {/* 드롭다운 목록 */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-[#1E1E1E] border border-gray-800 rounded-lg max-h-60 overflow-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-oem-border rounded-sm shadow-lg max-h-60 overflow-auto">
           <div ref={listRef} className="py-1">
             {filteredClients.length > 0 ? (
               filteredClients.map((client) => (
@@ -138,26 +138,25 @@ const ClientCombobox = ({
                       handleSelect(client)
                     }
                   }}
-                  className={`px-4 py-2 cursor-pointer hover:bg-white/5 focus:bg-white/10 focus:outline-none ${
-                    selectedClient?.id === client.id ? 'bg-white/10' : ''
-                  }`}
+                  className={`px-4 py-2 cursor-pointer hover:bg-gray-50 focus:bg-gray-100 focus:outline-none ${selectedClient?.id === client.id ? 'bg-blue-50 text-oem-blue' : 'text-oem-text-primary'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-medium text-white">{client.company || '알 수 없음'}</span>
+                      <span className="text-sm font-bold">{client.company || 'Unknown Client'}</span>
                       {client.contact_person && (
-                        <span className="text-xs text-gray-300 ml-2">({client.contact_person})</span>
+                        <span className="text-xs text-oem-text-secondary ml-2">({client.contact_person})</span>
                       )}
                     </div>
                     {selectedClient?.id === client.id && (
-                      <Check className="w-4 h-4 text-gray-300" />
+                      <Check className="w-4 h-4 text-oem-blue" />
                     )}
                   </div>
                 </div>
               ))
             ) : (
-              <div className="px-4 py-2 text-sm text-gray-300 text-center">
-                {searchTerm ? '검색 결과가 없습니다' : '거래처가 없습니다'}
+              <div className="px-4 py-2 text-sm text-oem-text-secondary text-center">
+                {searchTerm ? 'No results found.' : 'No clients available.'}
               </div>
             )}
           </div>

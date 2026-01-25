@@ -500,26 +500,26 @@ ${currentText}`
         </div>
 
         {/* 이슈 등록 체크박스 */}
-        <div className="flex items-center space-x-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <div className="flex items-center space-x-2 p-3 bg-gray-50 border border-oem-border rounded-sm">
           <input
             type="checkbox"
             id="registerAsIssue"
             checked={registerAsIssue}
             onChange={(e) => setRegisterAsIssue(e.target.checked)}
-            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+            className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
           />
-          <label htmlFor="registerAsIssue" className="text-sm font-medium text-gray-700 cursor-pointer">
-            이슈로 등록
+          <label htmlFor="registerAsIssue" className="text-sm font-bold text-oem-text-primary cursor-pointer uppercase">
+            REGISTER AS ISSUE
           </label>
-          <span className="text-xs text-gray-500 ml-1">
-            (체크 시 이 활동이 이슈 리스트에도 자동으로 추가됩니다)
+          <span className="text-xs text-oem-text-secondary ml-1">
+            (Automatically adds this activity to the Issue Tracker)
           </span>
         </div>
 
         {registerAsIssue && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-700">
-              💡 이 활동이 이슈로 등록되며, 제목과 내용이 이슈 항목에 복사됩니다.
+          <div className="p-3 bg-blue-50 border border-blue-100 rounded-sm">
+            <p className="text-xs text-oem-blue font-medium">
+              💡 This activity will be copied to the Issue Tracker with the same title and description.
             </p>
           </div>
         )}
