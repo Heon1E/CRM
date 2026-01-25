@@ -225,22 +225,38 @@ export const DataProvider = ({ children }) => {
 
   // 1. 유틸리티 함수
   // 1. 유틸리티 함수
+  // 1. 유틸리티 함수
   const getValidUserId = async (currentUser) => {
-    if (currentUser?.id) return currentUser.id
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser?.id) return authUser.id
+    let candidateId = currentUser?.id
 
-    // Fallback: 인증된 사용자가 없을 경우, DB에 존재하는 첫 번째 사용자 ID를 가져옴 (FK 오류 방지)
-    // 주의: 실제 운영 환경에서는 보안상 좋지 않으나, 현재 데이터 마이그레이션 도구로서의 역할에 집중
-    console.warn('[getValidUserId] 인증된 사용자를 찾을 수 없어 DB에서 임의의 사용자를 조회합니다.')
-    const { data: users, error } = await supabase.from('users').select('id').limit(1)
-    if (!error && users && users.length > 0) {
+    if (!candidateId) {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      candidateId = authUser?.id
+    }
+
+    // [Fix] FK Constraint Error 방지: public.users에 실제로 존재하는지 확인
+    if (candidateId) {
+      const { data: exists, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', candidateId)
+        .maybeSingle()
+
+      if (exists) return candidateId
+
+      console.warn(`[getValidUserId] User ${candidateId} authenticated but not found in public.users. Falling back.`)
+    }
+
+    // Fallback: 인증된 사용자가 없거나 DB에 없을 경우, DB에 존재하는 첫 번째 사용자 ID를 가져옴
+    console.warn('[getValidUserId] 유효한 사용자 ID를 찾을 수 없어 DB에서 임의의 사용자를 조회합니다.')
+    const { data: users } = await supabase.from('users').select('id').limit(1)
+
+    if (users && users.length > 0) {
       return users[0].id
     }
 
-    // 정말 아무것도 없으면... 에러를 내거나 null 반환 (하지만 products insert 시 에러 날 것임)
     console.error('[getValidUserId] 유효한 사용자 ID를 찾을 수 없습니다.')
-    return '00000000-0000-0000-0000-000000000000' // 임시 더미 (하지만 FK 제약조건 있으면 실패함)
+    return '00000000-0000-0000-0000-000000000000' // 임시 더미
   }
 
   // 매출 데이터 그룹화 함수 (sale_date, client_id, created_at 분 단위 기준)
