@@ -225,7 +225,6 @@ export const DataProvider = ({ children }) => {
 
   // 1. 유틸리티 함수
   // 1. 유틸리티 함수
-  // 1. 유틸리티 함수
   const getValidUserId = async (currentUser) => {
     // 1. 현재 로그인된 유저 ID가 있으면 최우선 사용
     if (currentUser?.id) return currentUser.id
@@ -233,11 +232,22 @@ export const DataProvider = ({ children }) => {
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (authUser?.id) return authUser.id
 
-    // 2. 로그인 유저가 없거나(개발 모드/비로그인), Auth ID가 DB 참조 무결성에 걸릴 수 있음.
-    // 따라서, 'users' 테이블(접근 불가할 수 있음) 대신, 이미 성공적으로 저장된 'activities'의 created_by를 빌려옴.
-    // 이는 FK 오류를 우회하기 위한 가장 확실한 방법임.
+    // 2. [In-Memory Fallback] 이미 로드된 데이터에서 성공했던 ID를 재사용 (가장 확실함)
+    // 데이터가 로드되어 있다는 건, 그 데이터를 만든 유저 ID가 유효하다는 뜻.
+    const validActivity = activities.find(a => a.created_by && a.created_by !== '00000000-0000-0000-0000-000000000000')
+    if (validActivity?.created_by) {
+      console.log(`[getValidUserId] Reusing valid User ID from loaded activities: ${validActivity.created_by}`)
+      return validActivity.created_by
+    }
+
+    const validClient = clients.find(c => c.created_by && c.created_by !== '00000000-0000-0000-0000-000000000000')
+    if (validClient?.created_by) {
+      console.log(`[getValidUserId] Reusing valid User ID from loaded clients: ${validClient.created_by}`)
+      return validClient.created_by
+    }
+
+    // 3. In-Memory에도 없으면 DB 조회 (최후의 수단)
     try {
-      // activities 테이블에서 가장 최근 활동 하나를 가져와 그 작성자 ID를 사용
       const { data: existingActivity } = await supabase
         .from('activities')
         .select('created_by')
@@ -245,30 +255,14 @@ export const DataProvider = ({ children }) => {
         .limit(1)
         .maybeSingle()
 
-      if (existingActivity?.created_by) {
-        console.warn(`[getValidUserId] Found safe existing User ID from activities: ${existingActivity.created_by}`)
-        return existingActivity.created_by
-      }
-
-      // 3. 만약 activities도 비어있다면... clients 테이블 시도
-      const { data: existingClient } = await supabase
-        .from('clients')
-        .select('created_by')
-        .not('created_by', 'is', null)
-        .limit(1)
-        .maybeSingle()
-
-      if (existingClient?.created_by) {
-        console.warn(`[getValidUserId] Found safe existing User ID from clients: ${existingClient.created_by}`)
-        return existingClient.created_by
-      }
-
+      if (existingActivity?.created_by) return existingActivity.created_by
     } catch (e) {
-      console.error('[getValidUserId] Error finding fallback user:', e)
+      console.error('[getValidUserId] DB fallback failed:', e)
     }
 
-    // 4. 정말 아무것도 없으면 어쩔 수 없이 더미 ID 반환 (이 경우 FK 에러 발생 가능성 높음)
-    console.error('[getValidUserId] No valid user found in DB (fallback failed).')
+    // 4. 정말 아무것도 없으면... 
+    // 경고: 이 경우 FK 에러가 발생할 수밖에 없음. (시스템에 유효한 유저가 단 한 명도 없는 상태)
+    console.error('[getValidUserId] FATAL: No valid user found in Auth, Memory, or DB.')
     return '00000000-0000-0000-0000-000000000000'
   }
 
