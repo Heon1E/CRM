@@ -54,14 +54,15 @@ export const ForecastService = {
             const result = calculateRevenueForecast(sales)
 
             // 3. Save to DB
+            // 3. Save to DB
             const { data: saved, error: saveError } = await supabase
                 .from('revenue_forecasts')
                 .insert([{
                     forecast_year: result.forecastYear,
-                    total_amount: result.totalAmount,
+                    total_amount: result.total_amount, // Updated key
                     monthly_data: result.monthlyData,
-                    growth_rate: result.growthRate,
-                    analysis_summary: result.analysisSummary,
+                    growth_rate: result.growth_rate,   // Updated key
+                    analysis_summary: result.analysis_summary, // Updated key if needed
                     user_id: userId
                 }])
                 .select()
