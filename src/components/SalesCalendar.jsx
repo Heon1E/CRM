@@ -8,7 +8,7 @@ import { useData } from '../contexts/DataContext'
 
 // ??구�? 캘린???�정
 const USER_CALENDAR_ID = 'heoniree@gmail.com'
-const GOOGLE_API_KEY = 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 const HOLIDAY_CALENDAR_ID = 'ko.south_korea#holiday@group.v.calendar.google.com'
 
 const SalesCalendar = ({ embedded = false, className = '', loading = false, onDateSelect }) => {
@@ -27,16 +27,16 @@ const SalesCalendar = ({ embedded = false, className = '', loading = false, onDa
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
-    
+
     checkMobile()
     window.addEventListener('resize', checkMobile)
-    
+
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   // 공휴??& 기념???�별
   const isRedDay = (title) => {
-    const redKeywords = ['?�정', '?�해', '?�날', '?�일??, '?�린?�날', '부�?, '?�충??, '광복??, '추석', '개천??, '?��???, '?�리?�마??, '?�탄??, '?�거', '?�체공?�일'];
+    const redKeywords = ['?�정', '?�해', '?�날', '?�일??, ' ?�린?�날', '부�?, '?�충??, '광복??, '추석', '개천??, '?��???, '?�리?�마??, '?�탄??, '?�거', '?�체공?�일'];
     return redKeywords && redKeywords.some(keyword => title.includes(keyword));
   }
   const isObservance = (title) => {

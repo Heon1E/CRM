@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { MapPin, Filter, RefreshCw, Calendar } from 'lucide-react'
 import { showSuccess, showError } from '../utils/alert'
 
-const GOOGLE_API_KEY = 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 const HQ_ADDRESS = '경기도 용인시 처인구 백암면 삼백로 367-20'
 
 const containerStyle = {

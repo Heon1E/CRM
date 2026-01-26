@@ -14,7 +14,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   })
   const { clients, updateClient, deleteClient, products, fetchClientContacts } = useData()
   const { user } = useAuth()
