@@ -227,7 +227,8 @@ export const DataProvider = ({ children }) => {
   // 1. 유틸리티 함수
   const getValidUserId = async (currentUser) => {
     // 1. 현재 로그인된 유저 ID가 있으면 최우선 사용
-    if (currentUser?.id) return currentUser.id
+    // 1. 현재 로그인된 유저 ID가 있으면 최우선 사용 (단, 더미 ID는 제외)
+    if (currentUser?.id && currentUser.id !== '00000000-0000-0000-0000-000000000000') return currentUser.id
 
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (authUser?.id) return authUser.id
@@ -256,14 +257,24 @@ export const DataProvider = ({ children }) => {
         .maybeSingle()
 
       if (existingActivity?.created_by) return existingActivity.created_by
+
+      // [New Fallback] sales 테이블에서도 검색
+      const { data: existingSale } = await supabase
+        .from('sales')
+        .select('created_by')
+        .not('created_by', 'is', null)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingSale?.created_by) return existingSale.created_by
     } catch (e) {
       console.error('[getValidUserId] DB fallback failed:', e)
     }
 
-    // 4. 정말 아무것도 없으면... 
-    // 경고: 이 경우 FK 에러가 발생할 수밖에 없음. (시스템에 유효한 유저가 단 한 명도 없는 상태)
-    console.error('[getValidUserId] FATAL: No valid user found in Auth, Memory, or DB.')
-    return '00000000-0000-0000-0000-000000000000'
+    // 4. 정말 아무것도 없으면... 유저가 찾아준 유효한 ID 사용 (Hardcoded Fallback)
+    const ULTIMATE_FALLBACK_ID = 'baad5267-f87d-4429-a7c3-f6f1a966d68d'
+    console.warn(`[getValidUserId] WARNING: No valid user found in Auth/Memory/DB. Using Hardcoded Fallback: ${ULTIMATE_FALLBACK_ID}`)
+    return ULTIMATE_FALLBACK_ID
   }
 
   // 매출 데이터 그룹화 함수 (sale_date, client_id, created_at 분 단위 기준)

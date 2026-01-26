@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { showSuccess, showError, showWarning } from '../utils/alert'
 
 const SalesExcelUpload = ({ onRefresh }) => {
-  const { clients, addSale } = useData()
+  const { clients, addSale, registerMissingProductsFromSales } = useData()
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, stage: '' })
   const [isDeleting, setIsDeleting] = useState(false)
@@ -271,6 +271,20 @@ const SalesExcelUpload = ({ onRefresh }) => {
       const totalRows = validatedSales.length
       const resultMessage = `Total ${totalRows} rows: ${insertedCount} inserted, ${duplicateCount} duplicates skipped.`
 
+      // [MODIFIED] 신규 등록이든 중복이든, 데이터가 처리되었으면 품목 동기화 시도 (연결 누락 보정)
+      if (insertedCount > 0 || duplicateCount > 0) {
+        try {
+          if (registerMissingProductsFromSales) {
+            setUploadProgress(prev => ({ ...prev, stage: '품목 동기화 및 매출 연결 중...' }))
+            const { count, updatedSales } = await registerMissingProductsFromSales()
+            console.log(`[Auto-Sync] Created ${count} products, Linked ${updatedSales} sales`)
+          }
+        } catch (syncError) {
+          console.error('자동 품목 동기화 실패:', syncError)
+          insertErrors.push(`데이터는 저장되었으나 품목 연결에 실패했습니다: ${syncError.message}`)
+        }
+      }
+
       if (insertedCount > 0) {
         await showSuccess(resultMessage)
       } else if (duplicateCount > 0) {
@@ -278,7 +292,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
       }
 
       if (insertErrors.length > 0) {
-        await showError(`일부 매출 등록에 실패했습니다:\n${insertErrors.join('\n')}`)
+        await showError(`일부 처리에 문제가 있었습니다:\n${insertErrors.join('\n')}`)
       }
 
       // 파일 입력 초기화
@@ -385,8 +399,8 @@ const SalesExcelUpload = ({ onRefresh }) => {
         onClick={handleDeleteAll}
         disabled={isDeleting || isUploading}
         className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${isDeleting || isUploading
-            ? 'opacity-50 cursor-not-allowed bg-[#1E1E1E] text-gray-300 border border-gray-800'
-            : 'bg-red-400/20 hover:bg-red-400/30 text-red-200 border border-red-400/30'
+          ? 'opacity-50 cursor-not-allowed bg-[#1E1E1E] text-gray-300 border border-gray-800'
+          : 'bg-red-400/20 hover:bg-red-400/30 text-red-200 border border-red-400/30'
           }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >

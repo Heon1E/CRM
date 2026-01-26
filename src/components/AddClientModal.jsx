@@ -129,7 +129,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
   // Google Maps SDK Load
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: 'AIzaSyDXVuNub5XdidbF93KsOpVS2snr5tQprQM'
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   })
 
   // 카카오 주소 검색 (Daum Postcode는 독립적)
