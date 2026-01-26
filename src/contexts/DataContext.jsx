@@ -714,6 +714,23 @@ export const DataProvider = ({ children }) => {
       })
       const groupedSales = processGroupedSales(rawSales)
       setSales(groupedSales)
+
+      // [FIX] 매출 데이터를 기반으로 각 거래처의 총 매출(last_year_revenue) 계산 및 업데이트
+      // DB의 last_year_revenue 컬럼을 믿지 않고, 실제 sales 데이터를 집계하여 동적으로 할당함.
+      const revenueMap = {}
+      rawSales.forEach(s => {
+        if (!revenueMap[s.clientId]) revenueMap[s.clientId] = 0
+        revenueMap[s.clientId] += s.totalAmount
+      })
+
+      const clientsWithRevenue = clientsData.map(client => ({
+        ...client,
+        last_year_revenue: revenueMap[client.id] || 0, // 실제 총 매출로 덮어쓰기
+        totalRevenue: revenueMap[client.id] || 0 // 별칭 추가
+      }))
+
+      setClients(clientsWithRevenue) // Revenue가 포함된 클라이언트 데이터로 업데이트
+
       setIssues(results.issues)
 
       console.log('[DataContext] Hybrid data synchronization complete.')
