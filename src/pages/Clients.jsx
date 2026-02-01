@@ -261,7 +261,80 @@ const Clients = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card View (md:hidden) */}
+          <div className="md:hidden space-y-3">
+            {Object.keys(visibleGroupedClients).length > 0 ? (
+              Object.keys(visibleGroupedClients).map((company) => {
+                const visibleClients = visibleGroupedClients[company]
+                const primaryContact = visibleClients[0]
+                const stats = getCompanyStats(visibleClients)
+
+                return (
+                  <SwipeableListItem
+                    key={company}
+                    onEdit={() => setEditingClient(primaryContact)}
+                    onDelete={async () => {
+                      const confirmed = await showConfirm('삭제하시겠습니까?', '이 작업은 되돌릴 수 없습니다.')
+                      if (confirmed) {
+                        try {
+                          await deleteClient(primaryContact.id)
+                          showSuccess('삭제되었습니다.')
+                        } catch (e) {
+                          console.error(e)
+                          showError('삭제 실패')
+                        }
+                      }
+                    }}
+                  >
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-oem-border active:bg-slate-50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <Link
+                            to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
+                            className="text-base font-bold text-oem-text-primary hover:text-oem-blue"
+                          >
+                            {company}
+                          </Link>
+                          <p className="text-xs text-oem-text-secondary mt-0.5">
+                            {primaryContact?.contact_person || '담당자 없음'}
+                          </p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${coerceClientStatus(primaryContact?.status) === '매출'
+                          ? 'bg-oem-green/10 text-oem-green border border-oem-green/20'
+                          : 'bg-oem-bg-header text-oem-text-secondary border border-oem-border'
+                          }`}>
+                          {primaryContact?.status || 'Unknown'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-end pt-2 border-t border-oem-border/50 mt-2">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-oem-text-secondary uppercase tracking-wider">최근 거래</span>
+                          <span className="text-xs font-medium text-oem-text-primary">
+                            {stats.lastOrder ? stats.lastOrder.split('T')[0] : '기록 없음'}
+                          </span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[10px] font-bold text-oem-text-secondary uppercase tracking-wider">총 매출 (작년)</span>
+                          <span className="text-sm font-bold text-oem-blue">
+                            {formatKoreanCurrency(stats.totalAmount || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </SwipeableListItem>
+                )
+              })
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-oem-text-secondary">
+                <Users className="w-12 h-12 mb-2 opacity-20" />
+                <p className="text-xs">데이터가 없습니다.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View (hidden md:block) */}
+          <div className="overflow-x-auto hidden md:block">
             <table className="oem-table min-w-full">
               <thead>
                 <tr>

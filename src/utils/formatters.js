@@ -10,17 +10,17 @@
  */
 export const formatDate = (dateString) => {
   if (!dateString) return '날짜 없음'
-  
+
   // ISO 형식 문자열인 경우 (예: "2026-01-07T00:00:00...")
   if (typeof dateString === 'string' && dateString.includes('T')) {
     return dateString.split('T')[0]
   }
-  
+
   // 이미 YYYY-MM-DD 형식인 경우
   if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
     return dateString.substring(0, 10)
   }
-  
+
   // Date 객체인 경우
   if (dateString instanceof Date) {
     const year = dateString.getFullYear()
@@ -28,7 +28,7 @@ export const formatDate = (dateString) => {
     const day = String(dateString.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   }
-  
+
   // 그 외의 경우 Date 객체로 변환 시도
   try {
     const date = new Date(dateString)
@@ -41,7 +41,7 @@ export const formatDate = (dateString) => {
   } catch (e) {
     // 변환 실패 시 원본 반환
   }
-  
+
   return dateString
 }
 
@@ -52,17 +52,17 @@ export const formatDate = (dateString) => {
  */
 export const parseDateForInput = (dateString) => {
   if (!dateString) return ''
-  
+
   // ISO 형식 문자열인 경우
   if (typeof dateString === 'string' && dateString.includes('T')) {
     return dateString.split('T')[0]
   }
-  
+
   // 이미 YYYY-MM-DD 형식인 경우
   if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateString)) {
     return dateString.substring(0, 10)
   }
-  
+
   // Date 객체인 경우
   if (dateString instanceof Date) {
     const year = dateString.getFullYear()
@@ -70,7 +70,7 @@ export const parseDateForInput = (dateString) => {
     const day = String(dateString.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   }
-  
+
   // 그 외의 경우 Date 객체로 변환 시도
   try {
     const date = new Date(dateString)
@@ -83,7 +83,7 @@ export const parseDateForInput = (dateString) => {
   } catch (e) {
     // 변환 실패 시 빈 문자열 반환
   }
-  
+
   return ''
 }
 
@@ -94,16 +94,11 @@ export const parseDateForInput = (dateString) => {
  */
 export const formatCurrency = (amount) => {
   if (!amount || amount === 0) return '0원'
-  
+
   const amountNum = Number(amount)
-  
-  // 1만원 미만: 원 단위로 표시
-  if (amountNum < 10000) {
-    return `${amountNum.toLocaleString()}원`
-  }
-  
-  // 1만원 이상: 만원 단위로 표시
-  return `${(amountNum / 10000).toLocaleString()}만원`
+
+  // 모든 금액을 원 단위로 표시 (천단위 콤마)
+  return `${amountNum.toLocaleString()}원`
 }
 
 /**
@@ -123,26 +118,26 @@ export const formatNumber = (amount) => {
  */
 export const formatKoreanCurrency = (amount) => {
   if (!amount || amount === 0) return '0원'
-  
+
   const amountNum = Number(amount)
-  
+
   // 1만원 미만: 원 단위로 표시
   if (amountNum < 10000) {
     return `${amountNum.toLocaleString()}원`
   }
-  
+
   // 1억원 이상: "X억 Y,YYY만원" 형식
   if (amountNum >= 100000000) {
     const eok = Math.floor(amountNum / 100000000)
     const man = Math.floor((amountNum % 100000000) / 10000)
-    
+
     if (man > 0) {
       return `${eok}억 ${man.toLocaleString()}만원`
     } else {
       return `${eok}억원`
     }
   }
-  
+
   // 1만원 이상 1억원 미만: "X,YYY만원" 형식
   const man = Math.floor(amountNum / 10000)
   return `${man.toLocaleString()}만원`

@@ -5,3 +5,8 @@ dist/
 *.zip
 .vercel
 .env*.local
+
+# Agent.md requirements
+.tmp/
+credentials.json
+token.json

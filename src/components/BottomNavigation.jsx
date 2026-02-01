@@ -1,63 +1,54 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Activity, Settings, TrendingUp } from 'lucide-react'
+import { Home, Users, PlusCircle, Map as MapIcon, Menu } from 'lucide-react'
 
 const BottomNavigation = () => {
   const location = useLocation()
+  const currentPath = location.pathname
 
-  // 모바일에서만 표시할 메뉴 항목 (5개 메뉴)
-  const menuItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/clients', label: 'Clients', icon: Users },
-    { path: '/pipeline', label: 'Pipeline', icon: TrendingUp },
-    { path: '/activities', label: 'Activities', icon: Activity },
-    { path: '/settings', label: 'Settings', icon: Settings },
+  const navItems = [
+    { path: '/', label: '홈', icon: Home },
+    { path: '/clients', label: '거래처', icon: Users },
+    { path: '/quick-action', label: '등록', icon: PlusCircle, isSpecial: true },
+    { path: '/map', label: '주변', icon: MapIcon },
+    { path: '/settings', label: '더보기', icon: Menu },
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#121212]/85 backdrop-blur border-t border-gray-800 z-50 md:hidden">
-      <div className="flex items-center justify-around h-16 px-2">
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.path
-          const Icon = item.icon
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-bottom shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+      <div className="flex justify-between items-center px-2 h-16">
+        {navItems.map((item) => {
+          const isActive = currentPath === item.path
+          const isSpecial = item.isSpecial
+
+          if (isSpecial) {
+            return (
+              <div key={item.path} className="relative -top-5">
+                <Link
+                  to={item.path} // 나중에 Quick Action Modal 등으로 변경 가능
+                  className="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-oem-blue text-white shadow-lg transform active:scale-95 transition-transform"
+                >
+                  <item.icon className="w-7 h-7" />
+                </Link>
+              </div>
+            )
+          }
+
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`
-                flex flex-col items-center justify-center flex-1 h-full
-                transition-all duration-200
-                ${isActive ? 'text-white' : 'text-gray-300'}
-                active:bg-white/5
-                touch-manipulation
-              `}
-              style={{ 
-                minHeight: '44px', // iOS 터치 가이드라인 (최소 44x44px)
-                WebkitTapHighlightColor: 'transparent'
-              }}
+              className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors ${isActive ? 'text-oem-blue' : 'text-gray-400 hover:text-gray-600'
+                }`}
             >
-              <Icon className={`w-5 h-5 mb-0.5 ${isActive ? 'text-white' : 'text-gray-300'}`} />
-              <span className={`text-[10px] font-medium ${isActive ? 'text-white' : 'text-gray-300'}`}>
-                {item.label}
-              </span>
+              <item.icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current opacity-20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           )
         })}
       </div>
-      {/* iOS Safe Area 대응 (iPhone X 이후 노치 영역) */}
-      <div className="h-safe-area-inset-bottom bg-[#121212]/85"></div>
-      <style>{`
-        @supports (padding: max(0px)) {
-          .h-safe-area-inset-bottom {
-            height: max(0px, env(safe-area-inset-bottom));
-          }
-        }
-      `}</style>
-    </nav>
+    </div>
   )
 }
 
 export default BottomNavigation
-
-
-

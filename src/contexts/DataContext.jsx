@@ -144,13 +144,13 @@ export const DataProvider = ({ children }) => {
         if (!cid) return
         clientRevenueMap[cid] = (clientRevenueMap[cid] || 0) + (Number(s.total_amount ?? s.totalAmount ?? 0) || 0)
       })
-      const top3RevenueClients = Object.entries(clientRevenueMap)
+      const topRevenueClients = Object.entries(clientRevenueMap)
         .map(([id, total]) => {
           const c = clients.find(x => x.id === id)
           return { id, name: c?.company || 'Unknown', total }
         })
         .sort((a, b) => b.total - a.total)
-        .slice(0, 3)
+        .slice(0, 5)
 
       // 6. Fastest Growing Clients
       const topGrowthClients = []
@@ -208,7 +208,7 @@ export const DataProvider = ({ children }) => {
         revenueYoY,
         clientGrowthVal,
         aggregatedMonthlyTrend,
-        top3RevenueClients,
+        topRevenueClients,
         topGrowthClients: calculatedGrowthClients,
         lastUpdated: new Date()
       })
@@ -451,6 +451,8 @@ export const DataProvider = ({ children }) => {
       delete sanitized.date
       delete sanitized.price // DB에 없는 필드 (products 테이블용)
       delete sanitized.unit_price // DB에 없는 필드 (sales 테이블용)
+      delete sanitized.totalRevenue // DB에 없는 가상 필드 (DataContext에서 계산됨)
+      delete sanitized.last_year_revenue // DB에 없는 가상 필드 (오류 방지)
 
       // 디버깅: DB에 전송될 데이터 확인 (최종 검증)
       console.log('[sanitizeData] clients 테이블에 저장될 데이터 (최종 검증):', sanitized)

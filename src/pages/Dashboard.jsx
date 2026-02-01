@@ -86,7 +86,7 @@ const Dashboard = () => {
     revenueYoY: '0.0',
     clientGrowthVal: 0,
     aggregatedMonthlyTrend: [],
-    top3RevenueClients: [],
+    topRevenueClients: [],
     topGrowthClients: []
   }
 
@@ -326,12 +326,12 @@ const Dashboard = () => {
           <div className="col-span-12 lg:col-span-6 space-y-6">
 
             {/* Top Revenue Clients */}
-            <Panel title="Top Revenue Clients (Historical)">
+            <Panel title="Top 5 Clients (Last Year)">
               <div className="space-y-3 mt-1">
-                {stats.top3RevenueClients.map((client, idx) => (
+                {(stats.topRevenueClients || []).map((client, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-white border border-oem-border rounded-oem hover:border-oem-blue transition-colors group cursor-pointer">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs ${idx === 0 ? 'bg-amber-400' : idx === 1 ? 'bg-slate-300' : 'bg-orange-400'
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs ${idx === 0 ? 'bg-amber-400' : idx === 1 ? 'bg-slate-300' : idx === 2 ? 'bg-orange-400' : 'bg-slate-200'
                         }`}>
                         {idx + 1}
                       </div>
@@ -344,7 +344,7 @@ const Dashboard = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold text-oem-text-primary">{formatKoreanCurrency(client.total)}</p>
-                      <p className="text-[10px] text-oem-green font-bold">LIFETIME_HIGH</p>
+                      <p className="text-[10px] text-oem-green font-bold">TOTAL_REVENUE</p>
                     </div>
                   </div>
                 ))}

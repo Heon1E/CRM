@@ -144,7 +144,7 @@ const PipelineBoard = () => {
         sample: lastOrderDates.slice(0, 10)
       })
 
-      // 3. 휴면 고객 필터링 (최근 1년 주문 없음 + 누적 매출 있음)
+      // 3. 휴면 고객 필터링 (최근 1년 주문 없음 + 누적 매출 있음 + 현재 파이프라인에 없음)
       const dormantCandidates = Array.from(clientStatsMap.values()).filter(stats => {
         // 조건 1: 누적 매출이 있어야 함
         if (stats.totalRevenue <= 0) return false
@@ -153,6 +153,15 @@ const PipelineBoard = () => {
         if (!stats.lastOrderDate) return false
         if (stats.lastOrderDate >= oneYearAgoStr) return false
 
+        // [NEW] 조건 3: 현재 파이프라인(활성, 종료, 대기 등)에 이미 있는 고객 제외
+        const clientInDB = clients.find(c => c.id === stats.clientId)
+        if (!clientInDB) return false // 로컬 데이터에 없으면 안전하게 제외
+
+        const currentStatus = normalizeStatus(clientInDB.status)
+        // 파이프라인의 모든 단계(메인 + 종료/대기)에 포함되어 있다면 '이미 관리 중'인 것으로 간주하고 제외
+        const allPipelineStages = [...mainStages, ...endStages]
+        if (allPipelineStages.includes(currentStatus)) return false
+
         return true
       })
 
@@ -160,7 +169,7 @@ const PipelineBoard = () => {
       console.log('[Pipeline Discovery] Sample dormant clients:', dormantCandidates.slice(0, 3))
 
       if (dormantCandidates.length === 0) {
-        setToast('발굴 가능한 휴면 VIP 고객이 없습니다.')
+        setToast('조건에 맞는 휴면 VIP 고객이 없습니다 (모두 파이프라인에 등록됨).')
         return
       }
 
@@ -172,6 +181,7 @@ const PipelineBoard = () => {
       console.log('[Pipeline Discovery] Top 10 VIPs:', top10VIPs)
 
       // 5. 기존 '잠재고객' 상태인 클라이언트를 '활성'으로 초기화
+      // (기존 잠재고객을 유지할지, 리셋할지 정책에 따라 다름. 여기서는 "새로운 리스트"를 위해 기존 것을 비우는 로직 유지)
       const { data: currentPotentials, error: potentialsError } = await supabase
         .from('clients')
         .select('id')
@@ -188,7 +198,7 @@ const PipelineBoard = () => {
       if (idsToReset.length > 0) {
         const { error: resetError } = await supabase
           .from('clients')
-          .update({ status: '활성' })
+          .update({ status: '활성' }) // 잠재고객 -> 일반 활성 상태로 되돌림
           .in('id', idsToReset)
         if (resetError) throw resetError
       }
@@ -298,6 +308,9 @@ const PipelineBoard = () => {
     }
   }
 
+  // [NEW] '거래 종료' 표시 여부 상태
+  const [showClosed, setShowClosed] = useState(false)
+
   // 로딩 상태
   if (loading) {
     return (
@@ -332,8 +345,8 @@ const PipelineBoard = () => {
               key={stage}
               onClick={() => setCurrentMobileStage(stage)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${currentMobileStage === stage
-                  ? 'bg-oem-blue text-white border-oem-blue'
-                  : 'bg-white text-oem-text-secondary border-oem-border'
+                ? 'bg-oem-blue text-white border-oem-blue'
+                : 'bg-white text-oem-text-secondary border-oem-border'
                 }`}
             >
               {stage}
@@ -473,73 +486,149 @@ const PipelineBoard = () => {
 
               {/* End Stages Row (Reused for Mobile Tab) */}
               <div className="flex flex-col md:flex-row gap-4 items-start md:border-t md:border-oem-border md:pt-6 md:mt-6">
-                <div className="w-full">
-                  <h2 className="hidden md:flex text-sm font-bold text-oem-text-secondary mb-4 items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-oem-text-secondary rounded-full"></span>
-                    종료 및 대기 단계
-                  </h2>
-                  <div className="flex gap-4">
-                    {endStages.map((stage) => {
-                      const isActive = currentMobileStage === stage
-                      const stageClients = clientsByStage[stage] || []
 
-                      return (
-                        <div
-                          key={stage}
-                          className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-oem-bg-app border border-oem-border rounded-oem opacity-70 hover:opacity-100 transition-opacity ${isActive ? 'block' : 'hidden md:flex'
-                            }`}
-                          style={{ minHeight: '300px' }}
-                        >
-                          <div className="p-3 border-b border-oem-border bg-oem-bg-header/30">
-                            <div className="flex items-center justify-between">
-                              <h3 className="font-bold text-sm text-oem-text-secondary">{stage}</h3>
-                              <span className="bg-oem-border text-oem-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                {stageClients.length}
-                              </span>
-                            </div>
+                {/* 1. 영업 대기 (항상 표시) */}
+                <div className="w-full md:w-auto">
+                  {(() => {
+                    const stage = '영업 대기'
+                    const isActive = currentMobileStage === stage
+                    const stageClients = clientsByStage[stage] || []
+
+                    return (
+                      <div
+                        key={stage}
+                        className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-oem-bg-app border border-oem-border rounded-oem hover:opacity-100 transition-opacity ${isActive ? 'block' : 'hidden md:flex'}`}
+                        style={{ minHeight: '300px' }}
+                      >
+                        <div className="p-3 border-b border-oem-border bg-oem-bg-header/30">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-sm text-oem-text-secondary">{stage}</h3>
+                            <span className="bg-oem-border text-oem-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              {stageClients.length}
+                            </span>
                           </div>
-
-                          <Droppable droppableId={stage}>
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.droppableProps}
-                                className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
-                                  }`}
-                              >
-                                {stageClients.map((client, index) => (
-                                  <Draggable
-                                    key={client.id}
-                                    draggableId={client.id}
-                                    index={index}
-                                  >
-                                    {(provided, snapshot) => (
-                                      <div
-                                        ref={provided.innerRef}
-                                        {...provided.draggableProps}
-                                        {...provided.dragHandleProps}
-                                        className="bg-white p-3 rounded border border-oem-border shadow-sm"
-                                        style={{ ...provided.draggableProps.style }}
-                                      >
-                                        <h4 className="font-bold text-sm text-oem-text-secondary mb-1">
-                                          {client.company}
-                                        </h4>
-                                        <div className="text-[10px] text-oem-text-secondary">
-                                          {client.contact_person || '-'}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
                         </div>
-                      )
-                    })}
-                  </div>
+
+                        <Droppable droppableId={stage}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.droppableProps}
+                              className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
+                                }`}
+                            >
+                              {stageClients.map((client, index) => (
+                                <Draggable
+                                  key={client.id}
+                                  draggableId={client.id}
+                                  index={index}
+                                >
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      className="bg-white p-3 rounded border border-oem-border shadow-sm"
+                                      style={{ ...provided.draggableProps.style }}
+                                    >
+                                      <h4 className="font-bold text-sm text-oem-text-secondary mb-1">
+                                        {client.company}
+                                      </h4>
+                                      <div className="text-[10px] text-oem-text-secondary">
+                                        {client.contact_person || '-'}
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
+                      </div>
+                    )
+                  })()}
                 </div>
+
+                {/* 2. 거래 종료 (숨김 처리 토글) */}
+                <div className="w-full md:w-auto flex flex-col gap-2">
+                  {/* Toggle Button for Closed Deals */}
+                  <div className="hidden md:flex">
+                    <button
+                      onClick={() => setShowClosed(!showClosed)}
+                      className="text-[11px] font-bold text-oem-text-secondary hover:text-oem-blue flex items-center gap-1 transition-colors"
+                    >
+                      {showClosed ? '▼' : '▶'} 거래 종료된 파이프라인 {showClosed ? '숨기기' : '보기'}
+                    </button>
+                  </div>
+
+                  {/* Closed Stage */}
+                  {(() => {
+                    const stage = '거래 종료'
+                    const isActive = currentMobileStage === stage
+                    const stageClients = clientsByStage[stage] || []
+
+                    // 모바일에서는 탭으로 선택되면 무조건 보이고, 데스크탑에서는 showClosed 상태 따름
+                    const shouldShow = isActive || (showClosed && window.innerWidth >= 768)
+
+                    if (!shouldShow && !isActive) return null
+
+                    return (
+                      <div
+                        key={stage}
+                        className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-gray-50 border border-oem-border rounded-oem opacity-70 hover:opacity-100 transition-opacity ${isActive ? 'block' : 'hidden md:flex'}`}
+                        style={{ minHeight: '300px' }}
+                      >
+                        <div className="p-3 border-b border-oem-border bg-gray-100">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-sm text-gray-500">{stage}</h3>
+                            <span className="bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              {stageClients.length}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Droppable droppableId={stage}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.droppableProps}
+                              className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
+                                }`}
+                            >
+                              {stageClients.map((client, index) => (
+                                <Draggable
+                                  key={client.id}
+                                  draggableId={client.id}
+                                  index={index}
+                                >
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      className="bg-white p-3 rounded border border-oem-border shadow-sm grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all"
+                                      style={{ ...provided.draggableProps.style }}
+                                    >
+                                      <h4 className="font-bold text-sm text-gray-500 mb-1">
+                                        {client.company}
+                                      </h4>
+                                      <div className="text-[10px] text-gray-400">
+                                        {client.contact_person || '-'}
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
+                      </div>
+                    )
+                  })()}
+                </div>
+
               </div>
             </DragDropContext>
           </div>

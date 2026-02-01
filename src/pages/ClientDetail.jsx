@@ -283,6 +283,90 @@ const ClientDetail = () => {
     })
   }, [companySales])
 
+  // --- [Sales Logic Enhancement] ---
+  // 1. Flatten all sales items to show Unit Price clearly
+  const flatSalesItems = useMemo(() => {
+    if (!companySales || companySales.length === 0) return []
+
+    const flats = []
+    companySales.forEach(sale => {
+      const saleDate = sale.sale_date || sale.date
+      const items = sale.items || []
+
+      if (items.length > 0) {
+        items.forEach(item => {
+          flats.push({
+            id: item.id || `${sale.id}-${item.product_id}`,
+            saleId: sale.id,
+            date: saleDate,
+            itemName: item.item_name || item.itemName || item.product_name || '-',
+            productId: item.product_id || item.productId,
+            quantity: Number(item.quantity) || 0,
+            unitPrice: Number(item.unit_price || item.unitPrice || item.price) || 0,
+            totalAmount: Number(item.total_amount || item.totalAmount) || 0,
+            notes: item.notes || sale.notes || '-'
+          })
+        })
+      } else {
+        // If no items array (legacy data?), treat sale itself as one item
+        flats.push({
+          id: sale.id,
+          saleId: sale.id,
+          date: saleDate,
+          itemName: sale.displayItemName || sale.item_name || '-',
+          productId: null,
+          quantity: 1, // assumption
+          unitPrice: Number(sale.total_amount || sale.totalAmount) || 0,
+          totalAmount: Number(sale.total_amount || sale.totalAmount) || 0,
+          notes: sale.notes || '-'
+        })
+      }
+    })
+
+    // [Performance & UX] Show only last 3 months by default
+    const threeMonthsAgo = new Date()
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+    threeMonthsAgo.setHours(0, 0, 0, 0)
+
+    // Sort by Date Descending
+    return flats
+      .filter(item => new Date(item.date) >= threeMonthsAgo)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+  }, [companySales])
+
+  // 2. Calculate Top Products (Frequent & Recent Price)
+  const topProducts = useMemo(() => {
+    if (!flatSalesItems.length) return []
+
+    const productStats = {}
+
+    flatSalesItems.forEach(item => {
+      const name = item.itemName
+      if (!productStats[name]) {
+        productStats[name] = {
+          name,
+          totalQty: 0,
+          lastSoldDate: item.date,
+          lastPrice: item.unitPrice
+        }
+      }
+      productStats[name].totalQty += item.quantity
+      // Since flatSalesItems is sorted by date desc, the first time we see a product is its latest sale
+      // (Assuming we iterate in order, which we do)
+      if (new Date(item.date) > new Date(productStats[name].lastSoldDate)) {
+        productStats[name].lastSoldDate = item.date
+        productStats[name].lastPrice = item.unitPrice
+      }
+    })
+
+    return Object.values(productStats)
+      .sort((a, b) => b.totalQty - a.totalQty)
+      .slice(0, 3)
+  }, [flatSalesItems])
+
+  // 3. Last Activity Summary
+  const lastActivity = sortedActivities[0]
+
   // Guard Clause: loading 상태는 모든 Hook 선언 후에 처리
   if (loading || isFetchingClient) {
     return (
@@ -447,8 +531,64 @@ const ClientDetail = () => {
           {/* Right Column (Timeline & History) - 8 cols */}
           <div className="lg:col-span-8 space-y-6">
 
+            {/* [NEW] Sales Briefing Card (⚡ Check Point) */}
+            <div className="bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-indigo-100 p-5 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <TrendingUp className="w-24 h-24 text-indigo-600" />
+              </div>
+
+              <h3 className="text-sm font-bold text-indigo-900 flex items-center gap-2 mb-4">
+                <span className="bg-indigo-600 text-white p-1 rounded">⚡</span>
+                Sales Check Point
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                {/* Top Products */}
+                <div>
+                  <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Top 3 Products</p>
+                  {topProducts.length > 0 ? (
+                    <ul className="space-y-2">
+                      {topProducts.map((prod, idx) => (
+                        <li key={idx} className="flex justify-between items-center bg-white/60 p-2 rounded border border-indigo-50">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-indigo-900">{prod.name}</span>
+                            <span className="text-[10px] text-indigo-400">{new Date(prod.lastSoldDate).toLocaleDateString()} 공급</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-indigo-700">{formatCurrency(prod.lastPrice)}</span>
+                            <span className="text-[10px] text-indigo-400 block">Total: {prod.totalQty}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-indigo-400 italic">구매 이력이 없습니다.</p>
+                  )}
+                </div>
+
+                {/* Last Activity Summary */}
+                <div>
+                  <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Last Interaction</p>
+                  {lastActivity ? (
+                    <div className="bg-white/60 p-3 rounded border border-indigo-50 h-full">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-2 h-2 rounded-full ${lastActivity.status === '완료' ? 'bg-green-400' : 'bg-amber-400'}`}></span>
+                        <span className="text-[11px] font-bold text-indigo-900">{lastActivity.type}</span>
+                        <span className="text-[10px] text-indigo-400">({new Date(lastActivity.activity_date || lastActivity.date).toLocaleDateString()})</span>
+                      </div>
+                      <p className="text-xs text-indigo-800 line-clamp-3 leading-relaxed">
+                        {lastActivity.description}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-indigo-400 italic">최근 활동 내역이 없습니다.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Activity Timeline */}
-            <div className="oem-panel min-h-[400px]">
+            <div className="oem-panel min-h-[300px]">
               <div className="oem-panel-header flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <Activity className="w-3.5 h-3.5 text-oem-text-secondary" />
@@ -464,7 +604,7 @@ const ClientDetail = () => {
                     {/* Vertical Line */}
                     <div className="absolute left-[34px] top-6 bottom-6 w-px bg-oem-border z-0"></div>
 
-                    {sortedActivities.map((activity, index) => {
+                    {sortedActivities.slice(0, 5).map((activity, index) => {
                       const dateObj = new Date(activity.activity_date || activity.date)
                       const dateStr = dateObj.toLocaleDateString()
 
@@ -488,6 +628,11 @@ const ClientDetail = () => {
                         </div>
                       )
                     })}
+                    {sortedActivities.length > 5 && (
+                      <div className="text-center pb-2">
+                        <button className="text-xs text-oem-text-secondary hover:text-oem-blue">View All Activities</button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-oem-text-secondary">
@@ -498,12 +643,12 @@ const ClientDetail = () => {
               </div>
             </div>
 
-            {/* Purchase History */}
+            {/* Purchase History (Flattened) */}
             <div className="oem-panel">
               <div className="oem-panel-header flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-3.5 h-3.5 text-oem-text-secondary" />
-                  <span className="text-xs font-bold uppercase tracking-tight">Purchase History</span>
+                  <span className="text-xs font-bold uppercase tracking-tight">Purchase History (Item Level)</span>
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] text-oem-text-secondary mr-2">Total YTD:</span>
@@ -511,35 +656,35 @@ const ClientDetail = () => {
                 </div>
               </div>
               <div className="p-0 overflow-hidden">
-                {sortedSales.length > 0 ? (
+                {flatSalesItems.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="oem-table min-w-full">
                       <thead>
                         <tr>
                           <th className="pl-4 py-2 text-left">DATE</th>
                           <th className="py-2 text-left">ITEM</th>
+                          <th className="py-2 text-right bg-amber-50/50 text-amber-900 border-b border-amber-100">UNIT PRICE</th>
                           <th className="py-2 text-center">QTY</th>
-                          <th className="py-2 text-right">AMOUNT</th>
+                          <th className="py-2 text-right">TOTAL</th>
                           <th className="py-2 text-left pr-4">NOTES</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedSales.map((sale) => {
-                          const dateStr = new Date(sale.sale_date || sale.date).toLocaleDateString()
-                          const items = sale.items || []
-                          const itemName = items[0]?.item_name || items[0]?.name || '-'
-                          const qty = items.reduce((acc, cur) => acc + (cur.quantity || 0), 0)
+                        {flatSalesItems.map((item) => {
+                          const dateStr = new Date(item.date).toLocaleDateString()
 
                           return (
-                            <tr key={sale.id}>
+                            <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                               <td className="pl-4 py-3 text-xs font-medium text-oem-text-secondary">{dateStr}</td>
                               <td className="py-3 text-xs font-bold text-oem-text-primary">
-                                {itemName}
-                                {items.length > 1 && <span className="ml-1 text-[10px] text-oem-text-secondary">(+{items.length - 1})</span>}
+                                {item.itemName}
                               </td>
-                              <td className="py-3 text-xs text-center text-oem-text-secondary">{qty}</td>
-                              <td className="py-3 text-xs font-bold text-right text-oem-text-primary">{formatCurrency(sale.totalAmount || 0)}</td>
-                              <td className="py-3 text-xs text-oem-text-secondary pr-4 truncate max-w-[150px]" title={sale.notes}>{sale.notes || '-'}</td>
+                              <td className="py-3 text-xs font-bold text-right text-amber-700 bg-amber-50/30">
+                                {item.unitPrice > 0 ? formatCurrency(item.unitPrice) : '-'}
+                              </td>
+                              <td className="py-3 text-xs text-center text-oem-text-secondary">{item.quantity}</td>
+                              <td className="py-3 text-xs text-right text-oem-text-secondary">{formatCurrency(item.totalAmount)}</td>
+                              <td className="py-3 text-xs text-oem-text-secondary pr-4 truncate max-w-[150px]" title={item.notes}>{item.notes}</td>
                             </tr>
                           )
                         })}

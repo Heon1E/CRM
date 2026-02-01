@@ -19,5 +19,15 @@ export default defineConfig({
       // 혹시 모를 충돌 방지를 위한 안전장치
       process: "process/browser",
     }
+  },
+  server: {
+    port: 5173,
+    host: true, // LAN 접근 허용
+    hmr: {
+      overlay: true,
+    }
+  },
+  build: {
+    chunkSizeWarningLimit: 1600,
   }
 })

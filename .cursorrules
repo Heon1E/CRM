@@ -15,3 +15,9 @@
 # 3. Error Handling
 - 모든 비동기 요청(Supabase Query)은 `try-catch`로 감싸고, 사용자에게 명확한 에러 메시지(Alert)를 보여준다.
 - 'Column does not exist' 같은 스키마 에러 발생 시, 쿼리문 수정보다 DB 스키마 확인을 우선한다.
+
+# 4. Project Structure (3-Layer Architecture)
+- **directives/**: Instructions & SOPs (Agent.md, Guides).
+- **execution/**: Maintenance scripts (.mjs, .js) & SQL files (execution/sql/).
+- **src/**: React Web Application source code.
+- **root**: Build config files (vite.config.js, etc.) - DO NOT MOVE.
