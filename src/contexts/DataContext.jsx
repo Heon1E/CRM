@@ -93,20 +93,51 @@ export const DataProvider = ({ children }) => {
       const churnedClientIds = new Set([...totalClientIds].filter(x => !activeClientIds.has(x)))
       const currentChurnedCount = churnedClientIds.size
 
-      // 3. YoY & Trends
-      const lastYearSameMonthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
-      const lastYearSameMonthEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0, 23, 59, 59, 999)
+      // 3. YoY & Trends (Same-Period Comparison with Business Day Awareness)
+      // Compare same date range: e.g., Feb 1-2 2026 vs Feb 1-2 2025
+      // BUT: Detect if last year's period was mostly weekends/holidays
+      const currentDayOfMonth = now.getDate()
 
-      const lastYearSameMonthSales = rawSalesData.filter((sale) => {
+      // Last year, same month, same day range (1st ~ current day)
+      const lastYearSamePeriodStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+      const lastYearSamePeriodEnd = new Date(now.getFullYear() - 1, now.getMonth(), currentDayOfMonth, 23, 59, 59, 999)
+
+      const lastYearSamePeriodSales = rawSalesData.filter((sale) => {
         const d = new Date(sale.sale_date || sale.date || sale.created_at)
-        return d >= lastYearSameMonthStart && d <= lastYearSameMonthEnd
+        return d >= lastYearSamePeriodStart && d <= lastYearSamePeriodEnd
       })
-      const lastYearSameMonthTotal = lastYearSameMonthSales.reduce(
+      const lastYearSamePeriodTotal = lastYearSamePeriodSales.reduce(
         (sum, sale) => sum + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0), 0
       )
 
-      const revenueYoY = lastYearSameMonthTotal > 0
-        ? ((currentMonthSalesTotal - lastYearSameMonthTotal) / lastYearSameMonthTotal * 100).toFixed(1)
+      // Count business days in both periods for context
+      const countBusinessDays = (startDate, endDate) => {
+        let count = 0
+        const current = new Date(startDate)
+        while (current <= endDate) {
+          const dayOfWeek = current.getDay()
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday(0) or Saturday(6)
+            count++
+          }
+          current.setDate(current.getDate() + 1)
+        }
+        return count
+      }
+
+      const currentPeriodBusinessDays = countBusinessDays(
+        new Date(now.getFullYear(), now.getMonth(), 1),
+        now
+      )
+      const lastYearPeriodBusinessDays = countBusinessDays(
+        lastYearSamePeriodStart,
+        lastYearSamePeriodEnd
+      )
+
+      // Flag if comparison is skewed due to weekend/holiday mismatch
+      const isComparisonSkewed = Math.abs(currentPeriodBusinessDays - lastYearPeriodBusinessDays) >= 2
+
+      const revenueYoY = lastYearSamePeriodTotal > 0
+        ? ((currentMonthSalesTotal - lastYearSamePeriodTotal) / lastYearSamePeriodTotal * 100).toFixed(1)
         : (currentMonthSalesTotal > 0 ? '100.0' : '0.0')
 
       // Client Growth
@@ -152,11 +183,30 @@ export const DataProvider = ({ children }) => {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5)
 
-      // 6. Fastest Growing Clients
+      // 6. Fastest Growing Clients (Safe Mode: Use Last Month if early in current month)
       const topGrowthClients = []
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+      const currentDay = now.getDate()
+
+      // If within first 5 days of month, analyze Last Month vs Prior Month
+      // Otherwise, analyze Current Month vs Last Month
+      const useLastMonthAsBasis = currentDay <= 5
+
+      const targetMonthStart = useLastMonthAsBasis
+        ? new Date(now.getFullYear(), now.getMonth() - 1, 1) // Jan 1 if Now is Feb 1
+        : new Date(now.getFullYear(), now.getMonth(), 1)
+
+      const targetMonthEnd = useLastMonthAsBasis
+        ? new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999) // Jan 31
+        : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+      const comparisonMonthStart = useLastMonthAsBasis
+        ? new Date(now.getFullYear(), now.getMonth() - 2, 1) // Dec 1
+        : new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
+      const comparisonMonthEnd = useLastMonthAsBasis
+        ? new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59, 999) // Dec 31
+        : new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+
       const growthStats = {}
 
       rawSalesData.forEach(sale => {
@@ -171,34 +221,144 @@ export const DataProvider = ({ children }) => {
             id: clientId,
             name: clientObj?.company || clientObj?.name || 'Unknown',
             role: clientObj?.industry || clientObj?.type || '',
-            currentMonth: 0,
-            lastMonth: 0,
-            historicalBeforeCurrent: 0,
+            targetMonthAmt: 0,
+            comparisonMonthAmt: 0,
+            historicalBeforeTarget: 0,
           }
         }
-        if (d >= currentMonthStart) growthStats[clientId].currentMonth += amount
-        else {
-          growthStats[clientId].historicalBeforeCurrent += amount
-          if (d >= lastMonthStart && d <= lastMonthEnd) growthStats[clientId].lastMonth += amount
+
+        if (d >= targetMonthStart && d <= targetMonthEnd) {
+          growthStats[clientId].targetMonthAmt += amount
+        } else if (d >= comparisonMonthStart && d <= comparisonMonthEnd) {
+          growthStats[clientId].comparisonMonthAmt += amount
+        } else if (d < targetMonthStart) {
+          // Count total historical revenue to determine "True New"
+          growthStats[clientId].historicalBeforeTarget += amount
         }
       })
 
       const calculatedGrowthClients = Object.values(growthStats)
-        .filter(c => c.currentMonth > 0)
+        .filter(c => c.targetMonthAmt > 0)
         .map(c => {
-          const isTrueNew = c.historicalBeforeCurrent === 0
+          const isTrueNew = c.historicalBeforeTarget === 0
           let growthRate = 0
-          if (c.lastMonth > 0) growthRate = ((c.currentMonth - c.lastMonth) / c.lastMonth) * 100
-          else if (!isTrueNew && c.lastMonth === 0) growthRate = 100
-          return { ...c, isTrueNew, growthRate, amount: c.currentMonth }
+          if (c.comparisonMonthAmt > 0) {
+            growthRate = ((c.targetMonthAmt - c.comparisonMonthAmt) / c.comparisonMonthAmt) * 100
+          } else if (c.targetMonthAmt > 0) {
+            growthRate = 100 // Infinite/New growth
+          }
+
+          return { ...c, isTrueNew, growthRate, amount: c.targetMonthAmt }
         })
         .sort((a, b) => {
           if (a.isTrueNew && !b.isTrueNew) return -1
           if (!a.isTrueNew && b.isTrueNew) return 1
+          // if both new, sort by amounts
           if (a.isTrueNew && b.isTrueNew) return b.amount - a.amount
+          // otherwise sort by growth rate
           return b.growthRate - a.growthRate
         })
         .slice(0, 4)
+
+      // 4. Sales Intelligence Metrics for AI Insight
+      // Dormant clients: had sales 3-12 months ago, but not in last 3 months
+      const threeMonthsAgo = new Date(now)
+      threeMonthsAgo.setMonth(now.getMonth() - 3)
+      const twelveMonthsAgo = new Date(now)
+      twelveMonthsAgo.setMonth(now.getMonth() - 12)
+
+      const recentClientIds = new Set(
+        rawSalesData
+          .filter(s => new Date(s.sale_date || s.date || s.created_at) >= threeMonthsAgo)
+          .map(s => s.client_id || s.clientId)
+      )
+
+      const dormantClientIds = new Set(
+        rawSalesData
+          .filter(s => {
+            const d = new Date(s.sale_date || s.date || s.created_at)
+            return d >= twelveMonthsAgo && d < threeMonthsAgo
+          })
+          .map(s => s.client_id || s.clientId)
+          .filter(id => !recentClientIds.has(id))
+      )
+
+      // Top client concentration (% of revenue from top 3 clients)
+      const topThreeRevenue = topRevenueClients.slice(0, 3).reduce((sum, c) => sum + c.total, 0)
+      const topClientConcentration = currentMonthSalesTotal > 0
+        ? ((topThreeRevenue / currentMonthSalesTotal) * 100).toFixed(0)
+        : 0
+
+      // Recent activity count (last 7 days)
+      const sevenDaysAgo = new Date(now)
+      sevenDaysAgo.setDate(now.getDate() - 7)
+      const recentActivitiesCount = activities.filter(a => {
+        const d = new Date(a.activity_date || a.date || a.created_at)
+        return d >= sevenDaysAgo
+      }).length
+
+      // 5. Detailed Data Lists for AI Drill-Down
+      // Dormant Clients Details (with contact info and historical revenue)
+      const dormantClientsDetails = Array.from(dormantClientIds).map(clientId => {
+        const client = clients.find(c => c.id === clientId)
+        if (!client) return null
+
+        // Get historical sales (3-12 months ago)
+        const historicalSales = rawSalesData.filter(s => {
+          const d = new Date(s.sale_date || s.date || s.created_at)
+          const cid = s.client_id || s.clientId
+          return cid === clientId && d >= twelveMonthsAgo && d < threeMonthsAgo
+        })
+
+        const historicalRevenue = historicalSales.reduce(
+          (sum, s) => sum + (Number(s.total_amount ?? s.totalAmount ?? 0) || 0), 0
+        )
+
+        // Get last sale info
+        const lastSale = historicalSales.sort((a, b) =>
+          new Date(b.sale_date || b.date || b.created_at) - new Date(a.sale_date || a.date || a.created_at)
+        )[0]
+
+        return {
+          id: client.id,
+          company: client.company,
+          contactPerson: client.contact_person || client.contactPerson,
+          phone: client.phone,
+          email: client.email,
+          lastSaleDate: lastSale ? (lastSale.sale_date || lastSale.date || lastSale.created_at) : null,
+          lastSaleAmount: lastSale ? (Number(lastSale.total_amount ?? lastSale.totalAmount ?? 0) || 0) : 0,
+          historicalRevenue: historicalRevenue,
+          status: client.status
+        }
+      }).filter(Boolean).sort((a, b) => b.historicalRevenue - a.historicalRevenue)
+
+      // Top Clients Details (with percentage)
+      const topClientsDetails = topRevenueClients.slice(0, 10).map(c => ({
+        ...c,
+        percentage: currentMonthSalesTotal > 0
+          ? ((c.total / currentMonthSalesTotal) * 100).toFixed(1)
+          : 0
+      }))
+
+      // Recent Activities Details
+      const recentActivitiesDetails = activities
+        .filter(a => {
+          const d = new Date(a.activity_date || a.date || a.created_at)
+          return d >= sevenDaysAgo
+        })
+        .map(a => {
+          const client = clients.find(c => c.id === a.client_id)
+          return {
+            id: a.id,
+            date: a.activity_date || a.date || a.created_at,
+            client: client?.company || 'Unknown',
+            clientId: a.client_id,
+            type: a.activity_type || a.type,
+            description: a.description || a.notes,
+            status: a.status
+          }
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
 
       setDashboardStats({
         currentMonthSalesTotal,
@@ -206,10 +366,22 @@ export const DataProvider = ({ children }) => {
         currentActiveClientsCount,
         currentChurnedCount,
         revenueYoY,
+        lastYearSamePeriodTotal, // For AI Insight comparison context
+        isComparisonSkewed, // Flag for weekend/holiday mismatch
+        currentPeriodBusinessDays,
+        lastYearPeriodBusinessDays,
         clientGrowthVal,
         aggregatedMonthlyTrend,
         topRevenueClients,
         topGrowthClients: calculatedGrowthClients,
+        // Sales Intelligence
+        dormantClientsCount: dormantClientIds.size,
+        topClientConcentration,
+        recentActivitiesCount,
+        // Detailed Data for AI Drill-Down
+        dormantClientsDetails,
+        topClientsDetails,
+        recentActivitiesDetails,
         lastUpdated: new Date()
       })
     }
@@ -394,7 +566,7 @@ export const DataProvider = ({ children }) => {
 
     try {
       while (true) {
-        console.log(`[DataContext] Fetching ${table}... (Range: ${from} - ${from + step - 1})`)
+        // console.log(`[DataContext] Fetching ${table}... (Range: ${from} - ${from + step - 1})`)
         let query = supabase
           .from(table)
           .select(selectStr)
@@ -413,7 +585,7 @@ export const DataProvider = ({ children }) => {
         }
 
         allData = [...allData, ...data]
-        console.log(`[DataContext] ${table} progressive total: ${allData.length}`)
+        // console.log(`[DataContext] ${table} progressive total: ${allData.length}`)
 
         if (data.length < step) break
         from += step
@@ -640,7 +812,7 @@ export const DataProvider = ({ children }) => {
         products: fetchAllRecords('products', '*', 'name'),
         clients: fetchAllRecords('clients', '*', 'company'),
         activities: fetchAllRecords('activities', '*', 'activity_date', false, (q) => q.gte('activity_date', oneYearAgo)),
-        sales: fetchAllRecords('sales', '*', 'sale_date', false), // 전체 Sales 데이터 로드 (통계 정확성 위함)
+        sales: fetchAllRecords('sales', 'id, sale_date, total_amount, client_id, notes, created_at, item_name, product_id, quantity, unit_price', 'sale_date', false), // Fetch specific columns (line-item supported)
         issues: fetchAllRecords('issues', '*', 'created_at', false),
         contacts: fetchAllRecords('client_contacts', '*', 'is_primary', false)
       }
@@ -745,22 +917,32 @@ export const DataProvider = ({ children }) => {
 
   // 자동 로드 (모달이 열려있을 때는 실행하지 않음)
   useEffect(() => {
-    if (authLoading || !user) {
-      if (!authLoading) setLoading(false)
-      return
-    }
+    if (authLoading) return
     if (openModalCount > 0) return
 
-    // [Manual Refresh Policy] 이미 데이터가 로드되어 있다면, 
-    // 페이지 이동이나 재진입 시 자동으로 다시 부르지 않고 기존 데이터를 유지함.
-    // 사용자가 Refresh 버튼을 누를 때만 fetchData()가 직접 호출되도록 함.
+    // [Manual Refresh Policy] 이미 데이터가 로드되어 있다면 재요청 안 함
     if (clients.length > 0 || activities.length > 0 || sales.length > 0) {
-      if (loading) setLoading(false) // 혹시 로딩 상태라면 해제
+      if (loading) setLoading(false)
       return
     }
 
-    fetchData()
+    // user 객체가 있으면 바로 로드
+    if (user) {
+      fetchData()
+      return
+    }
+
+    // user가 없더라도 Supabase 세션이 있으면 로드 (OAuth 리다이렉트 후 세션 복원 타이밍 이슈 방지)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        console.log('[DataContext] Session found without user context, loading data...')
+        fetchData()
+      } else {
+        setLoading(false)
+      }
+    })
   }, [user, authLoading, openModalCount, fetchData, clients.length, activities.length, sales.length])
+
 
   // 5. CRUD 액션
   const addClient = useCallback(async (c) => {
@@ -834,20 +1016,24 @@ export const DataProvider = ({ children }) => {
       const clientId = r.clientId || r.client_id
       const saleDate = r.sale_date || r.saleDate
 
-      // 기존 sales 데이터에서 중복 확인 (그룹화된 데이터를 평탄화하여 확인)
-      const existingSale = sales.find(sale => {
-        const saleClientId = sale.client_id || sale.clientId
-        const saleDateStr = sale.sale_date || sale.date
-        return saleClientId === clientId && saleDateStr === saleDate
-      })
-
-      if (existingSale) {
-        skippedRows.push({
-          clientId: clientId,
-          saleDate: saleDate,
-          reason: '이미 존재하는 매출 데이터입니다.'
+      // 이 검사는 "그 거래처의 그 날짜에 매출이 하나라도 있으면 통째로 건너뛴다"는 뜻이다.
+      // 같은 날 여러 품목을 파는 경우나, 금액이 정정된 건을 반영해야 하는 경우에는
+      // 오히려 방해가 되므로, 대사(Reconciliation)를 거친 호출은 이 검사를 건너뛴다.
+      if (!s.skipDuplicateCheck) {
+        const existingSale = sales.find(sale => {
+          const saleClientId = sale.client_id || sale.clientId
+          const saleDateStr = sale.sale_date || sale.date
+          return saleClientId === clientId && saleDateStr === saleDate
         })
-        continue
+
+        if (existingSale) {
+          skippedRows.push({
+            clientId: clientId,
+            saleDate: saleDate,
+            reason: '이미 존재하는 매출 데이터입니다.'
+          })
+          continue
+        }
       }
 
       rowsToInsert.push(r)
@@ -916,6 +1102,12 @@ export const DataProvider = ({ children }) => {
       const clientId = r.clientId || r.client_id || newClientsMap[r.clientName?.trim()]
       const row = {
         client_id: clientId,
+        // 거래처 연결이 실패하더라도 업체명은 남긴다.
+        // 과거에 이 값을 저장하지 않아, client_id가 비어버린 매출의 업체명을
+        // 사후에 알아낼 방법이 없었다 (execution/repair_orphan_sales.mjs 참고).
+        client_name: (r.clientName || '').toString().trim()
+          || clients.find(c => c.id === clientId)?.company
+          || '',
         sale_date: r.sale_date || r.saleDate || null,
         item_name: r.item_name || r.itemName || r.product_name || '',
         quantity: Number(r.quantity) || 0,
@@ -1000,7 +1192,7 @@ export const DataProvider = ({ children }) => {
     })
 
     return { inserted: insertedTotal, skipped: skippedRows.length }
-  }, [user, processGroupedSales, sales])
+  }, [user, processGroupedSales, sales, clients, products])
 
   // 매출 수정 (그룹 내 모든 항목 업데이트)
   const updateSale = useCallback(async (groupId, saleData) => {
@@ -1333,6 +1525,115 @@ export const DataProvider = ({ children }) => {
 
     return results
   }, [user, sanitizeData, replaceClientContacts, clients])
+
+  /**
+   * 미등록 거래처 일괄 등록 (회사명만으로 생성)
+   *
+   * 매출 엑셀 업로드에 신규 업체가 섞여 있을 때 사용한다. 거래처를 먼저 만들어 두지 않으면
+   * 매출이 client_id 없이 저장되어 목록에 '알수없음'으로 남는다.
+   * 담당자/연락처는 비워두고 생성하므로, 이후 거래처 화면에서 보완하면 된다.
+   *
+   * @param {string[]} companyNames
+   * @returns {Promise<Array>} 생성된 거래처 목록
+   */
+  const registerMissingClients = useCallback(async (companyNames) => {
+    const names = [...new Set(
+      (companyNames || []).map(n => (n || '').toString().trim()).filter(Boolean)
+    )]
+    if (names.length === 0) return []
+
+    const uid = await getValidUserId(user)
+
+    const { data, error } = await supabase
+      .from('clients')
+      .insert(names.map(company => ({ company, created_by: uid })))
+      .select()
+
+    if (error) throw error
+
+    // 목록 UI가 기대하는 형태로 정규화 (addClient와 동일한 형태)
+    const created = (data || []).map(d => ({
+      ...d,
+      lastOrder: d.last_order,
+      orderAmount: d.order_amount,
+      contact_person: '',
+      phone: '',
+      email: ''
+    }))
+
+    if (created.length > 0) {
+      console.log(`[registerMissingClients] 신규 거래처 ${created.length}개 등록:`, created.map(c => c.company))
+      setClients(prev => [...prev, ...created])
+    }
+
+    return created
+  }, [user])
+
+  /**
+   * 대사 결과를 실제 DB에 반영한다 (삭제 -> 수정 -> 등록 순).
+   *
+   * 반드시 사용자가 미리보기를 보고 승인한 뒤에만 호출할 것.
+   * 삭제를 먼저 하는 이유: 잘못된 행이 남은 채 새 행이 들어가면 잠깐이라도 매출이 이중 계상된다.
+   *
+   * @param {{toInsert: Array, toUpdate: Array, toDelete: Array}} plan
+   * @param {(progress: {stage: string, current: number, total: number}) => void} [onProgress]
+   */
+  const applySalesReconciliation = useCallback(async (plan, onProgress = () => { }) => {
+    const { toInsert = [], toUpdate = [], toDelete = [] } = plan || {}
+    const result = { deleted: 0, updated: 0, inserted: 0, errors: [] }
+    const BATCH = 200
+
+    // 1. 삭제
+    if (toDelete.length > 0) {
+      const ids = toDelete.map(r => r.id).filter(Boolean)
+      for (let i = 0; i < ids.length; i += BATCH) {
+        const batch = ids.slice(i, i + BATCH)
+        onProgress({ stage: '기존 매출 삭제 중', current: i, total: ids.length })
+        const { error } = await supabase.from('sales').delete().in('id', batch)
+        if (error) result.errors.push(`삭제 실패: ${error.message}`)
+        else result.deleted += batch.length
+      }
+    }
+
+    // 2. 수정 (행 단위라 개별 update)
+    for (let i = 0; i < toUpdate.length; i++) {
+      const u = toUpdate[i]
+      if (i % 20 === 0) onProgress({ stage: '금액 수정 중', current: i, total: toUpdate.length })
+
+      const e = u.excel
+      const quantity = Number(e.quantity) || 0
+      const unitPrice = Number(e.unitPrice ?? e.unit_price) || 0
+      const { error } = await supabase.from('sales').update({
+        quantity,
+        unit_price: unitPrice,
+        total_amount: Number(e.totalAmount ?? e.total_amount) || quantity * unitPrice,
+        item_name: e.item_name || '',
+        notes: e.notes || '',
+        client_id: e.clientId || e.client_id,
+        client_name: (e.clientName || '').trim()
+      }).eq('id', u.id)
+
+      if (error) result.errors.push(`수정 실패(${u.id}): ${error.message}`)
+      else result.updated++
+    }
+
+    // 3. 신규 등록 (거래처/품목 자동 등록은 addSale이 처리)
+    if (toInsert.length > 0) {
+      onProgress({ stage: '신규 매출 등록 중', current: 0, total: toInsert.length })
+      try {
+        const res = await addSale({ rows: toInsert, skipDuplicateCheck: true })
+        result.inserted = res?.inserted || 0
+      } catch (e) {
+        result.errors.push(`등록 실패: ${e.message}`)
+      }
+    }
+
+    // 로컬 상태를 DB와 다시 맞춘다 (삭제/수정은 상태에 반영되지 않으므로 전체 재조회)
+    onProgress({ stage: '데이터 새로고침 중', current: 0, total: 0 })
+    await fetchData()
+
+    return result
+  }, [addSale, fetchData])
 
   // 활동 내역 추가
   const addActivity = useCallback(async (activityData) => {
@@ -1712,6 +2013,8 @@ export const DataProvider = ({ children }) => {
     products, clients, activities, sales, issues, loading, isOnline, pendingSyncCount,
     addClient, updateClient, replaceClientContacts, addSale, updateSale, deleteSale, getStats, getWeeklySalesData,
     fetchClientContacts, deleteClient, addClientsBulk, addProductsBulk,
+    registerMissingClients, // 매출 업로드 시 신규 거래처 자동 등록
+    applySalesReconciliation, // 대사 결과 반영 (삭제/수정/등록)
     addActivity, updateActivity, deleteActivity, addIssue, updateIssue, deleteIssue,
     registerModal, // 모달 상태 등록 함수
     processGroupedSales, // 그룹화 로직 노출
