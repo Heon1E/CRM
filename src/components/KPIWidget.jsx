@@ -32,17 +32,39 @@ function getGradeInfo(percent) {
 }
 
 // Check monthly revenue >= 2M KRW
-const checkMonthlyRevenue = (clientId, salesData, year) => {
-    const clientSales = salesData.filter(s =>
-        s.client_id === clientId &&
-        new Date(s.sale_date || s.date).getFullYear() === year
-    )
-    const months = {}
-    clientSales.forEach(s => {
-        const m = new Date(s.sale_date || s.date).getMonth()
-        months[m] = (months[m] || 0) + (s.total_amount || s.totalAmount || 0)
+/**
+ * KPI 인정 실적 기준
+ *
+ * 신규고객 발굴 / 단절고객 편입 모두 이 기준을 통과해야 건수로 인정된다.
+ * 반기 1천만원 = 연 2천만원과 같은 속도이므로, 둘 중 하나만 넘으면 인정한다.
+ * (예: 상반기에 1천만원을 채웠다면 연말까지 기다리지 않고 그 시점에 인정)
+ *
+ * 기준이 바뀌면 여기만 고치면 된다.
+ */
+export const KPI_REVENUE_QUALIFY = {
+    HALF_YEAR: 10_000_000, // 반기 1천만원
+    ANNUAL: 20_000_000,    // 연 2천만원
+}
+
+/**
+ * 해당 거래처가 그 해에 KPI 인정 실적을 냈는지 판정한다.
+ * 예전에는 '어느 한 달이라도 200만원'이었는데 실제 평가 기준과 달랐다.
+ */
+const checkQualifyingRevenue = (clientId, salesData, year) => {
+    let h1 = 0
+    let h2 = 0
+
+    ;(salesData || []).forEach(s => {
+        if ((s.client_id || s.clientId) !== clientId) return
+        const d = new Date(s.sale_date || s.date)
+        if (isNaN(d.getTime()) || d.getFullYear() !== year) return
+        const amt = Number(s.total_amount ?? s.totalAmount ?? 0) || 0
+        if (d.getMonth() < 6) h1 += amt
+        else h2 += amt
     })
-    return Object.values(months).some(v => v >= 2_000_000)
+
+    return Math.max(h1, h2) >= KPI_REVENUE_QUALIFY.HALF_YEAR
+        || (h1 + h2) >= KPI_REVENUE_QUALIFY.ANNUAL
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +146,8 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 .map(s => s.client_id)
         )
 
-        const dormantClientIds = new Set(
+        // 3~12개월 전에 거래가 있던 거래처 (아직 '복귀 여부'는 따지지 않은 모집단)
+        const priorPeriodClientIds = new Set(
             rawSalesData
                 .filter(s => {
                     const d = new Date(s.sale_date || s.date)
@@ -132,11 +155,22 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 })
                 .filter(s => managedClientIds.includes(s.client_id))
                 .map(s => s.client_id)
-                .filter(id => !recentClientIds.has(id))
         )
 
-        // Reactivated = was dormant AND now has recent sales
-        const reactivatedIds = [...dormantClientIds].filter(id => recentClientIds.has(id))
+        // 아직 돌아오지 않은 단절고객 (최근 3개월 거래 없음) — 화면 안내용
+        const dormantCount = [...priorPeriodClientIds].filter(id => !recentClientIds.has(id)).length
+
+        // 편입 성공 = 예전에 거래가 끊겼다가 최근 3개월에 다시 거래한 곳
+        //
+        // [버그 수정] 예전에는 dormantClientIds를 만들 때 '최근 거래가 있는 곳'을 이미
+        // 제외해 놓고, 그 집합에서 다시 '최근 거래가 있는 곳'을 찾았다.
+        // 정의상 교집합이 항상 비어 있어 이 KPI는 영원히 0건이었다.
+        //
+        // 또한 재거래만 하면 무조건 1건으로 잡혔으므로, 신규고객과 동일하게
+        // 반기 1천만원 / 연 2천만원 기준을 통과해야 실적으로 인정한다.
+        const reactivatedIds = [...priorPeriodClientIds]
+            .filter(id => recentClientIds.has(id))
+            .filter(id => checkQualifyingRevenue(id, rawSalesData, currentYear))
         const reactivatedCount = reactivatedIds.length
         const reactivatedNames = reactivatedIds.map(id => {
             const c = clients.find(cl => cl.id === id)
@@ -152,7 +186,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             const created = new Date(c.created_at || c.createdAt || 0)
             return created >= yearStart
         })
-        const qualifiedNewIds = newClientIds.filter(id => checkMonthlyRevenue(id, rawSalesData, currentYear))
+        const qualifiedNewIds = newClientIds.filter(id => checkQualifyingRevenue(id, rawSalesData, currentYear))
         const qualifiedNewCount = qualifiedNewIds.length
         const qualifiedNewNames = qualifiedNewIds.map(id => {
             const c = clients.find(cl => cl.id === id)
@@ -224,12 +258,15 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 {
                     id: 'client_mgmt', category: '\uc815\uc131\ud3c9\uac00', name: '\uace0\uac1d\uad00\ub9ac', kpi: '\ub2e8\uc808\uace0\uac1d \ud3b8\uc785', weight: 15, unit: '\uac74',
                     actual: reactivatedCount, target: 0, percent: clientMgmtPercent, icon: Users,
-                    detail: reactivatedNames.length > 0 ? `\ud3b8\uc785 \uc131\uacf5: ${reactivatedNames.join(', ')}` : '\uc544\uc9c1 \ub2e8\uc808\uace0\uac1d \ud3b8\uc785 \uc2e4\uc801 \uc5c6\uc74c',
+                    detail: (reactivatedNames.length > 0
+                        ? `\ud3b8\uc785 \uc131\uacf5: ${reactivatedNames.join(', ')}`
+                        : '\ubc18\uae30 1\ucc9c\ub9cc\uc6d0(\ub610\ub294 \uc5f0 2\ucc9c\ub9cc\uc6d0) \uae30\uc900\uc744 \ub118\uc740 \ub2e8\uc808\uace0\uac1d \ud3b8\uc785 \uc2e4\uc801 \uc5c6\uc74c')
+                        + `\n\uc544\uc9c1 \ubcf5\uadc0\ud558\uc9c0 \uc54a\uc740 \ub2e8\uc808\uace0\uac1d: ${dormantCount}\uacf3`,
                 },
                 {
-                    id: 'new_clients', category: '\uc815\uc131\ud3c9\uac00', name: '\uc2e0\uaddc\uace0\uac1d \ubc1c\uad74', kpi: '\uc2e0\uaddc \uac70\ub798\uc81c (\uc6d4200\ub9cc+)', weight: 10, unit: '\uac74',
+                    id: 'new_clients', category: '\uc815\uc131\ud3c9\uac00', name: '\uc2e0\uaddc\uace0\uac1d \ubc1c\uad74', kpi: '\uc2e0\uaddc \uac70\ub798\ucc98 (\ubc18\uae30 1\ucc9c\ub9cc+)', weight: 10, unit: '\uac74',
                     actual: qualifiedNewCount, target: 3, percent: newClientPercent, icon: UserPlus,
-                    detail: qualifiedNewNames.length > 0 ? `KPI \uc778\uc815: ${qualifiedNewNames.join(', ')}` : `\ub2f4\ub2f9 \uac70\ub798\uc81c \uc911 \uc6d4 200\ub9cc+ \ub9e4\ucd9c \ub2ec\uc131\ud55c \uc2e0\uaddc \uac70\ub798\uc81c \uc5c6\uc74c`,
+                    detail: qualifiedNewNames.length > 0 ? `KPI \uc778\uc815: ${qualifiedNewNames.join(', ')}` : `\ubc18\uae30 1\ucc9c\ub9cc\uc6d0(\ub610\ub294 \uc5f0 2\ucc9c\ub9cc\uc6d0) \uae30\uc900\uc744 \ub118\uc740 \uc2e0\uaddc \uac70\ub798\ucc98 \uc5c6\uc74c`,
                 },
                 {
                     id: 'visits', category: '\uc815\uc131\ud3c9\uac00', name: '\uc815\uae30\uc801 \ubc29\ubb38', kpi: '\ubbf8\ud305 \ud69f\uc218 (\uc5f0\uac04)', weight: 10, unit: '\uac74',
