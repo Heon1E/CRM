@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Bell, Menu, X } from 'lucide-react'
+import { Bell, Menu, X, Search } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const TopNavbar = () => {
@@ -16,6 +16,7 @@ const TopNavbar = () => {
     { path: '/pipeline', label: 'Pipeline' },
     { path: '/map', label: 'Map' },
     { path: '/settings', label: 'Settings' },
+    { path: '/my-accounts', label: 'My Accounts' },
   ]
 
   const userInitials = useMemo(() => {
@@ -27,25 +28,37 @@ const TopNavbar = () => {
   }, [user])
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b-[3px] border-oem-blue h-[50px] shadow-sm flex items-center px-5 font-['Noto_Sans_KR',sans-serif]">
+    <header
+      className="fixed top-0 left-0 right-0 z-50 h-[56px] flex items-center px-6 font-['Inter',sans-serif]"
+      style={{
+        backgroundColor: 'var(--bg-header)',
+        borderBottom: '1px solid var(--border)',
+        boxShadow: '0 1px 12px rgba(0,0,0,0.4)'
+      }}
+    >
       {/* Left: Logo & Navigation */}
       <div className="flex items-center gap-8 flex-1">
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 bg-oem-blue flex items-center justify-center text-white font-black text-xl italic">I</div>
-          <span className="text-oem-blue font-black text-lg tracking-tighter group-hover:opacity-80 transition-opacity">IND CRM</span>
+        <Link to="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm"
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >X</div>
+          <span className="font-bold text-lg tracking-tight transition-colors"
+            style={{ color: 'var(--text-primary)' }}
+          >Xavian CRM</span>
         </Link>
 
-        <nav className="hidden lg:flex items-center h-[50px]">
+        <nav className="hidden lg:flex items-center h-[56px] gap-6">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`px-4 h-full flex items-center text-[12px] font-medium transition-colors border-b-2 ${isActive
-                    ? 'border-oem-blue text-oem-blue bg-oem-bg-header/50'
-                    : 'border-transparent text-oem-text-primary hover:text-oem-blue hover:bg-oem-bg-app'
-                  }`}
+                className="relative py-4 text-[13px] font-semibold transition-all border-b-2"
+                style={{
+                  color: isActive ? 'var(--accent-light)' : 'var(--text-secondary)',
+                  borderBottomColor: isActive ? 'var(--accent)' : 'transparent',
+                }}
               >
                 {item.label}
               </Link>
@@ -55,41 +68,60 @@ const TopNavbar = () => {
       </div>
 
       {/* Right: Global Tools */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-5">
         {/* Search */}
-        <div className="hidden md:flex items-center relative">
+        <div className="hidden md:flex items-center relative group">
           <input
             type="text"
             placeholder="Search..."
-            className="w-48 h-7 bg-oem-bg-panel border border-oem-border px-3 pr-8 rounded-oem text-[11px] focus:outline-none focus:border-oem-blue"
+            className="w-52 h-8 px-3 pl-9 rounded-lg text-sm outline-none transition-all"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              color: 'var(--text-primary)',
+            }}
           />
-          <div className="absolute right-2 text-oem-text-secondary">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+          <div className="absolute left-3" style={{ color: 'var(--text-muted)' }}>
+            <Search className="w-4 h-4" />
           </div>
         </div>
 
         <button
           type="button"
-          className="p-1.5 text-oem-text-secondary hover:text-oem-blue transition-colors relative"
+          className="p-2 relative transition-colors"
+          style={{ color: 'var(--text-secondary)' }}
           aria-label="Notifications"
         >
           <Bell className="w-5 h-5" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-oem-red rounded-full border border-white"></span>
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }}></span>
         </button>
 
-        <div className="flex items-center gap-3 pl-4 border-l border-oem-border">
+        <div className="flex items-center gap-3 pl-5 h-8" style={{ borderLeft: '1px solid var(--border)' }}>
           <div className="text-right hidden sm:block">
-            <p className="text-[11px] font-bold text-oem-text-primary leading-none uppercase">{user?.user_metadata?.company_name || 'SYSTEM'}</p>
-            <p className="text-[10px] text-oem-text-secondary mt-1">{user?.email?.split('@')[0].toUpperCase()}</p>
+            <p className="text-[12px] font-bold leading-none" style={{ color: 'var(--text-primary)' }}>
+              {user?.user_metadata?.company_name || 'SYSTEM'}
+            </p>
+            <div className="flex items-center justify-end gap-1 mt-1">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--success)' }}></span>
+              <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Online</span>
+            </div>
           </div>
-          <div className="w-8 h-8 rounded-full bg-oem-bg-header border border-oem-border flex items-center justify-center text-oem-blue font-bold text-xs">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs cursor-pointer transition-all"
+            style={{
+              backgroundColor: 'var(--accent-subtle)',
+              border: '1px solid rgba(16,185,129,0.3)',
+              color: 'var(--accent-light)',
+            }}
+          >
             {userInitials}
           </div>
         </div>
 
         <button
           type="button"
-          className="lg:hidden p-1.5 text-oem-text-primary"
+          className="lg:hidden p-2"
+          style={{ color: 'var(--text-secondary)' }}
           onClick={() => setIsMobileOpen((prev) => !prev)}
         >
           {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -98,8 +130,11 @@ const TopNavbar = () => {
 
       {/* Mobile Menu */}
       {isMobileOpen && (
-        <div className="absolute top-[50px] left-0 right-0 bg-white border-b border-oem-border lg:hidden shadow-lg animate-in slide-in-from-top duration-200">
-          <div className="p-2 grid grid-cols-2 gap-1">
+        <div
+          className="absolute top-[56px] left-0 right-0 lg:hidden z-40"
+          style={{ backgroundColor: 'var(--bg-header)', borderBottom: '1px solid var(--border)' }}
+        >
+          <div className="flex flex-col">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path
               return (
@@ -107,7 +142,12 @@ const TopNavbar = () => {
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMobileOpen(false)}
-                  className={`px-4 py-3 text-[12px] font-medium rounded-oem ${isActive ? 'bg-oem-bg-header text-oem-blue' : 'text-oem-text-secondary hover:bg-oem-bg-panel'}`}
+                  className="px-6 py-4 text-[13px] font-semibold border-l-4 transition-colors"
+                  style={{
+                    color: isActive ? 'var(--accent-light)' : 'var(--text-secondary)',
+                    borderLeftColor: isActive ? 'var(--accent)' : 'transparent',
+                    backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
+                  }}
                 >
                   {item.label}
                 </Link>

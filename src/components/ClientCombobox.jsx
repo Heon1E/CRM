@@ -5,6 +5,7 @@ const ClientCombobox = ({
   clients = [],
   value,
   onSelect,
+  onNewClient,
   placeholder = '거래처를 검색하세요...',
   disabled = false
 }) => {
@@ -47,6 +48,14 @@ const ClientCombobox = ({
     onSelect(client.id)
   }
 
+  // 신규 거래처 생성
+  const handleCreateNew = () => {
+    if (onNewClient && searchTerm.trim()) {
+      onNewClient(searchTerm.trim())
+      setIsOpen(false)
+    }
+  }
+
   // 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -71,6 +80,8 @@ const ClientCombobox = ({
         setIsOpen(true)
       } else if (isOpen && filteredClients.length > 0) {
         handleSelect(filteredClients[0])
+      } else if (isOpen && filteredClients.length === 0 && onNewClient && searchTerm.trim()) {
+        handleCreateNew()
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false)
@@ -157,6 +168,15 @@ const ClientCombobox = ({
             ) : (
               <div className="px-4 py-2 text-sm text-oem-text-secondary text-center">
                 {searchTerm ? 'No results found.' : 'No clients available.'}
+              </div>
+            )}
+            {/* 신규 거래처 등록 옵션 */}
+            {onNewClient && searchTerm.trim() && filteredClients.length === 0 && (
+              <div
+                onClick={handleCreateNew}
+                className="px-4 py-2.5 cursor-pointer hover:bg-green-50 text-green-700 font-bold text-sm border-t border-gray-100 flex items-center gap-1"
+              >
+                <span className="text-lg leading-none">+</span> "{searchTerm.trim()}" 신규 거래처로 등록
               </div>
             )}
           </div>

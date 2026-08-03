@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'
+import ClientCombobox from './ClientCombobox'
 import ProductCombobox from './ProductCombobox'
 import useEnterMove from '../hooks/useEnterMove'
 import { supabase } from '../lib/supabase'
 import { showWarning, showSuccess, showError } from '../utils/alert'
 
 const AddSaleModal = ({ isOpen, onClose }) => {
-  const { clients, products, addSale } = useData()
+  const { clients, products, addSale, addClient } = useData()
   const formRef = useRef(null)
 
   // 상태 단순화: DB 컬럼명과 일치하는 키만 사용
@@ -207,21 +208,34 @@ const AddSaleModal = ({ isOpen, onClose }) => {
     })
   }
 
-  // 거래처 변경 시 품목 단가 재계산
+  // 거래처 변경 시 품목 단가 재계산 (새 거래처에 저장된 단가가 없으면 기존 단가 유지)
   const handleClientChange = (clientId) => {
     setFormData((prev) => {
       const newItems = prev.items.map((item) => {
         if (item.productId) {
-          const unitPrice = getUnitPrice(item.productId, clientId)
+          const newPrice = getUnitPrice(item.productId, clientId)
           return {
             ...item,
-            unitPrice: unitPrice,
+            unitPrice: newPrice > 0 ? newPrice : item.unitPrice,
           }
         }
         return item
       })
       return { ...prev, clientId, items: newItems }
     })
+  }
+
+  // 신규 거래처 자동 등록 (ClientCombobox에서 호출)
+  const handleNewClient = async (companyName) => {
+    try {
+      const newClient = await addClient({ company: companyName })
+      if (newClient?.id) {
+        handleClientChange(newClient.id)
+      }
+    } catch (error) {
+      console.error('신규 거래처 등록 실패:', error)
+      await showError('신규 거래처 등록에 실패했습니다.')
+    }
   }
 
   // 총액 계산
@@ -357,19 +371,13 @@ const AddSaleModal = ({ isOpen, onClose }) => {
             <label className="font-bold text-black uppercase tracking-tight">
               CLIENT_ID: <span className="text-red-600">*</span>
             </label>
-            <select
+            <ClientCombobox
+              clients={clients || []}
               value={formData.clientId}
-              onChange={(e) => handleClientChange(e.target.value)}
-              className="oracle-sunken px-2 py-0.5 bg-white"
-              required
-            >
-              <option value="">-- Select Client --</option>
-              {clients?.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.company}
-                </option>
-              ))}
-            </select>
+              onSelect={(id) => handleClientChange(id)}
+              onNewClient={handleNewClient}
+              placeholder="거래처 검색 또는 신규 입력..."
+            />
           </div>
 
           <div className="flex flex-col gap-1">

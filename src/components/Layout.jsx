@@ -5,19 +5,20 @@ import OfflineIndicator from './OfflineIndicator'
 import NotificationPermissionPrompt from './NotificationPermissionPrompt'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator'
 import BottomNavigation from './BottomNavigation'
+import CommandPalette from './CommandPalette'
 
 const Layout = ({ children }) => {
   // Guard Clause: children이 없으면 빈 화면 방지 (.cursorrules 규칙 준수)
   if (!children) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-500">컨텐츠를 불러오는 중...</div>
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-secondary)' }}>
+        <div>컨텐츠를 불러오는 중...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       {/* 상단 고정 네비게이션 */}
       <TopNavbar />
 
@@ -35,6 +36,9 @@ const Layout = ({ children }) => {
 
       {/* Bottom Navigation (Mobile Only) */}
       <BottomNavigation />
+
+      {/* Global Command Palette (PC: Ctrl+K) */}
+      <CommandPalette />
 
       {/* 컨텐츠 영역 
           - PC: Navbar 높이만큼 padding-top (16 = 4rem)

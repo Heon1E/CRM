@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api'
 import { supabase } from '../lib/supabase'
-import { MapPin, Filter, RefreshCw, Calendar } from 'lucide-react'
+import { MapPin, Filter, RefreshCw, Calendar, Navigation, Loader } from 'lucide-react'
 import { showSuccess, showError } from '../utils/alert'
+
 
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 const HQ_ADDRESS = '경기도 용인시 처인구 백암면 삼백로 367-20'
@@ -25,6 +26,10 @@ const Map = () => {
     const [selectedClient, setSelectedClient] = useState(null)
     const [hqLocation, setHqLocation] = useState(null)
     const [isSyncing, setIsSyncing] = useState(false)
+    const [userLocation, setUserLocation] = useState(null)
+    const [locationLoading, setLocationLoading] = useState(false)
+    const [locationError, setLocationError] = useState(null)
+
 
     const { isLoaded, loadError } = useJsApiLoader({
         id: 'google-map-script',
@@ -131,6 +136,60 @@ const Map = () => {
         alert(`${updatedCount}개의 거래처 좌표가 업데이트되었습니다.`)
     }
 
+    // Get Current Location
+    const handleGetCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            setLocationError('이 브라우저는 위치 서비스를 지원하지 않습니다')
+            showError('이 브라우저는 위치 서비스를 지원하지 않습니다')
+            return
+        }
+
+        setLocationLoading(true)
+        setLocationError(null)
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords
+                const newLocation = { lat: latitude, lng: longitude }
+                setUserLocation(newLocation)
+
+                // Center map on user location
+                if (map) {
+                    map.panTo(newLocation)
+                    map.setZoom(14) // Zoom in to show nearby clients
+                }
+
+                setLocationLoading(false)
+                showSuccess('현재 위치를 찾았습니다')
+            },
+            (error) => {
+                setLocationLoading(false)
+                let errorMessage = '위치를 가져올 수 없습니다'
+
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = '위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.'
+                        break
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = '위치 정보를 사용할 수 없습니다'
+                        break
+                    case error.TIMEOUT:
+                        errorMessage = '위치 요청 시간이 초과되었습니다'
+                        break
+                }
+
+                setLocationError(errorMessage)
+                showError(errorMessage)
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        )
+    }
+
+
     const onLoad = useCallback(function callback(map) {
         setMap(map)
     }, [])
@@ -179,7 +238,7 @@ const Map = () => {
     if (!isLoaded) return <div className="p-10 text-gray-500">지도를 불러오는 중...</div>
 
     return (
-        <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
+        <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
             <div className="max-w-[1600px] mx-auto flex flex-col h-[calc(100vh-120px)] space-y-4">
 
                 {/* Page Header */}
@@ -233,6 +292,21 @@ const Map = () => {
                     </div>
 
                     <div className="flex-1 relative m-1 rounded-oem overflow-hidden border border-oem-border shadow-inner">
+                        {/* Current Location Button */}
+                        <button
+                            onClick={handleGetCurrentLocation}
+                            disabled={locationLoading}
+                            className="absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-white p-2 md:p-3 rounded-full shadow-lg hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200"
+                            aria-label="현재 위치로 이동"
+                            title="현재 위치 표시"
+                        >
+                            {locationLoading ? (
+                                <Loader className="w-4 h-4 md:w-5 md:h-5 animate-spin text-blue-600" />
+                            ) : (
+                                <Navigation className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+                            )}
+                        </button>
+
                         <GoogleMap
                             mapContainerStyle={containerStyle}
                             center={defaultCenter}
@@ -267,6 +341,23 @@ const Map = () => {
                                         anchor: new window.google.maps.Point(12, 12),
                                     }}
                                     zIndex={999}
+                                />
+                            )}
+
+                            {/* User Location Marker */}
+                            {userLocation && (
+                                <Marker
+                                    position={userLocation}
+                                    title="내 위치"
+                                    icon={{
+                                        path: window.google.maps.SymbolPath.CIRCLE,
+                                        scale: 10,
+                                        fillColor: '#4285F4',
+                                        fillOpacity: 1,
+                                        strokeColor: '#FFFFFF',
+                                        strokeWeight: 3,
+                                    }}
+                                    zIndex={1000}
                                 />
                             )}
 

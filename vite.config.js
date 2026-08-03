@@ -22,10 +22,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true, // 5173 사용 중이면 강제 실패 (포트 혼재 방지)
     host: true, // LAN 접근 허용
     hmr: {
+      host: 'localhost',
+      clientPort: 5173, // 브라우저 WS 연결 포트 명시
       overlay: true,
-    }
+    },
   },
   build: {
     chunkSizeWarningLimit: 1600,

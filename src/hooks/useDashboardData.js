@@ -125,7 +125,9 @@ export const useDashboardData = () => {
         const currentYear = now.getFullYear()
         const currentMonth = now.getMonth() + 1
         const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-        const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`
+        // 실제 해당 월의 마지막 날 계산 (월+1의 0번째 날 = 이번 달 마지막 날)
+        const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate()
+        const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${lastDayOfMonth}`
 
         const { data: allSalesData, error: salesError } = await supabase
           .from('sales')
