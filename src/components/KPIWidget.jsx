@@ -6,7 +6,7 @@ import {
 import { Target, TrendingUp, Users, UserPlus, MapPin } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useI18n } from '../contexts/I18nContext'
-import { getKpiOverrides, setKpiCategory } from '../utils/kpiCategories'
+import { getKpiExclusions, toggleKpiExclusion, isExcludedFrom, KPI_EXCLUSION_KINDS } from '../utils/kpiCategories'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,12 +71,15 @@ const checkQualifyingRevenue = (clientId, salesData, year) => {
 /**
  * 단절 판정 기준
  *
- * "3개월 이상 주문이 없으면 단절"
- * 편입 인정은 과거 거래 규모·빈도와 무관하며, 오직 올해 실적(반기 1천만원)으로 판단한다.
- * 복구 가능성이 없는 곳(폐업·상호변경 등)은 화면에서 수동으로 제외할 수 있다.
+ * "5개월 이상 거래가 끊겼고, 과거에 1천만원 이상 거래한 적이 있는 곳"
+ *
+ * 과거 실적 조건이 핵심이다. 한두 번 소액만 사고 만 곳까지 단절고객으로 잡으면
+ * 목록이 의미를 잃는다. 챙길 가치가 있던 거래처만 단절로 본다.
+ * 편입 인정 여부는 별도로 올해 실적(반기 1천만원)으로 판단한다.
  */
 export const CHURN_RULE = {
-    GAP_MONTHS: 3, // 마지막 주문 후 3개월 이상 주문 없음 -> 단절
+    GAP_MONTHS: 5,                    // 마지막 주문 후 5개월 이상 주문 없음
+    MIN_HISTORY_REVENUE: 10_000_000,  // 과거 누적 1천만원 이상 거래 이력
 }
 
 /** 연/월을 하나의 정수로 (2026년 3월 -> 2026*12+2) */
@@ -95,23 +98,28 @@ const formatMan = (v) => `${Math.round((Number(v) || 0) / 10000).toLocaleString(
  *   churned     : 단골이었는데 지금까지 3개월 이상 주문이 없음 (아직 미복귀)
  *   reactivated : 단골이었다가 3개월 이상 끊겼고, 올해 다시 주문함 (편입 성공)
  */
-const analyzeChurn = (orderMonths, nowMonthIdx, yearStartMonthIdx) => {
+const analyzeChurn = (orderMonths, nowMonthIdx, yearStartMonthIdx, historyRevenue = 0) => {
     const ms = [...orderMonths].sort((a, b) => a - b)
     if (ms.length === 0) return { churned: false, reactivated: false, lastOrderMonth: null }
 
-    // 편입: 주문이 3개월 이상 끊긴 구간이 있고, 다시 주문한 시점이 올해인 경우
-    // (과거에 얼마를 거래했는지는 따지지 않는다 — 인정 여부는 올해 실적으로 판단)
+    // 과거에 챙길 만한 규모로 거래한 적이 있는 곳만 단절 대상으로 본다
+    const worthTracking = historyRevenue >= CHURN_RULE.MIN_HISTORY_REVENUE
+
+    // 편입: 주문이 끊긴 구간이 있고, 다시 주문한 시점이 올해인 경우
+    // (편입 인정 여부는 호출부에서 올해 실적 기준으로 한 번 더 거른다)
     let reactivated = false
-    for (let i = 1; i < ms.length; i++) {
-        if (ms[i] - ms[i - 1] >= CHURN_RULE.GAP_MONTHS && ms[i] >= yearStartMonthIdx) {
-            reactivated = true
-            break
+    if (worthTracking) {
+        for (let i = 1; i < ms.length; i++) {
+            if (ms[i] - ms[i - 1] >= CHURN_RULE.GAP_MONTHS && ms[i] >= yearStartMonthIdx) {
+                reactivated = true
+                break
+            }
         }
     }
 
-    // 미복귀 단절: 마지막 주문 이후 3개월 이상 지났고 아직 돌아오지 않음
+    // 미복귀 단절: 마지막 주문 이후 GAP_MONTHS 이상 지났고 아직 돌아오지 않음
     const last = ms[ms.length - 1]
-    const churned = nowMonthIdx - last >= CHURN_RULE.GAP_MONTHS
+    const churned = worthTracking && (nowMonthIdx - last >= CHURN_RULE.GAP_MONTHS)
 
     return { churned, reactivated, lastOrderMonth: last }
 }
@@ -124,34 +132,23 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     const { locale } = useI18n()
     const [expandedKPI, setExpandedKPI] = useState(null)
 
-    // KPI \uc0b0\uc815\uc5d0\uc11c \uc81c\uc678\ud55c \uac70\ub798\ucc98 (\ud3d0\uc5c5\u00b7\uc0c1\ud638\ubcc0\uacbd \ub4f1\uc73c\ub85c \ubcf5\uad6c \uac00\ub2a5\uc131\uc774 \uc5c6\ub294 \uacf3)
-    // kpiCategories\uc758 '\ubbf8\uc0b0\uc815' \uc624\ubc84\ub77c\uc774\ub4dc\ub97c \uadf8\ub300\ub85c \uc4f4\ub2e4 (localStorage \uc800\uc7a5)
-    const [excludedIds, setExcludedIds] = useState(() => {
-        const overrides = getKpiOverrides()
-        return new Set(Object.keys(overrides).filter(id => overrides[id] === '\ubbf8\uc0b0\uc815'))
-    })
+    // KPI\ubcc4 \uc81c\uc678 \ubaa9\ub85d.
+    // \ud56d\ubaa9\ubcc4\ub85c \ube7c\uc57c \ud558\ub294 \uacbd\uc6b0\uac00 \uc788\uc5b4 \uc804\uccb4 \uc81c\uc678('\ubbf8\uc0b0\uc815')\uc640 \ubd84\ub9ac\ud574\uc11c \uad00\ub9ac\ud55c\ub2e4.
+    //   - \uc790\ud68c\uc0ac \ud30c\uc0dd \uac70\ub798\ucc98 -> \uc2e0\uaddc\uace0\uac1d \ubc1c\uad74\uc5d0\uc11c\ub9cc \uc81c\uc678 (\ub9e4\ucd9c \uc2e4\uc801\uc740 \uadf8\ub300\ub85c \uc7a1\ud600\uc57c \ud568)
+    //   - \ud3d0\uc5c5/\uc0c1\ud638\ubcc0\uacbd     -> \ub2e8\uc808\uace0\uac1d \ud3b8\uc785\uc5d0\uc11c\ub9cc \uc81c\uc678
+    const [exclusions, setExclusions] = useState(() => getKpiExclusions())
 
-    const toggleExcluded = (clientId) => {
-        setExcludedIds(prev => {
-            const next = new Set(prev)
-            if (next.has(clientId)) {
-                next.delete(clientId)
-                setKpiCategory(clientId, 'auto')
-            } else {
-                next.add(clientId)
-                setKpiCategory(clientId, '\ubbf8\uc0b0\uc815')
-            }
-            return next
-        })
+    const toggleExclusion = (clientId, kind) => {
+        setExclusions(toggleKpiExclusion(clientId, kind))
     }
 
-    // Managed client IDs (\uc81c\uc678\ud55c \uac70\ub798\ucc98\ub294 \ube60\uc9c4\ub2e4)
+    // Managed client IDs \u2014 \ud56d\ubaa9\ubcc4 \uc81c\uc678\ub294 \uc5ec\uae30\uc11c \uac78\uc9c0 \uc54a\ub294\ub2e4.
+    // \uc5ec\uae30\uc11c \ube7c\uba74 \ub9e4\ucd9c\u00b7\ubd80\ubb38\uae30\uc5ec KPI\uc5d0\uc11c\uae4c\uc9c0 \uc2e4\uc801\uc774 \uc0ac\ub77c\uc9c4\ub2e4.
     const managedClientIds = useMemo(() => {
-        const base = (myAccounts && myAccounts.length > 0)
+        return (myAccounts && myAccounts.length > 0)
             ? myAccounts.map(c => c.id)
             : (clients || []).filter(c => c.sales_rep === '\uc774\ud5cc\uc77c').map(c => c.id)
-        return base.filter(id => !excludedIds.has(id))
-    }, [clients, salesRepName, myAccounts, excludedIds])
+    }, [clients, salesRepName, myAccounts])
 
     // currentWeek is needed both in kpiData useMemo AND in JSX header
     const currentWeek = getISOWeekNumber(new Date())
@@ -243,12 +240,25 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             }
         })
 
+        // 거래처별 전체 누적 매출 (단절 판정의 '과거 1천만원 이상' 조건에 쓴다)
+        const historyRevenueByClient = {}
+        rawSalesData.forEach(s => {
+            const cid = s.client_id || s.clientId
+            if (!managedClientIds.includes(cid)) return
+            historyRevenueByClient[cid] = (historyRevenueByClient[cid] || 0)
+                + (Number(s.total_amount ?? s.totalAmount ?? 0) || 0)
+        })
+
         // 4. 신규고객 발굴
         // [수정] 예전에는 CRM 등록일(created_at)로 판정했다. 거래처 데이터를 올해 한꺼번에
         // 입력했기 때문에 2025년부터 거래하던 곳까지 전부 '신규'로 잡혔다.
         // 실제 거래 이력을 기준으로 '올해 처음 거래한 곳'만 신규로 본다.
-        const newClientIds = managedClientIds.filter(id =>
+        const newCandidateIds = managedClientIds.filter(id =>
             !hadSalesBeforeThisYear.has(id) && (ytdRevenueByClient[id] || 0) > 0
+        )
+        // 기존 거래처에서 자회사 등으로 파생된 곳은 사용자가 직접 제외한다
+        const newClientIds = newCandidateIds.filter(
+            id => !isExcludedFrom(exclusions, id, KPI_EXCLUSION_KINDS.NEW)
         )
         const qualifiedNewIds = newClientIds.filter(id => checkQualifyingRevenue(id, rawSalesData, currentYear))
         const qualifiedNewCount = qualifiedNewIds.length
@@ -259,13 +269,18 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         const dormantIds = []
 
         managedClientIds.forEach(id => {
+            if (isExcludedFrom(exclusions, id, KPI_EXCLUSION_KINDS.CHURN)) return
+
             const { churned, reactivated, lastOrderMonth } = analyzeChurn(
-                orderMonthsByClient[id] || new Set(), nowMonthIdx, yearStartMonthIdx
+                orderMonthsByClient[id] || new Set(),
+                nowMonthIdx,
+                yearStartMonthIdx,
+                historyRevenueByClient[id] || 0
             )
             if (churned) dormantIds.push({ id, lastOrderMonth })
             // 올해 처음 거래한 곳은 '단절 후 편입'이 될 수 없다 (신규와 이중 계상 방지)
             if (reactivated
-                && !newClientIds.includes(id)
+                && !newCandidateIds.includes(id)
                 && checkQualifyingRevenue(id, rawSalesData, currentYear)) {
                 reactivatedIds.push(id)
             }
@@ -284,15 +299,20 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         const dormantList = dormantIds
             .map(({ id, lastOrderMonth }) => ({
                 ...toRow(id),
+                history: historyRevenueByClient[id] || 0,
                 lastOrder: lastOrderMonth == null
                     ? '-'
                     : `${Math.floor(lastOrderMonth / 12)}.${String((lastOrderMonth % 12) + 1).padStart(2, '0')}`
             }))
-            .sort(byRevenueDesc)
+            .sort((a, b) => b.history - a.history)
 
-        // 제외 처리된 거래처 (되돌릴 수 있도록 목록으로 보여준다)
-        const excludedList = [...excludedIds]
-            .map(id => ({ id, name: (clients.find(cl => cl.id === id)?.company) || id }))
+        // 제외 처리된 거래처 (되돌릴 수 있도록 항목별로 보여준다)
+        const excludedIdsFor = (kind) => Object.keys(exclusions)
+            .filter(id => exclusions[id]?.[kind])
+            .map(id => ({ id, name: nameOf(id) }))
+
+        const excludedNewList = excludedIdsFor(KPI_EXCLUSION_KINDS.NEW)
+        const excludedChurnList = excludedIdsFor(KPI_EXCLUSION_KINDS.CHURN)
 
         // 5. Visit count
         const visitCount = activities.filter(a => {
@@ -358,11 +378,12 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 {
                     id: 'client_mgmt', category: '\uc815\uc131\ud3c9\uac00', name: '\uace0\uac1d\uad00\ub9ac', kpi: '\ub2e8\uc808\uace0\uac1d \ud3b8\uc785', weight: 15, unit: '\uac74',
                     actual: reactivatedCount, target: 0, percent: clientMgmtPercent, icon: Users,
-                    detail: '3\uac1c\uc6d4 \uc774\uc0c1 \uc8fc\ubb38\uc774 \ub04a\uacbc\ub2e4\uac00 \uc62c\ud574 \ub2e4\uc2dc \uac70\ub798\ud55c \uacf3 \uc911, \ubc18\uae30 1\ucc9c\ub9cc\uc6d0(\ub610\ub294 \uc5f0 2\ucc9c\ub9cc\uc6d0)\uc744 \ub118\uae34 \uac70\ub798\ucc98',
+                    detail: `${CHURN_RULE.GAP_MONTHS}\uac1c\uc6d4 \uc774\uc0c1 \uac70\ub798\uac00 \ub04a\uacbc\ub2e4\uac00 \uc62c\ud574 \ub2e4\uc2dc \uac70\ub798\ud55c \uacf3 \uc911, \ubc18\uae30 1\ucc9c\ub9cc\uc6d0(\ub610\ub294 \uc5f0 2\ucc9c\ub9cc\uc6d0)\uc744 \ub118\uae34 \uac70\ub798\ucc98`,
                     clientList: reactivatedList,
                     emptyText: '\uae30\uc900\uc744 \ub118\uc740 \ud3b8\uc785 \uc2e4\uc801\uc774 \uc544\uc9c1 \uc5c6\uc2b5\ub2c8\ub2e4.',
                     dormantList,
-                    excludedList,
+                    excludeKind: KPI_EXCLUSION_KINDS.CHURN,
+                    excludedList: excludedChurnList,
                 },
                 {
                     id: 'new_clients', category: '\uc815\uc131\ud3c9\uac00', name: '\uc2e0\uaddc\uace0\uac1d \ubc1c\uad74', kpi: '\uc2e0\uaddc \uac70\ub798\ucc98 (\ubc18\uae30 1\ucc9c\ub9cc+)', weight: 10, unit: '\uac74',
@@ -370,6 +391,10 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                     detail: `\uc62c\ud574 \ucc98\uc74c \uac70\ub798\ud55c ${newClientIds.length}\uacf3 \uc911, \ubc18\uae30 1\ucc9c\ub9cc\uc6d0(\ub610\ub294 \uc5f0 2\ucc9c\ub9cc\uc6d0)\uc744 \ub118\uae34 \uac70\ub798\ucc98`,
                     clientList: qualifiedNewList,
                     emptyText: '\uae30\uc900\uc744 \ub118\uc740 \uc2e0\uaddc \uac70\ub798\ucc98\uac00 \uc544\uc9c1 \uc5c6\uc2b5\ub2c8\ub2e4.',
+                    clientListExcludable: true,
+                    clientListExcludeHint: '\uae30\uc874 \uac70\ub798\ucc98\uc5d0\uc11c \uc790\ud68c\uc0ac \ub4f1\uc73c\ub85c \ud30c\uc0dd\ub41c \uacf3\uc740 \uc81c\uc678\ud558\uc138\uc694. \ub9e4\ucd9c \uc2e4\uc801\uc5d0\ub294 \uadf8\ub300\ub85c \ubc18\uc601\ub429\ub2c8\ub2e4.',
+                    excludeKind: KPI_EXCLUSION_KINDS.NEW,
+                    excludedList: excludedNewList,
                 },
                 {
                     id: 'visits', category: '\uc815\uc131\ud3c9\uac00', name: '\uc815\uae30\uc801 \ubc29\ubb38', kpi: '\ubbf8\ud305 \ud69f\uc218 (\uc5f0\uac04)', weight: 10, unit: '\uac74',
@@ -379,7 +404,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             ],
             weeklyTrend: weeklyTrendData,
         }
-    }, [rawSalesData, clients, activities, managedClientIds, excludedIds])
+    }, [rawSalesData, clients, activities, managedClientIds, exclusions])
 
     const overallScore = useMemo(() => {
         const totalWeight = kpiData.items.reduce((sum, item) => sum + item.weight, 0)
@@ -484,16 +509,32 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                             {/* 인정된 거래처 목록 + 올해 누적 매출 */}
                                             {item.clientList && (
                                                 item.clientList.length > 0 ? (
-                                                    <ul className="mt-2 divide-y" style={{ borderColor: 'var(--border-light)' }}>
-                                                        {item.clientList.map(c => (
-                                                            <li key={c.id} className="flex items-center justify-between gap-3 py-1.5">
-                                                                <span className="truncate" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
-                                                                <span className="shrink-0 tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                                                    {formatMan(c.revenue)}
-                                                                </span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
+                                                    <>
+                                                        {item.clientListExcludable && (
+                                                            <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+                                                                {item.clientListExcludeHint}
+                                                            </p>
+                                                        )}
+                                                        <ul className="mt-2 divide-y" style={{ borderColor: 'var(--border-light)' }}>
+                                                            {item.clientList.map(c => (
+                                                                <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
+                                                                    <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                                                                    <span className="shrink-0 tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                                        {formatMan(c.revenue)}
+                                                                    </span>
+                                                                    {item.clientListExcludable && (
+                                                                        <button
+                                                                            onClick={() => toggleExclusion(c.id, item.excludeKind)}
+                                                                            className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
+                                                                            style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
+                                                                        >
+                                                                            제외
+                                                                        </button>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </>
                                                 ) : (
                                                     <p className="mt-2" style={{ color: 'var(--text-muted)' }}>{item.emptyText}</p>
                                                 )
@@ -506,17 +547,17 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                                         아직 복귀하지 않은 단절고객 {item.dormantList.length}곳
                                                     </p>
                                                     <p className="mb-2" style={{ color: 'var(--text-muted)' }}>
-                                                        폐업·상호변경 등으로 복구 가능성이 없는 곳은 제외하세요. KPI 산정에서 빠집니다.
+                                                        폐업·상호변경 등으로 복구 가능성이 없는 곳은 제외하세요.
                                                     </p>
                                                     <ul className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
                                                         {item.dormantList.map(c => (
                                                             <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
-                                                                <span className="truncate" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                                                                <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
                                                                 <span className="shrink-0 tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                                                                    최종 {c.lastOrder}
+                                                                    최종 {c.lastOrder} · 누적 {formatMan(c.history)}
                                                                 </span>
                                                                 <button
-                                                                    onClick={() => toggleExcluded(c.id)}
+                                                                    onClick={() => toggleExclusion(c.id, item.excludeKind)}
                                                                     className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
                                                                     style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
                                                                 >
@@ -539,7 +580,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                                             <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
                                                                 <span className="truncate" style={{ color: 'var(--text-muted)' }}>{c.name}</span>
                                                                 <button
-                                                                    onClick={() => toggleExcluded(c.id)}
+                                                                    onClick={() => toggleExclusion(c.id, item.excludeKind)}
                                                                     className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
                                                                     style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
                                                                 >

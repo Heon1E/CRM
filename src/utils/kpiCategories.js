@@ -12,6 +12,73 @@
 
 const STORAGE_KEY = 'kpi_category_overrides'
 
+// ---------------------------------------------------------------------------
+// KPI별 개별 제외
+//
+// '미산정'(위 STORAGE_KEY)은 거래처를 KPI 전체에서 빼버린다.
+// 그런데 실무에서는 항목별로 빼야 하는 경우가 있다:
+//   - 기존 거래처에서 자회사로 파생된 곳 -> '신규고객 발굴'에서만 제외.
+//     매출은 정상 실적이므로 수익성·부문기여 KPI에는 그대로 잡혀야 한다.
+//   - 폐업/상호변경으로 복구 불가능한 곳  -> '단절고객 편입'에서만 제외.
+// 그래서 전체 제외와 별도로 항목별 제외를 둔다.
+// ---------------------------------------------------------------------------
+const EXCLUSION_KEY = 'kpi_exclusions'
+
+/** 제외 대상 KPI 종류 */
+export const KPI_EXCLUSION_KINDS = {
+    NEW: 'new',     // 신규고객 발굴
+    CHURN: 'churn', // 단절고객 편입
+}
+
+/**
+ * KPI별 제외 목록 전체 조회
+ * @returns {Object} clientId → { new?: boolean, churn?: boolean }
+ */
+export function getKpiExclusions() {
+    try {
+        const stored = localStorage.getItem(EXCLUSION_KEY)
+        return stored ? JSON.parse(stored) : {}
+    } catch {
+        return {}
+    }
+}
+
+/**
+ * 특정 거래처가 해당 KPI에서 제외되었는지
+ * @param {Object} exclusions - getKpiExclusions() 결과
+ * @param {string} clientId
+ * @param {string} kind - 'new' | 'churn'
+ */
+export function isExcludedFrom(exclusions, clientId, kind) {
+    return Boolean(exclusions?.[clientId]?.[kind])
+}
+
+/**
+ * 제외 상태를 토글하고 갱신된 전체 목록을 돌려준다.
+ * @param {string} clientId
+ * @param {string} kind - 'new' | 'churn'
+ * @returns {Object} 갱신된 제외 목록
+ */
+export function toggleKpiExclusion(clientId, kind) {
+    const exclusions = getKpiExclusions()
+    const current = { ...(exclusions[clientId] || {}) }
+
+    if (current[kind]) {
+        delete current[kind]
+    } else {
+        current[kind] = true
+    }
+
+    if (Object.keys(current).length === 0) {
+        delete exclusions[clientId]
+    } else {
+        exclusions[clientId] = current
+    }
+
+    localStorage.setItem(EXCLUSION_KEY, JSON.stringify(exclusions))
+    return exclusions
+}
+
 export const KPI_CATEGORIES = [
     { value: 'auto', label: '자동', color: 'text-gray-400', bg: 'bg-gray-100' },
     { value: '신규', label: '신규', color: 'text-blue-600', bg: 'bg-blue-50' },
