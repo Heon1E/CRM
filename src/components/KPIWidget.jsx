@@ -67,6 +67,60 @@ const checkQualifyingRevenue = (clientId, salesData, year) => {
         || (h1 + h2) >= KPI_REVENUE_QUALIFY.ANNUAL
 }
 
+/**
+ * 단절 판정 기준
+ *
+ * "거의 매월 주문하던 업체가 3개월 이상 주문이 없으면 단절"
+ * '거의 매월'을 어떻게 볼지는 REGULAR_WINDOW / REGULAR_MIN으로 정한다.
+ * (기본: 직전 6개월 중 4개월 이상 주문했으면 단골로 본다)
+ */
+export const CHURN_RULE = {
+    GAP_MONTHS: 3,      // 마지막 주문 후 3개월 이상 주문 없음 -> 단절
+    REGULAR_WINDOW: 6,  // 단절 직전 6개월을 보고
+    REGULAR_MIN: 4,     // 그 중 4개월 이상 주문했으면 '거의 매월'
+}
+
+/** 연/월을 하나의 정수로 (2026년 3월 -> 2026*12+2) */
+const monthIndex = (d) => d.getFullYear() * 12 + d.getMonth()
+
+/**
+ * 거래처의 '주문이 있었던 월' 목록만으로 단절/편입을 판정한다.
+ *
+ * @param {Set<number>} orderMonths - monthIndex 집합
+ * @param {number} nowMonthIdx      - 오늘이 속한 월
+ * @param {number} yearStartMonthIdx- 올해 1월
+ * @returns {{churned: boolean, reactivated: boolean}}
+ *   churned     : 단골이었는데 지금까지 3개월 이상 주문이 없음 (아직 미복귀)
+ *   reactivated : 단골이었다가 3개월 이상 끊겼고, 올해 다시 주문함 (편입 성공)
+ */
+const analyzeChurn = (orderMonths, nowMonthIdx, yearStartMonthIdx) => {
+    const ms = [...orderMonths].sort((a, b) => a - b)
+    if (ms.length === 0) return { churned: false, reactivated: false }
+
+    // 특정 시점까지의 직전 구간에서 '거의 매월' 주문했는지
+    const wasRegularUntil = (endIdx) => {
+        const start = endIdx - CHURN_RULE.REGULAR_WINDOW + 1
+        return ms.filter(m => m >= start && m <= endIdx).length >= CHURN_RULE.REGULAR_MIN
+    }
+
+    // 편입: 주문이 끊긴 구간이 있고, 재개 시점이 올해이며, 끊기기 전엔 단골이었던 경우
+    let reactivated = false
+    for (let i = 1; i < ms.length; i++) {
+        if (ms[i] - ms[i - 1] >= CHURN_RULE.GAP_MONTHS
+            && ms[i] >= yearStartMonthIdx
+            && wasRegularUntil(ms[i - 1])) {
+            reactivated = true
+            break
+        }
+    }
+
+    // 미복귀 단절: 마지막 주문 이후 3개월 이상 지났고, 그 전엔 단골이었던 경우
+    const last = ms[ms.length - 1]
+    const churned = (nowMonthIdx - last >= CHURN_RULE.GAP_MONTHS) && wasRegularUntil(last)
+
+    return { churned, reactivated }
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -130,47 +184,43 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             : 0
         const salesGrowthPercent = Math.min(Math.max(salesGrowthRate + 100, 0), 150)
 
-        // 3. Reactivated clients
-        const twelveMonthsAgo = new Date(now)
-        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-        const threeMonthsAgo = new Date(now)
-        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
-
-        const recentClientIds = new Set(
-            rawSalesData
-                .filter(s => {
-                    const d = new Date(s.sale_date || s.date)
-                    return d >= threeMonthsAgo && d <= now
-                })
-                .filter(s => managedClientIds.includes(s.client_id))
-                .map(s => s.client_id)
-        )
-
-        // 3~12개월 전에 거래가 있던 거래처 (아직 '복귀 여부'는 따지지 않은 모집단)
-        const priorPeriodClientIds = new Set(
-            rawSalesData
-                .filter(s => {
-                    const d = new Date(s.sale_date || s.date)
-                    return d >= twelveMonthsAgo && d < threeMonthsAgo
-                })
-                .filter(s => managedClientIds.includes(s.client_id))
-                .map(s => s.client_id)
-        )
-
-        // 아직 돌아오지 않은 단절고객 (최근 3개월 거래 없음) — 화면 안내용
-        const dormantCount = [...priorPeriodClientIds].filter(id => !recentClientIds.has(id)).length
-
-        // 편입 성공 = 예전에 거래가 끊겼다가 최근 3개월에 다시 거래한 곳
+        // 3. 단절 / 편입 판정
         //
-        // [버그 수정] 예전에는 dormantClientIds를 만들 때 '최근 거래가 있는 곳'을 이미
-        // 제외해 놓고, 그 집합에서 다시 '최근 거래가 있는 곳'을 찾았다.
-        // 정의상 교집합이 항상 비어 있어 이 KPI는 영원히 0건이었다.
+        // 정의: "거의 매월 주문하던 업체가 3개월 이상 주문이 없으면 단절"
         //
-        // 또한 재거래만 하면 무조건 1건으로 잡혔으므로, 신규고객과 동일하게
-        // 반기 1천만원 / 연 2천만원 기준을 통과해야 실적으로 인정한다.
-        const reactivatedIds = [...priorPeriodClientIds]
-            .filter(id => recentClientIds.has(id))
-            .filter(id => checkQualifyingRevenue(id, rawSalesData, currentYear))
+        // [버그 수정 이력]
+        // 1) 예전에는 '거의 매월 주문하던' 조건이 아예 없어서, 몇 달 전에 딱 한 번
+        //    거래한 곳도 단절고객으로 잡혔다.
+        // 2) 또 단절 목록을 만들 때 '최근 거래가 있는 곳'을 미리 제외해 놓고
+        //    그 목록에서 다시 '최근 거래가 있는 곳'을 찾았다. 교집합이 정의상
+        //    항상 비어 있어 이 KPI는 구조적으로 영원히 0건이었다.
+        const nowMonthIdx = monthIndex(now)
+        const yearStartMonthIdx = currentYear * 12
+
+        const orderMonthsByClient = {}
+        rawSalesData.forEach(s => {
+            const cid = s.client_id || s.clientId
+            if (!managedClientIds.includes(cid)) return
+            const d = new Date(s.sale_date || s.date)
+            if (isNaN(d.getTime())) return
+            if (!orderMonthsByClient[cid]) orderMonthsByClient[cid] = new Set()
+            orderMonthsByClient[cid].add(monthIndex(d))
+        })
+
+        const reactivatedIds = []
+        let dormantCount = 0
+
+        managedClientIds.forEach(id => {
+            const { churned, reactivated } = analyzeChurn(
+                orderMonthsByClient[id] || new Set(), nowMonthIdx, yearStartMonthIdx
+            )
+            if (churned) dormantCount++
+            // 편입도 신규고객과 동일한 실적 기준을 통과해야 인정한다
+            if (reactivated && checkQualifyingRevenue(id, rawSalesData, currentYear)) {
+                reactivatedIds.push(id)
+            }
+        })
+
         const reactivatedCount = reactivatedIds.length
         const reactivatedNames = reactivatedIds.map(id => {
             const c = clients.find(cl => cl.id === id)
