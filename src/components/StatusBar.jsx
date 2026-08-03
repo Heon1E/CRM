@@ -58,7 +58,7 @@ const StatusBar = () => {
             ? 'bg-red-400/10 border-t border-red-400/30 text-red-300'
             : pendingSyncCount > 0
             ? 'bg-amber-400/10 border-t border-amber-400/30 text-amber-300'
-            : 'bg-[#1E1E1E] border-t border-gray-800 text-gray-300'
+            : 'bg-[color:var(--bg-card)] border-t border-[color:var(--border)] text-[color:var(--text-secondary)]'
         }
         shadow-soft
       `}
