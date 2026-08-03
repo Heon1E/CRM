@@ -52,6 +52,10 @@ export const ForecastService = {
                     .from('sales')
                     .select('sale_date, total_amount, client_id')
                     .gte('sale_date', `${new Date().getFullYear() - 3}-01-01`)
+                    // 정렬 없는 .range()는 페이지 간 행 중복/누락을 일으켜 집계 총액을 틀리게 만든다.
+                    // id를 tie-breaker로 두어 sale_date가 같은 행의 순서까지 고정한다.
+                    .order('sale_date', { ascending: true })
+                    .order('id', { ascending: true })
                     .range(page * pageSize, (page + 1) * pageSize - 1)
 
                 if (error) throw error
@@ -69,7 +73,7 @@ export const ForecastService = {
 
             // DEBUG LOGGING
             if (result.debug) {
-                console.group('AI Forecast Debug Report (v6.0)')
+                console.group('AI Forecast Debug Report (v7.0)')
                 console.log('%c Revenue Audit', 'font-weight: bold; color: #4F46E5')
                 console.table(result.debug.audit)
 
@@ -86,7 +90,15 @@ export const ForecastService = {
                     console.table(result.debug.highPotentialClients)
                 }
 
-                console.log(`Scale Factor: ${result.debug.clampedScale} (Raw: ${result.debug.scaleFactor})`)
+                if (result.debug.newThisYearClients?.length > 0) {
+                    console.log('%c 🌱 New Clients Acquired This Year (Sample)', 'color: #0EA5E9')
+                    console.table(result.debug.newThisYearClients)
+                }
+
+                console.log(`Scale Factor: ${result.debug.clampedScale} (Raw: ${result.debug.rawScale.toFixed(3)})`)
+                if (result.incompleteFlag) {
+                    console.warn('올해 매출 입력이 거의 없어 YTD 보정을 건너뛰었습니다. 예측 신뢰도가 낮습니다.')
+                }
                 console.groupEnd()
             }
 
@@ -117,7 +129,11 @@ export const ForecastService = {
             return {
                 ...saved,
                 monthlyData: saved.monthly_data,
-                segments: result.segments, // Pass segment debug info to UI (even if not in DB)
+                // DB 컬럼에 없는 진단 정보는 계산 결과에서 그대로 전달한다.
+                // (캐시로 재조회될 때는 analysis_summary의 ⚠️ 문구로만 남는다)
+                incompleteFlag: result.incompleteFlag,
+                holidayDataMissing: result.holidayDataMissing,
+                contribution: result.debug?.contribution,
                 created_at: saved.created_at || new Date().toISOString() // Ensure date exists
             }
 
