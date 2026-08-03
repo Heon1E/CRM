@@ -21,6 +21,10 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 # Gemini AI Agent Configuration (새로 추가)
 VITE_GEMINI_API_KEY=AIzaSy-your-actual-key-here
 
+# 사용할 Gemini 모델 (생략 시 gemini-2.5-flash)
+# 구글이 모델을 단종시키면 여기만 바꾸면 된다. gemini-1.5-flash는 단종되어 404가 난다.
+VITE_GEMINI_MODEL=gemini-2.5-flash
+
 # Optional: Custom Agent API endpoint
 # VITE_AGENT_API_URL=https://your-domain.com/api/chat-agent
 ```
