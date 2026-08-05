@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Search, Check, ChevronsUpDown } from 'lucide-react'
+import { Check, ChevronsUpDown } from 'lucide-react'
 
 const ProductCombobox = ({ 
   products = [], 
@@ -94,7 +94,6 @@ const ProductCombobox = ({
   return (
     <div className="relative" ref={comboboxRef} data-combobox>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[color:var(--text-secondary)] w-4 h-4" />
         <input
           ref={inputRef}
           type="text"
@@ -113,7 +112,7 @@ const ProductCombobox = ({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="input-field w-full pl-10 pr-10 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          className="input-field w-full pr-8 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <button
           type="button"

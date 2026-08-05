@@ -150,6 +150,8 @@ const Sales = () => {
   const selectedId = editingSale?.id || null
   const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1
   const pageSum = localSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
+  // 한 행은 '같은 거래처·같은 날짜'의 매출을 묶은 것이라, 행 수와 원본 건수가 다르다.
+  const rawCount = localSales.reduce((n, s) => n + (s.items?.length || 1), 0)
 
   return (
     <div className="min-h-screen bg-oem-bg-app p-2 md:p-4 mt-[56px]">
@@ -240,7 +242,7 @@ const Sales = () => {
                         className={selectedId === sale.id ? 'is-selected' : ''}
                         onDoubleClick={() => handleEdit(sale)}
                       >
-                        <td className="seq">{(page - 1) * PAGE_SIZE + index + 1}</td>
+                        <td className="seq">{index + 1}</td>
                         <td className="dt">{sale.date ? sale.date.split('T')[0] : '-'}</td>
                         <td style={{ fontWeight: 600 }}>{sale.clientName}</td>
                         <td style={{ maxWidth: '340px', overflow: 'hidden', textOverflow: 'ellipsis' }}
@@ -296,7 +298,7 @@ const Sales = () => {
           <div className="statusbar">
             <span><span className="dot" style={{ background: localLoading ? 'var(--warning)' : 'var(--success)' }} />
               {localLoading ? '조회 중' : '준비됨'}</span>
-            <span>조회 {localSales.length}건 / 전체 {totalCount.toLocaleString()}건</span>
+            <span>표시 {localSales.length}행 (매출 {rawCount}건) / 전체 {totalCount.toLocaleString()}건</span>
             {searchTerm && <span>필터: {searchTerm}</span>}
             <span className="flex-1" />
             <span className="hint"><kbd>F2</kbd> 신규 · <kbd>F5</kbd> 새로고침 · <kbd>Esc</kbd> 닫기 · 행 더블클릭으로 수정</span>
