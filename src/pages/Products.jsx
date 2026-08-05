@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Edit, Plus, Trash2 } from 'lucide-react'
+import { Edit, Plus, Trash2, RefreshCw } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase, supabaseConfigError } from '../lib/supabase'
 import AddProductModal from '../components/AddProductModal'
@@ -51,6 +51,17 @@ const Products = () => {
     fetchData()
   }, [page])
 
+  // 단축키
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'F2') { e.preventDefault(); setIsAddModalOpen(true) }
+      else if (e.key === 'F5') { e.preventDefault(); fetchData() }
+      else if (e.key === 'Escape') { setIsAddModalOpen(false); setEditingProductId(null) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   // 제품 삭제 후 데이터 새로고침
   const handleDeleteSuccess = () => {
     fetchData()
@@ -58,8 +69,8 @@ const Products = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-[color:var(--text-secondary)]">데이터를 불러오는 중...</div>
+      <div className="win" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+        데이터를 불러오는 중...
       </div>
     )
   }
@@ -88,28 +99,29 @@ const Products = () => {
     }
   }
 
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <p className="text-[color:var(--text-muted)] text-xs font-semibold tracking-wide mb-1">제품</p>
-          <h1 className="text-2xl md:text-3xl font-semibold text-[color:var(--text-primary)]">제품 관리</h1>
-          <p className="text-[color:var(--text-secondary)] mt-1.5 text-sm md:text-base">총 {totalCount}개</p>
-        </div>
-        <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="btn-primary flex items-center justify-center gap-2 touch-manipulation min-h-[44px] px-4 py-3 w-full sm:w-auto"
-            style={{ WebkitTapHighlightColor: 'transparent' }}
-          >
-            <Plus className="w-4 h-4" />
-            <span>제품 추가</span>
-          </button>
-        </div>
+    <div className="win flex flex-col">
+      {/* 타이틀바 */}
+      <div className="win-title">
+        <span className="flex items-baseline gap-3">
+          제품 관리
+          <span className="meta">PRODUCT · 전체 {totalCount.toLocaleString()}개 · {page}/{totalPages}</span>
+        </span>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="grid-scroll">
+      {/* 툴바 */}
+      <div className="toolbar">
+        <button className="tb-btn primary" onClick={() => setIsAddModalOpen(true)}>
+          <Plus className="w-3.5 h-3.5" /> 신규 <kbd>F2</kbd>
+        </button>
+        <button className="tb-btn" onClick={fetchData}>
+          <RefreshCw className="w-3.5 h-3.5" /> 새로고침 <kbd>F5</kbd>
+        </button>
+      </div>
+
+      <div className="grid-scroll flex-1" style={{ minHeight: '280px' }}>
           <table className="dgrid">
             <thead>
               <tr>
@@ -140,8 +152,10 @@ const Products = () => {
                 </tr>
               )}
             </tbody>
-          </table>
-        </div>
+        </table>
+      </div>
+
+      <div style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>
         {/* Pagination */}
         <Pagination
           totalCount={totalCount}
@@ -149,6 +163,13 @@ const Products = () => {
           currentPage={page}
           onPageChange={setPage}
         />
+      </div>
+
+      <div className="statusbar">
+        <span><span className="dot" />준비됨</span>
+        <span>표시 {products.length}개 / 전체 {totalCount.toLocaleString()}개</span>
+        <span className="flex-1" />
+        <span className="hint"><kbd>F2</kbd> 신규 · <kbd>F5</kbd> 새로고침 · 행 더블클릭으로 수정</span>
       </div>
 
       {/* Modals */}

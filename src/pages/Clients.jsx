@@ -268,7 +268,7 @@ const Clients = () => {
             onClick={handleBulkDelete}
             className="flex items-center gap-2 text-red-400 hover:text-red-300 font-bold text-sm transition-colors"
           >
-            <Trash2 className="w-4 h-4" /> Delete Selection
+            <Trash2 className="w-4 h-4" /> 선택 삭제
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
@@ -281,22 +281,19 @@ const Clients = () => {
 
       <div className="max-w-[1600px] mx-auto space-y-6">
 
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--accent-light)' }}>
-              Customers Maintenance
-              <span className="text-[10px] px-2 py-0.5 font-normal" style={{ backgroundColor: 'var(--bg-header)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontFamily: 'var(--font-data)' }}>CLIENT</span>
-            </h1>
-            <p className="text-[11px] text-oem-text-secondary mt-1 font-medium">
-              Manage enterprise clients and their primary contact information. Total Records: <span className="text-oem-blue font-bold">{totalCount}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={() => setIsAddModalOpen(true)} className="oem-btn-primary flex items-center gap-1.5 py-1.5 h-8">
-              <Plus className="w-3.5 h-3.5 text-white" /> NEW_CLIENT
-            </button>
-          </div>
+        {/* 타이틀바 */}
+        <div className="win-title" style={{ border: '1px solid var(--border)', borderBottom: 0 }}>
+          <span className="flex items-baseline gap-3">
+            거래처 관리
+            <span className="meta">CLIENT · 전체 {totalCount.toLocaleString()}개</span>
+          </span>
+        </div>
+
+        {/* 툴바 */}
+        <div className="toolbar" style={{ border: '1px solid var(--border)', borderTop: 0 }}>
+          <button onClick={() => setIsAddModalOpen(true)} className="tb-btn primary">
+            <Plus className="w-3.5 h-3.5" /> 신규 <kbd>F2</kbd>
+          </button>
         </div>
 
         {/* Search & Statistics Ribbon */}
@@ -419,7 +416,7 @@ const Clients = () => {
             {/* Left List Pane */}
             <div className={`${selectedClientId ? 'w-1/2' : 'w-full'} transition-all duration-300 flex flex-col`}>
               <div className="flex-1 overflow-y-auto border border-oem-border rounded-lg bg-white">
-                <table className="oem-table min-w-full relative">
+                <table className="dgrid min-w-full relative">
                   <thead className="sticky top-0 z-10 bg-oem-bg-header shadow-sm">
                     <tr>
                       <th className="w-8 py-2 text-center">
@@ -432,11 +429,11 @@ const Clients = () => {
                       </th>
                       <th className="w-12 text-center py-2">SEQ</th>
                       <th className="w-80 py-2">COMPANY_NAME</th>
-                      {!selectedClientId && <th className="py-2 ">CONTACT_METADATA</th>}
+                      {!selectedClientId && <th className="py-2 ">담당자</th>}
                       <th className="w-24 py-2 text-center">STATUS</th>
-                      {!selectedClientId && <th className="w-32 py-2 ">LAST_TX_DATE</th>}
-                      <th className="w-32 text-right py-2 pr-4 ">HISTORICAL_REV</th>
-                      <th className="w-20 text-center py-2">ACTIONS</th>
+                      {!selectedClientId && <th className="w-32 py-2 ">최종거래</th>}
+                      <th className="w-32 text-right py-2 pr-4 ">누적매출</th>
+                      <th className="w-20 text-center py-2">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-oem-border text-xs">
@@ -569,6 +566,15 @@ const Clients = () => {
         clientId={editingClient?.id}
         client={editingClient}
       />
+      <div className="statusbar" style={{ border: '1px solid var(--border)' }}>
+        <span><span className="dot" style={{ background: localLoading ? 'var(--warning)' : 'var(--success)' }} />
+          {localLoading ? '조회 중' : '준비됨'}</span>
+        <span>표시 {clients.length}개 / 전체 {totalCount.toLocaleString()}개</span>
+        {searchTerm && <span>필터: {searchTerm}</span>}
+        <span className="flex-1" />
+        <span className="hint"><kbd>F2</kbd> 신규 · <kbd>Enter</kbd> 조회</span>
+      </div>
+
       <BusinessCardScannerModal
         isOpen={isScannerModalOpen}
         onClose={() => {

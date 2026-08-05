@@ -86,24 +86,24 @@ const Issues = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <p className="text-[color:var(--text-secondary)] text-[11px] font-bold uppercase tracking-[0.15em] mb-1">Overview</p>
-          <h1 className="text-2xl md:text-3xl font-semibold text-[color:var(--text-primary)] flex items-center space-x-2">
-            <AlertCircle className="w-6 h-6 text-[color:var(--text-secondary)]" />
-            <span>ISSUE 트래커</span>
-          </h1>
-          <p className="text-[color:var(--text-secondary)] mt-1.5 text-sm md:text-base">
-            총 {filteredIssues.length} ISSUE
+      {/* 타이틀바 */}
+      <div className="win-title" style={{ border: '1px solid var(--border)', borderBottom: 0 }}>
+        <span className="flex items-baseline gap-3">
+          <span className="flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
+            이슈 관리
+          </span>
+          <span className="meta">
+            ISSUE · {filteredIssues.length}건
             {statusFilter !== 'all' && ` (전체 ${issues.length}건 중)`}
-          </p>
-        </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="btn-primary w-full sm:w-auto flex items-center justify-center space-x-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>ISSUE 추가</span>
+          </span>
+        </span>
+      </div>
+
+      {/* 툴바 */}
+      <div className="toolbar" style={{ border: '1px solid var(--border)', borderTop: 0 }}>
+        <button onClick={() => setIsAddModalOpen(true)} className="tb-btn primary">
+          <Plus className="w-3.5 h-3.5" /> 신규 <kbd>F2</kbd>
         </button>
       </div>
 
@@ -216,6 +216,14 @@ const Issues = () => {
       </div>
 
       {/* Modals */}
+      <div className="statusbar" style={{ border: '1px solid var(--border)' }}>
+        <span><span className="dot" />준비됨</span>
+        <span>표시 {filteredIssues.length}건 / 전체 {issues.length}건</span>
+        {statusFilter !== 'all' && <span>필터: {statusFilter}</span>}
+        <span className="flex-1" />
+        <span className="hint"><kbd>F2</kbd> 신규</span>
+      </div>
+
       <AddIssueModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

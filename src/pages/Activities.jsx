@@ -125,26 +125,25 @@ const Activities = () => {
     <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
       <div className="max-w-[1600px] mx-auto space-y-6">
 
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
-          <div>
-            <h1 className="text-xl font-bold text-oem-blue tracking-tight flex items-center gap-2">
-              Activity History
-              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">FORM: ACT_LOG_01</span>
-            </h1>
-            <p className="text-[11px] text-oem-text-secondary mt-1 font-medium">
-              Enterprise activity tracking and customer engagement records. {statusFilter ? `Status: ${statusFilter} | ` : ''}
-              Filtered Records: <span className="text-oem-blue font-bold">{filteredActivities.length}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={handleExport} className="oem-btn-secondary flex items-center gap-1.5 py-1.5 h-8">
-              <Download className="w-3.5 h-3.5" /> EXPORT_DATA
-            </button>
-            <button onClick={() => setIsAddModalOpen(true)} className="oem-btn-primary flex items-center gap-1.5 py-1.5 h-8">
-              <Edit className="w-3.5 h-3.5 text-white" /> NEW_ACTIVITY
-            </button>
-          </div>
+        {/* 타이틀바 */}
+        <div className="win-title" style={{ border: '1px solid var(--border)', borderBottom: 0 }}>
+          <span className="flex items-baseline gap-3">
+            영업활동
+            <span className="meta">
+              ACTIVITY · {statusFilter ? `${statusFilter} · ` : ''}{filteredActivities.length}건
+            </span>
+          </span>
+        </div>
+
+        {/* 툴바 */}
+        <div className="toolbar" style={{ border: '1px solid var(--border)', borderTop: 0 }}>
+          <button onClick={() => setIsAddModalOpen(true)} className="tb-btn primary">
+            <Edit className="w-3.5 h-3.5" /> 신규 <kbd>F2</kbd>
+          </button>
+          <span className="tb-sep" />
+          <button onClick={handleExport} className="tb-btn">
+            <Download className="w-3.5 h-3.5" /> 엑셀 내리기
+          </button>
         </div>
 
         {/* Filter Ribbon */}
@@ -286,6 +285,14 @@ const Activities = () => {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="statusbar" style={{ border: '1px solid var(--border)' }}>
+        <span><span className="dot" />준비됨</span>
+        <span>표시 {filteredActivities.length}건</span>
+        {statusFilter && <span>필터: {statusFilter}</span>}
+        <span className="flex-1" />
+        <span className="hint"><kbd>F2</kbd> 신규</span>
       </div>
 
       <AddActivityModal
