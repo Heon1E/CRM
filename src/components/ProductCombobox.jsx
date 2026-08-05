@@ -94,7 +94,7 @@ const ProductCombobox = ({
   return (
     <div className="relative" ref={comboboxRef} data-combobox>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300 w-4 h-4" />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[color:var(--text-secondary)] w-4 h-4" />
         <input
           ref={inputRef}
           type="text"
@@ -121,7 +121,7 @@ const ProductCombobox = ({
             setIsOpen(!isOpen)
             inputRef.current?.focus()
           }}
-          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-300 hover:text-white"
+          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)]"
           disabled={disabled}
         >
           <ChevronsUpDown className="w-4 h-4" />
@@ -130,7 +130,7 @@ const ProductCombobox = ({
 
       {/* 드롭다운 목록 */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-[#1E1E1E] border border-gray-800 rounded-lg max-h-60 overflow-auto">
+        <div className="absolute z-50 w-full mt-1 bg-[color:var(--bg-card)] border border-[color:var(--border)] rounded-lg max-h-60 overflow-auto">
           <div ref={listRef} className="py-1">
             {filteredProducts.length > 0 ? (
               filteredProducts.map((product) => (
@@ -145,23 +145,23 @@ const ProductCombobox = ({
                       handleSelect(product)
                     }
                   }}
-                  className={`px-4 py-2 cursor-pointer hover:bg-white/5 focus:bg-white/10 focus:outline-none ${
+                  className={`px-4 py-2 cursor-pointer hover:bg-[color:var(--bg-subtle)] focus:bg-white/10 focus:outline-none ${
                     selectedProduct?.id === product.id ? 'bg-white/10' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-white">{product.name}</span>
+                    <span className="text-sm text-[color:var(--text-primary)]">{product.name}</span>
                     {selectedProduct?.id === product.id && (
-                      <Check className="w-4 h-4 text-gray-300" />
+                      <Check className="w-4 h-4 text-[color:var(--text-secondary)]" />
                     )}
                   </div>
                   {product.type && (
-                    <span className="text-xs text-gray-300">{product.type}</span>
+                    <span className="text-xs text-[color:var(--text-secondary)]">{product.type}</span>
                   )}
                 </div>
               ))
             ) : (
-              <div className="px-4 py-2 text-sm text-gray-300 text-center">
+              <div className="px-4 py-2 text-sm text-[color:var(--text-secondary)] text-center">
                 {searchTerm ? '검색 결과가 없습니다' : '품목이 없습니다'}
               </div>
             )}

@@ -3,13 +3,14 @@ import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'
 import ProductCombobox from './ProductCombobox'
+import ClientCombobox from './ClientCombobox'
 import useEnterMove from '../hooks/useEnterMove'
 import { supabase } from '../lib/supabase'
 import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 
 const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
-  const { clients, products, updateSale, deleteSale } = useData()
+  const { clients, products, updateSale, deleteSale, addClient } = useData()
   const formRef = useRef(null)
 
   // 원본 데이터 저장 (Diff 알고리즘용)
@@ -319,15 +320,15 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
     })
   }
 
-  // 거래처 변경 시 품목 단가 재계산
+  // 거래처 변경 시 품목 단가 재계산 (새 거래처에 저장된 단가가 없으면 기존 단가 유지)
   const handleClientChange = (clientId) => {
     setFormData((prev) => {
       const newItems = prev.items.map((item) => {
         if (item.productId) {
-          const unitPrice = getUnitPrice(item.productId, clientId)
+          const newPrice = getUnitPrice(item.productId, clientId)
           return {
             ...item,
-            unitPrice: unitPrice,
+            unitPrice: newPrice > 0 ? newPrice : item.unitPrice,
           }
         }
         return item
@@ -339,6 +340,19 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
   // 날짜 변경 시 모든 품목의 날짜도 일괄 변경 (실제로는 저장 시 처리)
   const handleSaleDateChange = (saleDate) => {
     setFormData((prev) => ({ ...prev, sale_date: saleDate }))
+  }
+
+  // 신규 거래처 자동 등록 (ClientCombobox에서 호출)
+  const handleNewClient = async (companyName) => {
+    try {
+      const newClient = await addClient({ company: companyName })
+      if (newClient?.id) {
+        handleClientChange(newClient.id)
+      }
+    } catch (error) {
+      console.error('신규 거래처 등록 실패:', error)
+      await showError('신규 거래처 등록에 실패했습니다.')
+    }
   }
 
   // 총액 계산
@@ -464,19 +478,13 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               거래처 <span className="text-red-400">*</span>
             </label>
-            <select
-              value={formData.clientId || ''}
-              onChange={(e) => handleClientChange(e.target.value)}
-              className="input-field"
-              required
-            >
-              <option value="">거래처 선택</option>
-              {clients?.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.company}
-                </option>
-              ))}
-            </select>
+            <ClientCombobox
+              clients={clients || []}
+              value={formData.clientId}
+              onSelect={(id) => handleClientChange(id)}
+              onNewClient={handleNewClient}
+              placeholder="거래처 검색 또는 신규 입력..."
+            />
           </div>
 
           <div>

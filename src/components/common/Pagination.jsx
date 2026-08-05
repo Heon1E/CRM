@@ -65,15 +65,15 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
   }
 
   return (
-    <div className="flex items-center justify-center space-x-2 py-4 px-4 bg-[#1E1E1E] border-t border-gray-800">
+    <div className="flex items-center justify-center space-x-2 py-4 px-4 border-t" style={{ borderColor: "var(--border)" }}>
       {/* 이전 버튼 */}
       <button
         onClick={handlePrev}
         disabled={currentPage === 1}
-        className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors touch-manipulation ${
+        className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors touch-manipulation ${
           currentPage === 1
-            ? 'border-gray-800 text-gray-300 cursor-not-allowed'
-            : 'border-gray-800 text-gray-300 hover:bg-white/5'
+            ? 'border-[color:var(--border)] text-[color:var(--text-secondary)] cursor-not-allowed'
+            : 'border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)]'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
@@ -86,13 +86,13 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
           <>
             <button
               onClick={() => handlePageClick(1)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-800 text-gray-300 hover:bg-white/5 transition-colors touch-manipulation"
+              className="flex items-center justify-center w-11 h-11 rounded-lg border border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)] transition-colors touch-manipulation"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               1
             </button>
             {pageNumbers[0] > 2 && (
-              <span className="px-2 text-gray-300">...</span>
+              <span className="px-2 text-[color:var(--text-secondary)]">...</span>
             )}
           </>
         )}
@@ -101,10 +101,10 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
           <button
             key={page}
             onClick={() => handlePageClick(page)}
-            className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors touch-manipulation ${
+            className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors touch-manipulation ${
               page === currentPage
-                ? 'bg-white/10 text-white border-gray-800 font-semibold'
-                : 'border-gray-800 text-gray-300 hover:bg-white/5'
+                ? 'bg-[color:var(--accent)] text-[color:var(--text-primary)] border-[color:var(--accent)] font-semibold'
+                : 'border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)]'
             }`}
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
@@ -115,11 +115,11 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
         {pageNumbers[pageNumbers.length - 1] < totalPages && (
           <>
             {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
-              <span className="px-2 text-gray-300">...</span>
+              <span className="px-2 text-[color:var(--text-secondary)]">...</span>
             )}
             <button
               onClick={() => handlePageClick(totalPages)}
-              className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-800 text-gray-300 hover:bg-white/5 transition-colors touch-manipulation"
+              className="flex items-center justify-center w-11 h-11 rounded-lg border border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)] transition-colors touch-manipulation"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               {totalPages}
@@ -132,10 +132,10 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
       <button
         onClick={handleNext}
         disabled={currentPage === totalPages}
-        className={`flex items-center justify-center w-10 h-10 rounded-lg border transition-colors touch-manipulation ${
+        className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors touch-manipulation ${
         currentPage === totalPages
-          ? 'border-gray-800 text-gray-300 cursor-not-allowed'
-          : 'border-gray-800 text-gray-300 hover:bg-white/5'
+          ? 'border-[color:var(--border)] text-[color:var(--text-secondary)] cursor-not-allowed'
+          : 'border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)]'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
@@ -143,7 +143,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
       </button>
 
       {/* 페이지 정보 */}
-      <div className="ml-4 text-sm text-gray-300 hidden sm:block">
+      <div className="ml-4 text-sm text-[color:var(--text-secondary)] hidden sm:block">
         {totalCount > 0 ? (
           <>
             {((currentPage - 1) * pageSize + 1).toLocaleString()} -{' '}

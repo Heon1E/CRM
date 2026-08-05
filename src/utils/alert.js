@@ -120,6 +120,40 @@ export const showConfirm = async (
 }
 
 /**
+ * HTML 본문을 가진 확인 대화상자 (대사 미리보기처럼 표·목록을 보여줘야 할 때)
+ * @param {string} html - 본문 HTML
+ * @param {string} title - 제목
+ * @param {string} confirmText - 확인 버튼 텍스트
+ * @param {string} cancelText - 취소 버튼 텍스트
+ * @returns {Promise<boolean>} 확인 시 true
+ */
+export const showHtmlConfirm = async (
+  html,
+  title = '확인',
+  confirmText = '적용',
+  cancelText = '취소'
+) => {
+  const result = await ReactSwal.fire({
+    ...commonConfig,
+    title,
+    html,
+    width: 640,
+    showCancelButton: true,
+    confirmButtonText: confirmText,
+    cancelButtonText: cancelText,
+    reverseButtons: true,
+    focusConfirm: false,
+    focusCancel: true,
+    customClass: {
+      ...commonConfig.customClass,
+      htmlContainer: 'text-sm text-slate-600 leading-relaxed text-left',
+    },
+  })
+
+  return result.isConfirmed
+}
+
+/**
  * 입력 대화상자 표시
  * @param {string} message - 표시할 메시지
  * @param {string} title - 제목

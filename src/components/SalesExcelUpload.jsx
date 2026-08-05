@@ -3,10 +3,11 @@ import { Upload, Download, Loader2, Trash2 } from 'lucide-react'
 import { downloadSaleTemplate, parseSaleExcel } from '../utils/excelExport'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
-import { showSuccess, showError, showWarning } from '../utils/alert'
+import { showSuccess, showError, showWarning, showInfo, showHtmlConfirm } from '../utils/alert'
+import { reconcileSales } from '../utils/salesReconciler'
 
 const SalesExcelUpload = ({ onRefresh }) => {
-  const { clients, addSale, registerMissingProductsFromSales } = useData()
+  const { clients, addSale, registerMissingProductsFromSales, registerMissingClients, applySalesReconciliation } = useData()
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, stage: '' })
   const [isDeleting, setIsDeleting] = useState(false)
@@ -91,7 +92,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
 
       // 거래처명으로 clientId 찾기 및 유효성 검사
       setUploadProgress({ current: 0, total: 0, stage: '거래처 목록 불러오는 중' })
-      const validatedSales = []
+      let validatedSales = []
       const errors = []
 
       const fetchedClients = await fetchAllRows(() =>
@@ -128,7 +129,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
 
         validatedSales.push({
           clientId: clientId,
-          clientName: sale.clientName,
+          clientName: sale.clientName.trim(),
           sale_date: sale.sale_date,
           item_name: sale.item_name,
           quantity: sale.quantity,
@@ -155,6 +156,63 @@ const SalesExcelUpload = ({ onRefresh }) => {
         return
       }
 
+      // Step 1.5: 엑셀에만 있고 DB에 없는 신규 거래처를 먼저 등록한다.
+      // 이 단계를 건너뛰면 매출이 client_id 없이 저장되어 목록에 '알수없음'으로 표시된다.
+      // 날짜별 저장 루프보다 앞에서 한 번에 처리해야, 같은 업체가 여러 날짜에 등장해도
+      // 거래처가 중복 생성되지 않는다.
+      const createdClientNames = []
+      const unresolvedRows = validatedSales.filter(s => !s.clientId)
+
+      if (unresolvedRows.length > 0) {
+        setUploadProgress({ current: 0, total: unresolvedRows.length, stage: '신규 거래처 등록 중' })
+
+        // 같은 업체의 표기 흔들림을 하나로 묶어 중복 생성을 막는다.
+        // 기존 거래처를 찾을 때 쓰는 것과 같은 최대 정규화 기준을 써야 한다.
+        // ('주식회사한국' / '(주)한국' / '한국' -> 모두 하나로 취급)
+        const newNameByKey = new Map()
+        unresolvedRows.forEach((s) => {
+          const key = normalizeKey(s.clientName, { removeCorp: true, removePunct: true })
+          if (key && !newNameByKey.has(key)) newNameByKey.set(key, s.clientName)
+        })
+
+        try {
+          const created = await registerMissingClients(Array.from(newNameByKey.values()))
+          created.forEach((c) => {
+            createdClientNames.push(c.company)
+            buildClientKeys(c.company).forEach((key) => {
+              if (!clientMap.has(key)) clientMap.set(key, c)
+            })
+          })
+        } catch (clientError) {
+          console.error('신규 거래처 자동 등록 실패:', clientError)
+        }
+
+        // 새로 만든 거래처 ID를 매출 행에 채운다
+        validatedSales.forEach((s) => {
+          if (s.clientId) return
+          const match = buildClientKeys(s.clientName).map((key) => clientMap.get(key)).find(Boolean)
+          if (match) s.clientId = match.id
+        })
+      }
+
+      // 거래처를 끝내 확정하지 못한 행은 저장하지 않는다.
+      // client_id 없이 넣으면 '알수없음' 매출로 남아 나중에 찾아내기 어렵다.
+      const orphanRows = validatedSales.filter(s => !s.clientId)
+      if (orphanRows.length > 0) {
+        const orphanNames = [...new Set(orphanRows.map(s => s.clientName))]
+        await showWarning(
+          `다음 거래처를 등록하지 못해 매출 ${orphanRows.length}건을 건너뜁니다:\n` +
+          `${orphanNames.join(', ')}\n\n` +
+          `거래처를 직접 추가한 뒤 다시 업로드해 주세요.`
+        )
+        validatedSales = validatedSales.filter(s => s.clientId)
+      }
+
+      if (validatedSales.length === 0) {
+        setIsUploading(false)
+        return
+      }
+
       // Step 2: 엑셀 파일에 있는 날짜들 추출
       const excelDates = [...new Set(validatedSales.map(s => s.sale_date).filter(Boolean))]
 
@@ -172,6 +230,9 @@ const SalesExcelUpload = ({ onRefresh }) => {
           supabase
             .from('sales')
             .select('*')
+            // 정렬이 없으면 .range() 페이지 사이에서 행이 중복/누락된다.
+            // 대사 결과가 통째로 틀어지므로 반드시 지정할 것.
+            .order('id', { ascending: true })
             .in('sale_date', excelDates)
         )
       } catch (error) {
@@ -181,95 +242,81 @@ const SalesExcelUpload = ({ onRefresh }) => {
         return
       }
 
-      // Step 3: Matching & Consuming Logic
-      setUploadProgress({ current: 0, total: validatedSales.length, stage: '중복 확인 중' })
-      // 기존 DB 레코드 풀 생성 (사용 여부 추적)
-      const dbRecordsPool = (existingSales || []).map(record => ({
-        ...record,
-        used: false, // 매칭 여부 플래그
-        matchKey: `${record.sale_date}|${record.client_id}|${record.total_amount || 0}` // 매칭 키
-      }))
+      // Step 3: 대사 - 엑셀과 기존 매출을 맞춰본다
+      // 단순 중복 제거가 아니라 "엑셀 기준으로 해당 날짜를 맞추는" 방식이다.
+      // 그래야 ERP에서 나중에 수정된 금액을 반영할 수 있다.
+      setUploadProgress({ current: 0, total: validatedSales.length, stage: '기존 데이터와 대조 중' })
+      const plan = reconcileSales(validatedSales, existingSales || [])
 
-      const salesToInsert = []
-      let duplicateCount = 0
+      const { stats } = plan
+      const hasChanges = stats.insert + stats.update + stats.delete > 0
 
-      // 각 Excel 행에 대해 매칭 시도
-      let dedupeCount = 0
-      for (const excelSale of validatedSales) {
-        const matchKey = `${excelSale.sale_date}|${excelSale.clientId}|${excelSale.totalAmount || 0}`
-
-        // 사용되지 않은 정확한 매칭 찾기
-        const matchedRecord = dbRecordsPool.find(
-          record => !record.used && record.matchKey === matchKey
+      if (!hasChanges) {
+        await showInfo(
+          `이미 모두 등록된 데이터입니다. 변경할 내용이 없습니다.\n(대조한 매출 ${stats.unchanged}건)`,
+          '변경 사항 없음'
         )
-
-        if (matchedRecord) {
-          // 매칭 발견: DB 레코드를 "사용됨"으로 표시하고 Excel 행은 스킵
-          matchedRecord.used = true
-          duplicateCount++
-        } else {
-          // 매칭 없음: 새로운 레코드로 추가
-          salesToInsert.push(excelSale)
-        }
-        dedupeCount += 1
-        if (dedupeCount % 200 === 0 || dedupeCount === validatedSales.length) {
-          setUploadProgress((prev) => ({
-            ...prev,
-            current: dedupeCount,
-            total: validatedSales.length
-          }))
-        }
+        setIsUploading(false)
+        setUploadProgress({ current: 0, total: 0, stage: '' })
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
       }
 
-      // Step 4: 새로운 레코드만 삽입
-      let insertedCount = 0
-      const insertErrors = []
+      // Step 4: 미리보기 -> 사용자 승인
+      const won = (v) => Number(v || 0).toLocaleString('ko-KR') + '원'
+      const diff = stats.amountAfter - stats.amountBefore
+      const diffText = diff === 0
+        ? '변동 없음'
+        : `${diff > 0 ? '+' : '-'}${Number(Math.abs(diff)).toLocaleString('ko-KR')}원`
 
-      if (salesToInsert.length > 0) {
-        setUploadProgress({ current: 0, total: salesToInsert.length, stage: '매출 등록 중' })
-        // 날짜별로 그룹화하여 addSale 함수 형식에 맞게 변환
-        const groupedByDate = {}
-        salesToInsert.forEach((sale) => {
-          const dateKey = sale.sale_date
-          if (!groupedByDate[dateKey]) {
-            groupedByDate[dateKey] = []
-          }
-          groupedByDate[dateKey].push({
-            clientId: sale.clientId,
-            sale_date: sale.sale_date,
-            item_name: sale.item_name,
-            quantity: sale.quantity,
-            unitPrice: sale.unitPrice,
-            totalAmount: sale.totalAmount,
-            notes: sale.notes,
-          })
-        })
+      const deleteSample = plan.toDelete.slice(0, 5).map(r =>
+        `<li>${r.sale_date} · ${r.item_name || '(품목없음)'} · ${won(r.total_amount)}${r.client_id ? '' : ' <b>(거래처 없음)</b>'}</li>`
+      ).join('')
+      const updateSample = plan.toUpdate.slice(0, 5).map(u =>
+        `<li>${u.db.sale_date} · ${u.db.item_name || '(품목없음)'} — ${u.changes.map(c => `${c.field} ${Number(c.before).toLocaleString('ko-KR')} → <b>${Number(c.after).toLocaleString('ko-KR')}</b>`).join(', ')}</li>`
+      ).join('')
 
-        // 각 날짜별로 addSale 호출
-        let insertedSoFar = 0
-        const totalToInsert = salesToInsert.length
-        for (const dateKey of Object.keys(groupedByDate)) {
-          try {
-            const result = await addSale({
-              rows: groupedByDate[dateKey],
-            })
-            insertedCount += groupedByDate[dateKey].length
-            insertedSoFar += result?.inserted || groupedByDate[dateKey].length
-            setUploadProgress((prev) => ({
-              ...prev,
-              current: Math.min(insertedSoFar, totalToInsert),
-              total: totalToInsert
-            }))
-          } catch (error) {
-            console.error(`매출 등록 오류 (${dateKey}):`, error)
-            insertErrors.push(`${dateKey} 날짜의 매출 등록 중 오류: ${error.message || '알 수 없는 오류'}`)
-          }
-        }
+      const previewHtml = `
+        <div style="text-align:left">
+          <p style="margin:0 0 10px"><b>대상 기간:</b> ${plan.targetDates[0]} ~ ${plan.targetDates[plan.targetDates.length - 1]} (${plan.targetDates.length}개 날짜)</p>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
+            <tr><td style="padding:5px 0">그대로 유지</td><td style="text-align:right"><b>${stats.unchanged}건</b></td></tr>
+            <tr><td style="padding:5px 0;color:#2563eb">신규 등록</td><td style="text-align:right;color:#2563eb"><b>${stats.insert}건</b></td></tr>
+            <tr><td style="padding:5px 0;color:#ca8a04">금액·수량 수정</td><td style="text-align:right;color:#ca8a04"><b>${stats.update}건</b></td></tr>
+            <tr><td style="padding:5px 0;color:#dc2626">삭제</td><td style="text-align:right;color:#dc2626"><b>${stats.delete}건</b></td></tr>
+          </table>
+          <p style="margin:0 0 10px;padding:8px;background:#f8fafc;border-radius:6px">
+            해당 기간 매출: ${won(stats.amountBefore)} → <b>${won(stats.amountAfter)}</b> (${diffText})
+          </p>
+          ${updateSample ? `<p style="margin:10px 0 4px"><b>수정될 항목</b>${stats.update > 5 ? ` (${stats.update}건 중 5건)` : ''}</p><ul style="margin:0;padding-left:18px;font-size:12px">${updateSample}</ul>` : ''}
+          ${deleteSample ? `<p style="margin:10px 0 4px;color:#dc2626"><b>삭제될 항목</b>${stats.delete > 5 ? ` (${stats.delete}건 중 5건)` : ''}</p><ul style="margin:0;padding-left:18px;font-size:12px">${deleteSample}</ul>` : ''}
+          ${stats.delete > 0 ? `<p style="margin:12px 0 0;font-size:12px;color:#dc2626">※ 삭제는 되돌릴 수 없습니다. 엑셀이 이 기간 전체를 담고 있는지 확인해 주세요.</p>` : ''}
+        </div>
+      `
+
+      const approved = await showHtmlConfirm(previewHtml, '반영할 내용을 확인해 주세요', '반영하기', '취소')
+
+      if (!approved) {
+        setIsUploading(false)
+        setUploadProgress({ current: 0, total: 0, stage: '' })
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
       }
 
-      // Step 5: 결과 알림
-      const totalRows = validatedSales.length
-      const resultMessage = `Total ${totalRows} rows: ${insertedCount} inserted, ${duplicateCount} duplicates skipped.`
+      // Step 5: 반영
+      const applyResult = await applySalesReconciliation(plan, (p) => {
+        setUploadProgress({ current: p.current, total: p.total, stage: p.stage })
+      })
+
+      const insertedCount = applyResult.inserted
+      const duplicateCount = stats.unchanged
+      const insertErrors = applyResult.errors || []
+
+      let resultMessage =
+        `신규 ${applyResult.inserted}건 · 수정 ${applyResult.updated}건 · 삭제 ${applyResult.deleted}건 · 유지 ${stats.unchanged}건`
+      if (createdClientNames.length > 0) {
+        resultMessage += `\n\n신규 거래처 ${createdClientNames.length}개를 자동 등록했습니다:\n${createdClientNames.join(', ')}\n(담당자·연락처는 거래처 화면에서 보완해 주세요)`
+      }
 
       // [MODIFIED] 신규 등록이든 중복이든, 데이터가 처리되었으면 품목 동기화 시도 (연결 누락 보정)
       if (insertedCount > 0 || duplicateCount > 0) {
@@ -379,8 +426,8 @@ const SalesExcelUpload = ({ onRefresh }) => {
       {isUploading && uploadProgress.stage && (
         <div className="flex items-center space-x-3 min-w-[220px]">
           <div className="flex-1">
-            <p className="text-xs text-gray-300 mb-1">{uploadProgress.stage}</p>
-            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-gray-800">
+            <p className="text-xs text-[color:var(--text-secondary)] mb-1">{uploadProgress.stage}</p>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden border border-[color:var(--border)]">
               <div
                 className="h-2 bg-white/70 transition-all"
                 style={{
@@ -389,7 +436,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
               />
             </div>
           </div>
-          <span className="text-xs text-gray-300 whitespace-nowrap">
+          <span className="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
             {uploadProgress.total > 0 ? `${uploadProgress.current}/${uploadProgress.total}` : ''}
           </span>
         </div>
@@ -399,8 +446,8 @@ const SalesExcelUpload = ({ onRefresh }) => {
         onClick={handleDeleteAll}
         disabled={isDeleting || isUploading}
         className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${isDeleting || isUploading
-          ? 'opacity-50 cursor-not-allowed bg-[#1E1E1E] text-gray-300 border border-gray-800'
-          : 'bg-red-400/20 hover:bg-red-400/30 text-red-200 border border-red-400/30'
+          ? 'opacity-50 cursor-not-allowed bg-[color:var(--bg-card)] text-[color:var(--text-secondary)] border border-[color:var(--border)]'
+          : 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
           }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >

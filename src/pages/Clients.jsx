@@ -7,6 +7,7 @@ import EditClientModal from '../components/EditClientModal'
 import AddClientModal from '../components/AddClientModal'
 import BusinessCardScannerModal from '../components/BusinessCardScannerModal'
 import SwipeableListItem from '../components/SwipeableListItem'
+import ClientDetailPanel from '../components/ClientDetailPanel'
 import Pagination from '../components/common/Pagination'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { coerceClientStatus, getClientStatusTone } from '../utils/clientStatus'
@@ -22,6 +23,7 @@ const Clients = () => {
   // Local State
   const [searchInput, setSearchInput] = useState('') // Search input value (not yet submitted)
   const [searchTerm, setSearchTerm] = useState('') // Submitted search term for API calls
+  const [selectedClientId, setSelectedClientId] = useState(null) // Split View Select
   const [editingClient, setEditingClient] = useState(null) // Store the full client object
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false)
@@ -188,6 +190,65 @@ const Clients = () => {
     }, {})
   }, [sortedCompanies, groupedClients])
 
+  // Bulk Selection State
+  const [selectedIds, setSelectedIds] = useState(new Set())
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      const allIds = Object.keys(visibleGroupedClients).map(company => visibleGroupedClients[company][0].id)
+      setSelectedIds(new Set(allIds))
+    } else {
+      setSelectedIds(new Set())
+    }
+  }
+
+  const handleSelectOne = (id, e) => {
+    e.stopPropagation()
+    const newSelected = new Set(selectedIds)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedIds(newSelected)
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    const confirmed = await showConfirm(
+      `${selectedIds.size}개 항목을 삭제하시겠습니까?`,
+      '삭제된 데이터는 복구할 수 없습니다.'
+    )
+    if (confirmed) {
+      try {
+        setLocalLoading(true)
+        // Simulate bulk delete (Supabase doesn't support array delete directly easily without function, so loops for now or 'in' filter)
+        // Using 'in' filter is better
+        const { error } = await supabase
+          .from('clients')
+          .delete()
+          .in('id', Array.from(selectedIds))
+
+        if (error) throw error
+
+        showSuccess(`${selectedIds.size}개 항목이 삭제되었습니다.`)
+        setSelectedIds(new Set())
+        fetchData(page, searchTerm)
+      } catch (e) {
+        console.error(e)
+        showError('일괄 삭제 중 오류가 발생했습니다.')
+      } finally {
+        setLocalLoading(false)
+      }
+    }
+  }
+
+  // Helper to check if all visible are selected
+  const isAllSelected = useMemo(() => {
+    const visibleIds = Object.keys(visibleGroupedClients).map(company => visibleGroupedClients[company][0].id)
+    return visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id))
+  }, [visibleGroupedClients, selectedIds])
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-oem-bg-app">
@@ -197,15 +258,35 @@ const Clients = () => {
   }
 
   return (
-    <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
+    <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen relative">
+      {/* Bulk Action Bar (Floating Bottom) */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 animate-in slide-in-from-bottom-10 fade-in duration-300">
+          <span className="font-bold">{selectedIds.size} selected</span>
+          <div className="h-4 w-px bg-slate-700"></div>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-2 text-red-400 hover:text-red-300 font-bold text-sm transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Delete Selection
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-slate-400 hover:text-white text-xs ml-2"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       <div className="max-w-[1600px] mx-auto space-y-6">
 
         {/* Page Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
           <div>
-            <h1 className="text-xl font-bold text-oem-blue tracking-tight flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--accent-light)' }}>
               Customers Maintenance
-              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">FORM: CLIENT_01</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-normal" style={{ backgroundColor: 'var(--border)', color: 'var(--text-muted)' }}>FORM: CLIENT_01</span>
             </h1>
             <p className="text-[11px] text-oem-text-secondary mt-1 font-medium">
               Manage enterprise clients and their primary contact information. Total Records: <span className="text-oem-blue font-bold">{totalCount}</span>
@@ -219,7 +300,7 @@ const Clients = () => {
         </div>
 
         {/* Search & Statistics Ribbon */}
-        <div className="oem-panel bg-white shadow-sm border-l-4 border-l-oem-blue">
+        <div className="oem-panel shadow-sm" style={{ borderLeft: '4px solid var(--accent)' }}>
           <div className="p-4 flex flex-col lg:flex-row gap-4 lg:items-center">
             <div className="flex-1 flex items-center gap-3">
               <label className="text-[11px] font-bold text-oem-text-secondary uppercase tracking-widest whitespace-nowrap">Filter By Company</label>
@@ -334,98 +415,137 @@ const Clients = () => {
           </div>
 
           {/* Desktop Table View (hidden md:block) */}
-          <div className="overflow-x-auto hidden md:block">
-            <table className="oem-table min-w-full">
-              <thead>
-                <tr>
-                  <th className="w-12 text-center hidden md:table-cell">SEQ</th>
-                  <th className="w-80">COMPANY_NAME</th>
-                  <th className="hidden md:table-cell">CONTACT_METADATA</th>
-                  <th className="w-32">STATUS</th>
-                  <th className="w-32 hidden md:table-cell">LAST_TX_DATE</th>
-                  <th className="w-40 text-right hidden md:table-cell">HISTORICAL_REV</th>
-                  <th className="w-20 text-center">TOOLS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.keys(visibleGroupedClients).length > 0 ? (
-                  Object.keys(visibleGroupedClients).map((company, groupIndex) => {
-                    const visibleClients = visibleGroupedClients[company]
-                    const primaryContact = visibleClients[0]
-                    const hasMultipleContacts = visibleClients.length > 1
-                    const stats = getCompanyStats(visibleClients)
-                    const index = (page - 1) * PAGE_SIZE + groupIndex + 1
+          <div className="hidden md:flex gap-6 h-[calc(100vh-200px)]">
+            {/* Left List Pane */}
+            <div className={`${selectedClientId ? 'w-1/2' : 'w-full'} transition-all duration-300 flex flex-col`}>
+              <div className="flex-1 overflow-y-auto border border-oem-border rounded-lg bg-white">
+                <table className="oem-table min-w-full relative">
+                  <thead className="sticky top-0 z-10 bg-oem-bg-header shadow-sm">
+                    <tr>
+                      <th className="w-8 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={isAllSelected}
+                          onChange={handleSelectAll}
+                        />
+                      </th>
+                      <th className="w-12 text-center py-2">SEQ</th>
+                      <th className="w-80 py-2">COMPANY_NAME</th>
+                      {!selectedClientId && <th className="py-2 hidden md:table-cell">CONTACT_METADATA</th>}
+                      <th className="w-24 py-2 text-center">STATUS</th>
+                      {!selectedClientId && <th className="w-32 py-2 hidden md:table-cell">LAST_TX_DATE</th>}
+                      <th className="w-32 text-right py-2 pr-4 hidden md:table-cell">HISTORICAL_REV</th>
+                      <th className="w-20 text-center py-2">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-oem-border text-xs">
+                    {Object.keys(visibleGroupedClients).length > 0 ? (
+                      Object.keys(visibleGroupedClients).map((company, groupIndex) => {
+                        const visibleClients = visibleGroupedClients[company]
+                        const primaryContact = visibleClients[0]
+                        const stats = getCompanyStats(visibleClients)
+                        const index = (page - 1) * PAGE_SIZE + groupIndex + 1
+                        const isSelected = selectedClientId === primaryContact.id
+                        const isChecked = selectedIds.has(primaryContact.id)
 
-                    return (
-                      <tr key={company} className="group">
-                        <td className="text-center font-bold text-oem-text-secondary hidden md:table-cell">{index}</td>
-                        <td>
-                          <Link
-                            to={`/clients/${primaryContact?.id}?company=${encodeURIComponent(company)}`}
-                            className="font-bold text-oem-blue hover:underline tracking-tight"
+                        return (
+                          <tr
+                            key={company}
+                            className={`group cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-l-oem-blue' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
+                            onClick={() => setSelectedClientId(primaryContact.id)}
                           >
-                            {company}
-                          </Link>
-                          {/* Mobile-only sub-info */}
-                          <div className="md:hidden text-[11px] text-oem-text-secondary mt-1">
-                            {primaryContact?.contact_person || 'UNASSIGNED'}
-                          </div>
-                        </td>
-                        <td className="hidden md:table-cell">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-medium">{primaryContact?.contact_person || 'UNASSIGNED'}</span>
-                            <span className="text-[11px] text-oem-text-secondary italic">{primaryContact?.email || 'no-email@system'}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${coerceClientStatus(primaryContact?.status) === '매출'
-                            ? 'bg-oem-green/10 text-oem-green border border-oem-green/20'
-                            : 'bg-oem-bg-header text-oem-text-secondary border border-oem-border'
-                            }`}>
-                            {primaryContact?.status?.toUpperCase() || 'UNKNOWN'}
-                          </span>
-                        </td>
-                        <td className="text-oem-text-secondary font-medium hidden md:table-cell">
-                          {stats.lastOrder ? stats.lastOrder.split('T')[0] : 'NO_RECORDS'}
-                        </td>
-                        <td className="text-right font-bold text-oem-text-primary hidden md:table-cell">
-                          {stats.totalAmount === 0 ? '₩ 0' : formatKoreanCurrency(stats.totalAmount || 0)}
-                        </td>
-                        <td className="text-center">
-                          <button
-                            onClick={() => setEditingClient(primaryContact)}
-                            className="p-1.5 hover:bg-oem-bg-header rounded transition-colors text-oem-blue"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                            <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                className="rounded border-gray-300"
+                                checked={isChecked}
+                                onChange={(e) => handleSelectOne(primaryContact.id, e)}
+                              />
+                            </td>
+                            <td className="text-center font-bold text-oem-text-secondary py-3">{index}</td>
+                            <td className="py-3">
+                              <span className={`font-bold ${isSelected ? 'text-oem-blue' : 'text-oem-text-primary'}`}>
+                                {company}
+                              </span>
+                              {selectedClientId && (
+                                <p className="text-[10px] text-oem-text-secondary truncate">{primaryContact?.contact_person}</p>
+                              )}
+                            </td>
+                            {!selectedClientId && (
+                              <td className="py-3 hidden md:table-cell">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-medium">{primaryContact?.contact_person || 'UNASSIGNED'}</span>
+                                  <span className="text-[10px] text-oem-text-secondary italic">{primaryContact?.email || '-'}</span>
+                                </div>
+                              </td>
+                            )}
+                            <td className="text-center py-3">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${coerceClientStatus(primaryContact?.status) === '매출'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-slate-100 text-slate-500'
+                                }`}>
+                                {primaryContact?.status?.toUpperCase() || 'UNKNOWN'}
+                              </span>
+                            </td>
+                            {!selectedClientId && (
+                              <td className="text-oem-text-secondary font-medium py-3 hidden md:table-cell">
+                                {stats.lastOrder ? stats.lastOrder.split('T')[0] : 'NO_RECORDS'}
+                              </td>
+                            )}
+                            {!selectedClientId && (
+                              <td className="text-right font-bold text-oem-text-primary py-3 pr-4 hidden md:table-cell">
+                                {stats.totalAmount === 0 ? '-' : formatKoreanCurrency(stats.totalAmount)}
+                              </td>
+                            )}
+                            <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                onClick={() => setEditingClient(primaryContact)}
+                                className="p-1.5 hover:bg-blue-50 rounded-md transition-colors group/btn"
+                                title="Edit Client"
+                              >
+                                <Edit className="w-4 h-4 text-slate-400 group-hover/btn:text-blue-600" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan="7" className="p-12 text-center text-slate-400">
+                          No Data
                         </td>
                       </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="7" className="p-12 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <Users className="w-12 h-12 text-oem-bg-header" />
-                        <p className="text-oem-text-secondary italic font-medium">
-                          {isLoading || localLoading ? 'Initializing record retrieval...' : 'No data records found in specified range.'}
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination (Compact Mode when split) */}
+              <div className="mt-2 flex justify-center">
+                <Pagination
+                  totalCount={totalCount}
+                  pageSize={PAGE_SIZE}
+                  currentPage={page}
+                  onPageChange={setPage}
+                />
+              </div>
+            </div>
 
-          {/* Footer Pagination */}
-          <div className="bg-oem-bg-header/30 border-t border-oem-border p-4 flex justify-center">
-            <Pagination
-              totalCount={totalCount}
-              pageSize={PAGE_SIZE}
-              currentPage={page}
-              onPageChange={setPage}
-            />
+            {/* Right Detail Pane (Split View) */}
+            {selectedClientId && (
+              <div className="w-1/2 flex flex-col bg-white border border-oem-border rounded-lg shadow-lg overflow-hidden relative animate-in slide-in-from-right-10 duration-300">
+                <div className="absolute top-2 right-2 z-10">
+                  <button onClick={() => setSelectedClientId(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+                    X
+                  </button>
+                </div>
+                <ClientDetailPanel
+                  clientId={selectedClientId}
+                  isEmbedded={true}
+                  onClose={() => setSelectedClientId(null)}
+                />
+              </div>
+            )}
           </div>
         </div>
 

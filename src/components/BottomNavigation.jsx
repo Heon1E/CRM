@@ -1,6 +1,6 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Users, PlusCircle, Map as MapIcon, Menu } from 'lucide-react'
+import { Home, Users, Map as MapIcon, Menu } from 'lucide-react'
 
 const BottomNavigation = () => {
   const location = useLocation()
@@ -9,7 +9,6 @@ const BottomNavigation = () => {
   const navItems = [
     { path: '/', label: '홈', icon: Home },
     { path: '/clients', label: '거래처', icon: Users },
-    { path: '/quick-action', label: '등록', icon: PlusCircle, isSpecial: true },
     { path: '/map', label: '주변', icon: MapIcon },
     { path: '/settings', label: '더보기', icon: Menu },
   ]
@@ -19,20 +18,6 @@ const BottomNavigation = () => {
       <div className="flex justify-between items-center px-2 h-16">
         {navItems.map((item) => {
           const isActive = currentPath === item.path
-          const isSpecial = item.isSpecial
-
-          if (isSpecial) {
-            return (
-              <div key={item.path} className="relative -top-5">
-                <Link
-                  to={item.path} // 나중에 Quick Action Modal 등으로 변경 가능
-                  className="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-oem-blue text-white shadow-lg transform active:scale-95 transition-transform"
-                >
-                  <item.icon className="w-7 h-7" />
-                </Link>
-              </div>
-            )
-          }
 
           return (
             <Link

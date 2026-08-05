@@ -122,7 +122,7 @@ const Activities = () => {
   }
 
   return (
-    <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
+    <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
       <div className="max-w-[1600px] mx-auto space-y-6">
 
         {/* Page Header */}

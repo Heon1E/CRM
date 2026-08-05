@@ -202,8 +202,10 @@ const ShareProcessing = () => {
   "content": "상세 내용"
 }`
 
+      // 모델명은 geminiService와 동일하게 환경변수로 관리한다 (gemini-1.5-flash는 단종됨)
+      const model = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -283,30 +285,30 @@ const ShareProcessing = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#121212] p-4">
-      <div className="bg-[#1E1E1E] border border-gray-800 rounded-lg p-8 max-w-md w-full text-center">
+    <div className="min-h-screen flex items-center justify-center bg-[color:var(--bg-app)] p-4">
+      <div className="bg-[color:var(--bg-card)] border border-[color:var(--border)] rounded-lg p-8 max-w-md w-full text-center">
         {status === 'loading' && (
           <>
-            <Loader2 className="w-16 h-16 mx-auto mb-4 text-gray-300 animate-spin" />
-            <h2 className="text-xl font-semibold text-white mb-2">파일 처리 중</h2>
-            <p className="text-gray-300">{message}</p>
+            <Loader2 className="w-16 h-16 mx-auto mb-4 text-[color:var(--text-secondary)] animate-spin" />
+            <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-2">파일 처리 중</h2>
+            <p className="text-[color:var(--text-secondary)]">{message}</p>
           </>
         )}
 
         {status === 'processing' && (
           <>
-            <Loader2 className="w-16 h-16 mx-auto mb-4 text-gray-300 animate-spin" />
-            <h2 className="text-xl font-semibold text-white mb-2">오디오 분석 중</h2>
-            <p className="text-gray-300">{message}</p>
+            <Loader2 className="w-16 h-16 mx-auto mb-4 text-[color:var(--text-secondary)] animate-spin" />
+            <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-2">오디오 분석 중</h2>
+            <p className="text-[color:var(--text-secondary)]">{message}</p>
             {analysisResult && (
-              <div className="mt-4 p-4 bg-[#1E1E1E] rounded-lg text-left border border-gray-800">
-                <p className="text-sm text-gray-300">
+              <div className="mt-4 p-4 bg-[color:var(--bg-card)] rounded-lg text-left border border-[color:var(--border)]">
+                <p className="text-sm text-[color:var(--text-secondary)]">
                   <strong>거래처:</strong> {analysisResult.clientName || '없음'}
                 </p>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-[color:var(--text-secondary)]">
                   <strong>날짜:</strong> {analysisResult.date}
                 </p>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm text-[color:var(--text-secondary)]">
                   <strong>유형:</strong> {analysisResult.type}
                 </p>
               </div>
@@ -317,10 +319,10 @@ const ShareProcessing = () => {
         {status === 'success' && (
           <>
             <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-emerald-300" />
-            <h2 className="text-xl font-semibold text-white mb-2">처리 완료</h2>
-            <p className="text-gray-300 mb-4">{message}</p>
+            <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-2">처리 완료</h2>
+            <p className="text-[color:var(--text-secondary)] mb-4">{message}</p>
             {analysisResult && (
-              <div className="mt-4 p-4 bg-[#1E1E1E] rounded-lg text-left border border-gray-800">
+              <div className="mt-4 p-4 bg-[color:var(--bg-card)] rounded-lg text-left border border-[color:var(--border)]">
                 <p className="text-sm text-emerald-300">
                   <strong>거래처:</strong> {analysisResult.clientName || '없음'}
                 </p>
@@ -335,16 +337,16 @@ const ShareProcessing = () => {
                 </p>
               </div>
             )}
-            <p className="text-sm text-gray-300 mt-4">잠시 후 대시보드로 이동합니다...</p>
+            <p className="text-sm text-[color:var(--text-secondary)] mt-4">잠시 후 대시보드로 이동합니다...</p>
           </>
         )}
 
         {status === 'error' && (
           <>
             <XCircle className="w-16 h-16 mx-auto mb-4 text-rose-400" />
-            <h2 className="text-xl font-semibold text-white mb-2">오류 발생</h2>
-            <p className="text-gray-300 mb-4">{message}</p>
-            <p className="text-sm text-gray-300 mt-4">잠시 후 대시보드로 이동합니다...</p>
+            <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-2">오류 발생</h2>
+            <p className="text-[color:var(--text-secondary)] mb-4">{message}</p>
+            <p className="text-sm text-[color:var(--text-secondary)] mt-4">잠시 후 대시보드로 이동합니다...</p>
           </>
         )}
       </div>

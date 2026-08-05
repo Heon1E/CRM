@@ -1,223 +1,378 @@
 /* =========================================
-   Oracle Enterprise Manager (OEM) Style
+   Xavian CRM — Design System
+   DESIGN.md 스펙 구현 (Indigo Purple / Clean SaaS / 8px radius)
+
+   이 파일이 앱 전체의 단일 기준이다.
+   과거에는 다크 이머럴드(:root), Oracle 레드(tailwind oem-*), 대시보드 레드(.dashboard-light),
+   DESIGN.md 보라 — 네 가지가 뒤섞여 있었다. 변수 '값'만 바꿔 전체를 한 번에 정렬한다.
+   (변수 '이름'은 그대로 두어 기존 컴포넌트가 깨지지 않게 한다)
    ========================================= */
 
 :root {
-  --oem-bg-app: #ffffff;
-  --oem-bg-panel: #f8f9fa;
-  --oem-bg-header: #eff2f5;
-  --oem-border-color: #dce1e7;
-  --oem-text-primary: #333333;
-  --oem-text-secondary: #666666;
-  --oem-text-link: #0076ce;
-  --oem-blue: #0076ce;
-  --oem-green: #4caf50;
-  --oem-red: #f44336;
+  /* --- Surfaces --- */
+  --bg-app: #f7f8fa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f5f3ff;
+  /* 브랜드 톤이 살짝 도는 hover */
+  --bg-header: #ffffff;
+  --bg-subtle: #f1f3f7;
+
+  --border: #e6e8ee;
+  --border-light: #f0f2f6;
+  --border-strong: #d4d8e2;
+
+  /* --- Text --- */
+  --text-primary: #12141a;
+  --text-secondary: #5a6072;
+  --text-muted: #8a90a2;
+
+  /* --- Brand (DESIGN.md: Primary Indigo Purple) --- */
+  --accent: #833CF6;
+  --accent-dark: #6d28d9;
+  --accent-light: #9b62f8;
+  --accent-glow: rgba(131, 60, 246, 0.18);
+  --accent-subtle: rgba(131, 60, 246, 0.08);
+
+  /* --- Semantic --- */
+  --success: #059669;
+  --success-subtle: rgba(5, 150, 105, 0.10);
+  --warning: #d97706;
+  --warning-subtle: rgba(217, 119, 6, 0.10);
+  --danger: #dc2626;
+  --danger-subtle: rgba(220, 38, 38, 0.10);
+  --info: #2563eb;
+
+  /* --- Shape (DESIGN.md: ROUND_EIGHT) --- */
+  --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+
+  /* --- Elevation (soft, diffused) --- */
+  --shadow-sm: 0 1px 2px rgba(18, 20, 26, 0.05);
+  --shadow: 0 2px 8px rgba(18, 20, 26, 0.06);
+  --shadow-md: 0 8px 24px rgba(18, 20, 26, 0.08);
+  --shadow-lg: 0 18px 40px rgba(18, 20, 26, 0.12);
+
+  /* --- Touch --- */
+  --tap-min: 44px;
+  /* Apple HIG / Material 권장 최소 터치 영역 */
+
+  /* Legacy OEM aliases (backward compat — 기존 컴포넌트가 참조 중) */
+  --oem-bg-app: var(--bg-app);
+  --oem-bg-panel: var(--bg-card);
+  --oem-bg-header: var(--bg-header);
+  --oem-border-color: var(--border);
+  --oem-text-primary: var(--text-primary);
+  --oem-text-secondary: var(--text-secondary);
+  --oem-text-link: var(--accent);
+  --oem-red: var(--danger);
+  --oem-red-dark: #b91c1c;
+  --oem-blue: var(--info);
+  --oem-green: var(--success);
+  --oem-grey-light: var(--bg-subtle);
+  --oem-grey-medium: var(--border);
+}
+
+/* 대시보드도 동일 토큰을 쓴다 (예전엔 여기만 빨강이라 페이지마다 색이 달랐다) */
+.dashboard-light {
+  --bg-app: #f7f8fa;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f5f3ff;
+  --bg-header: #ffffff;
+  --border: #e6e8ee;
+  --border-light: #f0f2f6;
+  --text-primary: #12141a;
+  --text-secondary: #5a6072;
+  --text-muted: #8a90a2;
+  --accent: #833CF6;
+  --accent-dark: #6d28d9;
+  --accent-light: #9b62f8;
+  --accent-glow: rgba(131, 60, 246, 0.18);
+  --accent-subtle: rgba(131, 60, 246, 0.08);
 }
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 1. Global Reset & Typography */
-html,
+/* =========================================
+   1. Global Reset & Typography
+   ========================================= */
+/* html은 16px을 유지해야 한다.
+   Tailwind의 text-xs(0.75rem) / text-sm(0.875rem)이 전부 rem 기준이라
+   여기를 15px로 낮추면 앱 전체 글자가 조용히 6% 작아진다. (text-xs가 11.3px이 됨) */
+html {
+  font-size: 16px;
+  height: 100%;
+}
+
 body {
-  background-color: var(--oem-bg-app);
-  color: var(--oem-text-primary);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: 'Noto Sans KR', 'Roboto', 'Arial', sans-serif;
-  font-size: 16px;
+  font-family: 'Inter', 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif;
+  font-size: 15px;
+  /* 본문만 14 -> 15px. 실무자가 하루 종일 보는 화면이다 */
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1,
 h2,
 h3,
 h4 {
-  color: var(--oem-text-primary);
+  color: var(--text-primary);
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 a {
-  color: var(--oem-text-link);
+  color: var(--accent);
   text-decoration: none;
+  transition: color 0.15s;
 }
 
 a:hover {
-  text-decoration: underline;
+  color: var(--accent-dark);
 }
 
-/* 2. OEM Components */
-@layer components {
-
-  /* Panels */
-  .oem-panel {
-    background-color: var(--oem-bg-panel);
-    border: 1px solid var(--oem-border-color);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .oem-panel-header {
-    background-color: var(--oem-bg-header);
-    border-bottom: 1px solid var(--oem-border-color);
-    padding: 6px 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-weight: 600;
-    font-size: 12px;
-    color: var(--oem-text-primary);
-  }
-
-  .oem-panel-content {
-    padding: 12px;
-  }
-
-  /* Global Header */
-  .oem-header {
-    background-color: #ffffff;
-    border-bottom: 3px solid var(--oem-blue);
-    height: 50px;
-    display: flex;
-    align-items: center;
-    padding: 0 20px;
-    justify-content: space-between;
-  }
-
-  /* Buttons */
-  .oem-btn-primary {
-    background-color: var(--oem-blue);
-    color: #ffffff;
-    padding: 4px 12px;
-    border-radius: 2px;
-    font-weight: 500;
-    font-size: 12px;
-    transition: background-color 0.2s;
-  }
-
-  .oem-btn-primary:hover {
-    background-color: #005fa6;
-  }
-
-  .oem-btn-secondary {
-    background-color: #ffffff;
-    color: var(--oem-text-primary);
-    border: 1px solid var(--oem-border-color);
-    padding: 4px 12px;
-    border-radius: 2px;
-    font-weight: 500;
-    font-size: 12px;
-  }
-
-  /* KPI Cards inside Summary */
-  .oem-kpi-item {
-    display: flex;
-    flex-direction: column;
-    padding: 0 20px;
-    border-right: 1px solid var(--oem-border-color);
-  }
-
-  .oem-kpi-item:last-child {
-    border-right: none;
-  }
-
-  .oem-kpi-label {
-    font-size: 11px;
-    color: var(--oem-text-secondary);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-
-  .oem-kpi-value {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--oem-text-primary);
-  }
-
-  /* Tables */
-  .oem-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-  }
-
-  .oem-table th {
-    background-color: var(--oem-bg-header);
-    border-bottom: 2px solid var(--oem-border-color);
-    padding: 8px;
-    text-align: left;
-    color: var(--oem-text-secondary);
-  }
-
-  .oem-table td {
-    padding: 8px;
-    border-bottom: 1px solid var(--oem-border-color);
-    color: var(--oem-text-primary);
-  }
-
-  .oem-table tr:hover {
-    background-color: #f1f3f5;
-  }
-
-  /* Forms */
-  .oem-input {
-    width: 100%;
-    padding: 6px 10px;
-    border: 1px solid var(--oem-border-color);
-    border-radius: 2px;
-    font-size: 13px;
-    color: var(--oem-text-primary);
-    background-color: #ffffff;
-    transition: all 0.2s;
-  }
-
-  .oem-input:focus {
-    outline: none;
-    border-color: var(--oem-blue);
-    box-shadow: 0 0 0 1px var(--oem-blue);
-  }
-
-  .oem-label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--oem-text-secondary);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
+/* --- 최소 글자 크기 보장 ---
+   코드 199곳에 text-[10px] / text-[10.5px] / text-[11px]가 흩어져 있다.
+   개별 수정은 레이아웃을 깨뜨릴 위험이 커서, 하한만 끌어올린다.
+   10px는 손에 든 화면에서 읽기 힘들다. */
+[class*="text-[10px]"],
+[class*="text-[10.5px]"],
+[class*="text-[11px]"] {
+  font-size: 12px !important;
+  line-height: 1.45;
 }
 
-/* 3. Utilities */
-.text-oem-green {
-  color: var(--oem-green);
+/* =========================================
+   2. Touch Targets
+   ========================================= */
+
+/* 아이콘만 든 버튼은 클릭 영역이 아이콘 크기로 쪼그라든다.
+   매출 목록의 수정/삭제가 19x19px이었고 삭제가 4px 옆에 붙어 있었다. */
+button:has(> svg:only-child),
+a:has(> svg:only-child) {
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
 }
 
-.text-oem-red {
-  color: var(--oem-red);
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  transition: background-color .15s, color .15s;
 }
 
-.bg-oem-blue {
-  background-color: var(--oem-blue);
+.icon-btn:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text-primary);
 }
 
-/* Scrollbar styling */
+.icon-btn-danger:hover {
+  background-color: var(--danger-subtle);
+  color: var(--danger);
+}
+
+/* =========================================
+   3. Panels & Buttons
+   ========================================= */
+.oem-panel,
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.oem-btn-primary,
+.btn-primary {
+  @apply px-4 py-2.5 font-semibold transition-all;
+  background-color: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  min-height: 40px;
+}
+
+.oem-btn-primary:hover,
+.btn-primary:hover {
+  background-color: var(--accent-dark);
+  box-shadow: var(--shadow);
+}
+
+.oem-btn-secondary,
+.btn-secondary {
+  @apply px-4 py-2.5 font-semibold transition-colors;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  min-height: 40px;
+}
+
+.oem-btn-secondary:hover,
+.btn-secondary:hover {
+  background-color: var(--bg-subtle);
+}
+
+.btn-danger {
+  @apply px-4 py-2.5 font-semibold transition-colors;
+  background-color: var(--danger-subtle);
+  color: var(--danger);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: var(--radius);
+  min-height: 40px;
+}
+
+/* =========================================
+   4. Forms
+   ========================================= */
+input,
+select,
+textarea {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-sm);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent) !important;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* =========================================
+   5. Misc
+   ========================================= */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--border-strong);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #bbb;
+  background: var(--text-muted);
+}
+
+.card-glow:hover {
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-md);
+  transition: box-shadow 0.2s ease;
+}
+
+.badge-accent {
+  background-color: var(--accent-subtle);
+  color: var(--accent-dark);
+  border: 1px solid rgba(131, 60, 246, 0.22);
+  @apply text-xs font-semibold px-2 py-0.5 rounded-full;
+}
+
+.table-row-hover:hover {
+  background-color: var(--bg-card-hover);
+}
+
+.modal-overlay {
+  background-color: rgba(18, 20, 26, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+/* =========================================
+   6. Mobile (<=768px)
+   ========================================= */
+@media (max-width: 768px) {
+
+  /* iOS 사파리는 16px 미만 입력칸을 탭하면 화면을 자동 확대한다.
+     매출 수정 모달의 입력칸 12개가 전부 여기 걸려 있었다. */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: var(--tap-min);
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  textarea {
+    min-height: 88px;
+  }
+
+  /* 손가락으로 누를 수 있는 크기 보장 */
+  button:has(> svg:only-child),
+  a:has(> svg:only-child),
+  .icon-btn {
+    min-width: var(--tap-min);
+    min-height: var(--tap-min);
+  }
+
+  /* FullCalendar 기본 버튼이 37~38px이라 터치 최소치에 못 미친다 */
+  .fc .fc-button {
+    min-height: var(--tap-min);
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* 모바일에선 본문을 조금 더 키운다 */
+  body {
+    font-size: 15px;
+  }
+
+  [class*="text-[10px]"],
+  [class*="text-[10.5px]"],
+  [class*="text-[11px]"] {
+    font-size: 12.5px !important;
+  }
+}
+
+/* 데이터 카드: 모바일에서 표를 대체한다 */
+.data-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-card+.data-card {
+  margin-top: 10px;
+}
+
+.data-card__label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.data-card__value {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
 }

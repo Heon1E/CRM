@@ -20,42 +20,6 @@ const IssueTracker = ({ maxItems = null }) => {
     ? issues.filter((issue) => issue.status !== '완료').slice(0, maxItems)
     : issues.filter((issue) => issue.status !== '완료')
 
-  // 색상 코딩 함수 (date 기준일과 오늘 날짜 비교)
-  const getIssueColor = (issue) => {
-    const baseDate = issue.date || issue.created_at
-    if (!baseDate) {
-      return 'bg-[#1E1E1E] border-gray-800'
-    }
-
-    const now = new Date()
-    const baseDateObj = new Date(baseDate)
-    const daysDiff = Math.floor((now - baseDateObj) / (1000 * 60 * 60 * 24))
-
-    if (daysDiff >= 14) {
-      return 'bg-[#1E1E1E] border-gray-700'
-    }
-
-    if (daysDiff >= 7) {
-      return 'bg-[#1E1E1E] border-gray-700'
-    }
-
-    return 'bg-[#1E1E1E] border-gray-800'
-  }
-
-  // 상태 색상
-  const getStatusColor = (status) => {
-    switch (status) {
-      case '완료':
-        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
-      case '진행':
-        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
-      case '등록':
-        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
-      default:
-        return 'bg-[#1E1E1E] text-gray-300 border border-gray-800'
-    }
-  }
-
   // 상태 변경 핸들러 (리스트에서 바로 변경)
   const handleStatusChange = async (issueId, newStatus) => {
     try {
@@ -63,7 +27,6 @@ const IssueTracker = ({ maxItems = null }) => {
         status: newStatus,
         updated_at: new Date().toISOString() // 상태 변경 시 업데이트 시간 갱신
       })
-      // 완료로 변경하면 대시보드에서 즉시 사라짐 (필터링에 의해)
     } catch (error) {
       console.error('상태 변경 중 오류:', error)
       alert('상태 변경 중 오류가 발생했습니다.')
@@ -71,22 +34,20 @@ const IssueTracker = ({ maxItems = null }) => {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header removed as it will be handled by Parent Panel */}
-
-      <div className="flex justify-between items-center mb-2 px-1">
-        <h4 className="text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight">Active Issues ({activeIssues.length})</h4>
+    <div className="space-y-2">
+      <div className="flex justify-between items-center mb-3 px-1">
+        <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Active Issues ({activeIssues.length})</h4>
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="oem-btn-secondary px-2 py-0.5 text-[10px] flex items-center gap-1"
+          className="bg-white border border-gray-300 text-gray-600 hover:text-oem-red hover:border-oem-red px-2 py-1 rounded-sm text-[10px] font-bold flex items-center gap-1 transition-all shadow-sm"
         >
           <Plus className="w-3 h-3" />
-          <span>ADD_ISSUE</span>
+          <span>NEW ISSUE</span>
         </button>
       </div>
 
       {activeIssues.length > 0 ? (
-        <div className={`space-y-2 ${maxItems ? 'max-h-96 overflow-y-auto pr-1' : ''}`}>
+        <div className={`space-y-0 divide-y divide-gray-100 border border-gray-100 rounded-sm bg-white ${maxItems ? 'max-h-96' : ''}`}>
           {activeIssues.map((issue) => {
             // 경과 일수 계산
             const baseDate = issue.date || issue.created_at
@@ -97,51 +58,39 @@ const IssueTracker = ({ maxItems = null }) => {
             return (
               <div
                 key={issue.id}
-                className="bg-white border border-oem-border rounded-sm p-3 hover:border-oem-blue transition-colors group relative"
+                className="p-3 hover:bg-gray-50 transition-colors group relative"
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <span className={`px-1.5 py-0.5 rounded-[2px] text-[10px] font-bold border ${issue.status === '완료' ? 'bg-gray-100 text-gray-500 border-gray-200' :
-                          issue.status === '진행' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                            'bg-yellow-50 text-amber-600 border-amber-100'
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-1.5 py-0.5 rounded-[2px] text-[9px] font-bold border uppercase tracking-tight ${issue.status === '완료' ? 'bg-gray-100 text-gray-500 border-gray-200' :
+                        issue.status === '진행' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                          'bg-amber-50 text-amber-700 border-amber-100'
                         }`}>
                         {issue.status}
                       </span>
                       {issue.target_date && (
-                        <span className="text-[10px] text-oem-text-secondary">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm border ${Math.ceil((new Date(issue.target_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 3 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-100'
+                          }`}>
                           D-{Math.ceil((new Date(issue.target_date) - new Date()) / (1000 * 60 * 60 * 24))}
                         </span>
                       )}
-                      {daysDiff > 0 && (
-                        <span className="text-[10px] text-oem-text-secondary">
-                          ({daysDiff}d ago)
-                        </span>
-                      )}
                     </div>
-                    <h4 className="font-bold text-oem-text-primary text-xs mb-1 break-words group-hover:text-oem-blue transition-colors">{issue.title}</h4>
-                    {issue.content && (
-                      <p className="text-[11px] text-gray-600 mb-1.5 line-clamp-2 break-words leading-relaxed">
-                        {issue.content}
-                      </p>
-                    )}
-                    <p className="text-[10px] text-gray-400">
-                      Registered: {new Date(issue.created_at || issue.date).toLocaleDateString('ko-KR')}
+                    <h4 className="font-bold text-gray-800 text-xs mb-1 break-words group-hover:text-oem-red transition-colors leading-tight">{issue.title}</h4>
+                    <p className="text-[11px] text-gray-500 line-clamp-1">
+                      {new Date(issue.created_at || issue.date).toLocaleDateString()}
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1 ml-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingIssueId(issue.id)
-                      }}
-                      className="p-1 text-gray-400 hover:text-oem-blue hover:bg-blue-50 rounded"
-                      title="Edit"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditingIssueId(issue.id)
+                    }}
+                    className="p-1.5 text-gray-300 hover:text-oem-blue hover:bg-blue-50 rounded-sm transition-all"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             )

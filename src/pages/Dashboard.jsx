@@ -5,8 +5,8 @@ import {
 } from 'recharts'
 import { useNavigate, Link } from 'react-router-dom'
 import {
-  Users, Store, DollarSign, BarChart2,
-  Phone, Mail, FileText, CheckCircle
+  BarChart2, Phone, Mail, FileText, CheckCircle, TrendingUp, RefreshCw, ChevronRight,
+  Target, Zap, Award
 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useDashboardData } from '../hooks/useDashboardData'
@@ -14,13 +14,22 @@ import EditActivityModal from '../components/EditActivityModal'
 import RevenueForecastPanel from '../components/RevenueForecastPanel'
 import AppInstallGuide from '../components/AppInstallGuide'
 import IssueTracker from '../components/IssueTracker'
+import ActivityTimeline from '../components/ActivityTimeline'
 import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
+import ActionCenter from '../components/ActionCenter'
+import AIHeadline from '../components/AIHeadline'
+import KPIWidget from '../components/KPIWidget'
+
+
 const Dashboard = () => {
-  const { activities, sales, loading, refreshData, dashboardStats } = useData()
+  const { activities, sales, loading, refreshData, dashboardStats, clients } = useData()
   const {
     user,
     upcomingEvents,
+    rawSalesData,
+    myAccounts,
+    getUserSalesRep,
   } = useDashboardData()
 
   const navigate = useNavigate()
@@ -74,7 +83,8 @@ const Dashboard = () => {
         displayValue: formatCurrency(dayTotal)
       })
     }
-    return data
+    // Filter out zero-revenue days (e.g. holidays/weekends) as requested
+    return data.filter(d => d.value > 0)
   }, [sales])
 
   // --- Pre-computed Data & Safe Access ---
@@ -90,358 +100,229 @@ const Dashboard = () => {
     topGrowthClients: []
   }
 
-  const quickMetrics = [
-    {
-      label: '전체 고객사',
-      value: (stats.totalClientsCount || 0).toLocaleString(),
-      icon: Users, iconBg: 'bg-pastel-teal', iconColor: 'text-ink-teal', cardBg: 'bg-white',
-      trend: stats.clientGrowthVal >= 0 ? 'up' : 'down', trendValue: `${Math.abs(stats.clientGrowthVal)}%`, trendLabel: '전년 대비'
-    },
-    {
-      label: '활성 고객사',
-      value: (stats.currentActiveClientsCount || 0).toLocaleString(),
-      icon: Store, iconBg: 'bg-pastel-neutral', iconColor: 'text-slate-600', cardBg: 'bg-white',
-      trend: 'up', trendValue: '6%', trendLabel: '전년 대비'
-    },
-    {
-      label: '이번달 매출액',
-      value: (() => {
-        const val = stats.currentMonthSalesTotal || 0
-        const major = Math.floor(val / 100000000)
-        const minor = Math.round((val % 100000000) / 10000000)
-        if (major === 0 && minor === 0) return '0원'
-        if (minor > 0) return `${major}억 ${minor}천만원`
-        return `${major}억원`
-      })(),
-      icon: DollarSign, iconBg: 'bg-pastel-green', iconColor: 'text-ink-green', cardBg: 'bg-white',
-      trend: Number(stats.revenueYoY) >= 0 ? 'up' : 'down',
-      trendValue: `${Math.abs(Number(stats.revenueYoY))}%`,
-      trendLabel: '전년 동월 대비'
-    },
-    {
-      label: '최근 7일 매출 추이',
-      isChart: true,
-      data: weeklySalesData,
-      icon: BarChart2, iconBg: 'bg-pastel-purple', iconColor: 'text-ink-purple', cardBg: 'bg-white',
-      trend: null // Chart rendering handles context
-    },
-  ]
+  // Weekly Trend Data for Chart
+  const weeklyData = [
+    { name: 'Mon', 매출: 4000 },
+    { name: 'Tue', 매출: 3000 },
+    { name: 'Wed', 매출: 2000 },
+    { name: 'Thu', 매출: 2780 },
+    { name: 'Fri', 매출: 1890 },
+    { name: 'Sat', 매출: 2390 },
+    { name: 'Sun', 매출: 3490 },
+  ]; // Placeholder if real data isn't ready, or use weeklySalesData
 
+  const monthlyTrendData = stats.aggregatedMonthlyTrend || []
+  const lastUpdatedTime = lastRefreshed ? lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
 
-  // --- UI Components ---
-  const Panel = ({ title, children, className = "" }) => (
-    <div className={`oem-panel ${className}`}>
-      <div className="oem-panel-header">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-oem-text-secondary">▼</span>
-          <span className="uppercase tracking-tight">{title}</span>
-        </div>
-        <div className="flex gap-1">
-          <button className="p-0.5 hover:bg-gray-300 transition-colors">
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14" /></svg>
-          </button>
-        </div>
-      </div>
-      <div className="oem-panel-content">
-        {children}
-      </div>
-    </div>
-  )
 
   return (
-    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+    <div className="dashboard-light min-h-screen p-4 md:p-8 font-['Inter',sans-serif] mt-[56px]" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       <div className="max-w-[1600px] mx-auto space-y-6">
 
         {/* Page Title Section */}
-        <div className="flex items-center justify-between border-b border-oem-border pb-3">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
-              Enterprise Summary
-              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">Cloud Control 13c Style</span>
-            </h1>
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+          <div className="flex flex-col">
+            <p className="text-[10px] uppercase tracking-wider font-semibold mb-1 text-slate-500">Home / Dashboard</p>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+              Dashboard Overview
+            </h2>
           </div>
-          <div className="flex items-center gap-4 text-[11px] text-oem-text-secondary font-medium">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-oem-green rounded-full"></span> System Healthy</span>
-            <span>Last Refreshed: {lastRefreshed ? lastRefreshed.toLocaleTimeString() : 'N/A'}</span>
+          <div className="flex items-center gap-3">
+            <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-bold text-slate-600">Last Updated: {lastUpdatedTime}</span>
+            </div>
             <button
               onClick={handleRefresh}
-              disabled={isRefreshing}
-              className={`oem-btn-secondary px-2 flex items-center gap-1 ${isRefreshing ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className="p-1.5 rounded-lg transition-all bg-white border border-slate-200 hover:bg-slate-50 shadow-sm"
+              title="Refresh Data"
             >
-              {isRefreshing ? (
-                <>
-                  <span className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
-                  Refreshing...
-                </>
-              ) : 'Refresh'}
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''} text-slate-600`} />
             </button>
           </div>
         </div>
 
-        {/* Overview KPI Panel - Full Width */}
-        <Panel title="Summary" className="bg-[#ffffff]">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-0 py-2 divide-x divide-transparent md:divide-border">
-            {quickMetrics.map((metric, idx) => (
-              <div key={idx} className={`oem-kpi-item group relative px-2 md:px-4 ${idx > 1 ? 'mt-2 md:mt-0' : ''}`}>
-                <span className="oem-kpi-label mb-0.5 md:mb-1 block text-[10px] md:text-[11px] truncate">{metric.label}</span>
-
-                {metric.isChart ? (
-                  <div className="h-[35px] md:h-[45px] w-full mt-1 pr-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={metric.data}>
-                        <defs>
-                          <linearGradient id="colorWeeklySales" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <Tooltip
-                          cursor={{ stroke: '#8884d8', strokeWidth: 1 }}
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              return (
-                                <div className="bg-slate-800 text-white text-[10px] py-1 px-2 rounded shadow-lg border border-slate-700">
-                                  <p className="font-bold mb-0.5">{payload[0].payload.name}</p>
-                                  <p>{payload[0].payload.displayValue}</p>
-                                </div>
-                              )
-                            }
-                            return null
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="value"
-                          stroke="#8884d8"
-                          fillOpacity={1}
-                          fill="url(#colorWeeklySales)"
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex flex-col md:flex-row md:items-baseline gap-0 md:gap-2">
-                      <span className="oem-kpi-value group-hover:text-oem-blue transition-colors text-lg md:text-2xl truncate">{metric.value}</span>
-                      <div className={`flex items-center text-[10px] md:text-[11px] font-bold ${metric.trend === 'up' ? 'text-oem-green' : 'text-oem-red'}`}>
-                        {metric.trend === 'up' ? '▲' : '▼'} {metric.trendValue}
-                      </div>
-                    </div>
-                    <p className="text-[9px] md:text-[10px] text-oem-text-secondary mt-0.5 md:mt-1 tracking-tight truncate hidden md:block">vs {metric.trendLabel}</p>
-                  </>
-                )}
+        {/* Global KPIs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Customers', value: stats?.totalClientsCount || 0, sub: `${stats?.clientGrowthVal}%`, icon: <Target className="w-5 h-5 text-slate-700" strokeWidth={1.5} /> },
+            { label: 'Active Customers', value: stats?.currentActiveClientsCount || 0, sub: `${((stats?.currentActiveClientsCount / (stats?.totalClientsCount || 1)) * 100).toFixed(0)}%`, icon: <Zap className="w-5 h-5 text-slate-700" strokeWidth={1.5} /> },
+            { label: 'Monthly Revenue', value: formatKoreanCurrency(stats?.currentMonthSalesTotal || 0), sub: `${stats?.revenueYoY}%`, icon: <Award className="w-5 h-5 text-slate-700" strokeWidth={1.5} /> }
+          ].map((kpi, i) => (
+            <div key={i} className="p-5 rounded-xl flex items-start justify-between relative overflow-hidden transition-all bg-white border border-slate-100 shadow-sm hover:shadow-md">
+              <div>
+                <p className="text-xs font-medium mb-1 text-slate-500">{kpi.label}</p>
+                <h3 className="text-2xl font-bold text-slate-900">{kpi.value}</h3>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-[10px] font-bold flex items-center gap-1 text-red-600"><TrendingUp className="w-3 h-3" />{kpi.sub}</span>
+                  <span className="text-[10px] font-medium text-slate-400">vs last year</span>
+                </div>
               </div>
-            ))}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">{kpi.icon}</div>
+            </div>
+          ))}
+
+          {/* 7-Day Trend */}
+          <div className="p-5 rounded-xl flex flex-col justify-between relative overflow-hidden transition-all bg-white border border-slate-100 shadow-sm hover:shadow-md">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-xs font-medium text-slate-500">7-Day Trend</p>
+              <div className="p-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100"><BarChart2 className="w-5 h-5" strokeWidth={1.5} /></div>
+            </div>
+            <div className="h-16 w-full relative mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weeklySalesData.length > 0 ? weeklySalesData : weeklyData}>
+                  <defs>
+                    <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#DC2626" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="value" stroke="#DC2626" strokeWidth={2} fillOpacity={1} fill="url(#colorTrend)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </Panel>
+        </div>
 
-        {/* Main 2-Column Layout - Adjusted to 50:50 split as requested */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* KPI Performance Tracker */}
+        <KPIWidget
+          rawSalesData={rawSalesData}
+          clients={clients}
+          activities={activities}
+          myAccounts={myAccounts}
+          salesRepName={getUserSalesRep}
+        />
 
-          {/* [Left Column - 50%] */}
-          <div className="col-span-12 lg:col-span-6 space-y-6">
+        {/* Middleware Section: AI Coach & Forecast */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+          <AIHeadline user={user} stats={stats} loading={loading} />
+          <RevenueForecastPanel />
+        </div>
 
-            <RevenueForecastPanel />
-
-            {/* Revenue Trend Chart (Changed to Bar Chart) */}
-            <Panel title="Revenue Trend (Last 12 Months)">
-              <div className="h-[320px] w-full pt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.aggregatedMonthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis
-                      dataKey="monthStr"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#999999', fontSize: 11 }}
-                      tickFormatter={(val) => val.split('-')[1] + 'M'}
-                      dy={10}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#999999', fontSize: 11 }}
-                      tickFormatter={(value) => {
-                        if (value >= 100000000) return (value / 100000000).toFixed(0) + '억'
-                        if (value >= 10000) return (value / 10000).toFixed(0) + '만'
-                        return value
-                      }}
-                    />
-                    <Tooltip
-                      cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ border: '1px solid #dce1e7', borderRadius: '2px', fontSize: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
-                      formatter={(value) => [formatKoreanCurrency(value), 'Revenue']}
-                    />
-                    <Bar
-                      dataKey="totalRevenue"
-                      fill="#0076ce"
-                      radius={[4, 4, 0, 0]}
-                      barSize={20}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+        {/* Lower Section: Dense Data Grids */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Fastest Growing Clients */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full overflow-hidden">
+            <div className="p-5 border-b border-slate-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-900">Fastest Growing Clients</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Top Performers by Growth Rate</p>
               </div>
-            </Panel>
-
-            {/* Fastest Growing Clients */}
-            <Panel title="Fastest Growing Clients (Top Performer)">
-              <div className="overflow-x-auto mt-2">
-                <table className="oem-table min-w-full table-fixed">
-                  <thead>
-                    <tr className="border-b border-oem-border bg-oem-bg-app/50">
-                      <th className="text-left pl-4 py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight">CLIENT</th>
-                      <th className="text-left py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[15%]">INDUSTRY</th>
-                      <th className="text-center py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[25%]">CURRENT_MONTH</th>
-                      <th className="text-center py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[15%]">GROWTH</th>
-                      <th className="text-center py-2 font-semibold text-[11px] text-oem-text-secondary tracking-tight w-[10%]">STATUS</th>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-white">
+                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Client Name</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sector</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Revenue (Mo)</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Growth</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {stats?.topGrowthClients?.map((client, idx) => (
+                    <tr key={idx} className="group hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-sm bg-gray-100 text-[9px] font-bold text-gray-500 flex items-center justify-center border border-gray-200">
+                            {client.name.substring(0, 1)}
+                          </div>
+                          <span className="text-[11px] font-bold text-gray-900">{client.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-[10px] text-gray-400 font-medium">{client.role || '-'}</td>
+                      <td className="py-3 px-4 text-[11px] font-bold text-gray-900 text-right tabular-nums">
+                        {formatKoreanCurrency(client.amount)}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <span className="inline-block px-1.5 py-0.5 rounded-sm bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100">
+                          +{client.growthRate?.toFixed(0)}%
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-oem-border">
-                    {stats.topGrowthClients.map((client, idx) => (
-                      <tr key={idx} className="hover:bg-oem-blue/5 transition-colors">
-                        <td className="py-2.5 pl-4 font-bold text-[12px] truncate" title={client.name}>{client.name}</td>
-                        <td className="py-2.5 text-[11px] text-oem-text-secondary truncate">{client.role && client.role !== 'Enterprise' ? client.role : '-'}</td>
-                        <td className="py-2.5 text-center font-bold text-[12px] tabular-nums text-oem-text-primary">{formatKoreanCurrency(client.amount)}</td>
-                        <td className="py-2.5 text-center font-bold text-[12px] tabular-nums">
-                          <span className="text-oem-green">+{client.growthRate.toFixed(0)}%</span>
-                        </td>
-                        <td className="py-2.5 text-center">
-                          {client.isTrueNew ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded-[2px] bg-oem-green/10 border border-oem-green/20 text-oem-green text-[10px] font-bold leading-none">NEW</span>
-                          ) : (
-                            <span className="inline-block px-1.5 py-0.5 rounded-[2px] bg-oem-blue/10 border border-oem-blue/20 text-oem-blue text-[10px] font-bold leading-none">UP</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Panel>
-
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* [Right Column - 50%] */}
-          <div className="col-span-12 lg:col-span-6 space-y-6">
-
-            {/* Top Revenue Clients */}
-            <Panel title="Top 5 Clients (Last Year)">
-              <div className="space-y-3 mt-1">
-                {(stats.topRevenueClients || []).map((client, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-white border border-oem-border rounded-oem hover:border-oem-blue transition-colors group cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs ${idx === 0 ? 'bg-amber-400' : idx === 1 ? 'bg-slate-300' : idx === 2 ? 'bg-orange-400' : 'bg-slate-200'
-                        }`}>
-                        {idx + 1}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-oem-text-primary group-hover:text-oem-blue transition-colors">
-                          {client.name}
-                        </p>
-                        <p className="text-[10px] text-oem-text-secondary font-medium uppercase tracking-tight">Main Contributor</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-oem-text-primary">{formatKoreanCurrency(client.total)}</p>
-                      <p className="text-[10px] text-oem-green font-bold">TOTAL_REVENUE</p>
-                    </div>
-                  </div>
-                ))}
+          {/* Priority Issues */}
+          <div className="flex flex-col gap-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
+              <div className="p-5 border-b border-slate-50 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-900">Priority Issues</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Pending Actions & Alerts</p>
+                </div>
               </div>
-              <button onClick={() => navigate('/clients')} className="w-full mt-4 oem-btn-secondary text-[11px] font-bold py-1.5 hover:bg-oem-bg-header transition-colors">
-                VIEW_ALL_CLIENTS
-              </button>
-            </Panel>
-
-            {/* [NEW] Issue Tracker Panel */}
-            <Panel title="Issue Tracker">
-              <div className="pt-2">
+              <div>
                 <IssueTracker maxItems={3} />
               </div>
-            </Panel>
+            </div>
+          </div>
+        </div>
 
-            <Panel title="My Activities (Timeline)">
-              <div className="space-y-4 py-2 mt-2">
-                {(activities || [])
-                  .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by date descending
-                  .slice(0, 5)
-                  .map((act) => {
-                    // Icon Mapping
-                    let Icon = Users
-                    let iconBg = 'bg-blue-100'
-                    let iconColor = 'text-blue-600'
-
-                    switch (act.type) {
-                      case '전화': Icon = Phone; iconBg = 'bg-green-100'; iconColor = 'text-green-600'; break;
-                      case '이메일': Icon = Mail; iconBg = 'bg-purple-100'; iconColor = 'text-purple-600'; break;
-                      case '제안서': Icon = FileText; iconBg = 'bg-orange-100'; iconColor = 'text-orange-600'; break;
-                      case '견적': Icon = DollarSign; iconBg = 'bg-amber-100'; iconColor = 'text-amber-600'; break;
-                      case '계약': Icon = CheckCircle; iconBg = 'bg-teal-100'; iconColor = 'text-teal-600'; break;
-                      default: break; // '미팅' defaults
-                    }
-
-                    return (
-                      <div
-                        key={act.id}
-                        className="relative flex gap-3 group cursor-pointer p-2 rounded hover:bg-gray-50 transition-colors border-l-2 border-transparent hover:border-l-oem-blue pl-2"
-                        onClick={() => setEditingActivityId(act.id)}
-                      >
-                        {/* Icon Box */}
-                        <div className={`mt-0.5 w-8 h-8 rounded flex-shrink-0 flex items-center justify-center ${iconBg} ${iconColor}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[10px] font-bold text-oem-text-secondary uppercase tracking-wider bg-gray-100 px-1.5 py-0.5 rounded">
-                              {act.type || 'Activity'}
-                            </span>
-                            <span className="text-[10px] text-oem-text-secondary whitespace-nowrap ml-2">
-                              {new Date(act.date).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          <p className="text-sm font-bold text-oem-text-primary mt-1 line-clamp-1 group-hover:text-oem-blue transition-colors">
-                            {act.title || act.clientName}
-                          </p>
-
-                          {/* Client Name & Desc */}
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <span className="text-[11px] text-oem-text-secondary font-medium truncate">@{act.clientName}</span>
-                          </div>
-
-                          <p className="text-[11px] text-gray-500 mt-1.5 line-clamp-2 leading-relaxed">
-                            {act.description || "No details provided."}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  })}
-
-                {(activities || []).length === 0 && (
-                  <div className="text-center py-8 text-gray-400 text-xs italic">
-                    No recent activities found.
-                  </div>
-                )}
+        {/* Footer Timeline & Key Accounts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20 mt-6">
+          <div className="rounded-xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
+            <div className="p-5 flex items-center justify-between border-b border-slate-50">
+              <div>
+                <h3 className="font-semibold text-slate-900">Recent Activities</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Timeline of Interactions</p>
               </div>
-              <Link to="/activities" className="block text-center text-[11px] font-bold text-oem-text-link mt-4 pt-4 border-t border-dashed border-gray-200 hover:underline">
-                OPEN_FULL_TIMELINE →
+            </div>
+            <div className="p-0">
+              <ActivityTimeline maxItems={5} />
+            </div>
+            <div className="p-4 text-center border-t border-slate-50">
+              <Link to="/activities" className="text-xs font-medium flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
+                View Full Timeline <ChevronRight className="w-4 h-4" />
               </Link>
-            </Panel>
-
+            </div>
           </div>
 
+          <div className="rounded-xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
+            <div className="p-5 flex items-center justify-between border-b border-slate-50">
+              <div>
+                <h3 className="font-semibold text-slate-900">Key Accounts</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Top Revenue Contributors</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse">
+                <tbody>
+                  {stats?.topRevenueClients?.slice(0, 5).map((client, idx) => (
+                    <tr key={idx} className="group hover:bg-slate-50 border-b border-slate-50 last:border-0 transition-colors">
+                      <td className="py-4 px-4 w-12 text-center">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${idx < 3 ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                          {idx + 1}
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className="text-[12px] font-semibold block mb-0.5 text-slate-900">{client.name}</span>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Total Sales Volume</span>
+                      </td>
+                      <td className="py-4 px-4 text-right">
+                        <span className="text-[12px] font-bold block tabular-nums text-slate-900">{formatKoreanCurrency(client.total)}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="p-4 text-center border-t border-slate-50">
+              <Link to="/my-accounts" className="text-xs font-medium flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
+                Manage All Accounts <ChevronRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <EditActivityModal
-        isOpen={editingActivityId !== null}
-        onClose={() => setEditingActivityId(null)}
-        activityId={editingActivityId}
-      />
-      <AppInstallGuide />
+        <EditActivityModal
+          isOpen={editingActivityId !== null}
+          onClose={() => setEditingActivityId(null)}
+          activityId={editingActivityId}
+        />
+      </div>
     </div>
   )
 }
