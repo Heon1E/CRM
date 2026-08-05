@@ -199,7 +199,7 @@ const Activities = () => {
                     </div>
 
                     {/* Timeline Interaction Table (Desktop) */}
-                    <table className="oem-table min-w-full hidden md:table">
+                    <table className="dgrid min-w-full">
                       <tbody>
                         {dateActivities.map((activity) => (
                           <tr key={activity.id} onClick={() => setEditingActivityId(activity.id)} className="group cursor-pointer">
@@ -234,7 +234,7 @@ const Activities = () => {
                     </table>
 
                     {/* Timeline Interaction List (Mobile) */}
-                    <div className="md:hidden divide-y divide-oem-border">
+                    <div className="hidden">
                       {dateActivities.map((activity) => (
                         <div key={activity.id} onClick={() => setEditingActivityId(activity.id)} className="p-4 bg-white active:bg-gray-50 transition-colors cursor-pointer">
                           <div className="flex justify-between items-start mb-2">

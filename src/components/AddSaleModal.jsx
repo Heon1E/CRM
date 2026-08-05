@@ -8,7 +8,7 @@ import useEnterMove from '../hooks/useEnterMove'
 import { supabase } from '../lib/supabase'
 import { showWarning, showSuccess, showError } from '../utils/alert'
 
-const AddSaleModal = ({ isOpen, onClose }) => {
+const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
   const { clients, products, addSale, addClient } = useData()
   const formRef = useRef(null)
 
@@ -364,7 +364,7 @@ const AddSaleModal = ({ isOpen, onClose }) => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="RECORD_ENTRY: SALES_TRANS" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="매출 등록" size="lg" docked={docked}>
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">

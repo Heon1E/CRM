@@ -6,47 +6,51 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // 웹폰트를 쓰지 않는다. 설치된 PC 프로그램처럼 보이게 하는 핵심 요소.
+        sans: ['"Segoe UI"', '"Malgun Gothic"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        data: ['Consolas', '"Cascadia Mono"', '"D2Coding"', 'monospace'],
+      },
       colors: {
-        // DESIGN.md 토큰. index.css의 CSS 변수와 값이 일치해야 한다.
-        // oem-* 이름은 기존 컴포넌트가 쓰고 있어 유지하고, 값만 브랜드에 맞춘다.
+        // 데스크톱 업무화면 토큰. index.css의 CSS 변수와 값이 일치해야 한다.
+        // oem-* 이름은 기존 컴포넌트가 쓰고 있어 유지하고, 값만 맞춘다.
         oem: {
           bg: {
-            app: '#f7f8fa',
+            app: '#eceef1',
             panel: '#ffffff',
-            header: '#ffffff',
+            header: '#e4e7eb',
           },
-          border: '#e6e8ee',
+          border: '#b9bec7',
           text: {
-            primary: '#12141a',
-            secondary: '#5a6072',
-            link: '#833CF6',      // Primary Indigo Purple
+            primary: '#16191d',
+            secondary: '#5b626c',
+            link: '#c74634',      // Oracle 계열 붉은색
           },
-          red: '#dc2626',
-          'red-dark': '#b91c1c',
+          red: '#c0392b',
+          'red-dark': '#8f2a1e',
           // oem-blue는 17개 파일에서 123번 쓰이는데 설정에 없어 그동안 전부 무효였다.
-          // (bg-oem-blue가 투명해지면서 흰 글씨만 남아 안 보이는 곳이 있었다)
-          // 이름은 legacy지만 값은 브랜드 색에 맞춘다.
-          blue: '#833CF6',
-          'blue-dark': '#6d28d9',
+          // 이름은 legacy지만 값은 강조색에 맞춘다.
+          blue: '#c74634',
+          'blue-dark': '#a3341f',
           grey: {
-            light: '#f1f3f7',
-            medium: '#e6e8ee',
+            light: '#f7f8fa',
+            medium: '#d6dae0',
           }
         },
         brand: {
-          DEFAULT: '#833CF6',
-          dark: '#6d28d9',
-          light: '#9b62f8',
-          subtle: '#f5f3ff',
+          DEFAULT: '#c74634',
+          dark: '#a3341f',
+          light: '#d8695a',
+          subtle: '#fbeeeb',
         },
         primary: {
-          50: '#f5f3ff',
-          500: '#833CF6',
-          600: '#6d28d9',
+          50: '#fbeeeb',
+          500: '#c74634',
+          600: '#a3341f',
         }
       },
       borderRadius: {
-        'oem': '8px', // DESIGN.md: ROUND_EIGHT
+        'oem': '2px', // 데스크톱 프로그램 느낌
       },
       minHeight: {
         'tap': '44px', // 터치 최소 영역

@@ -425,8 +425,8 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-3">
                     <h2 className="text-base font-black" style={{ color: 'var(--text-primary)' }}>KPI Performance</h2>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ color: 'var(--text-muted)', backgroundColor: 'var(--border)' }}>
-                        Week {currentWeek} / {totalWeeks}
+                    <span className="text-[10px] font-bold px-2 py-0.5" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontFamily: 'var(--font-data)' }}>
+                        {currentWeek}주차 / {totalWeeks}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">

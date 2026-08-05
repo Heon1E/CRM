@@ -286,7 +286,7 @@ const Clients = () => {
           <div>
             <h1 className="text-xl font-bold tracking-tight flex items-center gap-2" style={{ color: 'var(--accent-light)' }}>
               Customers Maintenance
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-normal" style={{ backgroundColor: 'var(--border)', color: 'var(--text-muted)' }}>FORM: CLIENT_01</span>
+              <span className="text-[10px] px-2 py-0.5 font-normal" style={{ backgroundColor: 'var(--bg-header)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontFamily: 'var(--font-data)' }}>CLIENT</span>
             </h1>
             <p className="text-[11px] text-oem-text-secondary mt-1 font-medium">
               Manage enterprise clients and their primary contact information. Total Records: <span className="text-oem-blue font-bold">{totalCount}</span>
@@ -342,8 +342,8 @@ const Clients = () => {
             </div>
           </div>
 
-          {/* Mobile Card View (md:hidden) */}
-          <div className="md:hidden space-y-3">
+          {/* 폰에서도 PC와 같은 표를 쓴다 (사용자 요청) — 카드 뷰는 숨긴다 */}
+          <div className="hidden">
             {Object.keys(visibleGroupedClients).length > 0 ? (
               Object.keys(visibleGroupedClients).map((company) => {
                 const visibleClients = visibleGroupedClients[company]
@@ -414,8 +414,8 @@ const Clients = () => {
             )}
           </div>
 
-          {/* Desktop Table View (hidden md:block) */}
-          <div className="hidden md:flex gap-6 h-[calc(100vh-200px)]">
+          {/* 목록 — 폰/PC 동일 */}
+          <div className="flex gap-6 h-[calc(100vh-200px)]">
             {/* Left List Pane */}
             <div className={`${selectedClientId ? 'w-1/2' : 'w-full'} transition-all duration-300 flex flex-col`}>
               <div className="flex-1 overflow-y-auto border border-oem-border rounded-lg bg-white">
@@ -432,10 +432,10 @@ const Clients = () => {
                       </th>
                       <th className="w-12 text-center py-2">SEQ</th>
                       <th className="w-80 py-2">COMPANY_NAME</th>
-                      {!selectedClientId && <th className="py-2 hidden md:table-cell">CONTACT_METADATA</th>}
+                      {!selectedClientId && <th className="py-2 ">CONTACT_METADATA</th>}
                       <th className="w-24 py-2 text-center">STATUS</th>
-                      {!selectedClientId && <th className="w-32 py-2 hidden md:table-cell">LAST_TX_DATE</th>}
-                      <th className="w-32 text-right py-2 pr-4 hidden md:table-cell">HISTORICAL_REV</th>
+                      {!selectedClientId && <th className="w-32 py-2 ">LAST_TX_DATE</th>}
+                      <th className="w-32 text-right py-2 pr-4 ">HISTORICAL_REV</th>
                       <th className="w-20 text-center py-2">ACTIONS</th>
                     </tr>
                   </thead>
@@ -473,7 +473,7 @@ const Clients = () => {
                               )}
                             </td>
                             {!selectedClientId && (
-                              <td className="py-3 hidden md:table-cell">
+                              <td className="py-3 ">
                                 <div className="flex flex-col gap-0.5">
                                   <span className="font-medium">{primaryContact?.contact_person || 'UNASSIGNED'}</span>
                                   <span className="text-[10px] text-oem-text-secondary italic">{primaryContact?.email || '-'}</span>
@@ -489,12 +489,12 @@ const Clients = () => {
                               </span>
                             </td>
                             {!selectedClientId && (
-                              <td className="text-oem-text-secondary font-medium py-3 hidden md:table-cell">
+                              <td className="text-oem-text-secondary font-medium py-3 ">
                                 {stats.lastOrder ? stats.lastOrder.split('T')[0] : 'NO_RECORDS'}
                               </td>
                             )}
                             {!selectedClientId && (
-                              <td className="text-right font-bold text-oem-text-primary py-3 pr-4 hidden md:table-cell">
+                              <td className="text-right font-bold text-oem-text-primary py-3 pr-4 ">
                                 {stats.totalAmount === 0 ? '-' : formatKoreanCurrency(stats.totalAmount)}
                               </td>
                             )}

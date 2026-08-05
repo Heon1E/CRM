@@ -8,7 +8,7 @@ import useEnterMove from '../hooks/useEnterMove'
 import { supabase } from '../lib/supabase'
 import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 
-const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
+const EditSaleModal = ({ isOpen, onClose, saleGroup , docked = false }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { clients, products, updateSale, deleteSale, addClient } = useData()
   const formRef = useRef(null)
@@ -471,89 +471,67 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="매출 수정" size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              거래처 <span className="text-red-400">*</span>
-            </label>
+    <Modal isOpen={isOpen} onClose={onClose} title="매출 수정" size="lg" docked={docked}>
+      <form ref={formRef} onSubmit={handleSubmit}>
+        {/* 머리 정보 — 라벨을 왼쪽에 두어 세로 공간을 아낀다 */}
+        <div className="fields">
+          <div className="f">
+            <label>거래처 <span className="req">*</span></label>
             <ClientCombobox
               clients={clients || []}
               value={formData.clientId}
               onSelect={(id) => handleClientChange(id)}
               onNewClient={handleNewClient}
-              placeholder="거래처 검색 또는 신규 입력..."
+              placeholder="거래처 검색 또는 신규 입력"
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              날짜 <span className="text-red-400">*</span>
-            </label>
+          <div className="f">
+            <label htmlFor="edit-sale-date">날짜 <span className="req">*</span></label>
             <input
+              id="edit-sale-date"
               type="date"
               value={formData.sale_date || ''}
               onChange={(e) => handleSaleDateChange(e.target.value || '')}
-              className="input-field"
               required
             />
           </div>
         </div>
 
-        {/* 품목 리스트 */}
-        <div>
-          <div className="flex justify-between items-center mb-3">
-            <label className="block text-sm font-medium text-gray-700">
-              품목 <span className="text-red-400">*</span>
-            </label>
-            <button
-              type="button"
-              onClick={addItem}
-              className="text-sm text-purple-600 hover:text-purple-700 font-medium flex items-center space-x-1 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>품목 추가</span>
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            {formData.items.map((item, index) => {
-              const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-
-              return (
-                <div key={index} className="border border-slate-200 rounded-lg p-4 bg-white shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-sm font-medium text-gray-700">품목 {index + 1}</span>
-                    {formData.items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeItem(index)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="relative z-50" data-product-index={index}>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">품목명</label>
-                      <ProductCombobox
-                        products={products || []}
-                        value={item.productId || ''}
-                        onSelect={(productId) => handleProductSelect(index, productId)}
-                        placeholder={formData.clientId ? '품목을 검색하세요...' : '먼저 거래처를 선택하세요'}
-                        disabled={!formData.clientId}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">수량</label>
+        {/* 품목 — 카드가 아니라 표로 입력한다. 한 줄이 한 품목. */}
+        <div className="lines">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: '32px' }}>#</th>
+                <th>품목명</th>
+                <th style={{ width: '80px' }}>수량</th>
+                <th style={{ width: '110px' }}>단가</th>
+                <th style={{ width: '120px' }}>공급가액</th>
+                <th style={{ width: '40px' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {formData.items.map((item, index) => {
+                const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+                return (
+                  <tr key={index}>
+                    <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-data)' }}>
+                      {index + 1}
+                    </td>
+                    <td style={{ padding: '2px 4px' }}>
+                      <div className="relative z-50" data-product-index={index}>
+                        <ProductCombobox
+                          products={products || []}
+                          value={item.productId || ''}
+                          onSelect={(productId) => handleProductSelect(index, productId)}
+                          placeholder={formData.clientId ? '품목 검색' : '먼저 거래처를 선택하세요'}
+                          disabled={!formData.clientId}
+                        />
+                      </div>
+                    </td>
+                    <td className="num">
                       <input
-                        ref={(el) => {
-                          if (el) quantityInputRefs.current[`quantity-${index}`] = el
-                        }}
+                        ref={(el) => { if (el) quantityInputRefs.current[`quantity-${index}`] = el }}
                         type="number"
                         value={item.quantity === '' ? '' : item.quantity}
                         onChange={(e) => handleQuantityChange(index, e.target.value)}
@@ -561,95 +539,77 @@ const EditSaleModal = ({ isOpen, onClose, saleGroup }) => {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            const unitPriceInput = unitPriceInputRefs.current[`unitPrice-${index}`]
-                            if (unitPriceInput) {
-                              unitPriceInput.focus()
-                              unitPriceInput.select()
-                            }
+                            const el = unitPriceInputRefs.current[`unitPrice-${index}`]
+                            if (el) { el.focus(); el.select() }
                           }
                         }}
-                        className="input-field text-sm"
                         min="1"
                         required
+                        aria-label={`품목 ${index + 1} 수량`}
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">단가 (원)</label>
+                    </td>
+                    <td className="num">
                       <input
-                        ref={(el) => {
-                          if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el
-                        }}
+                        ref={(el) => { if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el }}
                         type="number"
                         value={item.unitPrice === '' ? '' : item.unitPrice}
                         onChange={(e) => handleUnitPriceChange(index, e.target.value)}
                         onBlur={() => handleUnitPriceBlur(index)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            addItem(true)
-                          }
+                          if (e.key === 'Enter') { e.preventDefault(); addItem(true) }
                         }}
-                        className="input-field text-sm"
                         min="0"
                         required
+                        aria-label={`품목 ${index + 1} 단가`}
                       />
-                    </div>
-                  </div>
+                    </td>
+                    <td className="num" style={{ padding: '3px 7px', color: 'var(--text-secondary)' }}>
+                      {itemTotal.toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {formData.items.length > 1 && (
+                        <button type="button" className="rowbtn danger" onClick={() => removeItem(index)}
+                          aria-label={`품목 ${index + 1} 삭제`}>×</button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="4" style={{ textAlign: 'right' }}>총 매출액</td>
+                <td className="num" style={{ fontFamily: 'var(--font-data)', fontSize: '13px' }}>
+                  {totalAmount.toLocaleString()}
+                </td>
+                <td>
+                  <button type="button" className="rowbtn" onClick={() => addItem()} title="품목 추가">+</button>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
 
-                  <div className="mt-2 text-right">
-                    <span className="text-sm font-medium text-gray-900">
-                      공급가액: {itemTotal.toLocaleString()}원
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
+        <div className="fields one">
+          <div className="f">
+            <label htmlFor="edit-sale-notes">비고</label>
+            <input
+              id="edit-sale-notes"
+              type="text"
+              value={formData.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value || '' })}
+              placeholder="(선택)"
+            />
           </div>
         </div>
 
-        {/* 총액 */}
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-gray-900">총 매출액</span>
-            <span className="text-xl font-bold text-purple-600">{totalAmount.toLocaleString()}원</span>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">비고</label>
-          <textarea
-            value={formData.notes || ''}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value || '' })}
-            rows={3}
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-            placeholder="비고 사항을 입력하세요"
-          />
-        </div>
-
-        <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="px-5 py-2.5 bg-white text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition-all duration-200 font-bold shadow-sm"
-          >
-            삭제
-          </button>
-          <div className="flex space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 bg-white text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-all duration-200 font-bold shadow-sm"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-all duration-200 font-medium shadow-sm hover:shadow"
-            >
-              저장
-            </button>
-          </div>
+        <div className="editor-foot">
+          <button type="submit" className="tb-btn primary">저장 <kbd>Ctrl+S</kbd></button>
+          <button type="button" className="tb-btn" onClick={onClose}>취소 <kbd>Esc</kbd></button>
+          <span className="tb-sep" />
+          <button type="button" className="tb-btn danger" onClick={handleDelete}>삭제</button>
+          <span className="flex-1" />
+          <span className="hint"><kbd>Enter</kbd> 다음 칸 · 단가에서 <kbd>Enter</kbd> 시 품목 줄 추가</span>
         </div>
       </form>
     </Modal>

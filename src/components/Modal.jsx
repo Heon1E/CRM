@@ -1,7 +1,12 @@
 import React from 'react'
 import { X } from 'lucide-react'
 
-const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
+/**
+ * @param {boolean} docked - true면 화면 가운데 뜨는 창이 아니라, 놓인 자리에
+ *   그대로 붙는 편집 영역으로 그린다. 목록을 가리지 않고 어느 행을 고치는 중인지
+ *   계속 보이므로, 매출처럼 목록↔수정을 반복하는 화면에서 쓴다.
+ */
+const Modal = ({ isOpen, onClose, title, children, size = 'md', docked = false, meta = null }) => {
   if (!isOpen) return null
 
   const sizeClasses = {
@@ -9,6 +14,23 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     md: 'max-w-2xl',
     lg: 'max-w-4xl',
     xl: 'max-w-6xl',
+  }
+
+  if (docked) {
+    return (
+      <div className="editor">
+        <div className="editor-head">
+          <span>{title}</span>
+          <span className="flex items-center gap-3">
+            {meta && <span className="rec">{meta}</span>}
+            <button onClick={onClose} className="icon-btn" title="닫기 (Esc)" aria-label="닫기">
+              <X className="w-4 h-4" />
+            </button>
+          </span>
+        </div>
+        <div>{children}</div>
+      </div>
+    )
   }
 
   return (

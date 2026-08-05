@@ -109,98 +109,38 @@ const Products = () => {
       </div>
 
       <div className="card overflow-hidden">
-        {/* --- 데스크톱: 표 --- */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full">
-            <thead style={{ backgroundColor: 'var(--bg-subtle)' }}>
+        <div className="grid-scroll">
+          <table className="dgrid">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>품목명</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>종류</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>규격</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>관리</th>
+                <th>품목명</th>
+                <th style={{ width: '160px' }}>종류</th>
+                <th style={{ width: '160px' }}>규격</th>
+                <th style={{ width: '86px' }}>관리</th>
               </tr>
             </thead>
-            <tbody className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
+            <tbody>
               {products.length > 0 ? (
                 products.map((product) => (
-                  <tr key={product.id} className="table-row-hover transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{product.name || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>{product.type || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>{product.standard || '-'}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setEditingProductId(product.id)}
-                          className="icon-btn"
-                          title="수정"
-                          aria-label="제품 수정"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          className="icon-btn icon-btn-danger"
-                          title="삭제"
-                          aria-label="제품 삭제"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                  <tr key={product.id} onDoubleClick={() => setEditingProductId(product.id)}>
+                    <td style={{ fontWeight: 600 }}>{product.name || '-'}</td>
+                    <td>{product.type || '-'}</td>
+                    <td>{product.standard || '-'}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button className="rowbtn" onClick={() => setEditingProductId(product.id)}>수정</button>
+                      <button className="rowbtn danger" onClick={() => handleDelete(product.id)}>삭제</button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center" style={{ color: 'var(--text-muted)' }}>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
                     등록된 제품이 없습니다.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-
-        {/* --- 모바일: 카드 --- */}
-        <div className="md:hidden p-3">
-          {products.length > 0 ? (
-            products.map((product) => (
-              <div key={product.id} className="data-card">
-                <p className="font-semibold text-[15px]" style={{ color: 'var(--text-primary)' }}>
-                  {product.name || '-'}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-                  <span className="data-card__label">종류 <span className="data-card__value">{product.type || '-'}</span></span>
-                  <span className="data-card__label">규격 <span className="data-card__value">{product.standard || '-'}</span></span>
-                </div>
-                <div className="mt-3 pt-3 border-t flex gap-2" style={{ borderColor: 'var(--border-light)' }}>
-                  <button
-                    onClick={() => setEditingProductId(product.id)}
-                    className="flex-1 min-h-tap flex items-center justify-center gap-1.5 rounded-lg border text-[14px] font-semibold"
-                    style={{ borderColor: 'var(--border-strong)', color: 'var(--text-primary)' }}
-                  >
-                    <Edit className="w-4 h-4" /> 수정
-                  </button>
-                  <button
-                    onClick={() => handleDelete(product.id)}
-                    className="min-h-tap px-4 flex items-center justify-center gap-1.5 rounded-lg border text-[14px] font-semibold"
-                    style={{ borderColor: 'rgba(220,38,38,0.2)', color: 'var(--danger)' }}
-                  >
-                    <Trash2 className="w-4 h-4" /> 삭제
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-              등록된 제품이 없습니다.
-            </p>
-          )}
         </div>
         {/* Pagination */}
         <Pagination
