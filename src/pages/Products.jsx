@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Edit, Plus, Trash2 } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseConfigError } from '../lib/supabase'
 import AddProductModal from '../components/AddProductModal'
 import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
@@ -38,7 +38,9 @@ const Products = () => {
       setTotalCount(count || 0)
     } catch (error) {
       console.error('제품 데이터 로드 오류:', error)
-      showError('제품 데이터를 불러오는 중 오류가 발생했습니다.')
+      showError(supabaseConfigError
+        ? `서버 연결 설정이 누락되었습니다 (${supabaseConfigError}). 배포 환경변수를 확인해 주세요.`
+        : '제품 데이터를 불러오는 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }

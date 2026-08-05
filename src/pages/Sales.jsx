@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Edit, Download, Plus, Trash2, Search, RefreshCw, FileText } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseConfigError } from '../lib/supabase'
 import AddSaleModal from '../components/AddSaleModal'
 import EditSaleModal from '../components/EditSaleModal'
 import Pagination from '../components/common/Pagination'
@@ -74,7 +74,10 @@ const Sales = () => {
 
     } catch (error) {
       console.error('매출 데이터 로드 오류:', error)
-      showError('매출 데이터를 불러오는 중 오류가 발생했습니다.')
+      // 환경변수가 빠지면 조회가 전부 실패한다. 그 경우 원인을 그대로 알려준다.
+      showError(supabaseConfigError
+        ? `서버 연결 설정이 누락되었습니다 (${supabaseConfigError}). 배포 환경변수를 확인해 주세요.`
+        : '매출 데이터를 불러오는 중 오류가 발생했습니다.')
     } finally {
       setLocalLoading(false)
     }
