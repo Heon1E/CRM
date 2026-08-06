@@ -199,3 +199,40 @@ export function categorizeClients(managedClientIds, clients, rawSalesData, curre
 
     return result
 }
+
+// ---------------------------------------------------------------------------
+// 수동 입력 KPI
+//
+// EBITDA(영업이익)와 채권관리는 CRM에 원천 데이터가 없다. 자동 계산이 불가능한데
+// 0으로 두면 '미흡'으로 잡혀 총점이 부당하게 깎인다. 그래서 값을 직접 입력받고,
+// 입력 전에는 '미입력'으로 두어 총점 계산에서 제외한다.
+// ---------------------------------------------------------------------------
+const MANUAL_KEY = 'kpi_manual_inputs'
+
+/** @returns {Object} { ebitda?: number, receivables?: number } */
+export function getKpiManualInputs() {
+    try {
+        const stored = localStorage.getItem(MANUAL_KEY)
+        return stored ? JSON.parse(stored) : {}
+    } catch {
+        return {}
+    }
+}
+
+/**
+ * 수동 입력값을 저장한다. 빈 값이면 '미입력'으로 되돌린다.
+ * @param {string} field - 'ebitda' | 'receivables'
+ * @param {string|number|null} value
+ * @returns {Object} 갱신된 전체 입력값
+ */
+export function setKpiManualInput(field, value) {
+    const inputs = getKpiManualInputs()
+    const num = Number(value)
+    if (value === '' || value === null || value === undefined || !Number.isFinite(num)) {
+        delete inputs[field]
+    } else {
+        inputs[field] = num
+    }
+    localStorage.setItem(MANUAL_KEY, JSON.stringify(inputs))
+    return inputs
+}

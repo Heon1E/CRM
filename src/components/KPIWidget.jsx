@@ -3,10 +3,10 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     Cell, ReferenceLine, ResponsiveContainer
 } from 'recharts'
-import { Target, TrendingUp, Users, UserPlus, MapPin } from 'lucide-react'
+import { Target, TrendingUp, Users, UserPlus, MapPin, FileWarning } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useI18n } from '../contexts/I18nContext'
-import { getKpiExclusions, toggleKpiExclusion, isExcludedFrom, KPI_EXCLUSION_KINDS } from '../utils/kpiCategories'
+import { getKpiExclusions, toggleKpiExclusion, isExcludedFrom, KPI_EXCLUSION_KINDS, getKpiManualInputs, setKpiManualInput } from '../utils/kpiCategories'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -21,15 +21,67 @@ function getISOWeekNumber(date) {
 const totalWeeks = 52
 
 // ---------------------------------------------------------------------------
-// Grade helper
+// 공식 KPI 기준 (2026년간 KPI 표)
 // ---------------------------------------------------------------------------
+
+/**
+ * 등급 구간. 기준표의 헤더와 동일하다.
+ *   탁월 120~ / 우수 110~ / 양호(계획) 100~ / 보통 90~ / 미흡 80~
+ *
+ * [수정] 예전에는 S≥110 / A≥100 / B≥80 / C≥60 으로 되어 있어 등급이
+ * 한 칸씩 후하게 나왔다. 110%면 기준표상 '우수'인데 '탁월'로 표시됐다.
+ */
 function getGradeInfo(percent) {
     const p = Number(percent) || 0
-    if (p >= 110) return { grade: 'S', color: '#6D28D9', barColor: '#8B5CF6', bgColor: '#EDE9FE' }
-    if (p >= 100) return { grade: 'A', color: '#B91C1C', barColor: '#DC2626', bgColor: '#FEF2F2' }
-    if (p >= 80) return { grade: 'B', color: '#1D4ED8', barColor: '#3B82F6', bgColor: '#DBEAFE' }
-    if (p >= 60) return { grade: 'C', color: '#B45309', barColor: '#F59E0B', bgColor: '#FEF3C7' }
-    return { grade: 'D', color: '#B91C1C', barColor: '#EF4444', bgColor: '#FEE2E2' }
+    if (p >= 120) return { grade: '탁월', color: '#6D28D9', barColor: '#8B5CF6', bgColor: '#EDE9FE' }
+    if (p >= 110) return { grade: '우수', color: '#1D4ED8', barColor: '#3B82F6', bgColor: '#DBEAFE' }
+    if (p >= 100) return { grade: '양호', color: '#1C6B3C', barColor: '#22A05B', bgColor: '#E3F5EA' }
+    if (p >= 90) return { grade: '보통', color: '#B45309', barColor: '#F59E0B', bgColor: '#FEF3C7' }
+    return { grade: '미흡', color: '#B91C1C', barColor: '#EF4444', bgColor: '#FEE2E2' }
+}
+
+/**
+ * 기준표의 구간을 그대로 옮긴 것. [기준값, 환산%] 를 높은 순으로 둔다.
+ * 값이 어느 구간 이상이면 그 구간의 환산율을 준다.
+ *
+ * 기준이 바뀌면 이 표만 고치면 된다.
+ */
+export const KPI_BANDS = {
+    // 수익성 — 2026년 EBITDA 목표달성율 (억원). 계획 15억이 '양호'
+    ebitda: [[18, 120], [16, 110], [15, 100], [12, 90]],
+    // 부문기여 — 25년대비 26년 판매상승률 (%)
+    salesGrowth: [[20, 120], [10, 110], [0, 100], [-10, 90]],
+    // 고객관리 — 기존고객 및 단절고객 편입 (건). 0건이 '양호'다
+    clientMgmt: [[2, 120], [1, 110], [0, 100], [-1, 90]],
+    // 신규고객 발굴 — 매출발생 기준 (건)
+    newClients: [[5, 120], [4, 110], [3, 100], [1, 90]],
+    // 정기적 방문횟수 — 연간 기준 (건)
+    visits: [[310, 120], [270, 110], [240, 100], [210, 90]],
+    // 채권관리 — 연간 기준 (건). 적을수록 좋다 (0건이 '양호')
+    receivables: [[0, 100], [1, 90]],
+}
+
+/** 미흡 구간(가장 낮은 기준 미만)의 환산율 */
+const BAND_FLOOR = 80
+
+/**
+ * 값을 기준표 구간에 따라 환산율로 바꾼다.
+ * @param {number} value
+ * @param {Array<[number, number]>} bands - [기준값, 환산%] 내림차순
+ * @param {boolean} lowerIsBetter - 채권관리처럼 적을수록 좋은 항목
+ */
+export function bandScore(value, bands, lowerIsBetter = false) {
+    // 미입력을 0으로 보면 안 된다. Number(null)/Number('')는 0이라
+    // 그냥 Number()로 받으면 '미입력'이 '미흡(80%)'으로 잡혀 총점이 깎인다.
+    if (value === null || value === undefined || value === '') return null
+    const v = Number(value)
+    if (!Number.isFinite(v)) return null
+    if (lowerIsBetter) {
+        for (const [threshold, pct] of bands) if (v <= threshold) return pct
+        return BAND_FLOOR
+    }
+    for (const [threshold, pct] of bands) if (v >= threshold) return pct
+    return BAND_FLOOR
 }
 
 // Check monthly revenue >= 2M KRW
@@ -143,6 +195,10 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     //   - \ud3d0\uc5c5/\uc0c1\ud638\ubcc0\uacbd     -> \ub2e8\uc808\uace0\uac1d \ud3b8\uc785\uc5d0\uc11c\ub9cc \uc81c\uc678
     const [exclusions, setExclusions] = useState(() => getKpiExclusions())
 
+    // EBITDA·채권관리는 CRM에 자료가 없어 직접 입력받는다
+    const [manual, setManual] = useState(() => getKpiManualInputs())
+    const updateManual = (field, value) => setManual(setKpiManualInput(field, value))
+
     const toggleExclusion = (clientId, kind) => {
         setExclusions(toggleKpiExclusion(clientId, kind))
     }
@@ -201,7 +257,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         const salesGrowthRate = myClientSalesLastYearSamePeriod > 0
             ? Math.round(((myClientSalesThisYear - myClientSalesLastYearSamePeriod) / myClientSalesLastYearSamePeriod) * 100)
             : 0
-        const salesGrowthPercent = Math.min(Math.max(salesGrowthRate + 100, 0), 150)
+        const salesGrowthPercent = bandScore(salesGrowthRate, KPI_BANDS.salesGrowth)
 
         // 3. 단절 / 편입 판정
         //
@@ -267,7 +323,9 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         )
         const qualifiedNewIds = newClientIds.filter(id => checkQualifyingRevenue(id, rawSalesData, currentYear))
         const qualifiedNewCount = qualifiedNewIds.length
-        const newClientPercent = Math.min(Math.round((qualifiedNewCount / 3) * 100), 130)
+        // [수정] 예전에는 count/3*100 (상한 130)이라 4건이 133%, 5건이 130%로
+        // 기준표(4건=우수 110%, 5건=탁월 120%)와 어긋났다.
+        const newClientPercent = bandScore(qualifiedNewCount, KPI_BANDS.newClients)
 
         // 단절 / 편입 판정
         const reactivatedIds = []
@@ -292,7 +350,9 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         })
 
         const reactivatedCount = reactivatedIds.length
-        const clientMgmtPercent = Math.min(reactivatedCount * 20, 120)
+        // [수정] 예전에는 '편입 1건당 20%'라 0건이면 0%(미흡)였다.
+        // 기준표상 0건은 '양호(100%)'다. 그대로 두면 담당자가 크게 손해를 본다.
+        const clientMgmtPercent = bandScore(reactivatedCount, KPI_BANDS.clientMgmt)
 
         // 화면 목록용 (업체명 + 올해 누적 매출)
         const nameOf = (id) => (clients.find(cl => cl.id === id)?.company) || id
@@ -324,10 +384,13 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             return managedClientIds.includes(a.client_id) &&
                 ['visit', '\ubc29\ubb38', '\uc601\uc5c5\ubc29\ubb38', 'meeting', '\ubbf8\ud305'].includes((a.activity_type || a.type || '').toLowerCase())
         }).length
-        const visitTarget = Math.round(totalWeeks * 2)
+        // [수정] 예전엔 52주 x 2 = 104건이었다. 기준표의 양호(계획)는 연 240건이다.
+        const visitTarget = 240
         const weekNum = getISOWeekNumber(now)
         const expectedVisitsByNow = (visitTarget / totalWeeks) * weekNum
-        const visitPercent = expectedVisitsByNow > 0 ? Math.min(Math.round((visitCount / expectedVisitsByNow) * 100), 130) : 0
+        // 연말 기준 예상 방문수로 환산해 구간을 적용한다 (연중에는 진도율로 환산)
+        const projectedVisits = weekNum > 0 ? Math.round(visitCount * (totalWeeks / weekNum)) : 0
+        const visitPercent = bandScore(projectedVisits, KPI_BANDS.visits)
 
         // Weekly trend
         const weeklyTrendData = []
@@ -366,19 +429,35 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             })
         }
 
+        // 수동 입력 항목 — 값이 없으면 null(미입력)로 두어 총점에서 제외한다
+        const ebitdaPercent = bandScore(manual.ebitda, KPI_BANDS.ebitda)
+        const receivablesPercent = bandScore(manual.receivables, KPI_BANDS.receivables, true)
+
         return {
             items: [
                 {
-                    id: 'revenue', category: '\uc815\ub7c9\ud3c9\uac00', name: '\uc218\uc775\uc131 (\uc5f0\ub9e4\ucd9c)', kpi: '\uc804\ub144 \ub300\ube44 \ub9e4\ucd9c \ub2ec\uc131\uc728', weight: 40, unit: '\uc5b5',
-                    actual: Math.round(totalRevThisYear / 100_000_000 * 10) / 10,
-                    target: Math.round(totalRevLastYear / 100_000_000 * 10) / 10,
-                    percent: revenuePercent, icon: Target,
-                    detail: `\uc62c\ud574 \uc5f0\ub9e4\ucd9c: ${(totalRevThisYear / 100_000_000).toFixed(1)}\uc5b5\n\uc804\ub144 \ub9e4\ucd9c: ${(totalRevLastYear / 100_000_000).toFixed(1)}\uc5b5\n\uc804\ub144 \ub3d9\uae30: ${(totalRevLastYearSamePeriod / 100_000_000).toFixed(1)}\uc5b5 \ub300\ube44 ${revenuePercent}%`,
+                    id: 'revenue', category: '정량평가', name: '수익성', kpi: 'EBITDA(영업이익) 목표달성', weight: 40, unit: '억원',
+                    actual: manual.ebitda ?? null,
+                    target: 15, percent: ebitdaPercent, icon: Target,
+                    manualField: 'ebitda',
+                    manualLabel: '2026년 EBITDA (억원)',
+                    detail: manual.ebitda == null
+                        ? [
+                            'EBITDA는 CRM에 자료가 없어 자동 계산되지 않습니다. 확정값을 입력하면 반영됩니다.',
+                            '기준: 18억↑ 탁월 · 16억↑ 우수 · 15억(경영계획) 양호 · 12억↑ 보통 · 12억↓ 미흡'
+                        ].join('\n')
+                        : [
+                            `입력한 EBITDA ${manual.ebitda}억원 (경영계획 15억)`,
+                            '기준: 18억↑ 탁월 · 16억↑ 우수 · 15억 양호 · 12억↑ 보통 · 12억↓ 미흡',
+                            `참고 — 올해 매출 ${(totalRevThisYear / 100_000_000).toFixed(1)}억 / 전년 ${(totalRevLastYear / 100_000_000).toFixed(1)}억`
+                        ].join('\n'),
                 },
                 {
-                    id: 'sales_growth', category: '\uc815\ub7c9\ud3c9\uac00', name: '\ubd80\ubb38\uae30\uc5ec (\ud310\ub9e4\ud655\ub300)', kpi: '\ub2f4\ub2f9 \uac70\ub798\uc81c \uc804\ub144 \ub300\ube44', weight: 20, unit: '%',
+                    id: 'sales_growth', category: '정량평가', name: '부문기여 (판매확대)', kpi: '25년대비 26년 판매상승률', weight: 20, unit: '%',
                     actual: salesGrowthRate, target: 0, percent: salesGrowthPercent, icon: TrendingUp,
-                    detail: `\ub2f4\ub2f9 \uac70\ub798\uc81c \uc62c\ud574 \ub9e4\ucd9c: ${(myClientSalesThisYear / 10000).toLocaleString()}\ub9cc\uc6d0\n\uc804\ub144 \ub3d9\uae30 \ub9e4\ucd9c: ${(myClientSalesLastYearSamePeriod / 10000).toLocaleString()}\ub9cc\uc6d0`,
+                    detail: `담당 거래처 올해 매출: ${(myClientSalesThisYear / 10000).toLocaleString()}만원
+전년 동기 매출: ${(myClientSalesLastYearSamePeriod / 10000).toLocaleString()}만원
+기준: +20% 탁월 · +10% 우수 · 0% 양호 · -10% 보통 · -20% 미흡`,
                 },
                 {
                     id: 'client_mgmt', category: '\uc815\uc131\ud3c9\uac00', name: '\uace0\uac1d\uad00\ub9ac', kpi: '\ub2e8\uc808\uace0\uac1d \ud3b8\uc785', weight: 15, unit: '\uac74',
@@ -402,19 +481,53 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                     excludedList: excludedNewList,
                 },
                 {
-                    id: 'visits', category: '\uc815\uc131\ud3c9\uac00', name: '\uc815\uae30\uc801 \ubc29\ubb38', kpi: '\ubbf8\ud305 \ud69f\uc218 (\uc5f0\uac04)', weight: 10, unit: '\uac74',
+                    id: 'visits', category: '\uc815\uc131\ud3c9\uac00', name: '\uc815\uae30\uc801\ubc29\ubb38\ud69f\uc218', kpi: '\uc5f0\uac04 \uae30\uc900', weight: 10, unit: '\uac74',
                     actual: visitCount, target: visitTarget, percent: visitPercent, icon: MapPin,
-                    detail: `${weekNum}\uc8fc\ucc28 \uae30\uc900 \ubaa9\ud45c ${Math.round(expectedVisitsByNow)}\uac74 \uc911 ${visitCount}\uac74 \ub2ec\uc131`,
+                    detail: [
+                        `${weekNum}\uc8fc\ucc28 \uae30\uc900 ${visitCount}\uac74 (\uc5f0\ub9d0 \uc608\uc0c1 ${projectedVisits}\uac74)`,
+                        `\uc9c4\ub3c4 \ubaa9\ud45c ${Math.round(expectedVisitsByNow)}\uac74 \u00b7 \uc5f0\uac04 \uacc4\ud68d ${visitTarget}\uac74`,
+                        '\uae30\uc900: 310\uac74 \ud0c1\uc6d4 \u00b7 270\uac74 \uc6b0\uc218 \u00b7 240\uac74 \uc591\ud638 \u00b7 210\uac74 \ubcf4\ud1b5 \u00b7 180\uac74 \ubbf8\ud761'
+                    ].join('\n'),
+                },
+                {
+                    // [\ucd94\uac00] \uae30\uc900\ud45c\uc5d0 \uc788\uc73c\ub098 \ud654\uba74\uc5d0 \uc544\uc608 \uc5c6\ub358 \ud56d\ubaa9. \uc774\uac83\uc774 \ube60\uc838 \uac00\uc911\uce58 \ud569\uc774
+                    // 95\uc810\uc774\uc5c8\uace0 \ucd1d\uc810\uc774 \uc2e4\uc81c\uc640 \ub2ec\ub790\ub2e4.
+                    id: 'receivables', category: '\uc815\uc131\ud3c9\uac00', name: '\ucc44\uad8c\uad00\ub9ac', kpi: '\uc5f0\uac04 \uae30\uc900', weight: 5, unit: '\uac74',
+                    actual: manual.receivables ?? null,
+                    target: 0, percent: receivablesPercent, icon: FileWarning,
+                    manualField: 'receivables',
+                    manualLabel: '\ucc44\uad8c \ubb38\uc81c \ubc1c\uc0dd \uac74\uc218',
+                    lowerIsBetter: true,
+                    detail: manual.receivables == null
+                        ? [
+                            '\ucc44\uad8c\uad00\ub9ac\ub294 CRM\uc5d0 \uc790\ub8cc\uac00 \uc5c6\uc5b4 \uc790\ub3d9 \uacc4\uc0b0\ub418\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4. \uac74\uc218\ub97c \uc785\ub825\ud558\uba74 \ubc18\uc601\ub429\ub2c8\ub2e4.',
+                            '\uae30\uc900: 0\uac74 \uc591\ud638 \u00b7 1\uac74 \ubcf4\ud1b5 \u00b7 2\uac74 \ubbf8\ud761 (\uc801\uc744\uc218\ub85d \uc88b\uc74c)'
+                        ].join('\n')
+                        : [
+                            `\uc785\ub825\ud55c \ucc44\uad8c \ubb38\uc81c ${manual.receivables}\uac74`,
+                            '\uae30\uc900: 0\uac74 \uc591\ud638 \u00b7 1\uac74 \ubcf4\ud1b5 \u00b7 2\uac74 \ubbf8\ud761 (\uc801\uc744\uc218\ub85d \uc88b\uc74c)'
+                        ].join('\n'),
                 }
             ],
             weeklyTrend: weeklyTrendData,
         }
-    }, [rawSalesData, clients, activities, managedClientIds, exclusions])
+    }, [rawSalesData, clients, activities, managedClientIds, exclusions, manual])
 
-    const overallScore = useMemo(() => {
-        const totalWeight = kpiData.items.reduce((sum, item) => sum + item.weight, 0)
-        const weightedSum = kpiData.items.reduce((sum, item) => sum + (item.percent * item.weight), 0)
-        return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0
+    /**
+     * 총점 = 가중평균.
+     * 미입력 항목(EBITDA·채권관리)은 0으로 치지 않고 계산에서 뺀다.
+     * 0으로 치면 '미흡'으로 잡혀 총점이 부당하게 깎인다.
+     */
+    const { overallScore, scoredWeight, missingItems } = useMemo(() => {
+        const scored = kpiData.items.filter(i => typeof i.percent === 'number')
+        const missing = kpiData.items.filter(i => typeof i.percent !== 'number')
+        const w = scored.reduce((sum, i) => sum + i.weight, 0)
+        const sum = scored.reduce((acc, i) => acc + (i.percent * i.weight), 0)
+        return {
+            overallScore: w > 0 ? Math.round(sum / w) : 0,
+            scoredWeight: w,
+            missingItems: missing
+        }
     }, [kpiData])
 
     const overallGrade = getGradeInfo(overallScore)
@@ -432,6 +545,10 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{locale === 'en' ? 'Overall:' : '\uc885\ud569:'}</span>
                     <span className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>{overallScore}%</span>
+                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        (가중치 {scoredWeight}/100
+                        {missingItems.length > 0 && ` · ${missingItems.map(i => i.name).join('·')} 미입력`})
+                    </span>
                     <span
                         className="text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm"
                         style={{ backgroundColor: overallGrade.bgColor, color: overallGrade.color }}
@@ -443,8 +560,9 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
 
             <div className="p-6 space-y-8">
                 {/* KPI Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                     {kpiData.items.map((item) => {
+                        const isUnset = typeof item.percent !== 'number'
                         const grade = getGradeInfo(item.percent)
                         const Icon = item.icon
                         const isExpanded = expandedKPI === item.id
@@ -481,26 +599,34 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                         </div>
                                     </div>
 
-                                    {/* Score */}
+                                    {/* Score — 미입력 항목에는 등급을 붙이지 않는다 */}
                                     <div className="flex items-end justify-between mb-3">
-                                        <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{item.percent}%</span>
-                                        <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md"
-                                            style={{ backgroundColor: `${grade.color}20`, color: grade.color }}>
-                                            {grade.grade}
-                                        </span>
+                                        {isUnset ? (
+                                            <span className="text-lg font-bold" style={{ color: 'var(--text-muted)' }}>미입력</span>
+                                        ) : (
+                                            <>
+                                                <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{item.percent}%</span>
+                                                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md"
+                                                    style={{ backgroundColor: `${grade.color}20`, color: grade.color }}>
+                                                    {grade.grade}
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
 
                                     {/* Progress Bar */}
                                     <div className="w-full h-1.5 mb-3 overflow-hidden rounded-sm" style={{ backgroundColor: 'var(--border)' }}>
-                                        <div
-                                            className="h-full transition-all duration-700 ease-out rounded-sm"
-                                            style={{ width: `${Math.min(item.percent, 120) / 1.2}%`, backgroundColor: grade.barColor }}
-                                        />
+                                        {!isUnset && (
+                                            <div
+                                                className="h-full transition-all duration-700 ease-out rounded-sm"
+                                                style={{ width: `${Math.min(item.percent, 120) / 1.2}%`, backgroundColor: grade.barColor }}
+                                            />
+                                        )}
                                     </div>
 
                                     {/* Actual vs Target */}
                                     <div className="flex justify-between text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                                        <span>{locale === 'en' ? 'Actual' : '\uc2e4\uc801'} <b style={{ color: 'var(--text-primary)' }}>{typeof item.actual === 'number' ? item.actual.toLocaleString() : item.actual}{item.unit}</b></span>
+                                        <span>{locale === 'en' ? 'Actual' : '\uc2e4\uc801'} <b style={{ color: 'var(--text-primary)' }}>{item.actual == null ? '미입력' : `${typeof item.actual === 'number' ? item.actual.toLocaleString() : item.actual}${item.unit}`}</b></span>
                                         {item.target > 0 && <span>{locale === 'en' ? 'Target' : '\ubaa9\ud45c'} {item.target}</span>}
                                     </div>
 
@@ -510,6 +636,33 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                             style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)' }}
                                             onClick={(e) => e.stopPropagation()}>
                                             <p className="whitespace-pre-line">{item.detail}</p>
+
+                                            {/* 자동 계산이 안 되는 항목은 직접 입력받는다 */}
+                                            {item.manualField && (
+                                                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                                    <label htmlFor={`kpi-${item.manualField}`} style={{ color: 'var(--text-secondary)' }}>
+                                                        {item.manualLabel}
+                                                    </label>
+                                                    <input
+                                                        id={`kpi-${item.manualField}`}
+                                                        type="number"
+                                                        step="any"
+                                                        value={manual[item.manualField] ?? ''}
+                                                        onChange={(e) => updateManual(item.manualField, e.target.value)}
+                                                        placeholder="미입력"
+                                                        style={{ width: '110px' }}
+                                                    />
+                                                    <span style={{ color: 'var(--text-muted)' }}>{item.unit}</span>
+                                                    {manual[item.manualField] != null && (
+                                                        <button
+                                                            className="rowbtn"
+                                                            onClick={() => updateManual(item.manualField, '')}
+                                                        >
+                                                            지우기
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* 인정된 거래처 목록 + 올해 누적 매출 */}
                                             {item.clientList && (
