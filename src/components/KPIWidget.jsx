@@ -47,8 +47,14 @@ function getGradeInfo(percent) {
  * 기준이 바뀌면 이 표만 고치면 된다.
  */
 export const KPI_BANDS = {
-    // 수익성 — 2026년 EBITDA 목표달성율 (억원). 계획 15억이 '양호'
-    ebitda: [[18, 120], [16, 110], [15, 100], [12, 90]],
+    // 수익성 — 목표 대비 매출 달성율 (%)
+    //
+    // 기준표 원안은 EBITDA(영업이익) 18/16/15/12억이지만 영업이익은 CRM에서
+    // 구할 수 없어 매출액으로 대체한다. 이때 억원 기준을 그대로 쓰면 안 된다
+    // (전사 매출이 연 125억대라 15억 기준은 언제나 '탁월'이 된다).
+    // 기준표의 등급 헤더(120~/110~/100~/90~) 자체가 달성율 눈금이므로
+    // '목표 대비 몇 %인가'에 그대로 적용한다.
+    revenue: [[120, 120], [110, 110], [100, 100], [90, 90]],
     // 부문기여 — 25년대비 26년 판매상승률 (%)
     salesGrowth: [[20, 120], [10, 110], [0, 100], [-10, 90]],
     // 고객관리 — 기존고객 및 단절고객 편입 (건). 0건이 '양호'다
@@ -195,7 +201,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     //   - \ud3d0\uc5c5/\uc0c1\ud638\ubcc0\uacbd     -> \ub2e8\uc808\uace0\uac1d \ud3b8\uc785\uc5d0\uc11c\ub9cc \uc81c\uc678
     const [exclusions, setExclusions] = useState(() => getKpiExclusions())
 
-    // EBITDA·채권관리는 CRM에 자료가 없어 직접 입력받는다
+    // 목표 매출·채권관리는 CRM에서 알 수 없어 직접 입력받는다 (목표는 미입력 시 전년 매출)
     const [manual, setManual] = useState(() => getKpiManualInputs())
     const updateManual = (field, value) => setManual(setKpiManualInput(field, value))
 
@@ -429,28 +435,39 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             })
         }
 
-        // 수동 입력 항목 — 값이 없으면 null(미입력)로 두어 총점에서 제외한다
-        const ebitdaPercent = bandScore(manual.ebitda, KPI_BANDS.ebitda)
+        // 수익성 — 연말 예상 매출을 목표와 견준다.
+        // 연중에는 YTD를 경과일 비례로 환산해야 진도가 반영된다
+        // (8월에 YTD를 연간 목표와 그대로 비교하면 항상 미달로 나온다).
+        const yearStart = new Date(currentYear, 0, 1)
+        const elapsedDays = Math.max(1, Math.round((now - yearStart) / 86400000) + 1)
+        const daysInYear = ((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0) ? 366 : 365
+        const projectedRevenue = totalRevThisYear * (daysInYear / elapsedDays)
+
+        // 목표는 직접 입력할 수 있고, 없으면 전년 매출을 기준으로 삼는다
+        const revenueTargetEok = manual.revenueTarget ?? (totalRevLastYear / 100_000_000)
+        const revenueAchievement = revenueTargetEok > 0
+            ? Math.round((projectedRevenue / 100_000_000) / revenueTargetEok * 100)
+            : null
+        const revenueKpiPercent = bandScore(revenueAchievement, KPI_BANDS.revenue)
         const receivablesPercent = bandScore(manual.receivables, KPI_BANDS.receivables, true)
 
         return {
             items: [
                 {
-                    id: 'revenue', category: '정량평가', name: '수익성', kpi: 'EBITDA(영업이익) 목표달성', weight: 40, unit: '억원',
-                    actual: manual.ebitda ?? null,
-                    target: 15, percent: ebitdaPercent, icon: Target,
-                    manualField: 'ebitda',
-                    manualLabel: '2026년 EBITDA (억원)',
-                    detail: manual.ebitda == null
-                        ? [
-                            'EBITDA는 CRM에 자료가 없어 자동 계산되지 않습니다. 확정값을 입력하면 반영됩니다.',
-                            '기준: 18억↑ 탁월 · 16억↑ 우수 · 15억(경영계획) 양호 · 12억↑ 보통 · 12억↓ 미흡'
-                        ].join('\n')
-                        : [
-                            `입력한 EBITDA ${manual.ebitda}억원 (경영계획 15억)`,
-                            '기준: 18억↑ 탁월 · 16억↑ 우수 · 15억 양호 · 12억↑ 보통 · 12억↓ 미흡',
-                            `참고 — 올해 매출 ${(totalRevThisYear / 100_000_000).toFixed(1)}억 / 전년 ${(totalRevLastYear / 100_000_000).toFixed(1)}억`
-                        ].join('\n'),
+                    id: 'revenue', category: '정량평가', name: '수익성', kpi: '매출 목표달성율', weight: 40, unit: '%',
+                    actual: revenueAchievement,
+                    target: 100, percent: revenueKpiPercent, icon: Target,
+                    manualField: 'revenueTarget',
+                    manualLabel: '2026년 목표 매출 (억원)',
+                    detail: [
+                        `연말 예상 매출 ${(projectedRevenue / 100_000_000).toFixed(1)}억 ÷ 목표 ${revenueTargetEok.toFixed(1)}억 = ${revenueAchievement}%`,
+                        `올해 실적 ${(totalRevThisYear / 100_000_000).toFixed(1)}억 (${elapsedDays}일 경과) · 전년 ${(totalRevLastYear / 100_000_000).toFixed(1)}억`,
+                        manual.revenueTarget == null
+                            ? '목표를 입력하지 않아 전년 매출을 목표로 잡았습니다. 경영계획 값을 넣으면 그 기준으로 계산합니다.'
+                            : '입력한 목표 기준으로 계산했습니다.',
+                        '기준: 120%↑ 탁월 · 110%↑ 우수 · 100%↑ 양호 · 90%↑ 보통 · 90%↓ 미흡',
+                        '※ 원 기준표는 EBITDA(영업이익)이나 자료가 없어 매출액으로 대체한 항목입니다.'
+                    ].join('\n'),
                 },
                 {
                     id: 'sales_growth', category: '정량평가', name: '부문기여 (판매확대)', kpi: '25년대비 26년 판매상승률', weight: 20, unit: '%',
@@ -515,7 +532,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
 
     /**
      * 총점 = 가중평균.
-     * 미입력 항목(EBITDA·채권관리)은 0으로 치지 않고 계산에서 뺀다.
+     * 미입력 항목(채권관리 등)은 0으로 치지 않고 계산에서 뺀다.
      * 0으로 치면 '미흡'으로 잡혀 총점이 부당하게 깎인다.
      */
     const { overallScore, scoredWeight, missingItems } = useMemo(() => {
