@@ -303,12 +303,45 @@ export const parseSaleExcel = (file) => {
           return parsed * multiplier * unit
         }
 
+        /**
+         * 엑셀의 다양한 날짜 표기를 DB와 같은 YYYY-MM-DD로 통일한다.
+         *
+         * [중요] 이 정규화가 없으면 대사(reconcileSales)가 기존 매출을 찾지 못한다.
+         * 실제 업로드 양식은 '20260122'처럼 구분자 없는 8자리를 쓰는데, DB의
+         * sale_date는 '2026-01-22'로 저장된다. 문자열이 달라 '엑셀에 있는 날짜'로
+         * 기존 데이터를 조회해도 하나도 매칭되지 않고, 전부 신규로 판단해
+         * 그대로 다시 등록된다. (2026-08-05 업로드에서 2,835건이 중복 등록됨)
+         */
+        const normalizeSaleDate = (value) => {
+          if (value === null || value === undefined || value === '') return ''
+          const text = value.toString().trim()
+
+          // 20260122 (숫자 8자리) - 이 프로젝트의 실제 양식
+          const ymd = text.match(/^(\d{4})(\d{2})(\d{2})$/)
+          if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`
+
+          // 2026-01-22 / 2026.1.22 / 2026/1/22
+          const sep = text.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/)
+          if (sep) return `${sep[1]}-${sep[2].padStart(2, '0')}-${sep[3].padStart(2, '0')}`
+
+          // 엑셀 시리얼 날짜 (셀 서식이 '날짜'인 경우)
+          const serial = Number(text)
+          if (Number.isFinite(serial) && serial > 0 && serial < 100000) {
+            const d = XLSX.SSF.parse_date_code(serial)
+            if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`
+          }
+
+          return text
+        }
+
         // 데이터 변환 및 검증
         const salesData = []
         
         jsonData.forEach((row, index) => {
           // 다양한 한글 컬럼명 변형 지원 (UTF-8 인코딩 보장) - null/undefined 안전 처리
-          const saleDate = ((row['날짜'] || row['판매날짜'] || row['매출일'] || row['date'] || row['sale_date'] || row['Date'] || row['DATE'] || row['SaleDate'] || row['SALE_DATE'] || '') || '').toString().trim()
+          const saleDate = normalizeSaleDate(
+            row['날짜'] || row['판매날짜'] || row['매출일'] || row['date'] || row['sale_date'] || row['Date'] || row['DATE'] || row['SaleDate'] || row['SALE_DATE'] || ''
+          )
           const clientName = ((row['거래처'] || row['거래처명'] || row['회사명'] || row['client'] || row['clientName'] || row['Client'] || row['CLIENT'] || row['Company'] || row['COMPANY'] || '') || '').toString().trim()
           const itemName = ((row['품목명'] || row['제품명'] || row['item'] || row['item_name'] || row['product_name'] || row['Item'] || row['ITEM'] || row['Product'] || row['PRODUCT'] || '') || '').toString().trim()
           const quantityValue = row['수량'] || row['quantity'] || row['Quantity'] || row['QUANTITY'] || 0

@@ -194,3 +194,34 @@ test('상반기 재업로드 시나리오: 유지·수정·신규·삭제가 한
     // 반영 후 금액 = 10000 + 12500 + 15000
     assert.equal(r.stats.amountAfter, 37500)
 })
+
+test('날짜 형식이 달라도 기존 매출을 찾아낸다 (중복 등록 방지)', () => {
+    // 2026-08-05 사고의 회귀 테스트.
+    // 엑셀은 '20260122', DB는 '2026-01-22'로 저장된다. 정규화가 없으면
+    // 대사 범위가 비어 전부 신규로 잡히고 그대로 다시 등록된다.
+    const dbRows = [db('1', '2026-01-22', C1, 'BF-50V1H', 15, 200000)]
+    const excel = [{
+        sale_date: '20260122',            // 구분자 없는 8자리
+        clientId: C1, clientName: '테스트상사', item_name: 'BF-50V1H',
+        quantity: 15, unitPrice: 200000, totalAmount: 3000000
+    }]
+
+    const r = reconcileSales(excel, dbRows)
+
+    assert.equal(r.stats.insert, 0, '같은 매출이 중복 등록되면 안 된다')
+    assert.equal(r.stats.unchanged, 1)
+    assert.equal(r.stats.delete, 0)
+    assert.deepEqual(r.targetDates, ['2026-01-22'], '대상 날짜가 DB 형식으로 정규화되어야 한다')
+})
+
+test('점/슬래시 구분 날짜도 동일하게 인식한다', () => {
+    const dbRows = [db('1', '2026-03-09', C1, 'A', 1, 1000)]
+    for (const fmt of ['2026.3.9', '2026/03/09', '2026-3-9']) {
+        const r = reconcileSales(
+            [{ sale_date: fmt, clientId: C1, item_name: 'A', quantity: 1, unitPrice: 1000, totalAmount: 1000 }],
+            dbRows
+        )
+        assert.equal(r.stats.insert, 0, `${fmt} 형식에서 중복 발생`)
+        assert.equal(r.stats.unchanged, 1, `${fmt} 형식이 매칭되지 않음`)
+    }
+})

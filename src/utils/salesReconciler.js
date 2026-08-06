@@ -30,9 +30,28 @@ const num = (v) => {
 const txt = (v) => (v == null ? '' : String(v).trim())
 const normItem = (v) => txt(v).replace(/\s+/g, '').toLowerCase()
 
+/**
+ * 날짜를 YYYY-MM-DD로 통일한다.
+ *
+ * [중요] 대사는 '엑셀에 있는 날짜'로 기존 매출을 찾는다. 형식이 다르면 하나도
+ * 매칭되지 않고 전부 신규로 판단해 그대로 다시 등록된다.
+ * 실제로 2026-08-05 업로드에서 엑셀은 '20260122', DB는 '2026-01-22'라
+ * 2,835건이 중복 등록됐다. 파서에서 이미 정규화하지만, 여기서도 한 번 더
+ * 맞춰 어떤 경로로 들어와도 같은 기준으로 비교되게 한다.
+ */
+const normalizeDate = (v) => {
+    if (v === null || v === undefined || v === '') return ''
+    const text = String(v).trim()
+    const ymd = text.match(/^(\d{4})(\d{2})(\d{2})$/)
+    if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`
+    const sep = text.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})/)
+    if (sep) return `${sep[1]}-${sep[2].padStart(2, '0')}-${sep[3].padStart(2, '0')}`
+    return text
+}
+
 /** DB(snake_case)와 엑셀(camelCase) 양쪽 표기를 모두 읽는다 */
 const F = {
-    date: (r) => txt(r.sale_date ?? r.date),
+    date: (r) => normalizeDate(r.sale_date ?? r.date),
     client: (r) => txt(r.client_id ?? r.clientId),
     item: (r) => normItem(r.item_name ?? r.itemName),
     qty: (r) => num(r.quantity),
