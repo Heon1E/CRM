@@ -16,3 +16,7 @@ build_log.txt
 test_pngs.txt
 playwright-report/
 test-results/
+
+# 자격증명 메모 (커밋 금지)
+OAuth_id_pw.txt
+*_pw.txt
