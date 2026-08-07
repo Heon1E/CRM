@@ -83,9 +83,18 @@ DESIGN.md 보라 — 네 가지가 뒤섞여 어느 것도 완성되지 않은 �
 - **snake_case(DB) ↔ camelCase(프론트) 혼용이 코드 전반에 존재한다.** 거의 모든 집계 코드가 `sale.total_amount ?? sale.totalAmount`, `sale.sale_date || sale.date || sale.created_at` 식으로 방어적으로 읽는다. 새 코드도 같은 패턴을 따를 것.
 - 1000행 초과 조회는 `.range()` 페이지네이션 필수 (Supabase 기본 limit). **페이지네이션 시 `.order()`를 반드시 함께 지정** — 없으면 행이 중복/누락된다.
 
+## 매출 일괄등록 — 입력 수단은 여러 개, 저장 경로는 하나
+
+**매출을 쓰는 경로는 `src/hooks/useSalesImport.js` 하나뿐이다.** 엑셀·ERP 스크린샷·텔레그램
+받은 항목이 전부 이 훅을 거친다. 새 입력 수단을 붙일 때도 반드시 여기로 넣을 것 —
+대사를 우회하는 경로를 만들면 2026-08-05처럼 중복이 쌓인다(2,835건).
+
+훅에 넘기는 행 형식: `{ clientName, sale_date, item_name, quantity, unitPrice, notes }`.
+`totalAmount`는 훅이 `quantity × unitPrice`로 다시 계산한다(판독이 합계 칸을 잘못 읽어도 대사가 어긋나지 않게).
+
 ## 엑셀 일괄등록 (매출)
 
-`src/components/SalesExcelUpload.jsx`. 처리 순서:
+`src/components/SalesExcelUpload.jsx`는 파싱만 하고 나머지는 `useSalesImport`에 넘긴다. 처리 순서:
 
 1. 엑셀 파싱 → 2. 거래처명 **퍼지 매칭**(`buildClientKeys`: ㈜/(주)/주식회사/공백/괄호 제거 후 소문자화)
 → 3. **미매칭 업체를 `registerMissingClients`로 먼저 생성** → 4. **대사**(`reconcileSales`)
@@ -218,8 +227,9 @@ CHURN_RULE          = { GAP_MONTHS: 6, MIN_HISTORY_REVENUE: 1천만 }  // 단절
 
 - 실적 = 연말 예상 매출 = 올해 누계 × (연간일수 ÷ 경과일수).
   연중에 YTD를 연간 목표와 그대로 비교하면 항상 미달로 나오므로 경과일 비례 환산이 필요하다.
-- 목표 = 수동 입력(`manual.revenueTarget`, 억원). **미입력 시 전년 매출**을 목표로 삼는다.
-- 2026-08-07 기준 실측: 올해 91.9억(219일 경과) → 연말 예상 153.2억 ÷ 전년 125.2억 = 122% → 탁월.
+- 목표 = 수동 입력(`manual.revenueTarget`, 억원). 미입력 시 `DEFAULT_REVENUE_TARGET_EOK`(2026년 경영계획 **145억**).
+  localStorage 입력값은 기기마다 따로 남으므로, 회사 공식 목표는 상수를 기본값으로 둔다.
+- 2026-08-07 기준 실측: 올해 91.9억(219일 경과) → 연말 예상 153.2억 ÷ 목표 145억 = 106% → 양호.
 
 참고 실적: 2023년 87.9억 / 2024년 115.6억 / 2025년 125.2억.
 
@@ -311,3 +321,51 @@ localStorage에 `{ clientId: { new?: true, churn?: true } }` 형태로 저장한
 > **Gemini 키는 노출 시 제3자가 사용자 계정으로 API를 호출할 수 있다.**
 > 근본 해결은 서버(예: `api/` 서버리스 함수)에서 호출하고 키를 `VITE_` 없이 두는 것이다.
 > 과거 커밋에 키가 하드코딩된 이력이 있으므로(`git log --all -S"AIzaSy"`), 그 키들은 폐기되어야 한다.
+
+## ERP 화면 스크린샷으로 입력
+
+`src/components/ErpScreenshotImport.jsx` (설정 > Bulk Data Operations 아래).
+붙여넣기(Ctrl+V)·끌어놓기·파일선택·휴대폰 카메라를 받는다. 최대 6장.
+
+```
+스크린샷 → /api/analyze-erp (Gemini Vision) → 화면에서 사람이 확인·수정 → 반영
+```
+
+- **판독 결과를 바로 저장하지 않는다.** 표로 띄워 고칠 수 있게 한 뒤 반영한다.
+- 매출 → `useSalesImport`(대사). 같은 화면을 두 번 올려도 중복되지 않는다.
+- 채권 → 연체 건수를 `manual.receivables`(KPI 채권관리)에 저장. 저장 후
+  `window.dispatchEvent(new Event('kpi-manual-updated'))`로 KPI 카드에 알린다
+  (localStorage는 같은 탭에서 `storage` 이벤트가 오지 않는다).
+- 일정·활동 → `addActivity`. 거래처를 못 찾은 행은 저장하지 않고 알린다.
+
+`src/services/erpVisionService.js`가 이미지 축소(최대 2000px, JPEG 0.85)와 결과 정규화를 맡는다.
+**`normalizeDate`가 핵심이다** — 화면 판독은 `26.01.22`, `01/22`, `20260122`가 뒤섞여 나오는데
+대사는 `YYYY-MM-DD`가 정확히 맞아야 기존 매출을 찾는다. `tests/erpVision.test.mjs`가 고정한다.
+
+**API 키는 서버에만 둔다.** 판독은 `api/analyze-erp.js`에서 하고 `GEMINI_API_KEY`(VITE_ 없음)를 쓴다.
+프론트에서 직접 부르면 키가 배포 번들에 박힌다.
+
+## 텔레그램 봇 입력
+
+설정 순서는 `directives/TELEGRAM_SETUP.md`. 스키마는 `execution/sql/telegram_inbox.sql`.
+
+```
+휴대폰 → 봇(api/telegram-webhook.js) → Gemini 판독 → telegram_inbox(대기)
+       → 앱 '받은 항목'(InboxPanel)에서 사람이 확인 → 반영
+```
+
+- **봇은 매출을 직접 INSERT하지 않는다.** 대사 로직이 앱에 있기 때문이다. 담아두기만 한다.
+- 보안 장치 두 개. 둘 다 없으면 안 된다:
+  1. `TELEGRAM_WEBHOOK_SECRET` — 웹훅 주소는 공개 URL이라 비밀 토큰 검증이 없으면 누구나 쓸 수 있다.
+  2. `TELEGRAM_ALLOWED_CHAT_IDS` — 봇 아이디는 검색되므로 허용 목록이 실질적인 자물쇠다.
+     비어 있으면 봇은 아무것도 받지 않고 chat id만 알려준다.
+- `SUPABASE_SERVICE_ROLE_KEY`는 RLS를 우회한다. **서버 환경변수에만** 둘 것.
+- **카카오톡은 불가능하다.** 개인 대화를 읽는 API가 없다(카카오 정책). 채널 챗봇은
+  사업자 심사가 필요하고 채널로 온 문의만 읽는다.
+
+## 개발 서버에서 api/ 함수 실행
+
+`vite-plugin-api-dev.js`. `vite dev`는 `api/`를 엔드포인트로 만들지 않아 예전엔
+스크린샷 판독을 배포해야만 확인할 수 있었다. 이 플러그인이 `/api/*`를 해당 파일의
+default export로 넘겨 준다. `.env`/`.env.local` 값을 `process.env`에 실어 주므로
+`GEMINI_API_KEY` 같은 VITE_ 없는 변수도 개발 중에 동작한다.

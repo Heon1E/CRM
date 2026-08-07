@@ -43,9 +43,10 @@ export default async function handler(req, res) {
       (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg';
 
     // Gemini (Legacy Stable Vision Model)
+    // 'gemini-pro-vision'은 단종되어 404가 난다. 하드코딩하지 말 것.
     const genAI = new GoogleGenerativeAI(API_KEY);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-pro-vision',
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     });
 
     const prompt = `
@@ -86,8 +87,6 @@ Use "" if missing.
     return res.status(500).json({
       error: 'SERVER_ERROR',
       message: error.message,
-      stack: error.stack,
-      toString: error.toString(),
     });
   }
 }

@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 // ✅ 1. 방금 설치한 전문 플러그인을 불러옵니다.
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+// 개발 서버에서도 api/ 서버리스 함수를 실행한다 (Vercel과 동작을 맞춤)
+import apiDevPlugin from './vite-plugin-api-dev.js'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -13,6 +15,7 @@ export default defineConfig({
     nodePolyfills({
       protocolImports: true, // 'stream', 'util' 같은 Node.js 내장 모듈 임포트도 지원
     }),
+    apiDevPlugin(),
   ],
   resolve: {
     alias: {

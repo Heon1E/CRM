@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     Cell, ReferenceLine, ResponsiveContainer
@@ -46,6 +46,16 @@ function getGradeInfo(percent) {
  *
  * 기준이 바뀌면 이 표만 고치면 된다.
  */
+/**
+ * 2026년 경영계획 목표 매출 (억원).
+ *
+ * KPI 카드에서 직접 입력하면 그 값이 우선한다. 다만 입력값은 브라우저
+ * localStorage에 저장되므로 PC와 휴대폰에 따로 남는다. 회사 공식 목표는
+ * 어느 기기에서 봐도 같아야 하므로 여기를 기본값으로 둔다.
+ * 목표가 바뀌면 이 숫자만 고치면 된다.
+ */
+export const DEFAULT_REVENUE_TARGET_EOK = 145
+
 export const KPI_BANDS = {
     // 수익성 — 목표 대비 매출 달성율 (%)
     //
@@ -204,6 +214,18 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     // 목표 매출·채권관리는 CRM에서 알 수 없어 직접 입력받는다 (목표는 미입력 시 전년 매출)
     const [manual, setManual] = useState(() => getKpiManualInputs())
     const updateManual = (field, value) => setManual(setKpiManualInput(field, value))
+
+    // ERP 스크린샷 판독(ErpScreenshotImport)이 채권 건수를 저장하면 여기로 알려온다.
+    // localStorage는 같은 탭에서 바뀔 때 storage 이벤트가 오지 않아 직접 신호를 보낸다.
+    useEffect(() => {
+        const sync = () => setManual(getKpiManualInputs())
+        window.addEventListener('kpi-manual-updated', sync)
+        window.addEventListener('storage', sync)
+        return () => {
+            window.removeEventListener('kpi-manual-updated', sync)
+            window.removeEventListener('storage', sync)
+        }
+    }, [])
 
     const toggleExclusion = (clientId, kind) => {
         setExclusions(toggleKpiExclusion(clientId, kind))
@@ -443,8 +465,8 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         const daysInYear = ((currentYear % 4 === 0 && currentYear % 100 !== 0) || currentYear % 400 === 0) ? 366 : 365
         const projectedRevenue = totalRevThisYear * (daysInYear / elapsedDays)
 
-        // 목표는 직접 입력할 수 있고, 없으면 전년 매출을 기준으로 삼는다
-        const revenueTargetEok = manual.revenueTarget ?? (totalRevLastYear / 100_000_000)
+        // 목표는 직접 입력할 수 있고, 없으면 경영계획 목표(DEFAULT_REVENUE_TARGET_EOK)를 쓴다
+        const revenueTargetEok = manual.revenueTarget ?? DEFAULT_REVENUE_TARGET_EOK
         const revenueAchievement = revenueTargetEok > 0
             ? Math.round((projectedRevenue / 100_000_000) / revenueTargetEok * 100)
             : null
@@ -463,8 +485,8 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                         `연말 예상 매출 ${(projectedRevenue / 100_000_000).toFixed(1)}억 ÷ 목표 ${revenueTargetEok.toFixed(1)}억 = ${revenueAchievement}%`,
                         `올해 실적 ${(totalRevThisYear / 100_000_000).toFixed(1)}억 (${elapsedDays}일 경과) · 전년 ${(totalRevLastYear / 100_000_000).toFixed(1)}억`,
                         manual.revenueTarget == null
-                            ? '목표를 입력하지 않아 전년 매출을 목표로 잡았습니다. 경영계획 값을 넣으면 그 기준으로 계산합니다.'
-                            : '입력한 목표 기준으로 계산했습니다.',
+                            ? `목표 ${DEFAULT_REVENUE_TARGET_EOK}억은 경영계획 기본값입니다. 아래 칸에 넣으면 그 값이 우선합니다.`
+                            : '아래 칸에 입력한 목표 기준으로 계산했습니다.',
                         '기준: 120%↑ 탁월 · 110%↑ 우수 · 100%↑ 양호 · 90%↑ 보통 · 90%↓ 미흡',
                         '※ 원 기준표는 EBITDA(영업이익)이나 자료가 없어 매출액으로 대체한 항목입니다.'
                     ].join('\n'),

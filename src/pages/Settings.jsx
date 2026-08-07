@@ -8,6 +8,8 @@ import EditProductModal from '../components/EditProductModal'
 import ProductExcelUpload from '../components/ProductExcelUpload'
 import ClientExcelUpload from '../components/ClientExcelUpload'
 import SalesExcelUpload from '../components/SalesExcelUpload'
+import ErpScreenshotImport from '../components/ErpScreenshotImport'
+import InboxPanel from '../components/InboxPanel'
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { exportSalesToExcel } from '../utils/excelExport'
@@ -406,6 +408,17 @@ const Settings = () => {
                     </p>
                     <SalesExcelUpload />
                   </div>
+                </div>
+
+                {/* ERP 화면을 캡처해서 그대로 넣는 경로.
+                    매출은 엑셀과 같은 대사(useSalesImport)를 타므로 중복되지 않는다. */}
+                <div className="mt-6">
+                  <ErpScreenshotImport />
+                </div>
+
+                {/* 텔레그램 봇이 담아둔 항목. 매출은 여기서도 대사를 거쳐 반영된다. */}
+                <div className="mt-6">
+                  <InboxPanel />
                 </div>
               </Panel>
 
