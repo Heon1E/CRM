@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Loader2, Check, Trash2, MapPin, Send }
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { showError, showConfirm } from '../utils/alert'
+import { HOLIDAYS_BY_YEAR, hasHolidayData } from '../utils/koreanHolidays'
 
 /**
  * 대시보드 달력 — 앞으로 할 일을 매일 확인하는 곳.
@@ -48,6 +49,17 @@ const hhmm = (iso) => {
     const d = new Date(iso)
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
+
+/**
+ * 공휴일 표 ('YYYY-MM-DD' -> 이름).
+ * `koreanHolidays.js`는 매출 추정 엔진의 영업일 계산과 같은 자료를 쓴다.
+ * 2023~2026만 들어 있으므로 **매년 갱신해야 한다** (없는 해는 주말만 빨갛게 나온다).
+ */
+const HOLIDAY_NAME = (() => {
+    const m = {}
+    Object.values(HOLIDAYS_BY_YEAR).forEach((list) => list.forEach((h) => { m[h.date] = h.name }))
+    return m
+})()
 
 const ScheduleCalendar = () => {
     const { clients } = useData()
@@ -207,6 +219,11 @@ const ScheduleCalendar = () => {
                 </button>
                 {loading && <Loader2 size={14} className="animate-spin" />}
                 <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {!hasHolidayData(cursor.getFullYear()) && (
+                        <span style={{ color: '#B45309', marginRight: 8 }}>
+                            {cursor.getFullYear()}년 공휴일 미등록
+                        </span>
+                    )}
                     이번 달 {rows.filter((r) => new Date(r.starts_at).getMonth() === cursor.getMonth()).length}건
                 </span>
             </div>
@@ -229,12 +246,13 @@ const ScheduleCalendar = () => {
                             const isToday = key === ymd(today)
                             const isSel = key === selected
                             const list = byDay[key] || []
+                            const holiday = HOLIDAY_NAME[key]
                             return (
                                 <button
                                     key={key}
                                     onClick={() => setSelected(key)}
                                     style={{
-                                        minHeight: 46, padding: '3px 4px', textAlign: 'left',
+                                        minHeight: 52, padding: '3px 4px', textAlign: 'left',
                                         border: isSel ? '2px solid var(--accent)' : '1px solid var(--border)',
                                         borderRadius: 'var(--radius)',
                                         background: isToday ? 'var(--bg-card-hover)' : 'transparent',
@@ -244,10 +262,20 @@ const ScheduleCalendar = () => {
                                 >
                                     <span style={{
                                         fontSize: 12, fontWeight: isToday ? 800 : 500,
-                                        color: d.getDay() === 0 ? '#B91C1C' : d.getDay() === 6 ? '#1D4ED8' : 'var(--text-primary)'
+                                        // 공휴일은 일요일과 같은 빨간색으로 (한국 달력 관례)
+                                        color: (holiday || d.getDay() === 0) ? '#B91C1C'
+                                            : d.getDay() === 6 ? '#1D4ED8' : 'var(--text-primary)'
                                     }}>
                                         {d.getDate()}
                                     </span>
+                                    {holiday && (
+                                        <span style={{
+                                            display: 'block', fontSize: 10, lineHeight: 1.2, color: '#B91C1C',
+                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                                        }}>
+                                            {holiday}
+                                        </span>
+                                    )}
                                     <span style={{ display: 'flex', gap: 2, marginTop: 2, flexWrap: 'wrap' }}>
                                         {list.slice(0, 4).map((r) => (
                                             <span key={r.id} style={{
@@ -268,6 +296,11 @@ const ScheduleCalendar = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                         <b style={{ fontSize: 13 }}>
                             {selected.slice(5).replace('-', '/')} ({WEEK[new Date(`${selected}T00:00:00`).getDay()]})
+                            {HOLIDAY_NAME[selected] && (
+                                <span style={{ marginLeft: 6, color: '#B91C1C', fontWeight: 600 }}>
+                                    {HOLIDAY_NAME[selected]}
+                                </span>
+                            )}
                         </b>
                         <button className="tb-btn" onClick={() => setAdding((v) => !v)}>
                             <Plus size={13} /> 추가

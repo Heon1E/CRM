@@ -18,7 +18,7 @@ import ActivityTimeline from '../components/ActivityTimeline'
 import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
 import ActionCenter from '../components/ActionCenter'
-import AIHeadline from '../components/AIHeadline'
+import SalesCoach from '../components/SalesCoach'
 import KPIWidget from '../components/KPIWidget'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 
@@ -29,6 +29,7 @@ const Dashboard = () => {
     user,
     upcomingEvents,
     rawSalesData,
+    totalClientsCount: repClientsCount,
     myAccounts,
     getUserSalesRep,
   } = useDashboardData()
@@ -89,7 +90,40 @@ const Dashboard = () => {
   }, [sales])
 
   // --- Pre-computed Data & Safe Access ---
-  const stats = dashboardStats || {
+  // DataContext(dashboardStats)와 useDashboardData가 각각 따로 데이터를 가져온다.
+  // 앞쪽이 비어 상단 카드가 전부 0으로 보이는 일이 있어, 그럴 때는 이미 받아온
+  // rawSalesData로 채운다. (근본적으로는 두 벌 조회를 하나로 합쳐야 한다)
+  const fallback = useMemo(() => {
+    if (!rawSalesData || rawSalesData.length === 0) return null
+    const now = new Date()
+    const y = now.getFullYear(), m = now.getMonth()
+    const amount = (s) => Number(s.total_amount ?? s.totalAmount ?? 0) || 0
+    const inMonth = (s, yy, mm) => {
+      const d = new Date(s.sale_date || s.date || s.created_at)
+      return d.getFullYear() === yy && d.getMonth() === mm
+    }
+    const thisMonth = rawSalesData.reduce((a, s) => a + (inMonth(s, y, m) ? amount(s) : 0), 0)
+    const lastYearMonth = rawSalesData.reduce((a, s) => a + (inMonth(s, y - 1, m) ? amount(s) : 0), 0)
+    const activeIds = new Set()
+    rawSalesData.forEach((s) => {
+      const d = new Date(s.sale_date || s.date || s.created_at)
+      if (s.client_id && d >= new Date(y, m - 3, 1)) activeIds.add(s.client_id)
+    })
+    return {
+      currentMonthSalesTotal: thisMonth,
+      totalClientsCount: repClientsCount || new Set(rawSalesData.map((s) => s.client_id).filter(Boolean)).size,
+      currentActiveClientsCount: activeIds.size,
+      revenueYoY: lastYearMonth > 0 ? (((thisMonth / lastYearMonth) - 1) * 100).toFixed(1) : '0.0',
+      clientGrowthVal: 0,
+      aggregatedMonthlyTrend: [],
+      topRevenueClients: [],
+      topGrowthClients: []
+    }
+  }, [rawSalesData, repClientsCount])
+
+  const stats = (dashboardStats && dashboardStats.totalClientsCount > 0)
+    ? dashboardStats
+    : (fallback || dashboardStats) || {
     currentMonthSalesTotal: 0,
     totalClientsCount: 0,
     currentActiveClientsCount: 0,
@@ -184,29 +218,36 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* KPI Performance Tracker */}
-        <KPIWidget
-          rawSalesData={rawSalesData}
-          clients={clients}
-          activities={activities}
-          myAccounts={myAccounts}
-          salesRepName={getUserSalesRep}
-        />
-
-        {/* 일정 달력 — 매일 확인하는 곳이라 대시보드 가운데에 둔다.
-            텔레그램으로 보낸 일정이 여기에 바로 뜬다. */}
-        <div className="mt-6">
+        {/* 일정 달력 + 영업 코치 — 매일 여는 화면이라 맨 위에 둔다.
+            일정은 텔레그램으로 보낸 것이 바로 뜨고, 코치는 오늘 누구부터
+            챙길지 거래처별 매출·접점을 함께 보고 정해 준다. */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6">
           <ScheduleCalendar />
+          <SalesCoach
+            sales={rawSalesData}
+            clients={clients}
+            activities={activities}
+            salesRepName={getUserSalesRep}
+          />
         </div>
 
-        {/* Middleware Section: AI Coach & Forecast */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <AIHeadline user={user} stats={stats} loading={loading} />
+        {/* KPI Performance Tracker */}
+        <div className="mt-6">
+          <KPIWidget
+            rawSalesData={rawSalesData}
+            clients={clients}
+            activities={activities}
+            myAccounts={myAccounts}
+            salesRepName={getUserSalesRep}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 mt-6">
           <RevenueForecastPanel />
         </div>
 
-        {/* Lower Section: Dense Data Grids */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Lower Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
           {/* Fastest Growing Clients */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full overflow-hidden">
             <div className="p-5 border-b border-slate-50 flex items-center justify-between">
@@ -252,24 +293,10 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Priority Issues */}
-          <div className="flex flex-col gap-6">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col overflow-hidden">
-              <div className="p-5 border-b border-slate-50 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-slate-900">Priority Issues</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Pending Actions & Alerts</p>
-                </div>
-              </div>
-              <div>
-                <IssueTracker maxItems={3} />
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Footer Timeline & Key Accounts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20 mt-6">
+        {/* 최근 활동 */}
+        <div className="grid grid-cols-1 gap-6 pb-20 mt-6">
           <div className="rounded-xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
             <div className="p-5 flex items-center justify-between border-b border-slate-50">
               <div>
@@ -287,41 +314,6 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="rounded-xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
-            <div className="p-5 flex items-center justify-between border-b border-slate-50">
-              <div>
-                <h3 className="font-semibold text-slate-900">Key Accounts</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Top Revenue Contributors</p>
-              </div>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-left border-collapse">
-                <tbody>
-                  {stats?.topRevenueClients?.slice(0, 5).map((client, idx) => (
-                    <tr key={idx} className="group hover:bg-slate-50 border-b border-slate-50 last:border-0 transition-colors">
-                      <td className="py-4 px-4 w-12 text-center">
-                        <div className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${idx < 3 ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                          {idx + 1}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="text-[12px] font-semibold block mb-0.5 text-slate-900">{client.name}</span>
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">Total Sales Volume</span>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <span className="text-[12px] font-bold block tabular-nums text-slate-900">{formatKoreanCurrency(client.total)}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="p-4 text-center border-t border-slate-50">
-              <Link to="/my-accounts" className="text-xs font-medium flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
-                Manage All Accounts <ChevronRight className="w-3 h-3" />
-              </Link>
-            </div>
-          </div>
         </div>
 
         <EditActivityModal

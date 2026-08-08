@@ -425,43 +425,6 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         const projectedVisits = weekNum > 0 ? Math.round(visitCount * (totalWeeks / weekNum)) : 0
         const visitPercent = bandScore(projectedVisits, KPI_BANDS.visits)
 
-        // Weekly trend
-        const weeklyTrendData = []
-        let cumulativeRevenue = 0
-
-        for (let w = 1; w <= weekNum; w++) {
-            const weekStart = new Date(currentYear, 0, 1)
-            weekStart.setDate(weekStart.getDate() + (w - 1) * 7 - weekStart.getDay() + 1)
-            const weekMonday = new Date(weekStart)
-            const weekSunday = new Date(weekMonday)
-            weekSunday.setDate(weekSunday.getDate() + 6)
-
-            const weekRevenue = rawSalesData.filter(s => {
-                const d = new Date(s.sale_date || s.date)
-                return d >= weekMonday && d <= weekSunday
-            }).reduce((sum, s) => sum + (s.total_amount || s.totalAmount || 0), 0)
-
-            cumulativeRevenue += weekRevenue
-
-            const cumulativeTarget = (totalRevLastYear / totalWeeks) * w
-            const label = `${weekMonday.getMonth() + 1}/${weekMonday.getDate()}~${weekSunday.getMonth() + 1}/${weekSunday.getDate()}`
-
-            weeklyTrendData.push({
-                week: label,
-                '주간매출': Math.round(weekRevenue / 10000),
-                '누적목표': Math.round(cumulativeTarget / 10000),
-                '누적실적': Math.round(cumulativeRevenue / 10000),
-                weekNum: w,
-            })
-        }
-
-        // Add visual dummy data if total cumulative revenue is 0 for demo purposes
-        if (cumulativeRevenue === 0) {
-            weeklyTrendData.forEach((d, i) => {
-                d['주간매출'] = Math.round(Math.random() * 800 + 200) + (i * 100);
-            })
-        }
-
         // 수익성 — 연말 예상 매출을 목표와 견준다.
         // 연중에는 YTD를 경과일 비례로 환산해야 진도가 반영된다
         // (8월에 YTD를 연간 목표와 그대로 비교하면 항상 미달로 나온다).
@@ -563,7 +526,6 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                         ].join('\n'),
                 }
             ],
-            weeklyTrend: weeklyTrendData,
         }
     }, [rawSalesData, clients, activities, managedClientIds, exclusions, manual])
 
@@ -739,9 +701,9 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 </div>
             </div>
 
-            <div className="p-6 space-y-8">
+            <div className="p-4 space-y-4">
                 {/* KPI Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
                     {kpiData.items.map((item) => {
                         const isUnset = typeof item.percent !== 'number'
                         const grade = getGradeInfo(item.percent)
@@ -752,7 +714,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                             <div
                                 key={item.id}
                                 onClick={() => setExpandedKPI(isExpanded ? null : item.id)}
-                                className={`relative group cursor-pointer rounded-xl p-4 transition-all duration-200 border-t-4 ${isExpanded ? 'shadow-lg' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
+                                className={`relative group cursor-pointer rounded-lg p-3 transition-all duration-200 border-t-4 ${isExpanded ? 'shadow-lg' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
                                 style={{
                                     backgroundColor: 'var(--bg-card-hover)',
                                     border: '1px solid var(--border)',
@@ -762,7 +724,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                             >
                                 <div className="relative z-10">
                                     {/* Category Badge */}
-                                    <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center justify-between mb-2">
                                         <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                                             {item.category}
                                         </span>
@@ -770,8 +732,8 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                     </div>
 
                                     {/* Name & Icon */}
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="p-2 rounded-lg" style={{ backgroundColor: `${grade.color}20` }}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="p-1.5 rounded-md shrink-0" style={{ backgroundColor: `${grade.color}20` }}>
                                             <Icon className="w-4 h-4" style={{ color: grade.color }} />
                                         </div>
                                         <div>
@@ -781,7 +743,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                     </div>
 
                                     {/* Score — 미입력 항목에는 등급을 붙이지 않는다 */}
-                                    <div className="flex items-end justify-between mb-3">
+                                    <div className="flex items-end justify-between mb-2">
                                         {isUnset ? (
                                             <span className="text-lg font-bold" style={{ color: 'var(--text-muted)' }}>미입력</span>
                                         ) : (
@@ -789,7 +751,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                                 {/* display가 있으면 그 값을 크게 보여준다 (수익성 = 올해 매출액).
                                                     환산 %는 등급 계산용이라 아래 '달성율' 줄에 남긴다. */}
                                                 <div className="min-w-0">
-                                                    <span className="text-2xl font-bold block truncate" style={{ color: 'var(--text-primary)' }}>
+                                                    <span className="text-xl font-bold block truncate" style={{ color: 'var(--text-primary)' }}>
                                                         {item.display ?? `${item.percent}%`}
                                                     </span>
                                                     {item.displaySub && (
@@ -808,7 +770,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                     </div>
 
                                     {/* Progress Bar */}
-                                    <div className="w-full h-1.5 mb-3 overflow-hidden rounded-sm" style={{ backgroundColor: 'var(--border)' }}>
+                                    <div className="w-full h-1 mb-2 overflow-hidden rounded-sm" style={{ backgroundColor: 'var(--border)' }}>
                                         {!isUnset && (
                                             <div
                                                 className="h-full transition-all duration-700 ease-out rounded-sm"
@@ -859,42 +821,6 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                     </div>
                 )}
 
-                {/* Weekly Trend Chart */}
-                <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border)' }}>
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Weekly Revenue Trend</h3>
-                            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>vs Annual Target Pace</p>
-                        </div>
-                        <div className="flex gap-4 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--border-light)' }}></div>Previous</div>
-                            <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--accent)' }}></div>Current</div>
-                        </div>
-                    </div>
-                    <div className="h-[160px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={kpiData.weeklyTrend} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                                <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fill: '#555E6E', fontSize: 11 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#555E6E', fontSize: 11 }} tickFormatter={(v) => v >= 10000 ? `${(v / 10000).toFixed(0)}\uc5b5` : `${v.toLocaleString()}`} />
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(16,185,129,0.06)' }}
-                                    contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', fontSize: '12px' }}
-                                    formatter={(value, name) => [`${value.toLocaleString()}\ub9cc\uc6d0`, name]}
-                                />
-                                <Bar dataKey="주간매출" radius={[4, 4, 0, 0]} barSize={40}>
-                                    {kpiData.weeklyTrend.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={index === kpiData.weeklyTrend.length - 1 ? '#DC2626' : '#E2E8F0'}
-                                        />
-                                    ))}
-                                </Bar>
-                                <ReferenceLine y={0} stroke="var(--border)" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
             </div>
         </div>
     )
