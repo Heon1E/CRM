@@ -24,6 +24,26 @@ const KIND_COLOR = {
 
 /** Date -> 'YYYY-MM-DD' (로컬 기준. toISOString은 UTC라 하루 밀린다) */
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/**
+ * 제목에 이미 거래처명이 들어 있으면 따로 또 붙이지 않는다.
+ * 봇이 "10일 대달산업 방문"을 읽으면 title='대달산업 방문', client_name='대달산업'이
+ * 되는데, 둘을 그냥 이어 붙이면 '대달산업 대달산업 방문'이 된다.
+ */
+const titleOf = (r) => {
+    const t = String(r.title || '').trim()
+    const c = String(r.client_name || '').trim()
+    if (!c) return t
+    if (!t) return c
+    return t.includes(c) ? t : `${c} ${t}`
+}
+
+/** 목록에서 제목과 따로 보여줄 거래처명 (제목에 이미 있으면 감춘다) */
+const subClientOf = (r) => {
+    const t = String(r.title || '').trim()
+    const c = String(r.client_name || '').trim()
+    return c && !t.includes(c) ? c : ''
+}
+
 const hhmm = (iso) => {
     const d = new Date(iso)
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -290,13 +310,13 @@ const ScheduleCalendar = () => {
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                                     <b style={{ fontSize: 12 }}>{r.all_day ? '종일' : hhmm(r.starts_at)}</b>
                                     <span style={{ fontSize: 12, textDecoration: r.status === '완료' ? 'line-through' : 'none' }}>
-                                        {r.title}
+                                        {titleOf(r)}
                                     </span>
                                     {r.source === 'telegram' && <Send size={10} style={{ opacity: 0.5 }} />}
                                 </div>
-                                {(r.client_name || r.location) && (
+                                {(subClientOf(r) || r.location) && (
                                     <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                                        {r.client_name}
+                                        {subClientOf(r)}
                                         {r.location && <> · <MapPin size={9} style={{ display: 'inline' }} /> {r.location}</>}
                                     </div>
                                 )}
@@ -321,7 +341,7 @@ const ScheduleCalendar = () => {
                             {upcoming.map((r) => (
                                 <div key={r.id} style={{ fontSize: 11, color: 'var(--text-secondary)', padding: '1px 0' }}>
                                     {ymd(new Date(r.starts_at)).slice(5).replace('-', '/')} {r.all_day ? '' : hhmm(r.starts_at)}{' '}
-                                    {r.client_name || ''} {r.title}
+                                    {titleOf(r)}
                                 </div>
                             ))}
                         </div>

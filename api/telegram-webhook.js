@@ -439,14 +439,23 @@ export default async function handler(req, res) {
                 applied_at: new Date().toISOString(), note: `일정 ${saved.length}건 등록`
             })
 
+            // 제목에 이미 거래처명이 있으면 또 붙이지 않는다 ('대달산업 대달산업 방문' 방지)
+            const label = (s) => {
+                const t = String(s.title || '').trim()
+                const c = String(s.company || s.clientName || '').trim()
+                if (!c) return t
+                if (!t) return c
+                return t.includes(c) ? t : `${c} ${t}`
+            }
+            const noTime = saved.filter((s) => !s.time).length
             const lines = saved.map((s) =>
-                `• ${fmtDate(s.date)} ${s.time || '종일'} ${s.company || s.clientName || ''} ${s.title}` +
+                `• ${fmtDate(s.date)} ${s.time || '종일'} ${label(s)}` +
                 (s.clientName && !s.matched ? ' <i>(거래처 미등록)</i>' : '')
             )
             await tgSend(chatId,
                 `📅 <b>일정 ${saved.length}건을 달력에 넣었습니다.</b>\n${lines.join('\n')}` +
                 (warn.length ? `\n\n⚠️ ${warn.join('\n⚠️ ')}` : '') +
-                `\n\n확인: CRM 대시보드 달력`
+                (noTime ? `\n\n시간을 적으면 그 시각으로 들어갑니다. 예: <i>10일 오후 2시 대달산업 방문</i>` : '')
             )
             return ok()
         }
