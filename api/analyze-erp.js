@@ -26,7 +26,7 @@ const MAX_IMAGES = 6
 const SCHEMA_HINT = `
 반환 형식(JSON only):
 {
-  "docType": "sales" | "receivables" | "activity" | "unknown",
+  "docType": "sales" | "receivables" | "daily_report" | "activity" | "unknown",
   "rows": [ ... ],
   "summary": "한 줄 요약(한국어)",
   "warnings": ["판독이 불확실한 부분(한국어)"]
@@ -45,7 +45,19 @@ docType 별 rows 형식:
      "dueDate": "YYYY-MM-DD" 또는 null }
    - 연체(기일 초과) 건만이 아니라 표에 보이는 행을 모두 담는다.
 
-3) activity — 일정/방문/미팅/메모
+3) daily_report — 일일업무보고서 양식 (한 장이 하루)
+   { "clientName": "거래처명", "activity_date": "YYYY-MM-DD", "person": "만난 담당자",
+     "purpose": "관리"|"신규"|"기타", "time": "9:30" 또는 "유선",
+     "description": "방문 및 미팅 내용 전문" }
+   - 표는 [거래처명 | 담당자 | 방문목적(관리/신규/기타) | 방문 및 미팅 내용] 구조다.
+     거래처명 아래 칸에 방문시간(9:30 등)이나 '유선'이 적혀 있다.
+   - 방문목적은 관리/신규/기타 칸 중 O 표시가 된 것을 쓴다.
+   - activity_date는 상단 '일자 :' 값을 모든 행에 그대로 넣는다.
+   - **'■ 금일 영업 계획' 아래 표는 절대 넣지 마라.** 아직 다녀오지 않은 계획이고,
+     실제로 다녀오면 다음 날 일지에 방문기록으로 다시 나온다. 넣으면 이중 계상된다.
+   - 방문 및 미팅 내용은 요약하지 말고 보이는 대로 옮긴다.
+
+4) activity — 일정/방문/미팅/메모
    { "clientName": "거래처명 또는 빈 문자열", "activity_date": "YYYY-MM-DD",
      "type": "방문"|"미팅"|"전화"|"이메일"|"기타", "description": "내용",
      "next_action_date": "YYYY-MM-DD" 또는 null, "next_action_detail": "" }
@@ -63,7 +75,8 @@ const TYPE_HINT = {
     sales: '이 이미지는 매출/판매 자료다. docType은 "sales"로 한다.',
     receivables: '이 이미지는 미수금/채권 자료다. docType은 "receivables"로 한다.',
     activity: '이 이미지는 일정/활동 자료다. docType은 "activity"로 한다.',
-    auto: '이미지를 보고 매출(sales) / 채권(receivables) / 일정(activity) 중 무엇인지 스스로 판단한다.'
+    daily_report: '이 이미지는 일일업무보고서다. docType은 "daily_report"로 한다.',
+    auto: '이미지를 보고 매출(sales) / 채권(receivables) / 일일업무보고서(daily_report) / 일정(activity) 중 무엇인지 스스로 판단한다. 상단에 "일일 업무 보고서"라고 적혀 있거나 [거래처명/담당자/방문목적/방문 및 미팅 내용] 표가 보이면 daily_report다.'
 }
 
 const parseDataUrl = (dataUrl) => {

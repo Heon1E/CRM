@@ -1,9 +1,10 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Image as ImageIcon, Loader2, Trash2, ScanLine, Check, AlertTriangle, X } from 'lucide-react'
 import { analyzeErpScreenshots, toNumber } from '../services/erpVisionService'
 import { useSalesImport, buildClientKeys } from '../hooks/useSalesImport'
 import { useData } from '../contexts/DataContext'
 import { setKpiManualInput } from '../utils/kpiCategories'
+import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../utils/clientAliases'
 import { showSuccess, showError, showWarning } from '../utils/alert'
 
 /**
@@ -20,12 +21,14 @@ const DOC_TYPES = [
     { value: 'auto', label: '자동 판별' },
     { value: 'sales', label: '매출' },
     { value: 'receivables', label: '채권(미수금)' },
+    { value: 'daily_report', label: '일일업무보고서' },
     { value: 'activity', label: '일정·활동' },
 ]
 
 const DOC_LABEL = {
     sales: '매출',
     receivables: '채권(미수금)',
+    daily_report: '일일업무보고서',
     activity: '일정·활동',
     unknown: '알 수 없음',
 }
@@ -33,7 +36,7 @@ const DOC_LABEL = {
 const won = (v) => Number(v || 0).toLocaleString('ko-KR')
 
 const ErpScreenshotImport = ({ onRefresh }) => {
-    const { clients, addActivity } = useData()
+    const { clients, activities, addActivity } = useData()
     const { importSalesRows, isImporting, progress } = useSalesImport()
 
     const [files, setFiles] = useState([])          // { file, url }
@@ -178,18 +181,41 @@ const ErpScreenshotImport = ({ onRefresh }) => {
         window.dispatchEvent(new Event('kpi-manual-updated'))
     }
 
-    const applyActivities = async () => {
-        const clientMap = new Map()
+    /**
+     * 적힌 이름으로 거래처를 찾는다.
+     * 대응표(ALIASES)와 '(오산)' 같은 괄호·공장 접미사까지 훑어야
+     * 이미 있는 회사를 못 찾고 새로 만드는 일이 없다.
+     */
+    const clientMap = useMemo(() => {
+        const m = new Map()
         clients.forEach((c) => {
-            buildClientKeys(c.company).forEach((k) => {
-                if (!clientMap.has(k)) clientMap.set(k, c)
-            })
+            buildClientKeys(c.company).forEach((k) => { if (!m.has(k)) m.set(k, c) })
         })
+        return m
+    }, [clients])
 
+    const findClient = (raw) => {
+        for (const cand of nameCandidates(raw)) {
+            const hit = buildClientKeys(cand).map((k) => clientMap.get(k)).find(Boolean)
+            if (hit) return hit
+        }
+        return null
+    }
+
+    /**
+     * 이미 등록된 활동인지. 같은 거래처를 같은 날 두 번 등록하지 않는다.
+     * 같은 일지를 두 번 찍어 올려도 활동이 늘지 않아야 한다
+     * (활동 건수는 KPI 정기적방문횟수의 근거다).
+     */
+    const isDuplicateActivity = (clientId, date) =>
+        activities.some((a) => (a.client_id || a.clientId) === clientId &&
+            String(a.activity_date || a.date || '') === date)
+
+    const applyActivities = async () => {
         const matched = []
         const unmatched = []
         result.rows.forEach((r) => {
-            const c = buildClientKeys(r.clientName).map((k) => clientMap.get(k)).find(Boolean)
+            const c = findClient(r.clientName)
             if (c) matched.push({ ...r, clientId: c.id })
             else unmatched.push(r.clientName || '(거래처 없음)')
         })
@@ -233,11 +259,76 @@ const ErpScreenshotImport = ({ onRefresh }) => {
         if (onRefresh) await onRefresh()
     }
 
+    /**
+     * 일일업무보고서 반영.
+     *
+     * '금일 영업 계획'은 판독 단계에서 이미 뺐다 (아직 다녀오지 않은 계획이고,
+     * 실제로 다녀오면 다음 날 일지에 방문기록으로 다시 나와 이중 계상된다).
+     */
+    const applyDailyReport = async () => {
+        const matched = [], unmatched = [], dups = [], skipped = []
+
+        result.rows.forEach((r) => {
+            const name = String(r.clientName || '').trim()
+            if (!name || NON_CLIENT_PATTERN.test(name)) { skipped.push(name || '(빈칸)'); return }
+            if (looksLikeMultiCompany(name)) { skipped.push(name); return }
+            if (!r.activity_date) { skipped.push(`${name} (일자 없음)`); return }
+
+            const c = findClient(name)
+            if (!c) { unmatched.push(name); return }
+            if (isDuplicateActivity(c.id, r.activity_date)) { dups.push(`${r.activity_date} ${c.company}`); return }
+            matched.push({ ...r, clientId: c.id, clientCompany: c.company })
+        })
+
+        if (matched.length === 0) {
+            let msg = '새로 등록할 방문기록이 없습니다.'
+            if (dups.length) msg += `\n\n이미 등록됨 ${dups.length}건: ${dups.slice(0, 5).join(', ')}`
+            if (unmatched.length) msg += `\n\n거래처를 찾지 못함: ${[...new Set(unmatched)].join(', ')}`
+            if (skipped.length) msg += `\n\n건너뜀: ${[...new Set(skipped)].join(', ')}`
+            await showWarning(msg)
+            return
+        }
+
+        setIsSaving(true)
+        const errors = []
+        let saved = 0
+        for (const a of matched) {
+            try {
+                await addActivity({
+                    clientId: a.clientId,
+                    activity_date: a.activity_date,
+                    type: a.type,   // 유선이면 '전화', 아니면 '미팅'
+                    status: '완료',
+                    description:
+                        [a.person ? `[담당자] ${a.person}` : '', a.purpose ? `[방문목적] ${a.purpose}` : '']
+                            .filter(Boolean).join(' ') + (a.description ? `\n${a.description}` : ''),
+                })
+                saved += 1
+            } catch (e) {
+                errors.push(`${a.clientCompany}: ${e.message}`)
+            }
+        }
+        setIsSaving(false)
+
+        let msg = `방문기록 ${saved}건을 활동으로 등록했습니다.`
+        const visits = matched.filter((m) => m.type === '미팅').length
+        if (visits !== saved) msg += `\n(방문 ${visits}건 · 유선 ${saved - visits}건 — KPI 방문횟수는 방문만 셉니다)`
+        if (dups.length) msg += `\n\n이미 등록되어 있어 건너뜀: ${dups.length}건`
+        if (unmatched.length) msg += `\n\n거래처를 찾지 못해 건너뜀: ${[...new Set(unmatched)].join(', ')}`
+        if (skipped.length) msg += `\n\n제외: ${[...new Set(skipped)].join(', ')}`
+        if (errors.length) msg += `\n\n실패: ${errors.join('\n')}`
+        await showSuccess(msg)
+
+        clearAll()
+        if (onRefresh) await onRefresh()
+    }
+
     const handleApply = async () => {
         if (!result || result.rows.length === 0) return
         try {
             if (result.docType === 'sales') await applySales()
             else if (result.docType === 'receivables') await applyReceivables()
+            else if (result.docType === 'daily_report') await applyDailyReport()
             else if (result.docType === 'activity') await applyActivities()
             else await showWarning('무엇을 반영할지 알 수 없습니다. 종류를 직접 지정해 다시 판독해 주세요.')
         } catch (e) {
@@ -347,6 +438,58 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                             연체 건수({overdue}건)를 기본으로 넣었습니다. 실제 문제 건수로 고쳐도 됩니다.
                         </span>
+                    </div>
+                </>
+            )
+        }
+
+        if (t === 'daily_report') {
+            const visits = result.rows.filter((r) => r.type === '미팅').length
+            return (
+                <>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table className="dgrid">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: 34 }}></th>
+                                    <th style={{ minWidth: 100 }}>일자</th>
+                                    <th style={{ minWidth: 140 }}>거래처</th>
+                                    <th style={{ minWidth: 110 }}>담당자</th>
+                                    <th style={{ minWidth: 70 }}>목적</th>
+                                    <th style={{ minWidth: 70 }}>시간</th>
+                                    <th style={{ minWidth: 260 }}>방문 및 미팅 내용</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {result.rows.map((r, i) => (
+                                    <tr key={i}>
+                                        <td>
+                                            <button className="rowbtn" onClick={() => removeRow(i)} title="이 행 빼기">
+                                                <X size={13} />
+                                            </button>
+                                        </td>
+                                        <td><input value={r.activity_date || ''} onChange={(e) => editCell(i, 'activity_date', e.target.value)} /></td>
+                                        <td><input value={r.clientName || ''} onChange={(e) => editCell(i, 'clientName', e.target.value)} /></td>
+                                        <td><input value={r.person || ''} onChange={(e) => editCell(i, 'person', e.target.value)} /></td>
+                                        <td><input value={r.purpose || ''} onChange={(e) => editCell(i, 'purpose', e.target.value)} /></td>
+                                        <td><input value={r.time || ''} onChange={(e) => editCell(i, 'time', e.target.value)} /></td>
+                                        <td>
+                                            <textarea
+                                                value={r.description || ''}
+                                                onChange={(e) => editCell(i, 'description', e.target.value)}
+                                                rows={3}
+                                                style={{ width: '100%', minWidth: 260, resize: 'vertical' }}
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="statusbar">
+                        <span>{result.rows.length}건</span>
+                        <span>방문 {visits}건 · 유선 {result.rows.length - visits}건</span>
+                        <span>KPI 방문횟수는 방문만 셉니다</span>
                     </div>
                 </>
             )
@@ -495,8 +638,9 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                     {result.rows.length > 0 && renderRows()}
 
                     <p style={{ padding: '8px 12px 12px', margin: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
-                        ※ 화면 판독은 틀릴 수 있습니다. <b>반영 전에 숫자를 확인</b>해 주세요.
+                        ※ 화면 판독은 틀릴 수 있습니다. <b>반영 전에 내용을 확인</b>해 주세요.
                         {result.docType === 'sales' && ' 매출은 같은 날짜를 다시 올려도 중복되지 않고, 바뀐 금액은 수정으로 반영됩니다.'}
+                        {result.docType === 'daily_report' && " '금일 영업 계획'은 아직 다녀오지 않은 일정이라 제외했습니다. 같은 일지를 다시 올려도 중복되지 않습니다."}
                     </p>
                 </div>
             )}

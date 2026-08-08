@@ -157,6 +157,26 @@ function normalizeRows(docType, rows, defaultYear, warnings) {
         }))
     }
 
+    if (docType === 'daily_report') {
+        return rows.map((r, i) => {
+            const activity_date = normalizeDate(r.activity_date ?? r.date, defaultYear)
+            if (!isValidDate(activity_date)) {
+                warnings.push(`${i + 1}행: 일자를 알아보지 못했습니다 (${r.activity_date ?? '빈칸'})`)
+            }
+            const time = String(r.time ?? '').trim()
+            return {
+                clientName: String(r.clientName ?? r.client_name ?? '').trim(),
+                activity_date,
+                person: String(r.person ?? '').trim(),
+                purpose: String(r.purpose ?? '').trim(),
+                time,
+                // '유선'은 방문이 아니다. KPI 정기적방문횟수가 미팅/방문만 세므로 구분해서 넣는다.
+                type: /유선|전화/.test(time) ? '전화' : '미팅',
+                description: String(r.description ?? r.notes ?? '').trim()
+            }
+        })
+    }
+
     if (docType === 'activity') {
         return rows.map((r) => ({
             clientName: String(r.clientName ?? r.client_name ?? '').trim(),
