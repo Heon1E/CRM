@@ -83,3 +83,35 @@ create policy "read inbox"  on public.telegram_inbox for select
     to authenticated, anon using (true);
 create policy "write inbox" on public.telegram_inbox for all
     to authenticated, anon using (true) with check (true);
+
+-- ========================== 봇 사용 허용 목록 ==========================
+--
+-- 텔레그램 봇 아이디는 누구나 검색할 수 있다. 허용 목록이 실질적인 자물쇠다.
+--
+-- 환경변수 대신 여기에 둔다 (설정할 게 하나라도 줄어야 한다).
+-- **첫 사람만 스스로 등록할 수 있다.** 목록이 비어 있을 때만 INSERT가 되고,
+-- 한 명이라도 들어오면 그 뒤로는 막힌다. 봇을 만들고 바로 /start 를 보낼 것.
+-- 남이 먼저 채갔다면 이 표를 비우고 다시 /start 하면 된다.
+create table if not exists public.bot_allowlist (
+    chat_id    text primary key,
+    label      text,
+    created_at timestamptz not null default now()
+);
+
+alter table public.bot_allowlist enable row level security;
+
+drop policy if exists "read allowlist"       on public.bot_allowlist;
+drop policy if exists "first claim only"     on public.bot_allowlist;
+drop policy if exists "authenticated manage" on public.bot_allowlist;
+
+create policy "read allowlist" on public.bot_allowlist for select
+    to authenticated, anon using (true);
+
+-- 비어 있을 때만 등록 가능 (선착순 1회). 이후로는 잠긴다.
+create policy "first claim only" on public.bot_allowlist for insert
+    to authenticated, anon
+    with check ((select count(*) from public.bot_allowlist) = 0);
+
+-- 로그인한 사용자는 언제든 고칠 수 있다 (잘못 등록됐을 때 되돌리기)
+create policy "authenticated manage" on public.bot_allowlist for all
+    to authenticated using (true) with check (true);

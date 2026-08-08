@@ -30,86 +30,79 @@
 
 ---
 
-## 1. 봇 만들기 (2분)
+## 설정 — 5분, 터미널 필요 없음
 
-1. 텔레그램에서 **@BotFather** 를 찾아 대화를 연다
-2. `/newbot` 을 보낸다
-3. 봇 이름과 아이디를 정한다 (아이디는 `_bot`으로 끝나야 한다)
-4. **토큰**을 준다. `123456:ABC-DEF...` 형태의 긴 문자열이다
+### 1. Supabase에서 표 만들기 (한 번)
+
+Supabase > SQL Editor 에서 `execution/sql/schedules_and_inbox.sql` 내용을 붙여넣고 **Run**.
+
+### 2. 봇 만들기
+
+텔레그램에서 **@BotFather** 를 찾아 대화를 연다.
+
+1. `/newbot` 보내기
+2. 봇 이름 정하기 (아무거나, 예: `내 CRM 비서`)
+3. 봇 아이디 정하기 — **반드시 `_bot`으로 끝나야 한다** (예: `xavian_crm_bot`)
+4. `123456789:AAE...` 형태의 긴 **토큰**을 준다. 길게 눌러 복사한다.
 
 > 토큰은 봇의 비밀번호다. 채팅방이나 화면 공유에 노출하지 말 것.
 
-## 2. Supabase에 테이블 만들기 (1분)
+### 3. Vercel에 토큰 넣기 (넣을 값은 이것 하나뿐)
 
-Supabase 대시보드 > SQL Editor 에서
-`execution/sql/schedules_and_inbox.sql` 내용을 붙여넣고 실행한다.
-(일정 달력과 받은 항목이 함께 만들어진다)
+Vercel > 프로젝트 > **Settings** > **Environment Variables**
 
-## 3. Vercel 환경변수 넣기
-
-Vercel > 프로젝트 > Settings > Environment Variables 에서 아래를 추가한다.
-**`VITE_` 접두어를 붙이면 안 된다.** 붙이면 브라우저에 그대로 노출된다.
-
-| 이름 | 값 |
+| 칸 | 넣을 값 |
 |---|---|
-| `TELEGRAM_BOT_TOKEN` | BotFather가 준 토큰 |
-| `TELEGRAM_WEBHOOK_SECRET` | 아무 긴 문자열 (예: 40자 랜덤). 직접 정한다 |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | 일단 비워두거나 아무 값. 4단계에서 채운다 |
-| `GEMINI_API_KEY` | 기존 Gemini 키 (`VITE_` 없는 이름으로) |
-| `SUPABASE_URL` | Supabase 프로젝트 URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase > Settings > API 의 `service_role` 키 |
+| Key | `TELEGRAM_BOT_TOKEN` |
+| Value | 2단계에서 복사한 토큰 |
 
-> `service_role` 키는 RLS를 무시하는 강력한 키다. **서버(Vercel 환경변수)에만** 두고
-> 코드나 프론트엔드에 절대 넣지 말 것.
+**Save** 를 누른 뒤, **Deployments** 탭 > 맨 위 항목 오른쪽 `⋯` > **Redeploy**.
 
-넣은 뒤 **재배포**한다 (Deployments > 최신 항목 > Redeploy).
+> 나머지(비밀 토큰, Gemini 키, DB 주소)는 넣지 않아도 된다.
+> 비밀 토큰은 봇 토큰에서 계산하고, 나머지는 이미 있는 값을 그대로 쓴다.
 
-## 4. 웹훅 연결
+### 4. 연결 (주소 한 번 열기)
 
-내 PC의 `.env.local`에 아래 두 줄을 넣는다 (이 파일은 커밋되지 않는다):
+브라우저에서 연다:
 
 ```
-TELEGRAM_BOT_TOKEN=BotFather가_준_토큰
-TELEGRAM_WEBHOOK_SECRET=3단계에서_정한_그_문자열
+https://내주소.vercel.app/api/telegram-setup
 ```
 
-그리고 실행한다:
+“연결됐습니다”가 나오면 된다. 아직 토큰이 없다고 나오면 3단계 저장·재배포를 확인한다.
 
-```bash
-node execution/setup_telegram_webhook.mjs --url https://내주소.vercel.app
-```
+### 5. 봇에게 `/start` 보내기
 
-이제 텔레그램에서 내 봇에게 `/start` 를 보낸다.
-봇이 **chat id**를 알려준다. 그 숫자를 Vercel의 `TELEGRAM_ALLOWED_CHAT_IDS` 에 넣고
-다시 재배포한다.
+텔레그램에서 내 봇을 찾아 `/start` 를 보낸다. “연결됐습니다”라고 답하면 끝.
 
-> 이 허용 목록이 비어 있으면 봇은 아무 데이터도 받지 않는다.
-> 봇 아이디는 누구나 검색할 수 있으므로, 이 목록이 사실상의 자물쇠다.
+> **처음 `/start` 를 보낸 대화가 주인으로 등록되고, 그 뒤로는 잠긴다.**
+> 4단계를 마치면 바로 보낼 것. 혹시 남이 먼저 채갔다면 Supabase에서
+> `bot_allowlist` 표를 비우고 다시 `/start` 하면 된다.
 
-## 5. 써보기
+---
 
-봇에게 보내본다:
+## 써보기
 
-- `내일 오후 2시 한국화학 방문` → 달력에 바로 등록, 답장으로 확인
+- `내일 오후 2시 한국화학 방문` → 대시보드 달력에 바로 뜬다
 - `오늘 대성드럼 김부장 미팅, 단가 협의함` → 활동에 바로 등록
-- `/today` → 오늘 일정 목록
-- ERP 매출 화면 캡처 → "받은 항목에서 확인해 주세요"
-
-일정은 CRM 대시보드 가운데 **달력**에서, 매출·채권은 **설정 > 받은 항목**에서 확인한다.
+- `/today` → 오늘 일정, `/week` → 앞으로 7일
+- ERP 매출·미수금 화면 사진 → 받은 항목에 담김 (앱에서 확인 후 반영)
 
 ---
 
 ## 잘 안 될 때
 
-```bash
-node execution/setup_telegram_webhook.mjs --info
-```
+`https://내주소.vercel.app/api/telegram-setup` 을 다시 열어 본다.
 
-- `마지막 오류: Wrong response from the webhook: 401` → `TELEGRAM_WEBHOOK_SECRET`이
-  Vercel과 `.env.local`에서 다르다
-- 봇이 "등록된 사용자만" 이라고 답한다 → `TELEGRAM_ALLOWED_CHAT_IDS`에 내 chat id가 없다
-- 봇이 답이 없다 → 웹훅 주소가 틀렸거나 재배포를 안 했다
-- "읽지 못했습니다" → `GEMINI_API_KEY`가 없거나 만료됐다
+- **"아직 토큰이 없습니다"** → Vercel에 저장은 했는데 재배포를 안 했다
+- **봇이 "등록된 사용자만"이라고 답한다** → 다른 사람이 먼저 `/start` 를 눌렀다.
+  Supabase에서 `bot_allowlist` 표의 행을 지우고 다시 `/start`
+- **봇이 아무 답이 없다** → 4단계(주소 열기)를 안 했거나 재배포 전에 열었다
+- **"등록에 실패했습니다"** → 1단계 SQL을 실행하지 않았다
+- **"읽지 못했습니다"** → Gemini 키 문제. Vercel에 `VITE_GEMINI_API_KEY`가 살아 있는지 확인
+
+터미널을 쓰고 싶다면 `node execution/setup_telegram_webhook.mjs --info` 로 상태를 볼 수 있다
+(`.env.local`에 `TELEGRAM_BOT_TOKEN` 필요).
 
 ## 사진 찍는 요령
 

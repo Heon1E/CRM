@@ -516,6 +516,21 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 | `question` | — | `/today`·`/week` 답장 |
 | `memo` | `telegram_inbox` | — |
 
+### 설정을 하나로 줄인 이유
+
+처음엔 Vercel 환경변수 6개 + 터미널 명령을 요구했는데, 사용자가 "뭔 말인지 모르겠다"고 했다.
+**설정 단계가 많으면 기능이 없는 것과 같다.** 그래서 전부 없앴다:
+
+- 비밀 토큰 → `deriveSecret(botToken)`으로 계산. 사람이 정해 두 군데 옮겨 적을 일이 없다.
+  (`api/telegram-setup.js`와 `api/telegram-webhook.js`가 같은 함수를 쓴다.)
+- 허용 목록 → `bot_allowlist` 표. **첫 `/start`가 스스로 등록**하고 그 뒤로는 RLS로 잠긴다
+  (`with check ((select count(*) from bot_allowlist) = 0)`).
+- Gemini/DB 키 → 이미 있는 `VITE_` 값으로 폴백.
+- 웹훅 등록 → `/api/telegram-setup` 주소를 열면 서버가 자기 자신을 등록한다. 터미널 불필요.
+  받는 값이 없고 자기 배포 주소로만 설정하므로 남이 눌러도 무해하다.
+
+**남는 것은 `TELEGRAM_BOT_TOKEN` 하나뿐이다.**
+
 - **매출·채권만 바로 넣지 않는다.** 대사 로직이 앱에 있기 때문이다.
 - 서버는 UTC로 돈다. `kstToday()`로 한국 날짜를 만들어 프롬프트에 넣어야
   '내일'·'다음주 화요일'이 맞게 풀린다. 저장할 때도 `+09:00`을 붙인다.

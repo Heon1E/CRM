@@ -14,21 +14,39 @@
  * 안 생기는데 그 로직은 앱에 있다. 봇이 바로 INSERT하면 2026-08-05 중복 사고
  * (2,835건)가 그대로 재현된다. 일정·활동은 중복 위험이 낮고 지우기도 쉬워 바로 넣는다.
  *
- * 필요한 환경변수 (Vercel, 모두 VITE_ 접두어 없이):
- *   TELEGRAM_BOT_TOKEN        BotFather가 준 토큰
- *   TELEGRAM_WEBHOOK_SECRET   임의의 긴 문자열. 가짜 요청을 막는다.
- *   TELEGRAM_ALLOWED_CHAT_IDS 쉼표로 구분한 허용 chat id. **반드시 설정할 것.**
- *   GEMINI_API_KEY            판독용
- *   SUPABASE_URL              프로젝트 URL
- *   SUPABASE_SERVICE_ROLE_KEY 서버 전용 키. 절대 VITE_를 붙이지 말 것.
+ * **Vercel에 새로 넣을 것은 TELEGRAM_BOT_TOKEN 하나뿐이다.**
+ * 설정할 게 많으면 아무도 끝까지 못 한다. 그래서 나머지는 전부 없앴다:
+ *   - 비밀 토큰   : 봇 토큰에서 계산해 쓴다(deriveSecret). 사람이 정할 필요 없다.
+ *   - 허용 목록   : bot_allowlist 테이블. 첫 /start가 스스로 등록한다.
+ *   - Gemini/DB 키: 이미 있는 VITE_ 값을 그대로 쓴다.
+ *
+ * 선택 (없어도 동작):
+ *   SUPABASE_SERVICE_ROLE_KEY  넣으면 RLS를 우회한다. 없으면 anon 키로 동작한다.
+ *   TELEGRAM_ALLOWED_CHAT_IDS  DB 대신 환경변수로 허용 목록을 고정하고 싶을 때.
  */
 
+import crypto from 'crypto'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../src/utils/clientAliases.js'
+
+/**
+ * 웹훅 비밀 토큰을 봇 토큰에서 만들어 낸다.
+ *
+ * 이 주소는 공개 URL이라 검증이 없으면 누구나 CRM에 데이터를 넣을 수 있다.
+ * 그렇다고 사람에게 "긴 문자열을 하나 정해서 두 군데에 똑같이 넣으세요"라고 하면
+ * 십중팔구 어긋난다. 봇 토큰만 알면 양쪽이 같은 값을 계산해 내도록 했다.
+ */
+export const deriveSecret = (botToken) =>
+    crypto.createHash('sha256').update(`xavian-crm:${botToken}`).digest('hex')
 
 export const config = { maxDuration: 60 }
 
 const TG = (m) => `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${m}`
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY
+const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+// service_role이 있으면 쓰고, 없으면 anon 키로 동작한다.
+// schedules / telegram_inbox / activities 는 anon에도 쓰기가 열려 있다.
+const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
 const KST_OFFSET = '+09:00'
 
 // ---------------------------------------------------------------------------
@@ -57,8 +75,8 @@ const keysOf = (n) => [...new Set([
 // Supabase (REST). service_role 키는 RLS를 우회한다.
 // ---------------------------------------------------------------------------
 const sb = async (path, { method = 'GET', body, prefer } = {}) => {
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+    const key = SUPA_KEY
+    const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, {
         method,
         headers: {
             apikey: key,
@@ -159,7 +177,7 @@ memo:
 
 async function callGemini(parts) {
     const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -297,8 +315,14 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
     // 웹훅 주소는 공개 URL이다. 비밀 토큰 검증이 없으면 누구나 CRM에 데이터를 넣을 수 있다.
-    const secret = process.env.TELEGRAM_WEBHOOK_SECRET
-    if (!secret || req.headers['x-telegram-bot-api-secret-token'] !== secret) {
+    // 비밀값은 봇 토큰에서 계산한다 — 사람이 정해서 두 군데에 옮겨 적을 필요가 없다.
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
+    if (!botToken) {
+        console.error('[telegram] TELEGRAM_BOT_TOKEN 없음')
+        return res.status(500).json({ ok: false, error: 'BOT_TOKEN_MISSING' })
+    }
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET || deriveSecret(botToken)
+    if (req.headers['x-telegram-bot-api-secret-token'] !== secret) {
         console.warn('[telegram] secret token 불일치 — 거부')
         return res.status(401).json({ ok: false })
     }
@@ -315,12 +339,39 @@ export default async function handler(req, res) {
     const chatId = String(msg.chat?.id || '')
     const fromName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || msg.from?.username || ''
 
-    // 허용된 사람만. 봇 아이디는 검색되므로 이 목록이 실질적인 자물쇠다.
-    const allowed = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean)
+    // ---- 허용된 사람만 ----
+    // 봇 아이디는 검색되므로 이 목록이 실질적인 자물쇠다.
+    // 환경변수가 있으면 그것이 우선, 없으면 bot_allowlist 테이블을 본다.
+    // 목록이 비어 있으면 **처음 말을 건 사람이 주인으로 등록된다** (선착순 1회).
+    // 봇을 만든 직후 바로 /start 를 보내면 안전하다.
+    const envAllowed = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || '').split(',').map((x) => x.trim()).filter(Boolean)
+    let allowed = envAllowed
+
     if (allowed.length === 0) {
-        await tgSend(chatId, `설정이 끝나지 않았습니다.\n이 대화의 chat id는 <b>${chatId}</b> 입니다.\nVercel 환경변수 TELEGRAM_ALLOWED_CHAT_IDS 에 넣어 주세요.`)
-        return ok()
+        let list = []
+        try { list = await sb('bot_allowlist?select=chat_id') } catch (e) { console.error('[telegram] allowlist 조회 실패', e.message) }
+
+        if (list.length === 0) {
+            try {
+                await sb('bot_allowlist', { method: 'POST', prefer: 'return=minimal', body: [{ chat_id: chatId, label: fromName || null }] })
+                await tgSend(chatId,
+                    `✅ <b>연결됐습니다.</b> 이제 이 대화만 이 봇을 쓸 수 있습니다.\n\n` +
+                    `그냥 보내보세요:\n` +
+                    `• <i>내일 오후 2시 한국화학 방문</i> → 달력에 등록\n` +
+                    `• <i>오늘 대성드럼 김부장 미팅함</i> → 활동에 등록\n` +
+                    `• ERP 화면 사진 → 읽어서 담아둠\n\n` +
+                    `<b>/today</b> 오늘 일정  <b>/week</b> 이번주  <b>/help</b> 사용법`
+                )
+                return ok()
+            } catch (e) {
+                console.error('[telegram] 자동 등록 실패', e.message)
+                await tgSend(chatId, `등록에 실패했습니다. Supabase에서 schedules_and_inbox.sql 을 실행했는지 확인해 주세요.\n(이 대화의 chat id: <b>${chatId}</b>)`)
+                return ok()
+            }
+        }
+        allowed = list.map((r) => String(r.chat_id))
     }
+
     if (!allowed.includes(chatId)) {
         await tgSend(chatId, '이 봇은 등록된 사용자만 쓸 수 있습니다.')
         console.warn('[telegram] 허용되지 않은 chat_id:', chatId)

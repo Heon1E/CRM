@@ -95,23 +95,19 @@ if (!url || has('--info')) {
     process.exit(0)
 }
 
-if (!SECRET) {
-    console.error('TELEGRAM_WEBHOOK_SECRET이 없습니다.')
-    console.error('아무 긴 문자열이나 정해 .env.local과 Vercel 환경변수 양쪽에 같은 값으로 넣어 주세요.')
-    console.error('이 값이 없으면 웹훅 주소를 아는 누구나 CRM에 데이터를 넣을 수 있습니다.')
-    process.exit(1)
-}
+// 비밀값은 봇 토큰에서 계산한다 (서버도 같은 방식으로 만든다).
+// 사람이 정해서 두 군데에 옮겨 적을 필요가 없다.
+const { createHash } = await import('crypto')
+const SECRET_VALUE = SECRET || createHash('sha256').update(`xavian-crm:${TOKEN}`).digest('hex')
 
 const endpoint = `${url.replace(/\/$/, '')}/api/telegram-webhook`
 await api('setWebhook', {
     url: endpoint,
-    secret_token: SECRET,
+    secret_token: SECRET_VALUE,
     allowed_updates: ['message', 'edited_message'],
     max_connections: 10
 })
 
 console.log(`웹훅을 등록했습니다:\n  ${endpoint}\n`)
-console.log('다음 순서로 확인하세요:')
-console.log(`  1. 텔레그램에서 @${me.username} 에게 /start 를 보낸다`)
-console.log('  2. 봇이 알려주는 chat id를 Vercel 환경변수 TELEGRAM_ALLOWED_CHAT_IDS 에 넣는다')
-console.log('  3. 재배포한 뒤 ERP 화면을 캡처해서 보내본다')
+console.log(`이제 텔레그램에서 @${me.username} 에게 /start 를 보내면 끝입니다.`)
+console.log('(처음 /start 를 보낸 대화가 주인으로 등록됩니다)')
