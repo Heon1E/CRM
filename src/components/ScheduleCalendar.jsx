@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Loader2, Check, Trash2, MapPin, Send }
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { showError, showConfirm } from '../utils/alert'
-import { HOLIDAYS_BY_YEAR, hasHolidayData } from '../utils/koreanHolidays'
+import { getHolidays, hasHolidayData } from '../utils/koreanHolidays'
 
 /**
  * 대시보드 달력 — 앞으로 할 일을 매일 확인하는 곳.
@@ -55,11 +55,15 @@ const hhmm = (iso) => {
  * `koreanHolidays.js`는 매출 추정 엔진의 영업일 계산과 같은 자료를 쓴다.
  * 2023~2026만 들어 있으므로 **매년 갱신해야 한다** (없는 해는 주말만 빨갛게 나온다).
  */
-const HOLIDAY_NAME = (() => {
-    const m = {}
-    Object.values(HOLIDAYS_BY_YEAR).forEach((list) => list.forEach((h) => { m[h.date] = h.name }))
-    return m
-})()
+const holidayCache = {}
+const holidayName = (year, key) => {
+    if (!holidayCache[year]) {
+        const m = {}
+        getHolidays(year).forEach((h) => { m[h.date] = h.name })
+        holidayCache[year] = m
+    }
+    return holidayCache[year][key]
+}
 
 const ScheduleCalendar = () => {
     const { clients } = useData()
@@ -246,7 +250,7 @@ const ScheduleCalendar = () => {
                             const isToday = key === ymd(today)
                             const isSel = key === selected
                             const list = byDay[key] || []
-                            const holiday = HOLIDAY_NAME[key]
+                            const holiday = holidayName(d.getFullYear(), key)
                             return (
                                 <button
                                     key={key}
@@ -296,9 +300,9 @@ const ScheduleCalendar = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                         <b style={{ fontSize: 13 }}>
                             {selected.slice(5).replace('-', '/')} ({WEEK[new Date(`${selected}T00:00:00`).getDay()]})
-                            {HOLIDAY_NAME[selected] && (
+                            {holidayName(Number(selected.slice(0, 4)), selected) && (
                                 <span style={{ marginLeft: 6, color: '#B91C1C', fontWeight: 600 }}>
-                                    {HOLIDAY_NAME[selected]}
+                                    {holidayName(Number(selected.slice(0, 4)), selected)}
                                 </span>
                             )}
                         </b>

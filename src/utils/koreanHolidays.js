@@ -80,9 +80,65 @@ export const HOLIDAYS_BY_YEAR = {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// 대체공휴일 자동 보정
+//
+// 손으로 적다 보면 빠진다. 실제로 2026-08-17(광복절이 토요일이라 생기는 대체공휴일)이
+// 누락돼 있었다. 규칙으로 계산할 수 있는 것은 계산해서 채운다.
+//
+// 관공서의 공휴일에 관한 규정 제3조:
+//   - 삼일절·광복절·개천절·한글날·부처님오신날·성탄절이 토요일 또는 일요일과 겹치면 대체
+//   - 어린이날은 토·일 또는 다른 공휴일과 겹치면 대체
+//   - 설날·추석 연휴는 **다른 공휴일(일요일 포함)과 겹칠 때만** 대체 (토요일은 대상 아님)
+//   - 현충일은 대체 대상이 아니다
+// 대체일은 그 뒤 첫 번째 '공휴일이 아닌 평일'이다.
+//
+// 설날·추석·부처님오신날은 음력이라 날짜 자체는 여전히 손으로 넣어야 한다.
+// ---------------------------------------------------------------------------
+const SUBSTITUTE_ELIGIBLE = ['삼일절', '광복절', '개천절', '한글날', '부처님오신날', '크리스마스', '어린이날']
+
+const ymdOf = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+const parseUTC = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)) }
+
+/** 규칙으로 만들어낼 수 있는 대체공휴일을 채워 넣는다 (이미 있으면 그대로 둔다) */
+export const withSubstituteHolidays = (list) => {
+    const dates = new Set(list.map((h) => h.date))
+    // 이미 적힌 '대체공휴일'은 법정공휴일 목록에서 뺀다 (건너뛰기 대상이 아니다)
+    const statutory = new Set(list.filter((h) => h.name !== '대체공휴일').map((h) => h.date))
+    const added = []
+
+    list.forEach((h) => {
+        if (!SUBSTITUTE_ELIGIBLE.includes(h.name)) return
+        const d = parseUTC(h.date)
+        const dow = d.getUTCDay()
+        if (dow !== 0 && dow !== 6) return   // 평일이면 대체 없음
+
+        // 대체일 = 그 뒤 첫 번째 평일. 단, 다른 법정공휴일이 놓인 날은 건너뛴다.
+        // (이미 적혀 있는 '대체공휴일'은 건너뛰면 안 된다 — 그게 바로 우리가 찾는 그 날이다.
+        //  건너뛰면 3/1(일)에 3/2가 이미 있는데도 3/3을 또 만들어 낸다.)
+        const next = new Date(d)
+        for (let i = 0; i < 10; i++) {
+            next.setUTCDate(next.getUTCDate() + 1)
+            const nd = next.getUTCDay()
+            if (nd === 0 || nd === 6) continue
+            if (statutory.has(ymdOf(next))) continue
+
+            const key = ymdOf(next)
+            if (dates.has(key)) return          // 이미 등록돼 있다
+            dates.add(key)
+            added.push({ date: key, name: '대체공휴일', substituteFor: h.name })
+            return
+        }
+    })
+
+    return [...list, ...added].sort((a, b) => a.date.localeCompare(b.date))
+}
+
 const warnedYears = new Set()
+const resolvedCache = new Map()
 
 export const getHolidays = (year) => {
+    if (resolvedCache.has(year)) return resolvedCache.get(year)
     const holidays = HOLIDAYS_BY_YEAR[year]
     if (!holidays) {
         // 공휴일 데이터가 없는 연도는 주말만 제외되어 영업일이 과대 계산된다.
@@ -93,7 +149,9 @@ export const getHolidays = (year) => {
         }
         return []
     }
-    return holidays
+    const resolved = withSubstituteHolidays(holidays)
+    resolvedCache.set(year, resolved)
+    return resolved
 }
 
 /** 해당 연도의 공휴일 데이터가 등록되어 있는지 여부 */

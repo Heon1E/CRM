@@ -5,13 +5,12 @@ import { supabase } from '../lib/supabase'
 
 export const useDashboardData = () => {
   const { user } = useAuth()
-  const { clients, activities } = useData()
+  const { clients, activities, sales, loading: dataLoading } = useData()
 
   const [myAccounts, setMyAccounts] = useState([])
   const [myMonthlySales, setMyMonthlySales] = useState(0)
   const [myWeeklySalesData, setMyWeeklySalesData] = useState([])
-  const [rawSalesData, setRawSalesData] = useState([])
-  const [salesLoading, setSalesLoading] = useState(false)
+  const salesLoading = dataLoading
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const [totalClientsCount, setTotalClientsCount] = useState(0)
 
@@ -156,56 +155,19 @@ export const useDashboardData = () => {
     fetchMyData()
   }, [getUserSalesRep, getWeeklySalesDataForClients])
 
-  // 3. 전체 매출 데이터 (Sales Data)
-  useEffect(() => {
-    const fetchSalesData = async () => {
-      try {
-        setSalesLoading(true)
-        let allSales = []
-        let from = 0
-        const step = 1000
-
-        while (true) {
-          const { data, error } = await supabase
-            .from('sales')
-            .select('*')
-            .order('sale_date', { ascending: false })
-            .range(from, from + step - 1)
-
-          if (error) throw error
-          if (!data || data.length === 0) break
-
-          allSales = [...allSales, ...data]
-
-          // 만약 가져온 데이터가 step보다 적으면 더 이상 데이터가 없는 것
-          if (data.length < step) break
-          from += step
-        }
-
-        const normalizedSales = allSales.map((sale) => {
-          // Join된 sales_items 사용 (여기서는 join 안했으므로 items는 비어있음)
-          const finalItems = sale.sales_items || sale.items || []
-          let calculatedTotal = sale.total_amount || 0
-
-          return {
-            ...sale,
-            totalAmount: calculatedTotal,
-            items: finalItems,
-            // sale_date vs date 호환성
-            date: sale.sale_date || sale.date
-          }
-        })
-
-        setRawSalesData(normalizedSales)
-      } catch (error) {
-        console.error('Failed to fetch sales data:', error)
-      } finally {
-        setSalesLoading(false)
-      }
-    }
-
-    fetchSalesData()
-  }, [])
+  // 3. 전체 매출 데이터
+  //
+  // 예전에는 여기서 sales 전체를 또 조회했다. DataContext도 같은 걸 조회하므로
+  // 1.5만 행을 **두 번** 읽었고, 그래서 첫 화면이 느려 상단 카드가 0으로 보였다
+  // (새로고침 버튼을 눌러야 채워졌다).
+  // DataContext가 이미 들고 있는 것을 쓰고, 화면이 기대하는 형태로만 맞춘다.
+  const rawSalesData = useMemo(() => (sales || []).map((sale) => ({
+    ...sale,
+    totalAmount: sale.total_amount || 0,
+    items: sale.sales_items || sale.items || [],
+    // sale_date vs date 호환성
+    date: sale.sale_date || sale.date,
+  })), [sales])
 
   // 4. Upcoming Events
   useEffect(() => {

@@ -1648,6 +1648,8 @@ export const DataProvider = ({ children }) => {
       status: activityData.status || '완료',
       next_action_date: activityData.next_action_date || null,
       next_action_detail: activityData.next_action_detail || '',
+      // 누가 다녀왔는지. 담당 자동 지정과 KPI 집계의 근거가 된다.
+      user_name: activityData.user_name || activityData.user || null,
       created_by: uid
     }
 
@@ -1670,6 +1672,22 @@ export const DataProvider = ({ children }) => {
     // 참석자 정보(user)는 UI용으로만 사용하고 DB에는 저장하지 않음
     // clientName 매핑 추가 (clients 조인)
     const client = clients.find(c => c.id === insertedData.client_id)
+
+    // 미팅·통화한 곳은 내 담당이다. 담당이 비어 있으면 채운다.
+    //
+    // 신규·복원 영업 대상은 거래처에 담당자가 지정되지 않은 경우가 많은데,
+    // 그러면 영업 코치에서 빠지고 KPI 정기적방문횟수에도 안 잡힌다
+    // (둘 다 담당 거래처만 센다). 정작 공들이는 곳이 화면에서 사라지는 셈이다.
+    // 이미 담당이 있으면 건드리지 않는다 — 남의 거래처를 뺏으면 안 된다.
+    const repName = activityData.user_name || activityData.user || null
+    if (client && !client.sales_rep && repName) {
+      try {
+        await supabase.from('clients').update({ sales_rep: repName }).eq('id', client.id).is('sales_rep', null)
+        setClients(prev => prev.map(c => (c.id === client.id ? { ...c, sales_rep: repName } : c)))
+      } catch (e) {
+        console.warn('[addActivity] 담당 자동 지정 실패:', e.message)
+      }
+    }
     const newActivity = {
       ...insertedData,
       clientId: insertedData.client_id,

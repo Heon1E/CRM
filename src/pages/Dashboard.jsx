@@ -147,81 +147,79 @@ const Dashboard = () => {
   ]; // Placeholder if real data isn't ready, or use weeklySalesData
 
   const monthlyTrendData = stats.aggregatedMonthlyTrend || []
+
+  const ytdRevenue = useMemo(() => {
+    const y = new Date().getFullYear()
+    return (rawSalesData || []).reduce((a, sale) => {
+      const d = new Date(sale.sale_date || sale.date || sale.created_at)
+      return d.getFullYear() === y ? a + (Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0) : a
+    }, 0)
+  }, [rawSalesData])
+
+  // 자료가 실제로 도착했는지. 이게 false면 숫자 대신 '—'를 보여준다.
+  const dataReady = !loading && (rawSalesData?.length > 0 || clients?.length > 0)
+
+  const summaryCards = useMemo(() => {
+    const yoy = Number(stats?.revenueYoY)
+    const yoyText = Number.isFinite(yoy) ? `${yoy > 0 ? '+' : ''}${yoy}% (작년 동월 대비)` : ' '
+    return [
+      { label: '전체 거래처', value: `${(stats?.totalClientsCount || 0).toLocaleString('ko-KR')}곳`, sub: `내 담당 ${myAccounts?.length || 0}곳` },
+      { label: '최근 거래 거래처', value: `${(stats?.currentActiveClientsCount || 0).toLocaleString('ko-KR')}곳`, sub: '최근 3개월 주문' },
+      { label: '이번 달 매출', value: formatKoreanCurrency(stats?.currentMonthSalesTotal || 0), sub: yoyText },
+      { label: '올해 누적 매출', value: formatKoreanCurrency(ytdRevenue), sub: `${new Date().getFullYear()}년 1월~오늘` },
+    ]
+  }, [stats, myAccounts, ytdRevenue])
   const lastUpdatedTime = lastRefreshed ? lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
 
 
   return (
-    <div className="dashboard-light min-h-screen p-4 md:p-8 font-['Inter',sans-serif] mt-[56px]" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
-      <div className="max-w-[1600px] mx-auto space-y-6">
+    <div className="dashboard-light min-h-screen p-3 md:p-4 mt-[56px]" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+      <div className="max-w-[1600px] mx-auto space-y-3">
 
-        {/* Page Title Section */}
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
-          <div className="flex flex-col">
-            <p className="text-[10px] uppercase tracking-wider font-semibold mb-1 text-slate-500">Home / Dashboard</p>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-              Dashboard Overview
-            </h2>
+        {/* 제목 줄 */}
+        <div className="win" style={{ marginBottom: 12 }}>
+          <div className="win-title">
+            <span>대시보드</span>
+            <span className="meta">
+              {dataReady ? `${lastUpdatedTime} 기준` : '불러오는 중…'}
+            </span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="px-3 py-1.5 rounded-lg bg-white border border-slate-200 shadow-sm">
-              <span className="text-[11px] font-bold text-slate-600">Last Updated: {lastUpdatedTime}</span>
-            </div>
-            <button
-              onClick={handleRefresh}
-              className="p-1.5 rounded-lg transition-all bg-white border border-slate-200 hover:bg-slate-50 shadow-sm"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''} text-slate-600`} />
+          <div className="toolbar">
+            <button className="tb-btn" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> 새로고침
             </button>
+            <span className="tb-sep" />
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              {getUserSalesRep ? `${getUserSalesRep} 담당` : '전사'}
+            </span>
           </div>
-        </div>
 
-        {/* Global KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Customers', value: stats?.totalClientsCount || 0, sub: `${stats?.clientGrowthVal}%`, icon: <Target className="w-5 h-5 text-slate-700" strokeWidth={1.5} /> },
-            { label: 'Active Customers', value: stats?.currentActiveClientsCount || 0, sub: `${((stats?.currentActiveClientsCount / (stats?.totalClientsCount || 1)) * 100).toFixed(0)}%`, icon: <Zap className="w-5 h-5 text-slate-700" strokeWidth={1.5} /> },
-            { label: 'Monthly Revenue', value: formatKoreanCurrency(stats?.currentMonthSalesTotal || 0), sub: `${stats?.revenueYoY}%`, icon: <Award className="w-5 h-5 text-slate-700" strokeWidth={1.5} /> }
-          ].map((kpi, i) => (
-            <div key={i} className="p-5 rounded-xl flex items-start justify-between relative overflow-hidden transition-all bg-white border border-slate-100 shadow-sm hover:shadow-md">
-              <div>
-                <p className="text-xs font-medium mb-1 text-slate-500">{kpi.label}</p>
-                <h3 className="text-2xl font-bold text-slate-900">{kpi.value}</h3>
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-[10px] font-bold flex items-center gap-1 text-red-600"><TrendingUp className="w-3 h-3" />{kpi.sub}</span>
-                  <span className="text-[10px] font-medium text-slate-400">vs last year</span>
+          {/* 요약 숫자 — 자료가 준비되기 전에는 '—'를 보여준다.
+              예전에는 0이나 계산 도중 값이 그대로 떠서, 새로고침을 눌러야
+              제대로 나오는 것처럼 보였다. 틀린 숫자보다 빈 칸이 낫다. */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: 1, background: 'var(--border)',
+            borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)'
+          }}>
+            {summaryCards.map((c) => (
+              <div key={c.label} style={{ background: 'var(--bg-card)', padding: '10px 14px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.label}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {dataReady ? c.value : '—'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  {dataReady ? c.sub : ' '}
                 </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">{kpi.icon}</div>
-            </div>
-          ))}
-
-          {/* 7-Day Trend */}
-          <div className="p-5 rounded-xl flex flex-col justify-between relative overflow-hidden transition-all bg-white border border-slate-100 shadow-sm hover:shadow-md">
-            <div className="flex justify-between items-start mb-2">
-              <p className="text-xs font-medium text-slate-500">7-Day Trend</p>
-              <div className="p-2.5 rounded-xl bg-red-50 text-red-600 border border-red-100"><BarChart2 className="w-5 h-5" strokeWidth={1.5} /></div>
-            </div>
-            <div className="h-16 w-full relative mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weeklySalesData.length > 0 ? weeklySalesData : weeklyData}>
-                  <defs>
-                    <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#DC2626" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="value" stroke="#DC2626" strokeWidth={2} fillOpacity={1} fill="url(#colorTrend)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            ))}
           </div>
         </div>
 
         {/* 일정 달력 + 영업 코치 — 매일 여는 화면이라 맨 위에 둔다.
             일정은 텔레그램으로 보낸 것이 바로 뜨고, 코치는 오늘 누구부터
             챙길지 거래처별 매출·접점을 함께 보고 정해 준다. */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-3">
           <ScheduleCalendar />
           <SalesCoach
             sales={rawSalesData}
@@ -232,7 +230,7 @@ const Dashboard = () => {
         </div>
 
         {/* KPI Performance Tracker */}
-        <div className="mt-6">
+        <div>
           <KPIWidget
             rawSalesData={rawSalesData}
             clients={clients}
@@ -242,75 +240,60 @@ const Dashboard = () => {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 mt-6">
+        <div>
           <RevenueForecastPanel />
         </div>
 
         {/* Lower Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* Fastest Growing Clients */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col h-full overflow-hidden">
-            <div className="p-5 border-b border-slate-50 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-900">Fastest Growing Clients</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Top Performers by Growth Rate</p>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          {/* 빠르게 크는 거래처 */}
+          <div className="win">
+            <div className="win-title">
+              <span>빠르게 크는 거래처</span>
+              <span className="meta">성장률 상위</span>
             </div>
-            <div className="flex-1 overflow-auto">
-              <table className="w-full text-left border-collapse">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="dgrid">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-white">
-                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Client Name</th>
-                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sector</th>
-                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Revenue (Mo)</th>
-                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Growth</th>
+                  <tr>
+                    <th className="seq" style={{ width: 36 }}>#</th>
+                    <th style={{ minWidth: 160 }}>거래처</th>
+                    <th style={{ minWidth: 110, textAlign: 'right' }}>월 매출</th>
+                    <th style={{ minWidth: 80, textAlign: 'right' }}>성장률</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {stats?.topGrowthClients?.map((client, idx) => (
-                    <tr key={idx} className="group hover:bg-gray-50">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-sm bg-gray-100 text-[9px] font-bold text-gray-500 flex items-center justify-center border border-gray-200">
-                            {client.name.substring(0, 1)}
-                          </div>
-                          <span className="text-[11px] font-bold text-gray-900">{client.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-[10px] text-gray-400 font-medium">{client.role || '-'}</td>
-                      <td className="py-3 px-4 text-[11px] font-bold text-gray-900 text-right tabular-nums">
-                        {formatKoreanCurrency(client.amount)}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span className="inline-block px-1.5 py-0.5 rounded-sm bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100">
-                          +{client.growthRate?.toFixed(0)}%
-                        </span>
+                <tbody>
+                  {(stats?.topGrowthClients || []).slice(0, 8).map((client, idx) => (
+                    <tr key={idx}>
+                      <td className="seq">{idx + 1}</td>
+                      <td>{client.name}</td>
+                      <td className="num">{formatKoreanCurrency(client.amount)}</td>
+                      <td className="num" style={{ color: '#1C6B3C', fontWeight: 600 }}>
+                        +{client.growthRate?.toFixed(0)}%
                       </td>
                     </tr>
                   ))}
+                  {(!stats?.topGrowthClients || stats.topGrowthClients.length === 0) && (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 18, color: 'var(--text-secondary)' }}>
+                      {dataReady ? '해당하는 거래처가 없습니다.' : '불러오는 중…'}
+                    </td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
-
         </div>
 
         {/* 최근 활동 */}
-        <div className="grid grid-cols-1 gap-6 pb-20 mt-6">
-          <div className="rounded-xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
-            <div className="p-5 flex items-center justify-between border-b border-slate-50">
-              <div>
-                <h3 className="font-semibold text-slate-900">Recent Activities</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Timeline of Interactions</p>
-              </div>
+        <div className="grid grid-cols-1 gap-3 pb-20">
+          <div className="win">
+            <div className="win-title">
+              <span>최근 활동</span>
+              <span className="meta">다녀온 기록</span>
             </div>
-            <div className="p-0">
-              <ActivityTimeline maxItems={5} />
-            </div>
-            <div className="p-4 text-center border-t border-slate-50">
-              <Link to="/activities" className="text-xs font-medium flex items-center justify-center gap-1 text-slate-500 hover:text-slate-800 transition-colors">
-                View Full Timeline <ChevronRight className="w-4 h-4" />
-              </Link>
+            <ActivityTimeline maxItems={5} />
+            <div className="statusbar">
+              <Link to="/activities" style={{ color: 'var(--text-secondary)' }}>전체 활동 보기 &rsaquo;</Link>
             </div>
           </div>
 
