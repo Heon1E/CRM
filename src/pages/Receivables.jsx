@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Loader2, AlertTriangle, Search, Target } from 'lucide-react'
+import { RefreshCw, Loader2, AlertTriangle, Search, Target, Upload } from 'lucide-react'
+import * as XLSX from 'xlsx'
+import { parseReceivablesLedger } from '../utils/receivablesLedger'
+import { buildClientKeys } from '../hooks/useSalesImport'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { setKpiManualInput } from '../utils/kpiCategories'
-import { showSuccess, showError } from '../utils/alert'
+import { showSuccess, showError, showWarning } from '../utils/alert'
 
 /**
  * 채권관리 — 결제가 밀린 순서로 본다.
@@ -51,6 +54,8 @@ const Receivables = () => {
     const [query, setQuery] = useState('')
     const [mineOnly, setMineOnly] = useState(false)
     const [sort, setSort] = useState({ key: 'aging_months', dir: 'desc' })
+    const [uploading, setUploading] = useState(false)
+    const fileRef = React.useRef(null)
 
     const repById = useMemo(() => {
         const m = new Map()
@@ -99,7 +104,8 @@ const Receivables = () => {
         const withBal = rows.filter((r) => Number(r.balance) > 0)
         const od = rows.filter((r) => Number(r.overdue_amount) > 0)
         return {
-            total: withBal.reduce((a, r) => a + Number(r.balance || 0), 0),
+            // 음수(선수금)까지 합산해야 대장의 합계행과 맞는다
+            total: rows.reduce((a, r) => a + Number(r.balance || 0), 0),
             clients: withBal.length,
             overdueCount: od.length,
             overdueAmount: od.reduce((a, r) => a + Number(r.overdue_amount || 0), 0),
@@ -136,6 +142,75 @@ const Receivables = () => {
     }
     const sortMark = (key) => (sort.key === key ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : '')
 
+    /**
+     * 외상매출금 대장 엑셀을 화면에서 바로 올린다.
+     *
+     * 판독·계산은 `receivablesLedger.js`로, 스크립트와 **같은 코드**를 쓴다.
+     * 매달 대장이 새로 오면 터미널 없이 여기서 갱신하면 된다.
+     * 같은 기준월을 다시 올리면 덮어쓴다(중복이 쌓이지 않는다).
+     */
+    const handleUpload = async (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setUploading(true)
+        try {
+            const buf = await file.arrayBuffer()
+            const wb = XLSX.read(buf, { type: 'array' })
+            const ws = wb.Sheets[wb.SheetNames[0]]
+            const parsed = parseReceivablesLedger({
+                aoa: XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }),
+                merges: ws['!merges'] || [],
+            })
+
+            if (!parsed.baseMonth || parsed.rows.length === 0) {
+                await showWarning('대장에서 잔액이 채워진 달을 찾지 못했습니다.\n외상매출금 관리대장 파일이 맞는지 확인해 주세요.')
+                return
+            }
+
+            // 거래처 연결 (스크립트와 같은 기준)
+            const map = new Map()
+            clients.forEach((c) => buildClientKeys(c.company).forEach((k) => { if (!map.has(k)) map.set(k, c) }))
+
+            const payload = parsed.rows.map((x) => {
+                const hit = buildClientKeys(x.name).map((k) => map.get(k)).find(Boolean)
+                return {
+                    client_id: hit ? hit.id : null,
+                    client_name: x.name,
+                    base_month: parsed.baseMonth,
+                    balance: Math.round(x.balance),
+                    overdue_amount: Math.round(x.overdue),
+                    aging_months: x.aging,
+                    oldest_unpaid_month: x.oldest,
+                    delay_note: x.delay || null,
+                    updated_at: new Date().toISOString(),
+                }
+            })
+
+            for (let i = 0; i < payload.length; i += 200) {
+                const { error } = await supabase.from('receivables')
+                    .upsert(payload.slice(i, i + 200), { onConflict: 'client_name,base_month' })
+                if (error) throw error
+            }
+
+            const overdue = payload.filter((p) => p.overdue_amount > 0).length
+            await showSuccess(
+                `${parsed.baseMonth} 기준 채권 ${payload.length}건을 반영했습니다.\n` +
+                `연체 ${overdue}곳 · 거래처 연결 ${payload.filter((p) => p.client_id).length}건`
+            )
+            await load(parsed.baseMonth)
+        } catch (err) {
+            console.error('대장 업로드 실패:', err)
+            if (/schema cache|does not exist|PGRST205/i.test(`${err.message} ${err.code}`)) {
+                await showError('receivables 테이블이 아직 없습니다.\nSupabase SQL Editor에서 execution/sql/receivables.sql 을 먼저 실행해 주세요.')
+            } else {
+                await showError(err.message || '대장을 반영하지 못했습니다.')
+            }
+        } finally {
+            setUploading(false)
+            if (fileRef.current) fileRef.current.value = ''
+        }
+    }
+
     const sendToKpi = async () => {
         setKpiManualInput('receivables', summary.overdueCount)
         window.dispatchEvent(new Event('kpi-manual-updated'))
@@ -146,12 +221,27 @@ const Receivables = () => {
         return (
             <div className="win" style={{ margin: 12 }}>
                 <div className="win-title"><span>채권관리</span></div>
+                <div className="toolbar">
+                    <input
+                        ref={fileRef} type="file" accept=".xlsx,.xls"
+                        onChange={handleUpload} style={{ display: 'none' }} id="recv-ledger-input-empty"
+                    />
+                    <label htmlFor="recv-ledger-input-empty" className="tb-btn primary" style={{ cursor: 'pointer' }}>
+                        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} 대장 올리기
+                    </label>
+                    <button className="tb-btn" onClick={() => load()} disabled={loading}>
+                        <RefreshCw size={14} /> 다시 확인
+                    </button>
+                </div>
                 <div style={{ padding: 16, fontSize: 13, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
                     <p style={{ margin: 0 }}>아직 준비되지 않았습니다. 두 단계만 하면 됩니다.</p>
                     <ol style={{ margin: '10px 0 0', paddingLeft: 20 }}>
                         <li>Supabase SQL Editor에서 <code>execution/sql/receivables.sql</code> 실행</li>
-                        <li>터미널에서{' '}
-                            <code>node execution/analyze_receivables.mjs "&lt;외상매출금.xlsx&gt;" --apply</code>
+                        <li>이 화면의 <b>대장 올리기</b>로 외상매출금 엑셀을 올리기<br />
+                            <span style={{ fontSize: 12 }}>
+                                (터미널을 쓰려면{' '}
+                                <code>node execution/analyze_receivables.mjs "&lt;외상매출금.xlsx&gt;" --apply</code>)
+                            </span>
                         </li>
                     </ol>
                 </div>
@@ -180,6 +270,14 @@ const Receivables = () => {
                         </select>
                     </>
                 )}
+                <span className="tb-sep" />
+                <input
+                    ref={fileRef} type="file" accept=".xlsx,.xls"
+                    onChange={handleUpload} style={{ display: 'none' }} id="recv-ledger-input"
+                />
+                <label htmlFor="recv-ledger-input" className="tb-btn" style={{ cursor: uploading ? 'not-allowed' : 'pointer' }}>
+                    {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} 대장 올리기
+                </label>
                 <span className="tb-sep" />
                 <button className="tb-btn" onClick={sendToKpi} disabled={loading || rows.length === 0}>
                     <Target size={14} /> KPI 채권관리에 {summary.overdueCount}건 저장

@@ -437,8 +437,16 @@ node execution/analyze_receivables.mjs "<외상매출금.xlsx>"
 `src/pages/Receivables.jsx`. 결제가 밀린 순서로 거래처를 세운다.
 데이터는 `receivables` 테이블(월 스냅샷)이고 `analyze_receivables.mjs --apply`가 채운다.
 
-준비(최초 1회): `execution/sql/receivables.sql` 실행 → 대장 파일로 `--apply`.
-매달 새 대장이 오면 `--apply`만 다시 돌리면 된다(같은 달은 덮어쓴다).
+준비(최초 1회): `execution/sql/receivables.sql`을 Supabase SQL Editor에서 실행.
+**이 DDL은 anon 키로 못 한다** — CLI·액세스 토큰·DB 비밀번호가 없으면 사람이 직접 해야 한다.
+
+그 다음부터는 화면의 **대장 올리기** 버튼으로 엑셀을 올리면 된다(터미널 불필요).
+스크립트 경로도 그대로 쓸 수 있다: `analyze_receivables.mjs "<파일>" --apply`.
+같은 기준월을 다시 올리면 덮어쓴다.
+
+**판독·계산은 `src/utils/receivablesLedger.js` 하나뿐이다.** 화면 업로드와 스크립트가
+같은 코드를 쓴다. 결과가 어긋나면 안 되기 때문이다 (`tests/receivablesLedger.test.mjs` 12건이 고정).
+열 위치는 헤더에서 찾는다 — 하드코딩하면 달이 하나 늘 때 뒤가 밀려 조용히 틀린 값을 읽는다.
 
 ### 연체 판정 — 대장의 '지연' 메모를 쓰지 않는다
 
@@ -457,6 +465,9 @@ node execution/analyze_receivables.mjs "<외상매출금.xlsx>"
 
 메모는 참고용으로 '대장 메모' 열에 그대로 보여준다. 계산값과 어긋나는 경우가 있다
 (인터코스코리아: 메모 '2개월' vs 계산 1개월).
+
+총 미수금은 **음수(선수금)까지 합산**한다. 그래야 대장의 합계행과 맞아떨어진다
+(2026-05: 1,889,368,834원으로 일치).
 
 ### 화면
 
