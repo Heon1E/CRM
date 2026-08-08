@@ -408,7 +408,12 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         const excludedChurnList = excludedIdsFor(KPI_EXCLUSION_KINDS.CHURN)
 
         // 5. Visit count
+        // [수정] 예전에는 연도 조건이 없어 작년 활동까지 올해 KPI에 합산됐다.
+        // 일일업무보고서를 일괄로 넣으면 작년 12월분이 그대로 딸려 들어와
+        // 올해 방문 실적이 부풀려진다. 반드시 올해 것만 센다.
         const visitCount = activities.filter(a => {
+            const d = a.activity_date || a.date
+            if (!d || new Date(d).getFullYear() !== currentYear) return false
             return managedClientIds.includes(a.client_id) &&
                 ['visit', '\ubc29\ubb38', '\uc601\uc5c5\ubc29\ubb38', 'meeting', '\ubbf8\ud305'].includes((a.activity_type || a.type || '').toLowerCase())
         }).length

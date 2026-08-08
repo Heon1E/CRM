@@ -369,3 +369,45 @@ localStorage에 `{ clientId: { new?: true, churn?: true } }` 형태로 저장한
 스크린샷 판독을 배포해야만 확인할 수 있었다. 이 플러그인이 `/api/*`를 해당 파일의
 default export로 넘겨 준다. `.env`/`.env.local` 값을 `process.env`에 실어 주므로
 `GEMINI_API_KEY` 같은 VITE_ 없는 변수도 개발 중에 동작한다.
+
+## 일일업무보고서 -> 활동 반영
+
+`execution/import_daily_report.mjs`. 시트 하나가 하루인 회사 양식을 읽어 `activities`에 넣는다.
+
+```bash
+node execution/import_daily_report.mjs "<보고서.xls>"                      # 미리보기
+node execution/import_daily_report.mjs "<보고서.xls>" --apply --create-clients
+```
+
+- **'금일 영업 계획'은 반영하지 않는다.** 아직 일어나지 않은 일이고, 실제로 다녀오면
+  다음 날 시트에 방문기록으로 다시 나온다. 같이 넣으면 이중 계상된다.
+- 중복 방지는 `(client_id, activity_date)` 기준. 같은 보고서를 다시 올려도 늘지 않는다.
+- `ALIASES` 표가 핵심이다. 보고서 표기와 CRM 거래처명이 달라서(`KP한석유화` ↔
+  `케이피한석유화 주식회사`, `KCC 전주공장` ↔ `KCC`) 그냥 두면 같은 회사가 하나 더 만들어진다.
+  미매칭으로 뜨는데 실은 CRM에 있는 곳이면 이 표에 추가할 것.
+- 여러 회사를 한 칸에 적은 행(`성진실업 인지산업 남양화학`)과 `사무실` 같은 항목은 건너뛴다.
+- 새로 만드는 거래처는 `status: '잠재고객'` + `sales_rep`(보고서 작성자). **`clients`에 `notes`
+  컬럼은 없다.**
+
+### KPI 정기적방문횟수와의 관계
+
+`KPIWidget`은 **담당 거래처(`sales_rep`)의 `미팅`/`방문` 활동만** 센다. 그래서:
+
+- `유선` 방문은 `전화`로 저장되어 KPI에서 빠진다. '정기적방문'이므로 의도된 동작이다.
+- **`sales_rep`이 비어 있는 거래처의 방문은 KPI에 잡히지 않는다.** 2026-08-08 기준
+  미팅/방문 137건 중 17건이 이 이유로 빠졌다. 담당을 지정하면 잡히지만, 매출이 있는
+  거래처를 담당으로 넣으면 부문기여·신규고객·단절고객 KPI 숫자도 함께 바뀐다.
+
+## 외상매출금 대장 분석
+
+`execution/analyze_receivables.mjs` (읽기 전용).
+
+```bash
+node execution/analyze_receivables.mjs "<외상매출금.xlsx>"
+```
+
+- **대장 금액은 부가세 포함, CRM은 공급가액이다.** 그대로 비교하면 CRM이 늘 9% 적어 보인다.
+  `÷1.1` 해야 맞는다. 2024-12 ~ 2026-05 전체 대조 결과 일치율 99.9%였다.
+- 월 열 위치는 헤더에서 찾는다. 하드코딩하면 다음 달에 열이 밀려 깨진다.
+- '지연' 표시 건수가 KPI 채권관리에 넣을 숫자다. localStorage 값이라
+  **스크립트가 넣을 수 없고 화면에서 직접 입력해야 한다.**
