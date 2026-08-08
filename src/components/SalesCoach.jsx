@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, TrendingDown, PhoneOff, Sprout, Target, ChevronRight, RotateCcw, Flame, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, TrendingDown, PhoneOff, Sprout, Target, ChevronRight, RotateCcw, Flame, CheckCircle2, EyeOff, Undo2 } from 'lucide-react'
+import { getCoachOverrides, toggleCoachOverride, clearCoachOverride, overrideFor } from '../utils/coachOverrides'
 
 /**
  * 영업 코치 — 오늘 누구부터 챙길지 정해 준다.
@@ -90,6 +91,8 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
     const [mineOnly, setMineOnly] = useState(true)
     const [openArea, setOpenArea] = useState('manage')
     const [openGroup, setOpenGroup] = useState('declining')
+    const [overrides, setOverrides] = useState(() => getCoachOverrides())
+    const [showHidden, setShowHidden] = useState(false)
 
     const result = useMemo(() => {
         const now = Date.now()
@@ -100,7 +103,7 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
         // 거래처별로 매출·활동을 한 번에 모은다
         const acc = new Map()
         const ensure = (id) => {
-            if (!acc.has(id)) acc.set(id, { sales: [], lastActivityMs: 0, actCount90: 0 })
+            if (!acc.has(id)) acc.set(id, { sales: [], lastActivityMs: 0, firstActivityMs: 0, actCount: 0, actCount90: 0 })
             return acc.get(id)
         }
 
@@ -118,6 +121,8 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
             if (!Number.isFinite(ms)) return
             const e = ensure(id)
             if (ms > e.lastActivityMs) e.lastActivityMs = ms
+            if (!e.firstActivityMs || ms < e.firstActivityMs) e.firstActivityMs = ms
+            e.actCount += 1
             if (ms >= now - 90 * DAY) e.actCount90 += 1
         })
 
@@ -126,12 +131,19 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
             restoreHot: [], restoreCold: [], restoreWon: [],
             newHot: [], newCold: [], newWon: [],
         }
+        const hidden = []
 
         clients.forEach((c) => {
             const e = acc.get(c.id)
             if (!e) return
 
+            // 담당이 아닌 곳은 어느 갈래에도 넣지 않는다.
+            // 미팅·통화하면 활동을 넣는 순간 담당이 채워지므로(addActivity),
+            // 여기서 걸러도 정작 공들이는 곳이 빠지지 않는다.
             if (mineOnly && salesRepName && c.sales_rep !== salesRepName) return
+
+            const ov = overrideFor(overrides, c)
+            if (ov?.kind === 'hide') { hidden.push({ id: c.id, name: c.company, why: ov.why }); return }
 
             const recent = e.sales.reduce((a, s) => (s.ms >= m3 ? a + s.amount : a), 0)
             const prev = e.sales.reduce((a, s) => (s.ms >= m6 && s.ms < m3 ? a + s.amount : a), 0)
@@ -147,10 +159,40 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                 unassigned: !c.sales_rep,
             }
 
+            // ---------- 사람이 알려준 사실이 규칙보다 우선한다 ----------
+            // CRM에 과거 실적이 없어도 실제로는 예전 거래처인 경우가 있다.
+            if (ov?.kind === 'restored') {
+                row.score = thisYear || totalEver
+                row.note = ov.why
+                groups.restoreWon.push(row)
+                return
+            }
+            if (ov?.kind === 'existing') {
+                // 신규가 아니라 기존 거래처. 기존관리 규칙만 태운다.
+                if (prev >= 500 * MAN && recent < prev * 0.7) {
+                    row.drop = Math.round((1 - recent / prev) * 100)
+                    row.score = prev - recent
+                    groups.declining.push(row)
+                }
+                return
+            }
+
             // ---------- 매출 이력이 없는 곳 = 신규 영업 ----------
             if (totalEver === 0) {
                 if (!e.lastActivityMs) return                 // 접점도 매출도 없으면 대상이 아니다
-                row.score = e.lastActivityMs
+
+                // 진행이 많이 된 곳을 위로 올린다.
+                // 접점 횟수가 곧 진행도다(여러 번 만났다 = 얘기가 되고 있다).
+                // 최근성은 살아있는 건인지를 가르고, 총 접촉 기간은 공들인 정도다.
+                const daysSince = Math.max(0, Math.floor((now - e.lastActivityMs) / DAY))
+                const spanDays = e.firstActivityMs ? Math.floor((e.lastActivityMs - e.firstActivityMs) / DAY) : 0
+                row.actTotal = e.actCount
+                row.spanDays = spanDays
+                row.score =
+                    e.actCount * 100 +                        // 만난 횟수 = 진행도
+                    Math.max(0, 90 - daysSince) +             // 최근일수록 가산
+                    Math.min(60, Math.floor(spanDays / 7))    // 오래 공들인 건 소폭 가산
+
                 if (touchedRecently) groups.newHot.push(row)
                 else groups.newCold.push(row)
                 return
@@ -204,10 +246,14 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
         })
 
         Object.values(groups).forEach((g) => g.sort((a, b) => b.score - a.score))
-        return groups
-    }, [sales, clients, activities, mineOnly, salesRepName])
+        return { groups, hidden }
+    }, [sales, clients, activities, mineOnly, salesRepName, overrides])
 
-    const areaCount = (area) => area.groups.reduce((a, g) => a + result[g.key].length, 0)
+    const { groups: G, hidden } = result
+    const areaCount = (area) => area.groups.reduce((a, g) => a + G[g.key].length, 0)
+
+    const hide = (row) => setOverrides(toggleCoachOverride(row.id, 'hide', '화면에서 제외'))
+    const unhide = (id) => setOverrides(clearCoachOverride(id))
     const total = AREAS.reduce((a, ar) => a + areaCount(ar), 0)
 
     const describe = (key, r) => {
@@ -216,9 +262,9 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
             case 'growingIgnored': return `최근 3개월 ${fmtMan(r.recent)} (+${r.gain}%) · 90일간 방문 없음`
             case 'restoreHot': return `마지막 거래 ${agoText(r.lastSaleMs)} · 최근 접촉 ${agoText(r.lastActivityMs)} · 누적 ${fmtMan(r.totalEver)}`
             case 'restoreCold': return `마지막 거래 ${agoText(r.lastSaleMs)} · 접촉도 ${agoText(r.lastActivityMs)} · 누적 ${fmtMan(r.totalEver)}`
-            case 'restoreWon': return `올해 ${fmtMan(r.thisYear)} 재개 · 과거 누적 ${fmtMan(r.totalEver)}`
-            case 'newHot': return `최근 접촉 ${agoText(r.lastActivityMs)} · 90일간 ${r.actCount90}회 · 아직 매출 없음`
-            case 'newCold': return `마지막 접촉 ${agoText(r.lastActivityMs)} · 아직 매출 없음`
+            case 'restoreWon': return r.note ? `${r.note} · 올해 ${fmtMan(r.thisYear)}` : `올해 ${fmtMan(r.thisYear)} 재개 · 과거 누적 ${fmtMan(r.totalEver)}`
+            case 'newHot': return `접촉 ${r.actTotal}회 · 최근 ${agoText(r.lastActivityMs)}${r.spanDays > 14 ? ` · ${Math.round(r.spanDays / 30)}개월째` : ''}`
+            case 'newCold': return `접촉 ${r.actTotal}회 · 마지막 ${agoText(r.lastActivityMs)}`
             case 'newWon': return `올해 첫 거래 ${fmtMan(r.thisYear)}`
             default: return ''
         }
@@ -237,6 +283,35 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                         <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
                         내 담당만
                     </label>
+                    {hidden.length > 0 && (
+                        <button
+                            className={`tb-btn${showHidden ? ' primary' : ''}`}
+                            onClick={() => setShowHidden((v) => !v)}
+                            title="코치에서 뺀 거래처"
+                        >
+                            <EyeOff size={13} /> 제외 {hidden.length}
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {showHidden && (
+                <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
+                    <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--text-secondary)' }}>
+                        코치에서 뺀 거래처입니다. 되돌리려면 화살표를 누르세요.
+                    </p>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                        {hidden.map((h) => (
+                            <li key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 12 }}>
+                                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {h.name}
+                                </span>
+                                <button className="rowbtn" onClick={() => unhide(h.id)} title="다시 넣기">
+                                    <Undo2 size={12} />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
 
@@ -262,7 +337,7 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                             </button>
 
                             {isOpen && area.groups.map((g) => {
-                                const list = result[g.key]
+                                const list = G[g.key]
                                 const Icon = g.icon
                                 const gOpen = openGroup === g.key
                                 return (
@@ -295,7 +370,7 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                                                 ) : (
                                                     <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                                                         {list.slice(0, 8).map((r) => (
-                                                            <li key={r.id}>
+                                                            <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                                                 <button
                                                                     onClick={() => navigate(`/clients/${r.id}`)}
                                                                     style={{
@@ -321,6 +396,14 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                                                                         </span>
                                                                     </span>
                                                                     <ChevronRight size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
+                                                                </button>
+                                                                <button
+                                                                    className="rowbtn"
+                                                                    onClick={(ev) => { ev.stopPropagation(); hide(r) }}
+                                                                    title="이 거래처를 코치에서 빼기"
+                                                                    style={{ flexShrink: 0 }}
+                                                                >
+                                                                    <EyeOff size={12} />
                                                                 </button>
                                                             </li>
                                                         ))}
