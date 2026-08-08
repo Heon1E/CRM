@@ -12,6 +12,7 @@ const TopNavbar = () => {
     { path: '/', label: 'Dashboard' },
     { path: '/clients', label: 'Customers' },
     { path: '/sales', label: 'Sales' },
+    { path: '/receivables', label: '채권관리' },
     { path: '/activities', label: 'Activities' },
     { path: '/pipeline', label: 'Pipeline' },
     { path: '/map', label: 'Map' },
