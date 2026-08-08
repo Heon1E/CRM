@@ -21,7 +21,8 @@ const KEY = 'coach_overrides'
  *       'hide'      코치에서 완전히 뺀다
  */
 export const KNOWN_FACTS = {
-    '한독산업(주)': { kind: 'restored', why: '예전 거래처가 되살아난 곳 (CRM에는 과거 실적이 없음)' },
+    // 복원 영업이 끝나 이제 안정적으로 매출이 나온다. 기존 거래처로 본다.
+    '한독산업(주)': { kind: 'existing', why: '복원 완료 — 안정적으로 거래 중' },
     '주식회사 윌슨플로켐': { kind: 'existing', why: '휴브글로벌 자회사로 원래 거래하던 곳' },
 }
 

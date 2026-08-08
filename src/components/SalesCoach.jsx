@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, TrendingDown, PhoneOff, Sprout, Target, ChevronRight, RotateCcw, Flame, CheckCircle2, EyeOff, Undo2 } from 'lucide-react'
 import { getCoachOverrides, toggleCoachOverride, clearCoachOverride, overrideFor } from '../utils/coachOverrides'
+import { getAllCachedStages } from '../services/clientBriefingService'
+import ClientBriefing from './ClientBriefing'
 
 /**
  * 영업 코치 — 오늘 누구부터 챙길지 정해 준다.
@@ -32,8 +34,8 @@ const agoText = (ms) => {
     const d = Math.floor((Date.now() - ms) / DAY)
     if (d <= 0) return '오늘'
     if (d < 30) return `${d}일 전`
-    const m = Math.floor(d / 30.44)
-    return m <= 0 ? '이번 달' : `${m}개월 전`
+    // Math.floor(30/30.44)는 0이라 '0개월 전'이 된다. 최소 1개월로 올린다.
+    return `${Math.max(1, Math.round(d / 30.44))}개월 전`
 }
 
 const AREAS = [
@@ -93,6 +95,10 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
     const [openGroup, setOpenGroup] = useState('declining')
     const [overrides, setOverrides] = useState(() => getCoachOverrides())
     const [showHidden, setShowHidden] = useState(false)
+    // 거래처를 누르면 브리핑을 연다. 활동 기록을 읽어 정리한 한 장이다.
+    const [briefingClient, setBriefingClient] = useState(null)
+    // 이미 읽어둔 브리핑의 단계만 배지로 보여준다 (여기서 새로 부르지 않는다 — 목록이 느려진다)
+    const [stages, setStages] = useState(() => getAllCachedStages())
 
     const result = useMemo(() => {
         const now = Date.now()
@@ -372,7 +378,7 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                                                         {list.slice(0, 8).map((r) => (
                                                             <li key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                                                 <button
-                                                                    onClick={() => navigate(`/clients/${r.id}`)}
+                                                                    onClick={() => setBriefingClient(clients.find((c) => c.id === r.id))}
                                                                     style={{
                                                                         width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                                                                         padding: '6px 0', background: 'transparent', border: 'none',
@@ -385,6 +391,15 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                                                                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                                                         }}>
                                                                             {r.name}
+                                                                            {stages[r.id] && (
+                                                                                <span style={{
+                                                                                    marginLeft: 5, fontSize: 10, fontWeight: 600,
+                                                                                    padding: '1px 5px', borderRadius: 8,
+                                                                                    background: 'var(--bg-card-hover)', color: 'var(--text-secondary)',
+                                                                                }}>
+                                                                                    {stages[r.id]}
+                                                                                </span>
+                                                                            )}
                                                                             {r.unassigned && (
                                                                                 <span style={{ marginLeft: 5, fontSize: 10, fontWeight: 500, color: '#B45309' }}>
                                                                                     담당 미지정
@@ -423,6 +438,15 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                     )
                 })}
             </div>
+
+            {briefingClient && (
+                <ClientBriefing
+                    client={briefingClient}
+                    sales={sales}
+                    activities={activities}
+                    onClose={() => { setBriefingClient(null); setStages(getAllCachedStages()) }}
+                />
+            )}
 
             {sales.length === 0 && (
                 <p style={{ padding: '0 12px 12px', margin: 0, fontSize: 12, color: '#B45309' }}>
