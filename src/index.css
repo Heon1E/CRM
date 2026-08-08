@@ -709,3 +709,29 @@ textarea:focus {
     height: 10px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   대시보드 일정 달력
+   좁은 화면에서는 달력과 목록을 위아래로 쌓는다. 2단으로 두면 최소 폭이
+   500px이라 375px 화면에서 가로 스크롤이 생긴다.
+--------------------------------------------------------------------------- */
+.sched-body {
+    display: grid;
+    grid-template-columns: 1fr;
+}
+
+.sched-grid {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+@media (min-width: 720px) {
+    .sched-body {
+        grid-template-columns: minmax(280px, 1.4fr) minmax(220px, 1fr);
+    }
+
+    .sched-grid {
+        border-bottom: none;
+        border-right: 1px solid var(--border);
+    }
+}

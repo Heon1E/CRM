@@ -481,14 +481,24 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         return {
             items: [
                 {
-                    id: 'revenue', category: '정량평가', name: '수익성', kpi: '매출 목표달성율', weight: 40, unit: '%',
+                    id: 'revenue', category: '정량평가', name: '수익성', kpi: '올해 매출 · 작년 동기 대비', weight: 40, unit: '',
+                    // 카드에 크게 보이는 값은 '올해 총 매출액'이다.
+                    // 달성율(%)은 등급 계산에만 쓰고 보조 줄에 적는다 — 영업사원이 매일 보는 건 매출액이다.
+                    display: `${(totalRevThisYear / 100_000_000).toFixed(1)}억`,
+                    displaySub: revenuePercent >= 100
+                        ? `작년 동기 대비 +${revenuePercent - 100}%`
+                        : `작년 동기 대비 ${revenuePercent - 100}%`,
+                    displaySubUp: revenuePercent >= 100,
                     actual: revenueAchievement,
                     target: 100, percent: revenueKpiPercent, icon: Target,
                     manualField: 'revenueTarget',
                     manualLabel: '2026년 목표 매출 (억원)',
                     detail: [
-                        `연말 예상 매출 ${(projectedRevenue / 100_000_000).toFixed(1)}억 ÷ 목표 ${revenueTargetEok.toFixed(1)}억 = ${revenueAchievement}%`,
-                        `올해 실적 ${(totalRevThisYear / 100_000_000).toFixed(1)}억 (${elapsedDays}일 경과) · 전년 ${(totalRevLastYear / 100_000_000).toFixed(1)}억`,
+                        `올해 매출 ${(totalRevThisYear / 100_000_000).toFixed(1)}억 (1/1~오늘, ${elapsedDays}일 경과)`,
+                        `작년 같은 기간 ${(totalRevLastYearSamePeriod / 100_000_000).toFixed(1)}억 → 성장률 ${revenuePercent >= 100 ? '+' : ''}${revenuePercent - 100}%`,
+                        `작년 연간 ${(totalRevLastYear / 100_000_000).toFixed(1)}억`,
+                        '',
+                        `[등급 산정] 연말 예상 ${(projectedRevenue / 100_000_000).toFixed(1)}억 ÷ 목표 ${revenueTargetEok.toFixed(1)}억 = ${revenueAchievement}%`,
                         manual.revenueTarget == null
                             ? `목표 ${DEFAULT_REVENUE_TARGET_EOK}억은 경영계획 기본값입니다. 아래 칸에 넣으면 그 값이 우선합니다.`
                             : '아래 칸에 입력한 목표 기준으로 계산했습니다.',
@@ -574,6 +584,133 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
         }
     }, [kpiData])
 
+    /**
+     * KPI 펼침 내용.
+     *
+     * 카드(6칸 그리드) 안이 아니라 표 아래 전체 폭에 그린다. 카드 안에 넣으면
+     * 칸이 좁아 거래처 목록의 글자가 겹치고 제외 버튼이 칸 밖으로 나간다.
+     */
+    const expandedItem = kpiData?.items?.find((i) => i.id === expandedKPI) || null
+
+    const renderDetail = (item) => (
+        <div className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                        <p className="whitespace-pre-line">{item.detail}</p>
+
+                        {/* 자동 계산이 안 되는 항목은 직접 입력받는다 */}
+                        {item.manualField && (
+                            <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                <label htmlFor={`kpi-${item.manualField}`} style={{ color: 'var(--text-secondary)' }}>
+                                    {item.manualLabel}
+                                </label>
+                                <input
+                                    id={`kpi-${item.manualField}`}
+                                    type="number"
+                                    step="any"
+                                    value={manual[item.manualField] ?? ''}
+                                    onChange={(e) => updateManual(item.manualField, e.target.value)}
+                                    placeholder="미입력"
+                                    style={{ width: '110px' }}
+                                />
+                                <span style={{ color: 'var(--text-muted)' }}>{item.unit}</span>
+                                {manual[item.manualField] != null && (
+                                    <button
+                                        className="rowbtn"
+                                        onClick={() => updateManual(item.manualField, '')}
+                                    >
+                                        지우기
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 인정된 거래처 목록 + 올해 누적 매출 */}
+                        {item.clientList && (
+                            item.clientList.length > 0 ? (
+                                <>
+                                    {item.clientListExcludable && (
+                                        <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
+                                            {item.clientListExcludeHint}
+                                        </p>
+                                    )}
+                                    <ul className="mt-2 divide-y" style={{ borderColor: 'var(--border-light)' }}>
+                                        {item.clientList.map(c => (
+                                            <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
+                                                <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                                                <span className="shrink-0 tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                    {formatMan(c.revenue)}
+                                                </span>
+                                                {item.clientListExcludable && (
+                                                    <button
+                                                        onClick={() => toggleExclusion(c.id, item.excludeKind)}
+                                                        className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
+                                                        style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
+                                                    >
+                                                        제외
+                                                    </button>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
+                            ) : (
+                                <p className="mt-2" style={{ color: 'var(--text-muted)' }}>{item.emptyText}</p>
+                            )
+                        )}
+
+                        {/* 아직 복귀하지 않은 단절고객 — 복구 불가한 곳은 제외 가능 */}
+                        {item.dormantList && item.dormantList.length > 0 && (
+                            <div className="mt-4">
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                                    아직 복귀하지 않은 단절고객 {item.dormantList.length}곳
+                                </p>
+                                <p className="mb-2" style={{ color: 'var(--text-muted)' }}>
+                                    폐업·상호변경 등으로 복구 가능성이 없는 곳은 제외하세요.
+                                </p>
+                                <ul className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
+                                    {item.dormantList.map(c => (
+                                        <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
+                                            <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                                            <span className="shrink-0 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                                                최종 {c.lastOrder} · 누적 {formatMan(c.history)}
+                                            </span>
+                                            <button
+                                                onClick={() => toggleExclusion(c.id, item.excludeKind)}
+                                                className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
+                                                style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
+                                            >
+                                                제외
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* 제외한 거래처 되돌리기 */}
+                        {item.excludedList && item.excludedList.length > 0 && (
+                            <div className="mt-4">
+                                <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                                    제외한 거래처 {item.excludedList.length}곳
+                                </p>
+                                <ul className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
+                                    {item.excludedList.map(c => (
+                                        <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
+                                            <span className="truncate" style={{ color: 'var(--text-muted)' }}>{c.name}</span>
+                                            <button
+                                                onClick={() => toggleExclusion(c.id, item.excludeKind)}
+                                                className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
+                                                style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                                            >
+                                                되돌리기
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+        </div>
+    )
+
     const overallGrade = getGradeInfo(overallScore)
 
     return (
@@ -649,8 +786,20 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                             <span className="text-lg font-bold" style={{ color: 'var(--text-muted)' }}>미입력</span>
                                         ) : (
                                             <>
-                                                <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{item.percent}%</span>
-                                                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md"
+                                                {/* display가 있으면 그 값을 크게 보여준다 (수익성 = 올해 매출액).
+                                                    환산 %는 등급 계산용이라 아래 '달성율' 줄에 남긴다. */}
+                                                <div className="min-w-0">
+                                                    <span className="text-2xl font-bold block truncate" style={{ color: 'var(--text-primary)' }}>
+                                                        {item.display ?? `${item.percent}%`}
+                                                    </span>
+                                                    {item.displaySub && (
+                                                        <span className="text-[11px] font-semibold"
+                                                            style={{ color: item.displaySubUp ? '#1C6B3C' : '#B91C1C' }}>
+                                                            {item.displaySub}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
                                                     style={{ backgroundColor: `${grade.color}20`, color: grade.color }}>
                                                     {grade.grade}
                                                 </span>
@@ -670,129 +819,21 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
 
                                     {/* Actual vs Target */}
                                     <div className="flex justify-between text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                                        <span>{locale === 'en' ? 'Actual' : '\uc2e4\uc801'} <b style={{ color: 'var(--text-primary)' }}>{item.actual == null ? '미입력' : `${typeof item.actual === 'number' ? item.actual.toLocaleString() : item.actual}${item.unit}`}</b></span>
+                                        <span>
+                                            {item.display ? '달성율' : (locale === 'en' ? 'Actual' : '실적')}{' '}
+                                            <b style={{ color: 'var(--text-primary)' }}>
+                                                {item.actual == null ? '미입력' : `${typeof item.actual === 'number' ? item.actual.toLocaleString() : item.actual}${item.display ? '%' : item.unit}`}
+                                            </b>
+                                        </span>
                                         {item.target > 0 && <span>{locale === 'en' ? 'Target' : '\ubaa9\ud45c'} {item.target}</span>}
                                     </div>
 
-                                    {/* Expanded Detail */}
+                                    {/* 펼침 내용은 카드 안이 아니라 표 아래 전체 폭에 그린다.
+                                        6칸 그리드 안에 목록을 넣으면 칸이 좁아 글자가 겹치고 버튼이 삐져나온다. */}
                                     {isExpanded && (
-                                        <div className="mt-4 pt-3 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl text-xs leading-relaxed"
-                                            style={{ borderTop: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)' }}
-                                            onClick={(e) => e.stopPropagation()}>
-                                            <p className="whitespace-pre-line">{item.detail}</p>
-
-                                            {/* 자동 계산이 안 되는 항목은 직접 입력받는다 */}
-                                            {item.manualField && (
-                                                <div className="mt-3 flex items-center gap-2 flex-wrap">
-                                                    <label htmlFor={`kpi-${item.manualField}`} style={{ color: 'var(--text-secondary)' }}>
-                                                        {item.manualLabel}
-                                                    </label>
-                                                    <input
-                                                        id={`kpi-${item.manualField}`}
-                                                        type="number"
-                                                        step="any"
-                                                        value={manual[item.manualField] ?? ''}
-                                                        onChange={(e) => updateManual(item.manualField, e.target.value)}
-                                                        placeholder="미입력"
-                                                        style={{ width: '110px' }}
-                                                    />
-                                                    <span style={{ color: 'var(--text-muted)' }}>{item.unit}</span>
-                                                    {manual[item.manualField] != null && (
-                                                        <button
-                                                            className="rowbtn"
-                                                            onClick={() => updateManual(item.manualField, '')}
-                                                        >
-                                                            지우기
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* 인정된 거래처 목록 + 올해 누적 매출 */}
-                                            {item.clientList && (
-                                                item.clientList.length > 0 ? (
-                                                    <>
-                                                        {item.clientListExcludable && (
-                                                            <p className="mt-2" style={{ color: 'var(--text-muted)' }}>
-                                                                {item.clientListExcludeHint}
-                                                            </p>
-                                                        )}
-                                                        <ul className="mt-2 divide-y" style={{ borderColor: 'var(--border-light)' }}>
-                                                            {item.clientList.map(c => (
-                                                                <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
-                                                                    <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
-                                                                    <span className="shrink-0 tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                                                        {formatMan(c.revenue)}
-                                                                    </span>
-                                                                    {item.clientListExcludable && (
-                                                                        <button
-                                                                            onClick={() => toggleExclusion(c.id, item.excludeKind)}
-                                                                            className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
-                                                                            style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
-                                                                        >
-                                                                            제외
-                                                                        </button>
-                                                                    )}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </>
-                                                ) : (
-                                                    <p className="mt-2" style={{ color: 'var(--text-muted)' }}>{item.emptyText}</p>
-                                                )
-                                            )}
-
-                                            {/* 아직 복귀하지 않은 단절고객 — 복구 불가한 곳은 제외 가능 */}
-                                            {item.dormantList && item.dormantList.length > 0 && (
-                                                <div className="mt-4">
-                                                    <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                                                        아직 복귀하지 않은 단절고객 {item.dormantList.length}곳
-                                                    </p>
-                                                    <p className="mb-2" style={{ color: 'var(--text-muted)' }}>
-                                                        폐업·상호변경 등으로 복구 가능성이 없는 곳은 제외하세요.
-                                                    </p>
-                                                    <ul className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
-                                                        {item.dormantList.map(c => (
-                                                            <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
-                                                                <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
-                                                                <span className="shrink-0 tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                                                                    최종 {c.lastOrder} · 누적 {formatMan(c.history)}
-                                                                </span>
-                                                                <button
-                                                                    onClick={() => toggleExclusion(c.id, item.excludeKind)}
-                                                                    className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
-                                                                    style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}
-                                                                >
-                                                                    제외
-                                                                </button>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                            {/* 제외한 거래처 되돌리기 */}
-                                            {item.excludedList && item.excludedList.length > 0 && (
-                                                <div className="mt-4">
-                                                    <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                                                        제외한 거래처 {item.excludedList.length}곳
-                                                    </p>
-                                                    <ul className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
-                                                        {item.excludedList.map(c => (
-                                                            <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
-                                                                <span className="truncate" style={{ color: 'var(--text-muted)' }}>{c.name}</span>
-                                                                <button
-                                                                    onClick={() => toggleExclusion(c.id, item.excludeKind)}
-                                                                    className="shrink-0 min-h-tap px-2.5 rounded-lg border text-xs font-semibold"
-                                                                    style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                                                                >
-                                                                    되돌리기
-                                                                </button>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
+                                        <div className="mt-3 pt-2 text-[11px] font-semibold text-center"
+                                            style={{ borderTop: '1px solid var(--border)', color: grade.color }}>
+                                            아래에서 자세히 보기 ▼
                                         </div>
                                     )}
                                 </div>
@@ -800,6 +841,23 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                         )
                     })}
                 </div>
+
+                {/* 펼친 KPI 상세 — 전체 폭 */}
+                {expandedItem && (
+                    <div className="rounded-xl p-5"
+                        style={{ backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border)', borderTop: `3px solid ${getGradeInfo(expandedItem.percent).color}` }}>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                            <div>
+                                <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{expandedItem.name}</h3>
+                                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{expandedItem.kpi}</p>
+                            </div>
+                            <button onClick={() => setExpandedKPI(null)}
+                                className="shrink-0 px-3 min-h-tap rounded-lg border text-xs font-semibold"
+                                style={{ borderColor: 'var(--border-strong)', color: 'var(--text-secondary)' }}>닫기</button>
+                        </div>
+                        {renderDetail(expandedItem)}
+                    </div>
+                )}
 
                 {/* Weekly Trend Chart */}
                 <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border)' }}>

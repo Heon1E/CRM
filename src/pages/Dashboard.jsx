@@ -20,6 +20,7 @@ import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 import ActionCenter from '../components/ActionCenter'
 import AIHeadline from '../components/AIHeadline'
 import KPIWidget from '../components/KPIWidget'
+import ScheduleCalendar from '../components/ScheduleCalendar'
 
 
 const Dashboard = () => {
@@ -191,6 +192,12 @@ const Dashboard = () => {
           myAccounts={myAccounts}
           salesRepName={getUserSalesRep}
         />
+
+        {/* 일정 달력 — 매일 확인하는 곳이라 대시보드 가운데에 둔다.
+            텔레그램으로 보낸 일정이 여기에 바로 뜬다. */}
+        <div className="mt-6">
+          <ScheduleCalendar />
+        </div>
 
         {/* Middleware Section: AI Coach & Forecast */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">

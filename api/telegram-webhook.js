@@ -1,63 +1,77 @@
 /**
- * 텔레그램 봇 수신 (서버리스)
+ * 텔레그램 봇 — 보낸 내용을 읽어 알맞은 곳에 넣는다
  *
- * 휴대폰에서 봇에게 스크린샷이나 메시지를 보내면 Gemini가 읽어 구조화한 뒤
- * telegram_inbox 테이블에 '대기' 상태로 담는다.
+ * 사진이든 글이든 하나의 창구로 받아서 종류를 판단하고 갈라 보낸다:
  *
- * **봇은 매출을 직접 저장하지 않는다.**
- * 매출은 대사(reconcileSales)를 거쳐야 중복이 생기지 않고, 그 로직은 앱에 있다.
- * 봇이 바로 넣으면 2026-08-05 중복 사고가 재현된다. 반영은 앱에서 사람이 확인한 뒤 한다.
+ *   일정      -> schedules 에 바로 등록  (달력에 즉시 뜬다)
+ *   업무기록  -> activities 에 바로 등록 (같은 거래처·같은 날은 중복 방지)
+ *   매출      -> telegram_inbox 에 대기  ← 바로 넣지 않는다
+ *   채권      -> telegram_inbox 에 대기  ← 바로 넣지 않는다
+ *   질문      -> 오늘/이번주 일정을 답해 준다
+ *   그 외     -> 메모로 담아둔다
+ *
+ * **매출을 바로 넣지 않는 이유.** 매출은 대사(reconcileSales)를 거쳐야 중복이
+ * 안 생기는데 그 로직은 앱에 있다. 봇이 바로 INSERT하면 2026-08-05 중복 사고
+ * (2,835건)가 그대로 재현된다. 일정·활동은 중복 위험이 낮고 지우기도 쉬워 바로 넣는다.
  *
  * 필요한 환경변수 (Vercel, 모두 VITE_ 접두어 없이):
  *   TELEGRAM_BOT_TOKEN        BotFather가 준 토큰
- *   TELEGRAM_WEBHOOK_SECRET   임의의 긴 문자열. 이 주소로 오는 가짜 요청을 막는다.
+ *   TELEGRAM_WEBHOOK_SECRET   임의의 긴 문자열. 가짜 요청을 막는다.
  *   TELEGRAM_ALLOWED_CHAT_IDS 쉼표로 구분한 허용 chat id. **반드시 설정할 것.**
  *   GEMINI_API_KEY            판독용
  *   SUPABASE_URL              프로젝트 URL
  *   SUPABASE_SERVICE_ROLE_KEY 서버 전용 키. 절대 VITE_를 붙이지 말 것.
  */
 
+import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../src/utils/clientAliases.js'
+
 export const config = { maxDuration: 60 }
 
-const TG = (method) =>
-    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`
-
+const TG = (m) => `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${m}`
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const KST_OFFSET = '+09:00'
 
-const PROMPT = (today) => `
-너는 한국 B2B 영업사원의 CRM 비서다. 사용자가 보낸 메시지나 ERP 화면 사진을 읽고
-아래 JSON 하나만 출력한다. 설명 문장은 쓰지 않는다.
+// ---------------------------------------------------------------------------
+// 시간 (서버는 UTC로 돈다. 한국 날짜를 기준으로 판단해야 '내일'이 맞는다)
+// ---------------------------------------------------------------------------
+const kstNow = () => new Date(Date.now() + 9 * 3600 * 1000)
+const kstToday = () => kstNow().toISOString().slice(0, 10)
+const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 
-오늘 날짜: ${today}
-
-{
-  "docType": "sales" | "receivables" | "activity" | "memo" | "unknown",
-  "rows": [ ... ],
-  "summary": "사용자에게 보여줄 한국어 한 줄 요약",
-  "warnings": ["불확실한 부분"]
+// ---------------------------------------------------------------------------
+// 거래처 이름 정규화 (앱의 buildClientKeys와 같은 기준)
+// ---------------------------------------------------------------------------
+const normalizeKey = (name, { removeCorp = false, removePunct = false } = {}) => {
+    if (!name) return ''
+    let t = String(name).replace(/[（]/g, '(').replace(/[）]/g, ')').replace(/㈜/g, '(주)').trim()
+    if (removeCorp) t = t.replace(/주식회사|유한회사|합자회사|합명회사|유한|㈜|\(주\)|\(유\)/g, '')
+    t = removePunct ? t.replace(/[\s()[\]{}\-_.·]/g, '') : t.replace(/\s+/g, '')
+    return t.toLowerCase()
 }
+const keysOf = (n) => [...new Set([
+    normalizeKey(n), normalizeKey(n, { removeCorp: true }),
+    normalizeKey(n, { removePunct: true }), normalizeKey(n, { removeCorp: true, removePunct: true })
+])].filter(Boolean)
 
-docType 판단:
-- 거래처·품목·수량·금액이 있는 표      -> sales
-- 미수금/채권/외상 잔액 표             -> receivables
-- 방문·미팅·전화 기록, 일정, 약속      -> activity
-- 위 어디에도 안 맞는 메모             -> memo
-
-rows 형식:
-- sales:       { "clientName", "sale_date": "YYYY-MM-DD", "item_name", "quantity": 숫자, "unitPrice": 숫자, "notes" }
-- receivables: { "clientName", "amount": 숫자, "overdueDays": 숫자|null, "dueDate": "YYYY-MM-DD"|null }
-- activity:    { "clientName", "activity_date": "YYYY-MM-DD", "type": "방문"|"미팅"|"전화"|"이메일"|"기타",
-                 "description", "next_action_date": "YYYY-MM-DD"|null, "next_action_detail" }
-- memo:        { "text" }
-
-규칙:
-- 보이는 값만 쓴다. 모르면 null 또는 "". 추측해서 채우지 않는다.
-- 금액·수량은 콤마와 '원'을 빼고 숫자만.
-- '내일', '다음주 화요일' 같은 표현은 오늘 날짜를 기준으로 실제 날짜로 바꾼다.
-- 합계·소계 행은 제외한다.
-`
-
-const json = (res, code, body) => res.status(code).json(body)
+// ---------------------------------------------------------------------------
+// Supabase (REST). service_role 키는 RLS를 우회한다.
+// ---------------------------------------------------------------------------
+const sb = async (path, { method = 'GET', body, prefer } = {}) => {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+        method,
+        headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            ...(prefer ? { Prefer: prefer } : {})
+        },
+        body: body ? JSON.stringify(body) : undefined
+    })
+    const text = await res.text()
+    if (!res.ok) throw new Error(`${path} ${res.status}: ${text.slice(0, 200)}`)
+    return text ? JSON.parse(text) : null
+}
 
 async function tgSend(chatId, text) {
     if (!process.env.TELEGRAM_BOT_TOKEN) return
@@ -72,19 +86,76 @@ async function tgSend(chatId, text) {
     }
 }
 
-/** 텔레그램에 올라온 사진을 base64로 가져온다 */
 async function fetchPhotoBase64(photoSizes) {
     // 가장 큰 것을 쓴다. 표 글씨는 작아서 축소본으로는 못 읽는다.
     const best = photoSizes[photoSizes.length - 1]
-    const infoRes = await fetch(TG(`getFile?file_id=${best.file_id}`))
-    const info = await infoRes.json()
+    const info = await fetch(TG(`getFile?file_id=${best.file_id}`)).then((r) => r.json())
     if (!info.ok) throw new Error('사진을 가져오지 못했습니다.')
-
     const url = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${info.result.file_path}`
-    const fileRes = await fetch(url)
-    const buf = Buffer.from(await fileRes.arrayBuffer())
+    const buf = Buffer.from(await fetch(url).then((r) => r.arrayBuffer()))
     return { data: buf.toString('base64'), mimeType: 'image/jpeg' }
 }
+
+// ---------------------------------------------------------------------------
+// 판독 프롬프트 — 무엇인지 고르고, 그에 맞는 칸만 채운다
+// ---------------------------------------------------------------------------
+const PROMPT = (today, dow) => `
+너는 한국 B2B 영업사원(드럼·IBC 용기 유통)의 CRM 비서다.
+사용자가 보낸 메시지나 사진을 읽고 **아래 JSON 하나만** 출력한다. 설명 문장은 쓰지 않는다.
+
+오늘은 ${today} (${dow}요일) 이다. 한국 시간 기준.
+
+{
+  "intent": "schedule" | "activity" | "sales" | "receivables" | "question" | "memo",
+  "items": [ ... ],
+  "reply": "사용자에게 보여줄 한국어 한 줄 요약",
+  "warnings": ["불확실한 부분"]
+}
+
+intent 고르는 법:
+- 앞으로 할 일 / 약속 / 방문 예정 / "내일", "다음주", "몇시에"  -> schedule
+- 이미 다녀온 방문·미팅·통화 기록, 일일업무보고서 사진          -> activity
+- 거래처·품목·수량·금액이 있는 매출표 사진                     -> sales
+- 미수금/채권/외상 잔액표 사진                                 -> receivables
+- "오늘 일정 뭐야", "이번주 뭐 있어" 같은 물음                  -> question
+- 위 어디에도 안 맞는 메모                                     -> memo
+
+items 형식:
+
+schedule:
+  { "title": "무엇을 하는지", "clientName": "거래처명 또는 \\"\\"",
+    "date": "YYYY-MM-DD", "time": "HH:MM" 또는 null,
+    "durationMin": 숫자 또는 null, "location": "", "kind": "방문"|"미팅"|"전화"|"기타", "notes": "" }
+  - '내일', '모레', '다음주 화요일'은 오늘 날짜를 기준으로 실제 날짜로 바꾼다.
+  - 시간이 없으면 time은 null (종일 일정으로 본다).
+  - "오후 2시"는 "14:00" 으로 쓴다.
+
+activity:
+  { "clientName": "거래처명", "date": "YYYY-MM-DD",
+    "kind": "미팅"|"전화", "person": "만난 사람", "description": "내용" }
+  - 유선/통화면 kind는 "전화", 직접 갔으면 "미팅".
+  - 일일업무보고서 사진이면 **'금일 영업 계획' 표는 절대 넣지 마라.**
+    아직 다녀오지 않은 계획이고, 다녀오면 다음 날 일지에 다시 나와 이중 계상된다.
+
+sales:
+  { "clientName": "", "date": "YYYY-MM-DD", "itemName": "", "quantity": 숫자, "unitPrice": 숫자 }
+  - 단가는 부가세 제외. 합계만 있으면 합계÷수량.
+  - 합계·소계 행은 제외한다.
+
+receivables:
+  { "clientName": "", "amount": 숫자, "overdueDays": 숫자 또는 null }
+
+question:
+  { "ask": "today" | "week" | "other" }
+
+memo:
+  { "text": "내용" }
+
+규칙:
+- 보이는 값만 쓴다. 모르면 null 또는 "". 지어내지 않는다.
+- 금액·수량은 콤마와 '원'을 빼고 숫자만.
+- 한 메시지에 여러 건이 있으면 items에 모두 담는다.
+`
 
 async function callGemini(parts) {
     const res = await fetch(
@@ -105,50 +176,138 @@ async function callGemini(parts) {
     const data = await res.json()
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const cleaned = text.replace(/```json|```/g, '').trim()
-    const match = cleaned.match(/\{[\s\S]*\}/)
-    return JSON.parse(match ? match[0] : cleaned)
+    const m = cleaned.match(/\{[\s\S]*\}/)
+    return JSON.parse(m ? m[0] : cleaned)
+}
+
+// ---------------------------------------------------------------------------
+// 갈라 보내기
+// ---------------------------------------------------------------------------
+const fmtDate = (d) => {
+    const dt = new Date(`${d}T00:00:00+09:00`)
+    return `${d.slice(5).replace('-', '/')}(${WEEKDAY[dt.getUTCDay()]})`
+}
+
+async function loadClients() {
+    const rows = await sb('clients?select=id,company&limit=5000')
+    const map = new Map()
+    rows.forEach((c) => keysOf(c.company).forEach((k) => { if (!map.has(k)) map.set(k, c) }))
+    return map
+}
+const findClient = (map, raw) => {
+    if (!raw || NON_CLIENT_PATTERN.test(String(raw).trim()) || looksLikeMultiCompany(raw)) return null
+    for (const cand of nameCandidates(raw)) {
+        const hit = keysOf(cand).map((k) => map.get(k)).find(Boolean)
+        if (hit) return hit
+    }
+    return null
+}
+
+/** 일정 -> schedules (달력에 바로 뜬다) */
+async function applySchedules(items, clientMap) {
+    const saved = []
+    for (const it of items) {
+        if (!it.date) continue
+        const c = findClient(clientMap, it.clientName)
+        const time = /^\d{1,2}:\d{2}$/.test(it.time || '') ? it.time.padStart(5, '0') : null
+        const startsAt = `${it.date}T${time || '09:00'}:00${KST_OFFSET}`
+        const dur = Number(it.durationMin) > 0 ? Number(it.durationMin) : 60
+        const endsAt = new Date(new Date(startsAt).getTime() + dur * 60000).toISOString()
+
+        await sb('schedules', {
+            method: 'POST', prefer: 'return=minimal',
+            body: [{
+                title: it.title || `${it.clientName || ''} ${it.kind || '방문'}`.trim(),
+                starts_at: startsAt,
+                ends_at: endsAt,
+                all_day: !time,
+                client_id: c ? c.id : null,
+                client_name: it.clientName || null,
+                location: it.location || null,
+                notes: it.notes || null,
+                kind: it.kind || '방문',
+                status: '예정',
+                source: 'telegram'
+            }]
+        })
+        saved.push({ ...it, time, matched: !!c, company: c?.company })
+    }
+    return saved
+}
+
+/** 업무기록 -> activities (같은 거래처·같은 날은 건너뛴다) */
+async function applyActivities(items, clientMap) {
+    const saved = [], skipped = [], unmatched = []
+    for (const it of items) {
+        const c = findClient(clientMap, it.clientName)
+        if (!c) { unmatched.push(it.clientName || '(거래처 없음)'); continue }
+        if (!it.date) { skipped.push(`${c.company} (날짜 없음)`); continue }
+
+        const dup = await sb(
+            `activities?select=id&client_id=eq.${c.id}&activity_date=eq.${it.date}&limit=1`
+        )
+        if (dup.length) { skipped.push(`${c.company} ${fmtDate(it.date)}`); continue }
+
+        await sb('activities', {
+            method: 'POST', prefer: 'return=minimal',
+            body: [{
+                client_id: c.id,
+                client_name: c.company,
+                activity_date: it.date,
+                // 유선은 방문이 아니다. KPI 정기적방문횟수는 미팅/방문만 센다.
+                type: it.kind === '전화' ? '전화' : '미팅',
+                status: '완료',
+                description: [it.person ? `[담당자] ${it.person}` : '', it.description || ''].filter(Boolean).join('\n')
+            }]
+        })
+        saved.push(c.company)
+    }
+    return { saved, skipped, unmatched }
+}
+
+/** 오늘/이번주 일정 답하기 */
+async function answerQuestion(ask) {
+    const today = kstToday()
+    const from = `${today}T00:00:00${KST_OFFSET}`
+    const days = ask === 'week' ? 7 : 1
+    const to = new Date(new Date(from).getTime() + days * 86400000).toISOString()
+
+    const rows = await sb(
+        `schedules?select=title,starts_at,all_day,client_name,location,kind,status` +
+        `&starts_at=gte.${encodeURIComponent(from)}&starts_at=lt.${encodeURIComponent(to)}` +
+        `&status=neq.취소&order=starts_at.asc&limit=50`
+    )
+    if (!rows.length) return ask === 'week' ? '이번 7일간 등록된 일정이 없습니다.' : '오늘 등록된 일정이 없습니다.'
+
+    const lines = rows.map((r) => {
+        const d = new Date(new Date(r.starts_at).getTime() + 9 * 3600 * 1000)
+        const hhmm = r.all_day ? '종일' : `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+        const day = ask === 'week' ? `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${WEEKDAY[d.getUTCDay()]}) ` : ''
+        return `• ${day}<b>${hhmm}</b> ${r.client_name || ''} ${r.title}${r.location ? ` @${r.location}` : ''}`
+    })
+    return `<b>${ask === 'week' ? '앞으로 7일' : '오늘'} 일정 ${rows.length}건</b>\n` + lines.join('\n')
 }
 
 async function saveToInbox(row) {
-    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/telegram_inbox`, {
-        method: 'POST',
-        headers: {
-            apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-            Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal'
-        },
-        body: JSON.stringify(row)
-    })
-    if (!res.ok) throw new Error(`자료함 저장 실패 (${res.status}): ${await res.text()}`)
+    await sb('telegram_inbox', { method: 'POST', prefer: 'return=minimal', body: [row] })
 }
 
-const LABEL = {
-    sales: '매출',
-    receivables: '채권(미수금)',
-    activity: '일정·활동',
-    memo: '메모',
-    unknown: '분류 불명'
-}
-
+// ---------------------------------------------------------------------------
 export default async function handler(req, res) {
-    if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' })
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-    // ---- 1. 이 주소로 오는 가짜 요청 차단 ----
-    // 웹훅 주소는 공개 URL이다. 비밀 토큰이 없으면 누구나 CRM에 데이터를 넣을 수 있다.
+    // 웹훅 주소는 공개 URL이다. 비밀 토큰 검증이 없으면 누구나 CRM에 데이터를 넣을 수 있다.
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET
     if (!secret || req.headers['x-telegram-bot-api-secret-token'] !== secret) {
-        console.warn('[telegram] secret token 불일치 — 요청 거부')
-        return json(res, 401, { ok: false })
+        console.warn('[telegram] secret token 불일치 — 거부')
+        return res.status(401).json({ ok: false })
     }
 
-    // 텔레그램은 200이 아니면 계속 재전송한다. 처리 실패도 200으로 답하고 로그로 남긴다.
-    const ok = () => json(res, 200, { ok: true })
+    // 텔레그램은 200이 아니면 계속 재전송한다. 처리 실패도 200으로 답한다.
+    const ok = () => res.status(200).json({ ok: true })
 
     let update = req.body
-    if (typeof update === 'string') {
-        try { update = JSON.parse(update) } catch { return ok() }
-    }
+    if (typeof update === 'string') { try { update = JSON.parse(update) } catch { return ok() } }
 
     const msg = update?.message || update?.edited_message
     if (!msg) return ok()
@@ -156,12 +315,9 @@ export default async function handler(req, res) {
     const chatId = String(msg.chat?.id || '')
     const fromName = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || msg.from?.username || ''
 
-    // ---- 2. 허용된 사람만 ----
-    const allowed = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || '')
-        .split(',').map((s) => s.trim()).filter(Boolean)
-
+    // 허용된 사람만. 봇 아이디는 검색되므로 이 목록이 실질적인 자물쇠다.
+    const allowed = (process.env.TELEGRAM_ALLOWED_CHAT_IDS || '').split(',').map((s) => s.trim()).filter(Boolean)
     if (allowed.length === 0) {
-        // 설정 전에는 아무 것도 받지 않는다. 대신 본인 chat id를 알려준다.
         await tgSend(chatId, `설정이 끝나지 않았습니다.\n이 대화의 chat id는 <b>${chatId}</b> 입니다.\nVercel 환경변수 TELEGRAM_ALLOWED_CHAT_IDS 에 넣어 주세요.`)
         return ok()
     }
@@ -171,33 +327,37 @@ export default async function handler(req, res) {
         return ok()
     }
 
-    // ---- 3. 명령어 ----
     const text = (msg.text || msg.caption || '').trim()
+    const photos = msg.photo
+
     if (text === '/start' || text === '/help') {
         await tgSend(chatId,
-            '<b>CRM 비서</b>\n\n' +
-            'ERP 화면을 캡처해서 보내거나, 그냥 적어서 보내세요.\n' +
-            '읽어서 CRM 자료함에 담아둡니다.\n\n' +
-            '• 매출/거래명세 화면 → 매출로 분류\n' +
-            '• 미수금 화면 → 채권으로 분류\n' +
-            '• "내일 오후 2시 한국화학 방문" → 일정으로 분류\n\n' +
-            '담아둔 내용은 CRM <b>설정 &gt; 받은 항목</b>에서 확인하고 반영합니다.\n' +
-            '(매출은 중복 검사를 거쳐야 해서 바로 저장하지 않습니다)\n\n' +
-            `이 대화의 chat id: <code>${chatId}</code>`
+            '<b>CRM 비서</b>\n\n그냥 보내세요. 알아서 갈라 넣습니다.\n\n' +
+            '<b>일정</b> — "내일 오후 2시 한국화학 방문"\n   → 달력에 바로 등록\n' +
+            '<b>업무기록</b> — "오늘 대성드럼 김부장 미팅, 단가 협의함"\n   → 활동에 바로 등록\n' +
+            '<b>일일업무보고서 사진</b> → 활동에 등록 (영업계획은 제외)\n' +
+            '<b>매출·미수금 화면 사진</b> → 받은함에 담아둠\n' +
+            '   (중복 검사를 거쳐야 해서 앱에서 확인 후 반영)\n\n' +
+            '<b>/today</b> 오늘 일정   <b>/week</b> 이번주 일정\n\n' +
+            `chat id: <code>${chatId}</code>`
         )
         return ok()
     }
-
-    const photos = msg.photo
+    if (text === '/today' || text === '/week') {
+        try { await tgSend(chatId, await answerQuestion(text === '/week' ? 'week' : 'today')) }
+        catch (e) { await tgSend(chatId, `일정을 불러오지 못했습니다: ${e.message}`) }
+        return ok()
+    }
     if (!text && !photos) {
         await tgSend(chatId, '사진이나 글로 보내주세요. 사용법은 /help')
         return ok()
     }
 
-    // ---- 4. 판독 ----
     try {
-        const today = new Date().toISOString().slice(0, 10)
-        const parts = [{ text: PROMPT(today) }]
+        const today = kstToday()
+        const dow = WEEKDAY[new Date(`${today}T00:00:00+09:00`).getUTCDay()]
+
+        const parts = [{ text: PROMPT(today, dow) }]
         if (text) parts.push({ text: `\n사용자 메시지:\n${text}` })
         if (photos?.length) {
             const img = await fetchPhotoBase64(photos)
@@ -205,29 +365,89 @@ export default async function handler(req, res) {
         }
 
         const parsed = await callGemini(parts)
-        const docType = LABEL[parsed.docType] ? parsed.docType : 'unknown'
-        const rows = Array.isArray(parsed.rows) ? parsed.rows : []
+        const intent = ['schedule', 'activity', 'sales', 'receivables', 'question', 'memo'].includes(parsed.intent)
+            ? parsed.intent : 'memo'
+        const items = Array.isArray(parsed.items) ? parsed.items : []
+        const warn = (parsed.warnings || []).slice(0, 3)
 
+        // ---- 질문 ----
+        if (intent === 'question') {
+            const ask = items[0]?.ask === 'week' ? 'week' : 'today'
+            await tgSend(chatId, await answerQuestion(ask))
+            return ok()
+        }
+
+        // ---- 일정: 바로 등록 ----
+        if (intent === 'schedule' && items.length) {
+            const clientMap = await loadClients()
+            const saved = await applySchedules(items, clientMap)
+            await saveToInbox({
+                chat_id: chatId, from_name: fromName, raw_text: text || null,
+                has_image: !!photos?.length, doc_type: 'schedule',
+                payload: { items, reply: parsed.reply || '' }, status: 'auto',
+                applied_at: new Date().toISOString(), note: `일정 ${saved.length}건 등록`
+            })
+
+            const lines = saved.map((s) =>
+                `• ${fmtDate(s.date)} ${s.time || '종일'} ${s.company || s.clientName || ''} ${s.title}` +
+                (s.clientName && !s.matched ? ' <i>(거래처 미등록)</i>' : '')
+            )
+            await tgSend(chatId,
+                `📅 <b>일정 ${saved.length}건을 달력에 넣었습니다.</b>\n${lines.join('\n')}` +
+                (warn.length ? `\n\n⚠️ ${warn.join('\n⚠️ ')}` : '') +
+                `\n\n확인: CRM 대시보드 달력`
+            )
+            return ok()
+        }
+
+        // ---- 업무기록: 바로 등록 (중복 방지) ----
+        if (intent === 'activity' && items.length) {
+            const clientMap = await loadClients()
+            const r = await applyActivities(items, clientMap)
+            await saveToInbox({
+                chat_id: chatId, from_name: fromName, raw_text: text || null,
+                has_image: !!photos?.length, doc_type: 'activity',
+                payload: { items, reply: parsed.reply || '' }, status: 'auto',
+                applied_at: new Date().toISOString(), note: `활동 ${r.saved.length}건 등록`
+            })
+
+            let reply = `📝 <b>업무기록 ${r.saved.length}건을 넣었습니다.</b>`
+            if (r.saved.length) reply += `\n${r.saved.map((n) => `• ${n}`).join('\n')}`
+            if (r.skipped.length) reply += `\n\n이미 있어 건너뜀: ${r.skipped.join(', ')}`
+            if (r.unmatched.length) reply += `\n\n거래처를 못 찾음: ${[...new Set(r.unmatched)].join(', ')}`
+            if (warn.length) reply += `\n\n⚠️ ${warn.join('\n⚠️ ')}`
+            await tgSend(chatId, reply)
+            return ok()
+        }
+
+        // ---- 매출·채권: 담아두기 (대사를 거쳐야 한다) ----
+        if (intent === 'sales' || intent === 'receivables') {
+            await saveToInbox({
+                chat_id: chatId, from_name: fromName, raw_text: text || null,
+                has_image: !!photos?.length, doc_type: intent,
+                payload: { rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [] },
+                status: 'pending'
+            })
+            const label = intent === 'sales' ? '매출' : '채권(미수금)'
+            await tgSend(chatId,
+                `📥 <b>${label} ${items.length}건으로 읽었습니다.</b>\n${parsed.reply || ''}` +
+                (warn.length ? `\n\n⚠️ ${warn.join('\n⚠️ ')}` : '') +
+                `\n\n중복 검사를 거쳐야 해서 바로 넣지 않았습니다.\nCRM <b>설정 &gt; 받은 항목</b>에서 확인 후 반영해 주세요.`
+            )
+            return ok()
+        }
+
+        // ---- 메모 ----
         await saveToInbox({
-            chat_id: chatId,
-            from_name: fromName,
-            raw_text: text || null,
-            has_image: Boolean(photos?.length),
-            doc_type: docType,
-            payload: { rows, summary: parsed.summary || '', warnings: parsed.warnings || [] },
-            status: 'pending'
+            chat_id: chatId, from_name: fromName, raw_text: text || null,
+            has_image: !!photos?.length, doc_type: 'memo',
+            payload: { items, reply: parsed.reply || '' }, status: 'pending'
         })
-
-        let reply = `✅ <b>${LABEL[docType]}</b>으로 읽었습니다. (${rows.length}건)\n`
-        if (parsed.summary) reply += `${parsed.summary}\n`
-        if (parsed.warnings?.length) reply += `\n⚠️ ${parsed.warnings.slice(0, 3).join('\n⚠️ ')}\n`
-        reply += `\nCRM <b>설정 &gt; 받은 항목</b>에서 확인 후 반영해 주세요.`
-
-        await tgSend(chatId, reply)
+        await tgSend(chatId, `🗒 메모로 담아뒀습니다.\n${parsed.reply || ''}\n\nCRM 설정 &gt; 받은 항목에서 볼 수 있습니다.`)
+        return ok()
     } catch (e) {
         console.error('[telegram] 처리 실패', e)
-        await tgSend(chatId, `읽지 못했습니다: ${e.message}\n화면을 더 크게 찍어 다시 보내주세요.`)
+        await tgSend(chatId, `읽지 못했습니다: ${e.message}\n사진이면 더 크게 찍어 다시 보내주세요.`)
+        return ok()
     }
-
-    return ok()
 }
