@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Loader2, AlertTriangle, Search, Target, Upload } from 'lucide-react'
+import { RefreshCw, Loader2, AlertTriangle, Search, Target, Upload, EyeOff, RotateCcw } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { parseReceivablesLedger } from '../utils/receivablesLedger'
 import { buildClientKeys } from '../hooks/useSalesImport'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { setKpiManualInput } from '../utils/kpiCategories'
-import { showSuccess, showError, showWarning } from '../utils/alert'
+import { showSuccess, showError, showWarning, showConfirm, showInput } from '../utils/alert'
 
 /**
  * 채권관리 — 결제가 밀린 순서로 본다.
@@ -55,6 +55,7 @@ const Receivables = () => {
     const [mineOnly, setMineOnly] = useState(false)
     const [sort, setSort] = useState({ key: 'aging_months', dir: 'desc' })
     const [uploading, setUploading] = useState(false)
+    const [showExcluded, setShowExcluded] = useState(false)
     const fileRef = React.useRef(null)
 
     const repById = useMemo(() => {
@@ -100,24 +101,29 @@ const Receivables = () => {
 
     useEffect(() => { load() }, [load])
 
+    // 제외된 건은 실제 채권이 아니므로 합계·연체 건수에서 모두 뺀다
+    const active = useMemo(() => rows.filter((r) => !r.excluded), [rows])
+    const excludedRows = useMemo(() => rows.filter((r) => r.excluded), [rows])
+
     const summary = useMemo(() => {
-        const withBal = rows.filter((r) => Number(r.balance) > 0)
-        const od = rows.filter((r) => Number(r.overdue_amount) > 0)
+        const withBal = active.filter((r) => Number(r.balance) > 0)
+        const od = active.filter((r) => Number(r.overdue_amount) > 0)
         return {
             // 음수(선수금)까지 합산해야 대장의 합계행과 맞는다
-            total: rows.reduce((a, r) => a + Number(r.balance || 0), 0),
+            total: active.reduce((a, r) => a + Number(r.balance || 0), 0),
             clients: withBal.length,
             overdueCount: od.length,
             overdueAmount: od.reduce((a, r) => a + Number(r.overdue_amount || 0), 0),
-            m3: rows.filter((r) => r.aging_months >= 3).length,
+            m3: active.filter((r) => r.aging_months >= 3).length,
         }
-    }, [rows])
+    }, [active])
 
     const view = useMemo(() => {
         const b = BUCKETS.find((x) => x.key === bucket) || BUCKETS[0]
         const q = query.trim().toLowerCase()
-        const out = rows.filter((r) => {
-            if (!b.test(r)) return false
+        const source = showExcluded ? excludedRows : active
+        const out = source.filter((r) => {
+            if (!showExcluded && !b.test(r)) return false
             if (mineOnly && repById.get(r.client_id) !== '이헌일') return false
             if (q && !String(r.client_name || '').toLowerCase().includes(q)) return false
             return true
@@ -135,7 +141,7 @@ const Receivables = () => {
             }
             return d * dir
         })
-    }, [rows, bucket, query, mineOnly, sort, repById])
+    }, [active, excludedRows, showExcluded, bucket, query, mineOnly, sort, repById])
 
     const toggleSort = (key) => {
         setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }))
@@ -171,9 +177,25 @@ const Receivables = () => {
             const map = new Map()
             clients.forEach((c) => buildClientKeys(c.company).forEach((k) => { if (!map.has(k)) map.set(k, c) }))
 
+            // 이미 '제외'로 표시해 둔 거래처는 새 달에도 그대로 제외한다.
+            // 회계 장부가 고쳐지기 전까지 대장에는 계속 미수로 찍혀 나오기 때문이다.
+            // (excluded 열이 아직 없으면 조용히 건너뛴다 — 마이그레이션 전에도 업로드는 되어야 한다)
+            const prevExcluded = new Map()
+            {
+                const { data: ex, error: exErr } = await supabase.from('receivables')
+                    .select('client_name, exclusion_reason').eq('excluded', true)
+                if (!exErr) {
+                    (ex || []).forEach((r) => { if (!prevExcluded.has(r.client_name)) prevExcluded.set(r.client_name, r.exclusion_reason) })
+                }
+            }
+
             const payload = parsed.rows.map((x) => {
                 const hit = buildClientKeys(x.name).map((k) => map.get(k)).find(Boolean)
+                const carried = prevExcluded.has(x.name)
+                    ? { excluded: true, exclusion_reason: prevExcluded.get(x.name) }
+                    : {}
                 return {
+                    ...carried,
                     client_id: hit ? hit.id : null,
                     client_name: x.name,
                     base_month: parsed.baseMonth,
@@ -209,6 +231,49 @@ const Receivables = () => {
             setUploading(false)
             if (fileRef.current) fileRef.current.value = ''
         }
+    }
+
+    /**
+     * 대장에는 미수로 잡혀 있지만 실제 채권이 아닌 건을 제외한다.
+     *
+     * **행을 지우지 않는다.** 회계 장부가 고쳐지기 전까지는 다음 달 대장에도
+     * 그대로 나오므로 지워봐야 되살아나고, 왜 뺐는지도 남지 않는다.
+     * 표시를 달아두면 새 달을 올릴 때 같은 거래처가 그 표시를 물려받는다.
+     */
+    const excludeRow = async (row) => {
+        const reason = await showInput(
+            `${row.client_name}의 미수금 ${won(row.balance)}원을 채권에서 뺍니다.
+왜 채권이 아닌지 적어 주세요.`,
+            '채권에서 제외',
+            'text',
+            '예) 선입금 후 출고 건을 미수로 잘못 잡음'
+        )
+        if (reason === null) return
+        try {
+            const { error } = await supabase.from('receivables')
+                .update({ excluded: true, exclusion_reason: reason || '사유 미기재' })
+                .eq('id', row.id)
+            if (error) throw error
+            await showSuccess(`${row.client_name}을(를) 채권에서 뺐습니다.
+다음 달 대장을 올려도 계속 제외됩니다.`)
+            await load(baseMonth)
+        } catch (e) {
+            if (/column .* does not exist|excluded/i.test(e.message || '')) {
+                await showError(`제외 기능이 아직 준비되지 않았습니다.
+Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.`)
+            } else {
+                await showError(e.message || '제외하지 못했습니다.')
+            }
+        }
+    }
+
+    const restoreRow = async (row) => {
+        const ok = await showConfirm(`${row.client_name}을(를) 다시 채권으로 되돌립니다.`, '제외 해제')
+        if (!ok) return
+        const { error } = await supabase.from('receivables')
+            .update({ excluded: false, exclusion_reason: null }).eq('id', row.id)
+        if (error) { await showError(error.message); return }
+        await load(baseMonth)
     }
 
     const sendToKpi = async () => {
@@ -320,6 +385,15 @@ const Receivables = () => {
                     <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
                     내 담당만
                 </label>
+                {excludedRows.length > 0 && (
+                    <button
+                        className={`tb-btn${showExcluded ? ' primary' : ''}`}
+                        onClick={() => setShowExcluded((v) => !v)}
+                        title="채권이 아니라고 표시해 둔 건"
+                    >
+                        <EyeOff size={13} /> 제외 {excludedRows.length}건
+                    </button>
+                )}
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
                     <Search size={14} style={{ opacity: 0.6 }} />
                     <input
@@ -351,6 +425,7 @@ const Receivables = () => {
                             <th style={{ minWidth: 100 }}>최초 미수월</th>
                             <th style={{ minWidth: 110 }}>대장 메모</th>
                             <th style={{ minWidth: 80 }}>담당</th>
+                            <th style={{ width: 44 }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -385,13 +460,28 @@ const Receivables = () => {
                                     </td>
                                     <td className="num">{won(r.balance)}</td>
                                     <td className="dt">{r.oldest_unpaid_month || '-'}</td>
-                                    <td style={{ fontSize: 12 }}>{r.delay_note || ''}</td>
+                                    <td style={{ fontSize: 12 }}>
+                                        {r.excluded
+                                            ? <span style={{ color: '#B45309' }}>제외: {r.exclusion_reason || '사유 미기재'}</span>
+                                            : (r.delay_note || '')}
+                                    </td>
                                     <td style={{ fontSize: 12 }}>{repById.get(r.client_id) || ''}</td>
+                                    <td onClick={(e) => e.stopPropagation()}>
+                                        {r.excluded ? (
+                                            <button className="rowbtn" onClick={() => restoreRow(r)} title="다시 채권으로 되돌리기">
+                                                <RotateCcw size={13} />
+                                            </button>
+                                        ) : (
+                                            <button className="rowbtn" onClick={() => excludeRow(r)} title="채권에서 제외 (회계 착오 등)">
+                                                <EyeOff size={13} />
+                                            </button>
+                                        )}
+                                    </td>
                                 </tr>
                             )
                         })}
                         {view.length === 0 && !loading && (
-                            <tr><td colSpan={8} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+                            <tr><td colSpan={9} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
                                 해당하는 거래처가 없습니다.
                             </td></tr>
                         )}

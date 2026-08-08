@@ -180,9 +180,23 @@ const clients = await fetchAll(() => supabase.from('clients').select('id, compan
 const clientMap = new Map()
 clients.forEach((c) => keysOf(c.company).forEach((k) => { if (!clientMap.has(k)) clientMap.set(k, c) }))
 
+// 이미 '제외'로 표시해 둔 거래처는 새 달에도 그대로 제외한다.
+// 회계 장부가 고쳐지기 전까지 대장에는 계속 미수로 찍혀 나오기 때문이다.
+const prevExcluded = new Map()
+try {
+    const ex = await fetchAll(() =>
+        supabase.from('receivables').select('client_name, exclusion_reason').eq('excluded', true).order('client_name')
+    )
+    ex.forEach((r) => { if (!prevExcluded.has(r.client_name)) prevExcluded.set(r.client_name, r.exclusion_reason) })
+    if (prevExcluded.size) console.log(`  제외 표시를 물려받는 거래처 ${prevExcluded.size}곳`)
+} catch (e) {
+    // excluded 열이 아직 없으면(마이그레이션 전) 그냥 넘어간다
+    if (!/column .* does not exist|excluded/i.test(e.message || '')) throw e
+}
+
 const payload = aged.map((x) => {
     const hit = keysOf(x.name).map((k) => clientMap.get(k)).find(Boolean)
-    return {
+    const row = {
         client_id: hit ? hit.id : null,
         client_name: x.name,
         base_month: baseMonth,
@@ -193,6 +207,11 @@ const payload = aged.map((x) => {
         delay_note: x.delay || null,
         updated_at: new Date().toISOString()
     }
+    if (prevExcluded.has(x.name)) {
+        row.excluded = true
+        row.exclusion_reason = prevExcluded.get(x.name)
+    }
+    return row
 })
 
 const linked = payload.filter((p) => p.client_id).length
