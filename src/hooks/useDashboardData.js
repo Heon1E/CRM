@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
+import { resolveSalesRep, SALES_REP_OPTIONS } from '../utils/salesRep'
 
 export const useDashboardData = () => {
   const { user } = useAuth()
@@ -14,30 +15,8 @@ export const useDashboardData = () => {
   const [upcomingEvents, setUpcomingEvents] = useState([])
   const [totalClientsCount, setTotalClientsCount] = useState(0)
 
-  // Sales Rep 옵션
-  const SALES_REP_OPTIONS = ['박민철', '송원기', '이헌일']
-
-  // 사용자 이름 매핑
-  const getUserSalesRep = useMemo(() => {
-    if (!user) return null
-    const userName = user.user_metadata?.full_name || user.email || ''
-
-    // 영어 이름 -> 한글 이름 매핑
-    const nameMapping = {
-      'Heonil Lee': '이헌일',
-      'heonil lee': '이헌일',
-      'Heonil': '이헌일',
-      'heonil': '이헌일',
-    }
-
-    if (nameMapping[userName]) return nameMapping[userName]
-    if (SALES_REP_OPTIONS.includes(userName)) return userName
-
-    const emailName = user.email?.split('@')[0]?.toLowerCase()
-    if (emailName && nameMapping[emailName]) return nameMapping[emailName]
-
-    return null
-  }, [user])
+  // 계정 -> 영업사원 이름. 다른 화면에서도 써야 해서 utils로 뺐다.
+  const getUserSalesRep = useMemo(() => resolveSalesRep(user), [user])
 
   // 유틸리티: 주간 매출 데이터 계산
   const getWeeklySalesDataForClients = useCallback((salesData) => {

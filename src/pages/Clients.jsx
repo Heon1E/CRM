@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Edit, Download, Users, Camera, Trash2, Plus } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
+import { useAuth } from '../contexts/AuthContext'
+import { resolveSalesRep } from '../utils/salesRep'
 import { supabase } from '../lib/supabase'
 import EditClientModal from '../components/EditClientModal'
 import AddClientModal from '../components/AddClientModal'
@@ -19,6 +21,8 @@ const PAGE_SIZE = 20
 const Clients = () => {
   // Common Data & Actions
   const { clients: contextClients, loading: contextLoading, sales, activities, deleteClient } = useData()
+  const { user } = useAuth()
+  const myRep = useMemo(() => resolveSalesRep(user), [user])
 
   // Local State
   const [searchInput, setSearchInput] = useState('') // Search input value (not yet submitted)
@@ -179,9 +183,62 @@ const Clients = () => {
     }, {})
   }, [clients])
 
+  /**
+   * 기본 정렬 — 챙겨야 할 순서대로 세운다.
+   *
+   *   1군  내 담당이면서 매출이 있는 곳   -> 매출 많은 순
+   *   2군  영업 중인 곳 (활동이 있는 곳)  -> 활동 많은 순, 같으면 최근 접촉순
+   *   3군  나머지                        -> 매출 많은 순
+   *
+   * 예전에는 가나다순이라 1,100곳 중 지금 챙길 곳을 찾으려면 검색을 해야 했다.
+   */
+  const companyRank = useMemo(() => {
+    const revenue = new Map()
+    ;(sales || []).forEach((s) => {
+      if (!s.client_id) return
+      revenue.set(s.client_id, (revenue.get(s.client_id) || 0) + (Number(s.total_amount ?? s.totalAmount ?? 0) || 0))
+    })
+
+    const actCount = new Map()
+    const lastAct = new Map()
+    ;(activities || []).forEach((a) => {
+      const id = a.client_id || a.clientId
+      if (!id) return
+      actCount.set(id, (actCount.get(id) || 0) + 1)
+      const ms = new Date(a.activity_date || a.date).getTime()
+      if (Number.isFinite(ms) && ms > (lastAct.get(id) || 0)) lastAct.set(id, ms)
+    })
+
+    // 회사명 하나에 여러 행이 묶여 있을 수 있으므로 합산한다
+    const byCompany = new Map()
+    Object.entries(groupedClients).forEach(([company, rows]) => {
+      let rev = 0, acts = 0, last = 0, mine = false
+      rows.forEach((c) => {
+        rev += revenue.get(c.id) || 0
+        acts += actCount.get(c.id) || 0
+        last = Math.max(last, lastAct.get(c.id) || 0)
+        if (myRep && c.sales_rep === myRep) mine = true
+      })
+      const tier = (mine && rev > 0) ? 0 : (acts > 0 ? 1 : 2)
+      byCompany.set(company, { tier, rev, acts, last })
+    })
+    return byCompany
+  }, [groupedClients, sales, activities, myRep])
+
   const sortedCompanies = useMemo(() => {
-    return Object.keys(groupedClients).sort((a, b) => a.localeCompare(b, 'ko'))
-  }, [groupedClients])
+    return Object.keys(groupedClients).sort((a, b) => {
+      const x = companyRank.get(a), y = companyRank.get(b)
+      if (!x || !y) return a.localeCompare(b, 'ko')
+      if (x.tier !== y.tier) return x.tier - y.tier
+      if (x.tier === 1) {
+        if (y.acts !== x.acts) return y.acts - x.acts
+        if (y.last !== x.last) return y.last - x.last
+        return a.localeCompare(b, 'ko')
+      }
+      if (y.rev !== x.rev) return y.rev - x.rev
+      return a.localeCompare(b, 'ko')
+    })
+  }, [groupedClients, companyRank])
 
   const visibleGroupedClients = useMemo(() => {
     return sortedCompanies.reduce((acc, company) => {
