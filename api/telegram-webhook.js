@@ -150,8 +150,12 @@ schedule:
 
 activity:
   { "clientName": "거래처명", "date": "YYYY-MM-DD",
-    "kind": "미팅"|"전화", "person": "만난 사람", "description": "내용" }
+    "kind": "미팅"|"전화", "person": "만난 사람", "description": "내용",
+    "nextDate": "YYYY-MM-DD" 또는 null, "nextDetail": "다음에 할 일" }
   - 유선/통화면 kind는 "전화", 직접 갔으면 "미팅".
+  - "다음주에 견적 보내기로 함", "2주 뒤 재방문" 처럼 **다음에 할 일이 적혀 있으면**
+    nextDate와 nextDetail을 채운다. 오늘 날짜를 기준으로 실제 날짜로 바꾼다.
+    적혀 있지 않으면 null. 지어내지 마라.
   - 일일업무보고서 사진이면 **'금일 영업 계획' 표는 절대 넣지 마라.**
     아직 다녀오지 않은 계획이고, 다녀오면 다음 날 일지에 다시 나와 이중 계상된다.
 
@@ -275,7 +279,10 @@ async function applyActivities(items, clientMap) {
                 // 유선은 방문이 아니다. KPI 정기적방문횟수는 미팅/방문만 센다.
                 type: it.kind === '전화' ? '전화' : '미팅',
                 status: '완료',
-                description: [it.person ? `[담당자] ${it.person}` : '', it.description || ''].filter(Boolean).join('\n')
+                description: [it.person ? `[담당자] ${it.person}` : '', it.description || ''].filter(Boolean).join('\n'),
+                // '다음에 할 일'이 적혀 있으면 같이 담는다. 이게 아침 브리핑의 재료다.
+                next_action_date: /^\d{4}-\d{2}-\d{2}$/.test(it.nextDate || '') ? it.nextDate : null,
+                next_action_detail: it.nextDetail || null
             }]
         })
         saved.push(c.company)

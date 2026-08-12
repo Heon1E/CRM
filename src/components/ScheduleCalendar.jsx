@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { showError, showConfirm } from '../utils/alert'
 import { getHolidays, hasHolidayData } from '../utils/koreanHolidays'
+import { openFollowUps } from '../utils/followUps'
 
 /**
  * 대시보드 달력 — 앞으로 할 일을 매일 확인하는 곳.
@@ -66,7 +67,7 @@ const holidayName = (year, key) => {
 }
 
 const ScheduleCalendar = () => {
-    const { clients } = useData()
+    const { clients, activities } = useData()
     const today = useMemo(() => new Date(), [])
 
     const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
@@ -138,6 +139,15 @@ const ScheduleCalendar = () => {
             return d
         })
     }, [monthStart])
+
+    /**
+     * 후속조치 — '언제 다시 연락할지'. 어디서도 안 보여줘서 아무도 안 쓰던 기능이다.
+     * 일정 옆에 같이 두어야 매일 눈에 들어온다.
+     */
+    const followUps = useMemo(() => {
+        const names = new Map((clients || []).map((c) => [c.id, c.company]))
+        return openFollowUps(activities || [], { today: ymd(today), names })
+    }, [activities, clients, today])
 
     const selectedList = byDay[selected] || []
     const upcoming = useMemo(() => {
@@ -371,6 +381,33 @@ const ScheduleCalendar = () => {
                             </div>
                         ))}
                     </div>
+
+                    {(followUps.overdue.length > 0 || followUps.today.length > 0) && (
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                            <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                                하기로 한 것
+                            </p>
+                            {followUps.today.map((r) => (
+                                <div key={r.id} style={{ fontSize: 11.5, padding: '2px 0', display: 'flex', gap: 5 }}>
+                                    <span style={{ color: '#1C6B3C', fontWeight: 700, flexShrink: 0 }}>오늘</span>
+                                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {r.clientName}{r.detail ? ` · ${r.detail}` : ''}
+                                    </span>
+                                </div>
+                            ))}
+                            {followUps.overdue.slice(0, 4).map((r) => (
+                                <div key={r.id} style={{ fontSize: 11.5, padding: '2px 0', display: 'flex', gap: 5 }}>
+                                    <span style={{ color: '#B91C1C', fontWeight: 700, flexShrink: 0 }}>{r.daysLate}일 지남</span>
+                                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {r.clientName}{r.detail ? ` · ${r.detail}` : ''}
+                                    </span>
+                                </div>
+                            ))}
+                            {followUps.overdue.length > 4 && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>… 외 {followUps.overdue.length - 4}건</div>
+                            )}
+                        </div>
+                    )}
 
                     {upcoming.length > 0 && (
                         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 'auto' }}>
