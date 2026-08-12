@@ -1,12 +1,26 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Bell, Menu, X, Search } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import GlobalSearch from './GlobalSearch'
 
 const TopNavbar = () => {
   const location = useLocation()
   const { user } = useAuth()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // Ctrl+K / Cmd+K 로 검색 열기 (업무용 프로그램의 관례)
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const navItems = [
     { path: '/', label: 'Dashboard' },
@@ -72,17 +86,28 @@ const TopNavbar = () => {
       <div className="flex items-center gap-5">
         {/* Search */}
         <div className="hidden md:flex items-center relative group">
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-52 h-8 px-3 pl-9 rounded-lg text-sm outline-none transition-all"
+          {/* 예전에는 핸들러가 없는 장식용 input이었다. 눌러서 검색을 연다. */}
+          <button
+          onClick={() => setSearchOpen(true)}
+          className="md:hidden icon-btn"
+          title="거래처 찾기"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
+        <button
+            onClick={() => setSearchOpen(true)}
+            className="w-52 h-8 px-3 pl-9 rounded-lg text-sm outline-none transition-all text-left"
             style={{
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border)',
-              color: 'var(--text-primary)',
+              color: 'var(--text-muted)',
             }}
-          />
-          <div className="absolute left-3" style={{ color: 'var(--text-muted)' }}>
+          >
+            거래처 찾기
+            <kbd style={{ float: 'right', fontSize: 10, opacity: 0.7 }}>Ctrl K</kbd>
+          </button>
+          <div className="absolute left-3 pointer-events-none" style={{ color: 'var(--text-muted)' }}>
             <Search className="w-4 h-4" />
           </div>
         </div>
@@ -157,6 +182,7 @@ const TopNavbar = () => {
           </div>
         </div>
       )}
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   )
 }
