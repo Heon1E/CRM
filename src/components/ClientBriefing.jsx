@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     X, Loader2, RefreshCw, AlertTriangle, Swords, Package,
-    ListChecks, Info, ExternalLink, TrendingUp, TrendingDown
+    ListChecks, Info, ExternalLink, TrendingUp, TrendingDown, Phone, User
 } from 'lucide-react'
 import { fetchBriefing } from '../services/clientBriefingService'
 
@@ -195,6 +195,31 @@ const ClientBriefing = ({ client, sales = [], activities = [], onClose }) => {
                         </div>
                     ))}
                 </div>
+
+                {/* 담당자 — 만나러 가기 전에 누구를 찾아야 하는지 */}
+                {(client.contact_person || client.phone) && (
+                    <div style={{
+                        padding: '8px 12px', fontSize: 12.5, borderBottom: '1px solid var(--border)',
+                        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                    }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <User size={13} style={{ color: 'var(--text-muted)' }} />
+                            <b>{client.contact_person}</b>
+                            {client.contact_role && (
+                                <span style={{ color: 'var(--text-secondary)' }}>{client.contact_role}</span>
+                            )}
+                        </span>
+                        {client.phone ? (
+                            // 휴대폰에서 누르면 바로 걸린다
+                            <a href={`tel:${String(client.phone).replace(/[^0-9+]/g, '')}`}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1D4ED8', fontWeight: 600 }}>
+                                <Phone size={12} /> {client.phone}
+                            </a>
+                        ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>전화번호 없음</span>
+                        )}
+                    </div>
+                )}
 
                 {m.topItems.length > 0 && (
                     <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>

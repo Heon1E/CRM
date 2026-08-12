@@ -856,6 +856,8 @@ export const DataProvider = ({ children }) => {
           lastOrder: client.last_order,
           orderAmount: client.order_amount,
           contact_person: primary?.name || '',
+          // 직급까지 있어야 '누구를 찾아야 하는지'가 된다 (김부장 / 유재민 책임)
+          contact_role: primary?.department_role || '',
           phone: primary?.phone || '',
           email: primary?.email || ''
         }
