@@ -45,10 +45,16 @@ on conflict (id) do nothing;
 alter table public.products
     add column if not exists image_url text;
 
--- ========================== 악세서리 (상부캡 · 밸브) ==========================
+-- ========================== 악세서리 (캡 · 밸브) ==========================
 --
 -- 품목을 고르면 그에 맞는 악세서리를 고를 수 있고, 고르면 사진이 뜬다.
 -- **'무밸브'도 하나의 선택지다** — 밸브가 없는 형태이고 그 부위 사진이 따로 있다.
+--
+-- ▶ 아래 product_accessories 표는 **더 이상 쓰지 않는다.**
+--   캡·밸브도 결국 품목이라 따로 표를 두면 사진을 두 번 올려야 하고 이름이 갈렸다.
+--   지금은 `products.type` 하나로 나눈다 — IBC/드럼/제리캔 = 완제품,
+--   캡/밸브 = 악세서리, 부품 = 그 밖. 앱은 이 표를 읽지 않는다.
+--   이미 만들어진 곳이 있어 정의만 남겨 둔다. 지워도 무방하다.
 create table if not exists public.product_accessories (
     id         uuid primary key default gen_random_uuid(),
     kind       text not null,          -- '상부캡' | '밸브'
