@@ -12,6 +12,8 @@ import ClientDetail from './pages/ClientDetail'
 import Activities from './pages/Activities'
 import Sales from './pages/Sales'
 import Receivables from './pages/Receivables'
+import Quotes from './pages/Quotes'
+import PurchaseOrders from './pages/PurchaseOrders'
 import Products from './pages/Products'
 import Issues from './pages/Issues'
 import Settings from './pages/Settings'
@@ -72,6 +74,8 @@ const ProtectedRoutes = () => {
           <Route path="/activities" element={<Activities />} />
           <Route path="/sales" element={<Sales />} />
           <Route path="/receivables" element={<Receivables />} />
+          <Route path="/quotes" element={<Quotes />} />
+          <Route path="/purchase-orders" element={<PurchaseOrders />} />
           <Route path="/products" element={<Products />} />
           <Route path="/issues" element={<Issues />} />
           <Route path="/pipeline" element={<PipelineBoard />} />

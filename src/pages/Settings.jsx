@@ -10,6 +10,7 @@ import ClientExcelUpload from '../components/ClientExcelUpload'
 import SalesExcelUpload from '../components/SalesExcelUpload'
 import ErpScreenshotImport from '../components/ErpScreenshotImport'
 import InboxPanel from '../components/InboxPanel'
+import ProductImages from '../components/ProductImages'
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { exportSalesToExcel } from '../utils/excelExport'
@@ -419,6 +420,11 @@ const Settings = () => {
                 {/* 텔레그램 봇이 담아둔 항목. 매출은 여기서도 대사를 거쳐 반영된다. */}
                 <div className="mt-6">
                   <InboxPanel />
+                </div>
+
+                {/* 견적서에 나갈 품목·악세서리 사진 */}
+                <div className="mt-6">
+                  <ProductImages />
                 </div>
               </Panel>
 

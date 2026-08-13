@@ -735,3 +735,64 @@ textarea:focus {
         border-right: 1px solid var(--border);
     }
 }
+
+/* ---------------------------------------------------------------------------
+   견적서 · 발주서 인쇄 (A4)
+
+   PDF 라이브러리를 쓰지 않는다. jsPDF+html2canvas는 한글 폰트를 따로 넣어야 하고
+   표가 이미지로 나가 글자가 뭉갠다. 브라우저 인쇄(Ctrl+P > PDF로 저장)가
+   한글도 표도 깨끗하고, 의존성도 늘지 않는다.
+--------------------------------------------------------------------------- */
+.doc-sheet {
+    background: #fff;
+    color: #111;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 14mm 14mm 16mm;
+    margin: 0 auto;
+    box-sizing: border-box;
+    font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+}
+
+.doc-sheet h1 {
+    text-align: center;
+    font-size: 22pt;
+    letter-spacing: 12px;
+    margin: 0 0 10mm;
+    font-weight: 700;
+}
+
+.doc-sheet table { width: 100%; border-collapse: collapse; }
+.doc-sheet .doc-grid th,
+.doc-sheet .doc-grid td {
+    border: 1px solid #444;
+    padding: 5px 6px;
+    font-size: 10pt;
+    vertical-align: middle;
+}
+.doc-sheet .doc-grid th { background: #eef1f5; font-weight: 700; text-align: center; }
+.doc-sheet .doc-grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.doc-sheet .doc-grid td.ctr { text-align: center; }
+
+.doc-sheet .doc-meta td { padding: 3px 6px; font-size: 10pt; border: none; }
+.doc-sheet .doc-photo {
+    width: 26mm; height: 26mm; object-fit: contain;
+    border: 1px solid #ddd; background: #fafafa; display: block;
+}
+
+@media print {
+    /* 인쇄할 때는 문서만 남긴다 */
+    body * { visibility: hidden; }
+    .doc-sheet, .doc-sheet * { visibility: visible; }
+    .doc-sheet {
+        position: absolute; left: 0; top: 0;
+        width: 100%; margin: 0; padding: 10mm;
+        box-shadow: none;
+    }
+    .doc-no-print { display: none !important; }
+    /* 표가 페이지 중간에서 잘리지 않게 */
+    .doc-sheet tr, .doc-sheet img { break-inside: avoid; page-break-inside: avoid; }
+    @page { size: A4; margin: 10mm; }
+}
