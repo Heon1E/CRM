@@ -69,13 +69,13 @@ const Quotes = () => {
             setTableMissing(false)
             setList(data || [])
 
-            const [p, a, c] = await Promise.all([
-                supabase.from('products').select('id,name,standard,image_url').order('name').limit(2000),
-                supabase.from('product_accessories').select('*').order('sort_order'),
+            const [p, c] = await Promise.all([
+                supabase.from('products').select('id,name,type,standard,image_url').order('name').limit(2000),
                 supabase.from('company_profile').select('*').eq('id', 1).maybeSingle(),
             ])
             setProducts(p.data || [])
-            setAccessories(a.data || [])
+            // 악세서리도 품목이다. 따로 표를 두면 사진을 두 번 올려야 한다.
+            setAccessories((p.data || []).filter((x) => ['캡', '밸브'].includes(x.type)))
             setCompany(c.data || {})
         } catch (e) {
             console.error('견적서 조회 실패:', e)
@@ -133,10 +133,10 @@ const Quotes = () => {
             ...e,
             lines: e.lines.map((l) => {
                 if (l.key !== accFor) return l
-                const on = (l.accessories || []).some((s) => s.kind === a.kind && s.name === a.name)
+                const on = (l.accessories || []).some((s) => s.kind === a.type && s.name === a.name)
                 const next = on
-                    ? l.accessories.filter((s) => !(s.kind === a.kind && s.name === a.name))
-                    : [...(l.accessories || []), { kind: a.kind, name: a.name, image_url: a.image_url || null }]
+                    ? l.accessories.filter((s) => !(s.kind === a.type && s.name === a.name))
+                    : [...(l.accessories || []), { kind: a.type, name: a.name, image_url: a.image_url || null }]
                 return { ...l, accessories: next }
             }),
         }))

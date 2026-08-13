@@ -7,9 +7,18 @@ import { Search, X, ImageOff, Check } from 'lucide-react'
  * 견적서는 고객이 보는 문서다. 품목명만으로는 "그래서 뭘 주는 건데"가 안 잡힌다.
  * 고를 때부터 사진을 띄워야 영업사원도 고객도 같은 것을 본다.
  *
- * 악세서리에는 **무밸브**가 하나의 선택지로 들어간다 (밸브가 없는 형태이고
+ * 악세서리는 **품목 목록에서 그대로 온다.** 캡·밸브도 결국 품목이라, 따로 표를
+ * 두면 사진을 두 번 올려야 하고 이름이 갈린다. `products.type`으로 갈래를 나눈다:
+ *   IBC / 드럼 / 제리캔 = 완제품,  캡 / 밸브 = 악세서리,  부품 = 그 밖
+ *
+ * 밸브에는 **무밸브**가 하나의 선택지로 들어간다 (밸브가 없는 형태이고
  * 그 부위 사진이 따로 있다). '없음'이 아니라 이름이 있는 선택지다.
  */
+
+/** 완제품으로 볼 갈래 — 품목 고르기에서 이것만 먼저 보여준다 */
+export const FINISHED_TYPES = ['IBC', '드럼', '제리캔']
+/** 악세서리로 볼 갈래 — 상부캡·밸브 고르기에 뜬다 */
+export const ACCESSORY_TYPES = ['캡', '밸브']
 
 const Thumb = ({ url, alt, size = 56 }) => (
     url
@@ -28,17 +37,21 @@ export { Thumb }
 /** 품목 고르기 */
 export const ProductPicker = ({ products = [], onPick, onClose }) => {
     const [q, setQ] = useState('')
+    const [onlyFinished, setOnlyFinished] = useState(true)
 
     const list = useMemo(() => {
         const term = q.trim().toLowerCase()
-        const base = term
-            ? products.filter((p) =>
+        let base = products
+        // 견적 품목으로는 보통 완제품을 고른다. 부품만 팔 때는 체크를 풀면 된다.
+        if (onlyFinished) base = base.filter((p) => FINISHED_TYPES.includes(p.type))
+        if (term) {
+            base = base.filter((p) =>
                 String(p.name || '').toLowerCase().includes(term) ||
                 String(p.standard || '').toLowerCase().includes(term))
-            : products
+        }
         // 사진이 있는 것을 먼저 (견적서에 바로 쓸 수 있는 것)
         return [...base].sort((a, b) => (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0)).slice(0, 60)
-    }, [products, q])
+    }, [products, q, onlyFinished])
 
     return (
         <div onClick={onClose} style={{
@@ -57,6 +70,12 @@ export const ProductPicker = ({ products = [], onPick, onClose }) => {
                         style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 16 }} />
                     <button className="rowbtn" onClick={onClose}><X size={14} /></button>
                 </div>
+                <div className="filterbar">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5 }}>
+                        <input type="checkbox" checked={onlyFinished} onChange={(e) => setOnlyFinished(e.target.checked)} />
+                        완제품만 (IBC · 드럼 · 제리캔)
+                    </label>
+                </div>
 
                 <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
                     {list.map((p) => (
@@ -70,7 +89,7 @@ export const ProductPicker = ({ products = [], onPick, onClose }) => {
                             <span style={{ flex: 1, minWidth: 0 }}>
                                 <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
                                 <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-secondary)' }}>
-                                    {p.standard || '규격 없음'}{!p.image_url && ' · 사진 없음'}
+                                    {p.type ? `${p.type} · ` : ''}{p.standard || '규격 없음'}{!p.image_url && ' · 사진 없음'}
                                 </span>
                             </span>
                         </button>
@@ -93,14 +112,19 @@ export const ProductPicker = ({ products = [], onPick, onClose }) => {
 export const AccessoryPicker = ({ accessories = [], selected = [], onToggle, onClose }) => {
     const kinds = useMemo(() => {
         const m = {}
-        accessories.filter((a) => a.active !== false).forEach((a) => {
-            (m[a.kind] = m[a.kind] || []).push(a)
-        })
-        Object.values(m).forEach((l) => l.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name, 'ko')))
+        accessories
+            .filter((a) => ACCESSORY_TYPES.includes(a.type))
+            .forEach((a) => { (m[a.type] = m[a.type] || []).push(a) })
+        // 밸브를 먼저 보여준다 (무밸브가 맨 앞)
+        Object.values(m).forEach((l) => l.sort((a, b) => {
+            if (a.name === '무밸브') return -1
+            if (b.name === '무밸브') return 1
+            return a.name.localeCompare(b.name, 'ko')
+        }))
         return m
     }, [accessories])
 
-    const isOn = (a) => selected.some((s) => s.kind === a.kind && s.name === a.name)
+    const isOn = (a) => selected.some((s) => s.kind === a.type && s.name === a.name)
 
     return (
         <div onClick={onClose} style={{

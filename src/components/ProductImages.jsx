@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Upload, Loader2, Search, Plus, Trash2, ImageOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { showError, showSuccess, showConfirm } from '../utils/alert'
+import { showError } from '../utils/alert'
 
 /**
  * 품목 · 악세서리 사진 등록
  *
  * 견적서에 사진이 나가려면 여기서 먼저 올려야 한다.
- *   - 품목:     제품 사진 (products.image_url)
- *   - 악세서리: 상부캡 / 밸브 사진 (product_accessories.image_url)
+ *
+ * **캡·밸브도 품목이다.** 따로 표를 두면 사진을 두 번 올려야 하고 이름이 갈린다.
+ * `products.type`으로만 갈래를 나눈다:
+ *   IBC / 드럼 / 제리캔 = 완제품,  캡 / 밸브 = 악세서리,  부품 = 그 밖
  *
  * **밸브 쪽에는 '무밸브'가 있다.** 밸브가 없는 형태이고, 그 부위 사진을 따로 올린다.
  *
@@ -89,15 +91,17 @@ const ProductImages = () => {
         setLoading(true)
         try {
             const [p, a] = await Promise.all([
-                supabase.from('products').select('id,name,standard,image_url').order('name').limit(2000),
-                supabase.from('product_accessories').select('*').order('kind').order('sort_order'),
+                supabase.from('products').select('id,name,type,standard,image_url').order('name').limit(2000),
+                supabase.from('company_profile').select('id').limit(1),
             ])
             if (a.error && (a.error.code === 'PGRST205' || /does not exist|could not find the table/i.test(a.error.message || ''))) {
                 setTableMissing(true); return
             }
             setTableMissing(false)
-            setProducts(p.data || [])
-            setAccessories(a.data || [])
+            const all = p.data || []
+            setProducts(all.filter((x) => ['IBC', '드럼', '제리캔', '부품'].includes(x.type) || !x.type))
+            // 캡·밸브도 품목이다. 갈래만 다르게 본다.
+            setAccessories(all.filter((x) => ['캡', '밸브'].includes(x.type)))
         } catch (e) {
             await showError(e.message)
         } finally {
@@ -111,8 +115,8 @@ const ProductImages = () => {
         setBusy(row.id)
         try {
             const url = await upload(file, kind)
-            const table = kind === 'product' ? 'products' : 'product_accessories'
-            const { error } = await supabase.from(table).update({ image_url: url }).eq('id', row.id)
+            // 캡·밸브도 products 행이다. 갈 곳은 한 곳뿐이다.
+            const { error } = await supabase.from('products').update({ image_url: url }).eq('id', row.id)
             if (error) throw error
             await load()
         } catch (e) {
@@ -122,19 +126,13 @@ const ProductImages = () => {
         }
     }
 
+    /** 없는 캡·밸브를 새로 만든다 — 품목으로 들어간다 */
     const addAccessory = async () => {
         const name = newAcc.name.trim()
         if (!name) { await showError('이름을 넣어 주세요.'); return }
-        const { error } = await supabase.from('product_accessories').insert([{ kind: newAcc.kind, name }])
+        const { error } = await supabase.from('products').insert([{ name, type: newAcc.kind }])
         if (error) { await showError(error.message); return }
         setNewAcc({ ...newAcc, name: '' })
-        await load()
-    }
-
-    const removeAccessory = async (a) => {
-        if (!(await showConfirm(`'${a.name}'을(를) 지웁니다.`, '악세서리 삭제'))) return
-        const { error } = await supabase.from('product_accessories').delete().eq('id', a.id)
-        if (error) { await showError(error.message); return }
         await load()
     }
 
@@ -149,7 +147,7 @@ const ProductImages = () => {
 
     const byKind = useMemo(() => {
         const m = {}
-        accessories.forEach((a) => { (m[a.kind] = m[a.kind] || []).push(a) })
+        accessories.forEach((a) => { (m[a.type] = m[a.type] || []).push(a) })
         return m
     }, [accessories])
 
@@ -189,9 +187,9 @@ const ProductImages = () => {
                     <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
                         <select value={newAcc.kind} onChange={(e) => setNewAcc({ ...newAcc, kind: e.target.value })}>
                             <option>밸브</option>
-                            <option>상부캡</option>
+                            <option>캡</option>
                         </select>
-                        <input value={newAcc.name} placeholder="이름 (예: DN50 버터플라이)"
+                        <input value={newAcc.name} placeholder="이름 (예: 50V3밸브)"
                             onChange={(e) => setNewAcc({ ...newAcc, name: e.target.value })} style={{ flex: 1, minWidth: 160 }} />
                         <button className="tb-btn primary" onClick={addAccessory}><Plus size={13} /> 추가</button>
                     </div>
@@ -201,18 +199,18 @@ const ProductImages = () => {
                             <b style={{ fontSize: 13 }}>{kind}</b>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))', gap: 8, marginTop: 6 }}>
                                 {list.map((a) => (
-                                    <Tile key={a.id} url={a.image_url} name={a.name} sub={a.note || ''}
+                                    <Tile key={a.id} url={a.image_url} name={a.name} sub={a.standard || ''}
                                         busy={busy === a.id}
-                                        onUpload={(f) => uploadFor('accessory', a, f)}
-                                        onDelete={() => removeAccessory(a)} />
+                                        onUpload={(f) => uploadFor('accessory', a, f)} />
                                 ))}
                             </div>
                         </div>
                     ))}
 
                     <p style={{ margin: 0, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                        ※ <b>무밸브</b>도 하나의 선택지입니다. 밸브가 없는 부위 사진을 올려 두면
-                        견적서에 그대로 나가서 고객이 형태를 바로 알 수 있습니다.
+                        ※ 캡·밸브도 <b>품목 목록에 있는 것</b>을 그대로 씁니다. 여기서 올린 사진이
+                        견적서에 그대로 나갑니다.<br />
+                        ※ <b>무밸브</b>도 하나의 선택지입니다. 밸브가 없는 부위 사진을 올려 두세요.
                     </p>
                 </div>
             ) : (
