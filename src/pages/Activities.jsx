@@ -166,7 +166,7 @@ const Activities = () => {
               </div>
             </div>
             <div className="flex items-center gap-4 px-4 text-[11px] font-medium text-oem-text-secondary uppercase">
-              <span className="bg-oem-bg-header px-2 py-1 rounded text-oem-blue border border-oem-border">STREAMING_ENABLED</span>
+              <span className="bg-oem-bg-header px-2 py-1 rounded text-oem-blue border border-oem-border">최신순</span>
             </div>
           </div>
         </div>
@@ -174,11 +174,11 @@ const Activities = () => {
         {/* Data Stream */}
         <div className="oem-panel bg-white shadow-sm overflow-hidden" ref={containerRef}>
           <div className="oem-panel-header">
-            <span>INTERACTION_STREAM</span>
+            <span>활동 기록</span>
             <div className="flex items-center gap-4 text-[10px] font-medium text-oem-text-secondary">
-              <span>SCROLL_TO_LOAD_MORE</span>
+              <span>아래로 내리면 더 불러옵니다</span>
               <span className="w-px h-3 bg-oem-border"></span>
-              <span className="text-oem-green font-bold">LIVE_RECORDS</span>
+              <span className="text-oem-green font-bold">실시간</span>
             </div>
           </div>
 

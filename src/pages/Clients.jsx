@@ -372,13 +372,13 @@ const Clients = () => {
             </div>
             <div className="flex items-center gap-6 px-4 lg:border-l border-oem-border text-[11px] font-medium text-oem-text-secondary uppercase">
               <div className="flex flex-col">
-                <span>ACTIVE_ACCOUNTS</span>
+                <span>거래 중인 거래처</span>
                 <span className="text-oem-blue font-bold text-sm tracking-tighter">
                   {contextClients?.filter(c => c.status === '매출' || c.status === '활성').length || 0}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span>QUERY_TIME</span>
+                <span>조회 시각</span>
                 <span className="text-oem-text-primary font-bold text-sm tracking-tighter">{(new Date().getTime() % 100).toFixed(2)}ms</span>
               </div>
             </div>
@@ -388,11 +388,11 @@ const Clients = () => {
         {/* Main Data View */}
         <div className="oem-panel bg-white shadow-sm overflow-hidden">
           <div className="oem-panel-header">
-            <span>CLIENT_DATA_GRID</span>
+            <span>거래처 목록</span>
             <div className="flex items-center gap-4 text-[10px] font-medium text-oem-text-secondary">
               <span>PAGE {page} OF {Math.ceil(totalCount / PAGE_SIZE)}</span>
               <span className="w-px h-3 bg-oem-border"></span>
-              <span className="text-oem-blue font-bold">SQL_READY</span>
+              <span className="text-oem-blue font-bold">준비됨</span>
             </div>
           </div>
 
@@ -485,9 +485,9 @@ const Clients = () => {
                         />
                       </th>
                       <th className="w-12 text-center py-2">SEQ</th>
-                      <th className="w-80 py-2">COMPANY_NAME</th>
+                      <th className="w-80 py-2">회사명</th>
                       {!selectedClientId && <th className="py-2 ">담당자</th>}
-                      <th className="w-24 py-2 text-center">STATUS</th>
+                      <th className="w-24 py-2 text-center">상태</th>
                       {!selectedClientId && <th className="w-32 py-2 ">최종거래</th>}
                       <th className="w-32 text-right py-2 pr-4 ">누적매출</th>
                       <th className="w-20 text-center py-2">관리</th>

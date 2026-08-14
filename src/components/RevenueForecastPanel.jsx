@@ -68,7 +68,7 @@ const RevenueForecastPanel = () => {
             <div className="oem-panel h-[320px] flex flex-col items-center justify-center p-6 relative"
                 style={{ backgroundColor: 'var(--bg-card)' }}>
                 <div className="absolute top-3 right-3">
-                    <span className="badge-accent">BETA FEATURE</span>
+                    <span className="badge-accent">시험 기능</span>
                 </div>
                 <BrainCircuit className="w-12 h-12 mb-4 opacity-30" style={{ color: 'var(--text-secondary)' }} />
                 <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>AI Revenue Forecast</h3>

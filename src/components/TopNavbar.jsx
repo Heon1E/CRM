@@ -62,7 +62,7 @@ const TopNavbar = () => {
           >X</div>
           <span className="font-bold text-lg tracking-tight transition-colors"
             style={{ color: 'var(--text-primary)' }}
-          >Xavian CRM</span>
+          >아이앤디 CRM</span>
         </Link>
 
         <nav className="hidden lg:flex items-center h-[56px] gap-6">
@@ -128,11 +128,11 @@ const TopNavbar = () => {
         <div className="flex items-center gap-3 pl-5 h-8" style={{ borderLeft: '1px solid var(--border)' }}>
           <div className="text-right hidden sm:block">
             <p className="text-[12px] font-bold leading-none" style={{ color: 'var(--text-primary)' }}>
-              {user?.user_metadata?.company_name || 'SYSTEM'}
+              {user?.user_metadata?.company_name || '아이앤디'}
             </p>
             <div className="flex items-center justify-end gap-1 mt-1">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--success)' }}></span>
-              <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Online</span>
+              <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>접속 중</span>
             </div>
           </div>
           <div

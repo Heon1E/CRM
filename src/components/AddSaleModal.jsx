@@ -397,14 +397,14 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
         {/* 품목 리스트 */}
         <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
           <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
-            <label className="font-bold text-black uppercase tracking-tight">LINE_ITEMS_SUBFORM</label>
+            <label className="font-bold text-black uppercase tracking-tight">품목</label>
             <button
               type="button"
               onClick={addItem}
               className="oracle-raised bg-gray-200 px-2 py-0.5 flex items-center gap-1"
             >
               <Plus className="w-3 h-3" />
-              <span>ADD_LINE</span>
+              <span>품목 추가</span>
             </button>
           </div>
 
@@ -415,7 +415,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
                   <th className="border-r border-b border-gray-400 w-8">ITEM</th>
                   <th className="border-r border-b border-gray-400">PRODUCT_NAME / SEARCH</th>
                   <th className="border-r border-b border-gray-400 w-16">QTY</th>
-                  <th className="border-r border-b border-gray-400 w-24 text-right">UNIT_PRICE</th>
+                  <th className="border-r border-b border-gray-400 w-24 text-right">단가</th>
                   <th className="border-r border-b border-gray-400 w-24 text-right">TOTAL</th>
                   <th className="border-b border-gray-400 w-6">DEL</th>
                 </tr>

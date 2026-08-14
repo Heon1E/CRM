@@ -417,7 +417,7 @@ ${currentText}`
               ) : (
                 <>
                   <Sparkles className="w-3 h-3" />
-                  <span>AI POLISH</span>
+                  <span>AI 다듬기</span>
                 </>
               )}
             </button>

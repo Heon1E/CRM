@@ -446,7 +446,7 @@ const Settings = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-white p-4 border border-oem-border rounded-sm flex items-center justify-between">
                       <div>
-                        <h4 className="text-sm font-bold text-oem-text-primary">EXPORT CLIENT DATABASE</h4>
+                        <h4 className="text-sm font-bold text-oem-text-primary">거래처 내려받기</h4>
                         <p className="text-[10px] text-oem-text-secondary mt-1">Download all registered client profiles as Excel.</p>
                       </div>
                       <button
@@ -469,7 +469,7 @@ const Settings = () => {
 
                     <div className="bg-white p-4 border border-oem-border rounded-sm flex items-center justify-between">
                       <div>
-                        <h4 className="text-sm font-bold text-oem-text-primary">EXPORT SALES JOURNAL</h4>
+                        <h4 className="text-sm font-bold text-oem-text-primary">매출 내려받기</h4>
                         <p className="text-[10px] text-oem-text-secondary mt-1">Download complete transaction history.</p>
                       </div>
                       <button
@@ -594,9 +594,9 @@ const Settings = () => {
                   <table className="oem-table min-w-full">
                     <thead>
                       <tr>
-                        <th className="pl-4 text-left">PRODUCT_NAME</th>
+                        <th className="pl-4 text-left">품목명</th>
                         <th className="text-left w-[20%]">TYPE</th>
-                        <th className="text-left w-[20%]">STANDARD</th>
+                        <th className="text-left w-[20%]">규격</th>
                         <th className="text-center w-[150px]">관리</th>
                       </tr>
                     </thead>

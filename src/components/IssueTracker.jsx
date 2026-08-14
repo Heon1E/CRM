@@ -42,7 +42,7 @@ const IssueTracker = ({ maxItems = null }) => {
           className="bg-white border border-gray-300 text-gray-600 hover:text-oem-red hover:border-oem-red px-2 py-1 rounded-sm text-[10px] font-bold flex items-center gap-1 transition-all shadow-sm"
         >
           <Plus className="w-3 h-3" />
-          <span>NEW ISSUE</span>
+          <span>새 이슈</span>
         </button>
       </div>
 

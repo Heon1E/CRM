@@ -109,7 +109,7 @@ const Pricing = () => {
 
                     {/* Pro Plan */}
                     <div className="bg-white border-2 border-[#007538] rounded-xl p-8 flex flex-col relative shadow-xl shadow-[#007538]/10 transform md:-translate-y-4">
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#007538] text-white text-xs font-bold px-4 py-1.5 rounded-full">MOST POPULAR</div>
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#007538] text-white text-xs font-bold px-4 py-1.5 rounded-full">가장 많이 씁니다</div>
                         <div className="mb-6">
                             <h3 className="text-lg font-bold text-slate-900">Pro</h3>
                             <p className="text-sm text-slate-500 mt-1">Advanced sales tools</p>

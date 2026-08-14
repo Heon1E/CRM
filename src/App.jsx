@@ -25,7 +25,6 @@ import Pricing from './pages/Pricing'
 import Onboarding from './pages/Onboarding'
 import ShareProcessing from './pages/ShareProcessing'
 import Map from './pages/Map'
-import OrderEntry from './pages/OrderEntry'
 import Calendar from './pages/Calendar'
 import MyAccounts from './pages/MyAccounts'
 
@@ -36,25 +35,18 @@ const DocumentTitleUpdater = () => {
 
   React.useEffect(() => {
     const path = location.pathname
-    let title = 'Xavian ERP'
-
-    if (path === '/landing') title += ' | CRM & ERP Solutions'
-    else if (path === '/pricing') title += ' | Pricing Plans'
-    else if (path === '/login') title += ' | Login'
-    else if (path === '/onboarding') title += ' | Getting Started'
-    else if (path === '/') title += ' | Dashboard'
-    else if (path === '/clients') title += ' | Clients'
-    else if (path.startsWith('/clients/')) title += ' | Client Details'
-    else if (path === '/pipeline') title += ' | Pipeline Board'
-    else if (path === '/sales') title += ' | Sales'
-    else if (path === '/my-accounts') title += ' | My Accounts'
-    else if (path === '/map') title += ' | Territories Map'
-    else if (path === '/activities') title += ' | Activities'
-    else if (path === '/calendar') title += ' | Calendar'
-    else if (path === '/products') title += ' | Products'
-    else if (path === '/issues') title += ' | Issues'
-    else if (path === '/order-entry') title += ' | Order Entry'
-    else if (path === '/settings') title += ' | Settings'
+    // 브라우저 탭에 뜨는 이름. 여러 탭을 띄워 두면 이것만 보고 고른다.
+    const TITLES = {
+      '/landing': '소개', '/pricing': '요금', '/login': '로그인',
+      '/onboarding': '시작하기', '/': '대시보드', '/clients': '거래처',
+      '/pipeline': '영업기회', '/sales': '매출', '/my-accounts': '내 담당',
+      '/map': '지도', '/activities': '영업활동', '/calendar': '일정',
+      '/products': '품목', '/issues': '이슈', '/settings': '설정',
+      '/quotes': '견적서', '/purchase-orders': '발주서', '/receivables': '채권관리',
+    }
+    let title = '아이앤디 CRM'
+    const sub = path.startsWith('/clients/') ? '거래처 상세' : TITLES[path]
+    if (sub) title += ` | ${sub}`
 
     document.title = title
   }, [location])
@@ -113,7 +105,6 @@ const ProtectedRoutes = () => {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/share-processing" element={<ShareProcessing />} />
-          <Route path="/order-entry" element={<OrderEntry />} />
           <Route path="/my-accounts" element={<MyAccounts />} />
         </Routes>
       </Layout>

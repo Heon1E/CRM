@@ -245,12 +245,12 @@ const Map = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
                     <div>
                         <h1 className="text-xl font-bold text-oem-blue tracking-tight flex items-center gap-2">
-                            Customer Location Map
-                            <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">FORM: MAP_DIST_01</span>
+                            거래처 지도
                         </h1>
-                        <p className="text-[11px] text-oem-text-secondary mt-1 font-medium italic overflow-hidden whitespace-nowrap overflow-ellipsis">
-                            Geospatial distribution of enterprise assets and client locations.
-                            <span className="ml-2 font-bold text-oem-blue underline italic">{validClients.length} identified location(s)</span>
+                        <p className="text-[11px] text-oem-text-secondary mt-1 overflow-hidden whitespace-nowrap overflow-ellipsis">
+                            {validClients.length > 0
+                                ? <>주소 좌표가 등록된 거래처 <b className="text-oem-blue">{validClients.length}곳</b>을 지도에 표시합니다.</>
+                                : <>아직 좌표가 등록된 거래처가 없습니다. 거래처 상세에서 주소를 넣으면 지도에 나타납니다.</>}
                         </p>
                     </div>
 
@@ -284,10 +284,10 @@ const Map = () => {
                 {/* Map Context Utility */}
                 <div className="oem-panel bg-white shadow-sm overflow-hidden flex-1 flex flex-col border-l-4 border-l-oem-blue">
                     <div className="oem-panel-header shrink-0">
-                        <span>SPATIAL_INTELLIGENCE_ENGINE</span>
+                        <span>지도</span>
                         <div className="flex items-center gap-3 text-[10px] uppercase font-bold text-oem-text-secondary">
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-black"></span> HQ</span>
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]"></span> CLIENTS</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-black"></span> 본사</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]"></span> 거래처</span>
                         </div>
                     </div>
 

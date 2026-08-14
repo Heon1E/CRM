@@ -410,7 +410,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
 
           {/* 주소 입력 섹션 */}
           <div className="col-span-1 md:col-span-2 oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-            <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">LOCATION_INFO</label>
+            <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">주소</label>
             <div className="flex gap-2 items-center">
               <label className="w-20">POSTAL_CODE:</label>
               <input
@@ -451,14 +451,14 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
         {/* 담당자 관리 섹션 */}
         <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
           <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
-            <label className="font-bold text-black uppercase tracking-tight">CONTACT_PERSONS_SUBFORM</label>
+            <label className="font-bold text-black uppercase tracking-tight">담당자</label>
             <button
               type="button"
               onClick={handleAddContact}
               className="oracle-raised bg-gray-200 px-2 py-0.5 flex items-center gap-1"
             >
               <Plus className="w-3 h-3" />
-              <span>ADD_CONTACT</span>
+              <span>담당자 추가</span>
             </button>
           </div>
 
@@ -547,12 +547,12 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
 
         {/* 계약 단가 관리 섹션 */}
         <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-          <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">CONTRACT_PRICES_CANVAS</label>
+          <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">계약 단가</label>
 
           <div className="bg-white p-2 oracle-sunken space-y-2">
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="block text-[9px] font-bold">SELECT_PRODUCT</label>
+                <label className="block text-[9px] font-bold">품목 고르기</label>
                 <select
                   value={newContractPrice.productId || ''}
                   onChange={(e) => setNewContractPrice({ ...newContractPrice, productId: e.target.value || '' })}
@@ -567,7 +567,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
                 </select>
               </div>
               <div className="w-24">
-                <label className="block text-[9px] font-bold">UNIT_PRICE</label>
+                <label className="block text-[9px] font-bold">단가</label>
                 <input
                   type="number"
                   value={newContractPrice.price || ''}
