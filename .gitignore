@@ -20,3 +20,5 @@ test-results/
 # 자격증명 메모 (커밋 금지)
 OAuth_id_pw.txt
 *_pw.txt
+/public/_preview/
+/public/doc_preview.html

@@ -1,28 +1,124 @@
-# Design System: Xavian CRM - Global SaaS
-**Project ID:** 4950519565524609594
+# IND 디자인 시스템
 
-## 1. Visual Theme & Atmosphere
-A clean, modern, and professional SaaS aesthetic. The UI feels premium, airy, and structured, utilizing ample whitespace to create a spacious hierarchy. The atmosphere balances approachable usability with enterprise-grade reliability, ideal for a global B2B CRM.
+아이앤디 주식회사의 문서·화면·발표자료가 따르는 단일 기준.
 
-## 2. Color Palette & Roles
-* **Primary Indigo Purple** (#833CF6): The key brand and action color. Used for primary call-to-action buttons, active states, and important highlights. It brings a vibrant, modern tech feel.
-* **Pure Clean White** (#FFFFFF): Used for core backgrounds, cards, and modal dialogs.
-* **Subtle Cool Grays**: Used for secondary text, borders, and muted backgrounds to establish depth without competing with the primary content.
+**출처는 회사 e카탈로그(`IND_eCatalog_2026.pdf`)다.** 전문 디자이너가 만든 것이라
+새로 지어내지 않고 PDF에서 값을 뽑아 그대로 옮겼다. 눈대중이 아니라 실측값이다.
 
-## 3. Typography Rules
-* **Font Family:** Inter. A highly legible, modern sans-serif ideal for dense data and clear UI navigation.
-* **Weights:** Employs medium and semi-bold weights for headings and button labels to establish clear visual hierarchy, while keeping body text regular to reduce fatigue.
+구현체는 `src/index.css`의 `:root` — `--ind-*` 토큰과 `@font-face`.
+**색을 바꾸려면 이 문서와 `index.css` 두 곳을 함께 고친다.**
 
-## 4. Component Stylings
-* **Buttons:** 
-  * Shape: Subtly rounded corners (8px radius) - smooth but structured.
-  * Primary style filled with Vibrant Purple (#833CF6) and crisp white text.
-* **Cards/Containers:** 
-  * Corner roundness: 8px (ROUND_EIGHT).
-  * Feature clean, thin borders or very soft, diffused drop shadows to gently lift elements off the page.
-* **Inputs/Forms:** 
-  * Well-padded, rounded-lg styles with subtle focus rings matching the primary color.
+---
 
-## 5. Layout Principles
-* **Structure:** Desktop-optimized (deviceType: DESKTOP), wide-format layout.
-* **Spacing:** Generous padding around distinct modules for a distraction-free experience. Elements breathe, preventing cognitive overload in complex data views.
+## 1. 색
+
+| 이름 | 값 | 쓰임 | 카탈로그 근거 |
+|---|---|---|---|
+| **IND Green** | `#007538` | 제목, 표 머리, 강조, 로고 | 본문 강조 887자 + 도형 채움 777회 |
+| Green Deep | `#005c2b` | 로고 그라데이션 어두운 쪽 | 로고 |
+| Green Soft | `#69ae8e` | 표지 하프톤 점 패턴 | 도형 채움 811회 (표지·뒤표지 장식) |
+| Green Pale | `#e6f2ea` | 강조 문구 배경 | "약 11% 더 많은 적재 용량!" |
+| **Ink** | `#3e3a39` | 본문 | 본문 4,988자 — 가장 많이 쓰인 색 |
+| Ink Mute | `#595757` | 보조 설명, 항목 이름 | 377자 |
+| Ink Faint | `#9fa0a0` | 캡션, 러닝헤드, 얇은 선 | 49자 + 선 색 |
+| Panel | `#f2f3f3` | 회색 패널, 표 줄무늬 | Accessories 영역 배경 |
+| Rule | `#dcdddd` | 헤어라인 | 0.28pt 선 |
+
+**본문은 순검정(`#000`)이 아니다.** 따뜻한 먹색 `#3e3a39`다. 검정으로 바꾸면
+인쇄물이 딱딱해지고 카탈로그와 달라 보인다.
+
+### 대비 규칙
+
+옅은 회색 `#9fa0a0`은 **캡션에만** 쓴다. 흰 배경에서 2.6:1이라 본문이나 항목
+이름에 쓰면 종이에서 안 읽힌다. 실제로 견적서 라벨에 썼다가 되돌렸다.
+본문급 글씨는 `#595757`(7.2:1) 이상을 쓸 것.
+
+---
+
+## 2. 서체
+
+| 용도 | 서체 | 굵기 |
+|---|---|---|
+| 한글 | **NanumSquare Neo** | 400 / 700 / 800 |
+| 영문·숫자 | **Montserrat** | 가변 (100~900) |
+
+둘을 섞는 것이 카탈로그의 조합이다. 숫자를 Montserrat로 두면 금액·규격이
+또렷해진다. `.num` / `.en` 클래스가 이 전환을 맡는다.
+
+`public/fonts/`에 **직접 담아 쓴다.** 외부 CDN에 기대면 인쇄하는 순간 글꼴이
+안 와서 문서가 다른 모양으로 나갈 수 있다 — 고객에게 나가는 문서라 그러면 안 된다.
+Montserrat는 가변 폰트 하나(37KB)로 전 굵기를 덮고, 나눔스퀘어 네오는 굵기별
+파일이라 셋만 담았다(각 ~380KB). 카탈로그의 Light(300)는 400으로 대체한다.
+
+### 크기 (A4 기준, pt)
+
+| 자리 | 크기 | 굵기 |
+|---|---|---|
+| 페이지 대제목 | 21~28 | 800 |
+| 문서 이름 (견 적 서) | 21 (자간 6px) | 800 |
+| 섹션 제목 | 10.5~12 | 800, 초록 |
+| 본문 | 8.9~9 | 400 |
+| 표 | 8~8.5 | 400 |
+| 캡션·러닝헤드 | 6~7 | 400 |
+
+---
+
+## 3. 판형과 여백
+
+- A4 **210 × 297mm**
+- 좌우 여백 **16mm** (카탈로그 실측 45pt)
+- 2단 구성 시 오른쪽 단 시작 = 왼쪽에서 **108.7mm**
+- 카드 모서리 반경 **8px**
+- 헤어라인 **0.28pt** (화면에서는 1px)
+
+---
+
+## 4. 되풀이되는 패턴
+
+카탈로그에서 가져와 문서·화면에 그대로 쓰는 것들.
+
+**러닝헤드** — 왼쪽에 영문 라벨, 오른쪽에 쪽번호. 7pt, `#595757`, 아래 헤어라인.
+
+**제목 두 층** — 작은 초록 윗말 + 큰 먹색 제목.
+카탈로그의 `IBC` / `BF-SERIES`가 문서에서는 `QUOTATION` / `견 적 서`가 된다.
+
+**섹션 제목** — 초록 글씨 + 아래 헤어라인이 단 전체를 가로지른다.
+
+**표** — 머리줄은 **초록 바탕에 흰 글씨**, 본문은 흰/`#fafbfb` 줄무늬,
+칸 구분은 헤어라인. **칸마다 검은 실선을 두르지 않는다** (관공서 양식처럼 보인다).
+근거: 카탈로그 p3 '20ft 컨테이너 적재 용량 비교' 표.
+
+**강조 한 줄** — 초록 글씨에 `#e6f2ea` 배경.
+
+**카드** — 흰 바탕 + `#dcdddd` 헤어라인 + 8px 반경. 회색 패널은 `#f2f3f3`.
+
+**바닥글** — 로고 + 헤어라인 + 상호(굵게) · 주소 · Tel/Fax/E-mail.
+라벨은 굵게, 값은 보통. 근거: 카탈로그 뒷표지.
+
+**하프톤 점** — `#69ae8e` 점이 모서리에서 옅어지는 장식. 표지·간지에만 쓴다.
+본문에 깔면 글씨를 방해한다.
+
+---
+
+## 5. 로고
+
+`public/brand-logo.png` (900×462) — 카탈로그 뒷표지에서 벡터로 뽑아낸 것.
+Supabase Storage `product-images/brand/ind-logo.png`에도 올라가 있고
+`company_profile.logo_url`이 그것을 가리킨다.
+
+'IND' 워드마크 아래 `PACKAGING SOLUTION`이 붙어 있는 형태를 기본으로 쓴다.
+문서 레터헤드에서는 높이 13mm, 바닥글에서는 7mm.
+
+---
+
+## 6. 어디에 적용되어 있나
+
+| 대상 | 상태 |
+|---|---|
+| 견적서 · 발주서 (`.doc-*` in `index.css`) | 적용 완료 |
+| CRM 화면 전반 | **아직 옛 Oracle 레드 그대로** |
+| PPT · 기타 문서 | 미적용 |
+
+CRM 화면은 `--accent`(#c74634 붉은색)를 쓰는 곳이 많아 한 번에 바꾸면
+대비가 깨진다. **색을 일괄 변경한 뒤에는 반드시 대비비 검사를 돌릴 것** —
+배경만 바뀌고 흰 글씨가 남으면 텍스트가 사라진다.

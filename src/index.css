@@ -11,7 +11,66 @@
    변수 '이름'은 기존 컴포넌트가 참조 중이라 유지하고 '값'만 바꾼다.
    ========================================= */
 
+/* ---------------------------------------------------------------------------
+   IND 브랜드 서체 — 회사 e카탈로그와 같은 것
+
+   전문 디자이너가 만든 카탈로그(IND_eCatalog_2026.pdf)에서 실제로 쓰인 서체를
+   그대로 가져왔다. 한글은 NanumSquare Neo, 영문·숫자는 Montserrat다.
+
+   **직접 담아 쓴다(self-host).** 외부 CDN에 기대면 인쇄하는 순간 글꼴이 안 와서
+   문서가 다른 모양으로 나갈 수 있다. 고객에게 나가는 문서라 그러면 안 된다.
+   Montserrat는 가변 폰트 하나(37KB)가 전 굵기를 덮는다.
+   나눔스퀘어 네오는 굵기별 파일이라 400/700/800 셋만 담았다 (각 ~380KB).
+   카탈로그의 Light(300)는 400으로 대체한다 — 파일 하나를 더 받을 값어치가 없다.
+--------------------------------------------------------------------------- */
+@font-face {
+  font-family: "NanumSquareNeo";
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/NanumSquareNeo-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "NanumSquareNeo";
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/NanumSquareNeo-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "NanumSquareNeo";
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/NanumSquareNeo-800.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/Montserrat-var.woff2") format("woff2");
+  /* 라틴 문자만 담겨 있다. 한글은 NanumSquareNeo가 받는다. */
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212;
+}
+
 :root {
+  /* ---------------------------------------------------------------------
+     IND 브랜드 (회사 e카탈로그에서 추출한 실제 값)
+
+     눈대중이 아니라 PDF에서 뽑은 숫자다. 문서·화면·PPT가 같은 값을 써야
+     한 회사가 만든 것처럼 보인다. 색을 바꾸려면 여기만 고친다.
+     --------------------------------------------------------------------- */
+  --ind-green: #007538;        /* 제목·표 머리·강조 — 카탈로그의 기준색 */
+  --ind-green-deep: #005c2b;   /* 로고 그라데이션의 어두운 쪽 */
+  --ind-green-soft: #69ae8e;   /* 표지 하프톤 점 패턴 */
+  --ind-green-pale: #e6f2ea;   /* 강조 문구 배경 ("약 11% 더 많은 적재 용량!") */
+  --ind-ink: #3e3a39;          /* 본문 — 순검정이 아닌 따뜻한 먹색 */
+  --ind-ink-mute: #595757;     /* 보조 설명 */
+  --ind-ink-faint: #9fa0a0;    /* 캡션·러닝헤드 */
+  --ind-panel: #f2f3f3;        /* 회색 패널 (Accessories 영역, 표 줄무늬) */
+  --ind-rule: #dcdddd;         /* 헤어라인 — 카탈로그는 0.28pt를 쓴다 */
+  --ind-card-radius: 8px;
+
+  --font-brand: "NanumSquareNeo", "Malgun Gothic", "맑은 고딕", sans-serif;
+  --font-brand-en: "Montserrat", "NanumSquareNeo", sans-serif;
+
   /* --- Surfaces --- */
   --bg-app: #eceef1;
   --bg-card: #ffffff;
@@ -745,42 +804,182 @@ textarea:focus {
 --------------------------------------------------------------------------- */
 .doc-sheet {
     background: #fff;
-    color: #111;
+    color: var(--ind-ink);
     width: 210mm;
     min-height: 297mm;
-    padding: 14mm 14mm 16mm;
+    /* 카탈로그와 같은 좌우 여백 16mm (PDF에서 잰 값: 45pt) */
+    padding: 15mm 16mm 14mm;
     margin: 0 auto;
     box-sizing: border-box;
-    font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
-    font-size: 11pt;
-    line-height: 1.5;
+    font-family: var(--font-brand);
+    font-size: 9.5pt;
+    line-height: 1.55;
+    display: flex;
+    flex-direction: column;
+    /* 초록 표머리가 인쇄에서 사라지지 않게 한다 (브라우저 기본은 배경색을 뺀다) */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 }
 
-.doc-sheet h1 {
-    text-align: center;
-    font-size: 22pt;
-    letter-spacing: 12px;
-    margin: 0 0 10mm;
-    font-weight: 700;
+/* 영문·숫자는 Montserrat로 — 카탈로그의 조합이다 */
+.doc-sheet .en,
+.doc-sheet .num,
+.doc-sheet .doc-no { font-family: var(--font-brand-en); }
+
+/* --- 레터헤드 : 로고 왼쪽 / 문서 이름 오른쪽 ------------------------------- */
+.doc-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8mm;
+    padding-bottom: 3mm;
+    border-bottom: 1px solid var(--ind-green);
+}
+.doc-head img { height: 13mm; object-fit: contain; object-position: left bottom; }
+.doc-head .fallback {
+    font-family: var(--font-brand-en);
+    font-size: 20pt; font-weight: 800; color: var(--ind-green); letter-spacing: -1px;
+}
+.doc-title { text-align: right; line-height: 1.15; }
+/* 카탈로그의 'IBC' → 'BF-SERIES' 조합: 작은 초록 윗말 + 큰 제목 */
+.doc-title .eyebrow {
+    display: block;
+    font-family: var(--font-brand-en);
+    font-size: 8pt; font-weight: 600; letter-spacing: 2.5px;
+    color: var(--ind-green);
+    text-transform: uppercase;
+}
+.doc-title .name {
+    display: block;
+    font-size: 21pt; font-weight: 800; letter-spacing: 6px;
+    color: var(--ind-ink);
+    margin-top: 1mm;
 }
 
+/* --- 문서번호 / 일자 줄 --------------------------------------------------- */
+.doc-idline {
+    display: flex; justify-content: flex-end; gap: 10mm;
+    margin: 2.5mm 0 6mm;
+    font-size: 8.5pt; color: var(--ind-ink-mute);
+}
+.doc-idline b { color: var(--ind-ink); font-weight: 700; }
+
+/* --- 섹션 제목 : 초록 글씨 + 아래 헤어라인 -------------------------------- */
+.doc-h2 {
+    font-size: 10.5pt; font-weight: 800; color: var(--ind-green);
+    margin: 0 0 2.5mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 1px solid var(--ind-rule);
+}
+
+/* --- 수신 / 공급자 패널 --------------------------------------------------- */
+.doc-parties { display: flex; gap: 5mm; margin-bottom: 6mm; }
+.doc-party {
+    flex: 1; min-width: 0;
+    border: 1px solid var(--ind-rule);
+    border-radius: var(--ind-card-radius);
+    padding: 3mm 3.5mm;
+}
+.doc-party.is-us { background: var(--ind-panel); border-color: transparent; }
+.doc-party h3 {
+    margin: 0 0 2mm; font-size: 8pt; font-weight: 700; letter-spacing: 1px;
+    color: var(--ind-green);
+}
+.doc-party dl { display: grid; grid-template-columns: 16mm 1fr; gap: .8mm 2.5mm; margin: 0; }
+.doc-party dt { font-size: 7.6pt; color: var(--ind-ink-mute); }
+/* 한글은 단어 중간에서 끊지 않는다. anywhere로 두면 '삼백로 367-/20'처럼 잘린다. */
+.doc-party dd { margin: 0; font-size: 8.4pt; word-break: keep-all; overflow-wrap: break-word; }
+.doc-party .big { font-size: 10.5pt; font-weight: 800; }
+
+/* --- 표 : 초록 머리 + 줄무늬 + 헤어라인 (카탈로그 p3 비교표와 같은 언어) --- */
 .doc-sheet table { width: 100%; border-collapse: collapse; }
-.doc-sheet .doc-grid th,
-.doc-sheet .doc-grid td {
-    border: 1px solid #444;
-    padding: 5px 6px;
-    font-size: 10pt;
+.doc-grid { border-radius: var(--ind-card-radius); overflow: hidden; }
+.doc-grid thead th {
+    background: var(--ind-green);
+    color: #fff;
+    font-weight: 700;
+    font-size: 8.5pt;
+    letter-spacing: .5px;
+    text-align: center;
+    padding: 2.4mm 2mm;
+    border: none;
+}
+.doc-grid tbody td {
+    padding: 1.8mm 2.5mm;
+    font-size: 9pt;
     vertical-align: middle;
+    border-bottom: 1px solid var(--ind-rule);
 }
-.doc-sheet .doc-grid th { background: #eef1f5; font-weight: 700; text-align: center; }
-.doc-sheet .doc-grid td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.doc-sheet .doc-grid td.ctr { text-align: center; }
+.doc-grid tbody tr:nth-child(even) td { background: #fafbfb; }
+.doc-grid tbody tr:last-child td { border-bottom: 1px solid var(--ind-rule); }
+.doc-grid td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.doc-grid td.ctr { text-align: center; }
+.doc-grid .item-name { font-weight: 700; }
+.doc-grid .item-spec { font-size: 8pt; color: var(--ind-ink-mute); }
 
-.doc-sheet .doc-meta td { padding: 3px 6px; font-size: 10pt; border: none; }
-.doc-sheet .doc-photo {
-    width: 26mm; height: 26mm; object-fit: contain;
-    border: 1px solid #ddd; background: #fafafa; display: block;
+/* 조건표(유효기간·비고) — 머리칸이 왼쪽에 오는 형태 */
+.doc-terms { border-top: 1px solid var(--ind-rule); }
+.doc-terms th {
+    width: 22mm;
+    background: var(--ind-panel);
+    color: var(--ind-ink);
+    font-size: 8.5pt; font-weight: 700; text-align: left;
+    padding: 1.8mm 3mm;
+    border-bottom: 1px solid var(--ind-rule);
 }
+.doc-terms td {
+    padding: 1.8mm 3mm; font-size: 9pt;
+    border-bottom: 1px solid var(--ind-rule);
+}
+
+/* --- 합계 : 마지막 줄만 초록 ---------------------------------------------- */
+.doc-totals { width: 78mm; margin: 4mm 0 0 auto; }
+.doc-totals td {
+    padding: 1.6mm 3mm; font-size: 9pt;
+    border-bottom: 1px solid var(--ind-rule);
+}
+.doc-totals td:first-child { color: var(--ind-ink-mute); }
+.doc-totals td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.doc-totals tr.sum td {
+    background: var(--ind-green); color: #fff;
+    font-weight: 800; font-size: 12pt;
+    border-bottom: none;
+}
+.doc-totals tr.sum td:first-child { color: #fff; font-size: 9.5pt; font-weight: 700; }
+
+/* --- 품목 사진 ------------------------------------------------------------ */
+.doc-photo {
+    width: 22mm; height: 22mm; object-fit: contain;
+    background: #fff; display: block; margin: 0 auto;
+}
+/* 악세서리 — 이름과 사진을 함께. 고객이 형태를 바로 알 수 있어야 한다. */
+.doc-acc { display: flex; gap: 2mm; margin-top: 2mm; flex-wrap: wrap; }
+.doc-acc figure {
+    margin: 0; width: 16mm; text-align: center;
+    background: var(--ind-panel); border-radius: 5px; padding: 1mm;
+}
+.doc-acc img { width: 100%; height: 11mm; object-fit: contain; display: block; background: #fff; border-radius: 3px; }
+.doc-acc figcaption { font-size: 6pt; line-height: 1.3; margin-top: .8mm; color: var(--ind-ink); }
+.doc-acc figcaption span { display: block; color: var(--ind-green); font-weight: 700; }
+
+/* --- 서명 ----------------------------------------------------------------- */
+.doc-sign { text-align: right; margin-top: 7mm; position: relative; }
+.doc-sign .co { font-size: 10pt; }
+.doc-sign .ceo { font-size: 11.5pt; font-weight: 800; margin-left: 2mm; }
+.doc-sign .seal { font-size: 8.5pt; color: var(--ind-ink-mute); margin-left: 1.5mm; }
+.doc-sign img { width: 18mm; height: 18mm; object-fit: contain; position: absolute; right: -2mm; top: -5mm; }
+
+/* --- 바닥글 : 카탈로그 뒷표지와 같은 형태 --------------------------------- */
+.doc-foot {
+    margin-top: auto;
+    padding-top: 3mm;
+    border-top: 1px solid var(--ind-rule);
+    display: flex; align-items: center; justify-content: space-between; gap: 6mm;
+    font-size: 7.5pt; color: var(--ind-ink-mute);
+}
+.doc-foot img { height: 7mm; object-fit: contain; }
+.doc-foot .lines { text-align: right; line-height: 1.5; }
+.doc-foot b { color: var(--ind-ink); font-weight: 700; }
 
 @media print {
     /* 인쇄할 때는 문서만 남긴다 */
@@ -788,11 +987,12 @@ textarea:focus {
     .doc-sheet, .doc-sheet * { visibility: visible; }
     .doc-sheet {
         position: absolute; left: 0; top: 0;
-        width: 100%; margin: 0; padding: 10mm;
+        width: 100%; min-height: 0; margin: 0; padding: 12mm 14mm;
         box-shadow: none;
     }
     .doc-no-print { display: none !important; }
     /* 표가 페이지 중간에서 잘리지 않게 */
-    .doc-sheet tr, .doc-sheet img { break-inside: avoid; page-break-inside: avoid; }
-    @page { size: A4; margin: 10mm; }
+    .doc-sheet tr, .doc-sheet img, .doc-party { break-inside: avoid; page-break-inside: avoid; }
+    .doc-grid thead { display: table-header-group; }
+    @page { size: A4; margin: 0; }
 }
