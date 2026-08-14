@@ -213,6 +213,44 @@ begin
     end loop;
 end $$;
 
+-- ========================== 5-2. 빠진 표 쓸어담기 ==========================
+--
+-- 위 목록은 손으로 적은 것이라 **새 표가 생기면 빠진다.** 실제로 첫 실행 뒤
+-- `product_accessories`가 anon 전체 허용인 채로 남아 있었다(지금은 안 쓰는 표).
+-- 그래서 public 스키마에 anon 정책이 남은 표를 전부 훑어 닫는다.
+--
+-- 여기서 걸리는 표가 있다면 그건 '앱이 로그인 없이 쓰는 표'가 아니라
+-- '닫는 걸 잊은 표'다. 서버 함수는 서비스 롤 키를 쓰므로 anon이 필요 없다.
+do $$
+declare p record;
+begin
+    for p in
+        select tablename, policyname
+        from pg_policies
+        where schemaname = 'public' and 'anon' = any(roles)
+    loop
+        execute format('drop policy if exists %I on public.%I', p.policyname, p.tablename);
+        raise notice 'anon 정책 제거: %.%', p.tablename, p.policyname;
+    end loop;
+
+    -- 정책을 다 뗀 표는 RLS만 켜 두면 아무도 못 읽는다.
+    -- 쓰는 표라면 위 목록에 이름을 넣어 정식 정책을 받아야 한다.
+    for p in
+        select c.relname as tablename
+        from pg_class c
+        join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+    loop
+        execute format('alter table public.%I enable row level security', p.tablename);
+        raise notice 'RLS 켬: %', p.tablename;
+    end loop;
+end $$;
+
+-- 안 쓰는 표를 아예 없애려면 아래 주석을 풀 것.
+-- `product_accessories`는 캡·밸브를 `products.type`으로 옮기면서 쓰지 않게 됐다
+-- (CLAUDE.md 참고). 남은 2줄은 무밸브·기본캡 씨앗이고 products에 이미 있다.
+-- drop table if exists public.product_accessories;
+
 -- ========================== 6. 사진 보관함 ==========================
 -- 품목 사진은 견적서에 박혀 나가므로 읽기는 열어 둔다 (카탈로그 사진이라 민감하지 않다).
 -- 올리고 지우는 것은 로그인한 사람만.
