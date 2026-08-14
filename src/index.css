@@ -593,7 +593,16 @@ textarea {
   font-family: inherit;
 }
 
-input:not([type="checkbox"]):not([type="radio"]),
+/* 업무화면의 조밀한 입력칸 기본값.
+   **선택자를 요소 하나로 유지한다(우선순위 0,0,0,1).** 여기가 미묘하다:
+   - 예전엔 `input:not([type=checkbox]):not([type=radio])`(0,0,2,1)였다.
+     이게 Tailwind의 `pl-10`(0,0,1,0)을 이겨서 로그인 화면의 왼쪽 여백이
+     사라졌고 아이콘과 글자가 겹쳤다.
+   - 그렇다고 `:where()`로 0을 만들면 Tailwind 리셋(`input {padding:0}`, 0,0,0,1)에
+     밀려 조밀한 입력칸이 통째로 풀린다(패딩 0, 글자 13px).
+   요소 선택자면 리셋보다 뒤에 와서 이기고, 클래스에는 진다 — 둘 다 만족한다.
+   체크박스·라디오만 아래에서 되돌린다. */
+input,
 select {
   min-height: 26px;
   padding: 2px 6px;
@@ -603,6 +612,13 @@ select {
 textarea {
   padding: 3px 6px;
   font-size: 12px;
+}
+
+/* 체크박스·라디오는 위 규칙을 되돌린다 (속성 선택자라 요소 선택자를 이긴다) */
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: 0;
+  padding: 0;
 }
 
 input::placeholder,

@@ -22,18 +22,19 @@ const TopNavbar = () => {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // 한국어 제품인데 메뉴가 영문이라 '설정'을 찾지 못한다는 이야기가 나왔다.
+  // 견적서·발주서·채권관리만 한글이고 나머지가 영문이라 더 헷갈렸다.
   const navItems = [
-    { path: '/', label: 'Dashboard' },
-    { path: '/clients', label: 'Customers' },
-    { path: '/sales', label: 'Sales' },
+    { path: '/', label: '대시보드' },
+    { path: '/clients', label: '거래처' },
+    { path: '/sales', label: '매출' },
     { path: '/quotes', label: '견적서' },
     { path: '/purchase-orders', label: '발주서' },
     { path: '/receivables', label: '채권관리' },
-    { path: '/activities', label: 'Activities' },
-    { path: '/pipeline', label: 'Pipeline' },
-    { path: '/map', label: 'Map' },
-    { path: '/settings', label: 'Settings' },
-    { path: '/my-accounts', label: 'My Accounts' },
+    { path: '/activities', label: '영업활동' },
+    { path: '/pipeline', label: '영업기회' },
+    { path: '/my-accounts', label: '내 담당' },
+    { path: '/settings', label: '설정' },
   ]
 
   const userInitials = useMemo(() => {
