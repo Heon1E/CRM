@@ -20,6 +20,7 @@ import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 import ActionCenter from '../components/ActionCenter'
 import SalesCoach from '../components/SalesCoach'
 import KPIWidget from '../components/KPIWidget'
+import { SALES_REP_OPTIONS, setStoredRep } from '../utils/salesRep'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 
 
@@ -189,9 +190,20 @@ const Dashboard = () => {
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> 새로고침
             </button>
             <span className="tb-sep" />
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              {getUserSalesRep ? `${getUserSalesRep} 담당` : '전사'}
-            </span>
+            {/* 로그인이 없어 '내가 누구인지'를 앱이 알 수 없다. 여기서 고른 값을
+                기기에 저장해 KPI·영업 코치·거래처 정렬이 모두 이 이름을 기준으로 돈다.
+                고르지 않으면 '내 담당'이 하나도 안 잡혀 전부 0으로 나온다. */}
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              담당
+              <select
+                value={getUserSalesRep || ''}
+                onChange={(e) => setStoredRep(e.target.value || null)}
+                style={{ fontSize: 12 }}
+              >
+                <option value="">전사 (내 담당 없음)</option>
+                {SALES_REP_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
           </div>
 
           {/* 요약 숫자 — 자료가 준비되기 전에는 '—'를 보여준다.

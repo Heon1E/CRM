@@ -16,7 +16,15 @@ export const useDashboardData = () => {
   const [totalClientsCount, setTotalClientsCount] = useState(0)
 
   // 계정 -> 영업사원 이름. 다른 화면에서도 써야 해서 utils로 뺐다.
-  const getUserSalesRep = useMemo(() => resolveSalesRep(user), [user])
+  // 로그인이 없을 때는 화면에서 고른 이름(localStorage)을 쓰므로, 그것이 바뀌면
+  // 다시 계산해야 한다. 안 그러면 이름을 골라도 숫자가 그대로다.
+  const [repTick, setRepTick] = useState(0)
+  useEffect(() => {
+    const onChange = () => setRepTick((t) => t + 1)
+    window.addEventListener('my-rep-changed', onChange)
+    return () => window.removeEventListener('my-rep-changed', onChange)
+  }, [])
+  const getUserSalesRep = useMemo(() => resolveSalesRep(user), [user, repTick])
 
   // 유틸리티: 주간 매출 데이터 계산
   const getWeeklySalesDataForClients = useCallback((salesData) => {

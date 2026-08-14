@@ -934,15 +934,15 @@ export const DataProvider = ({ children }) => {
       return
     }
 
-    // user가 없더라도 Supabase 세션이 있으면 로드 (OAuth 리다이렉트 후 세션 복원 타이밍 이슈 방지)
+    // **로그인이 없어도 로드한다.**
+    // 예전에는 세션이 없으면 아무것도 부르지 않고 끝냈다. 로그인 화면을 떼어낸 뒤
+    // 세션이 영영 생기지 않게 되면서, 거래처·매출·활동이 통째로 빈 배열로 남았다.
+    // 그 결과 상단 카드가 '—', KPI가 0, 영업 코치가 0건으로 나왔다.
+    // 데이터는 RLS로 보호되므로(anon 허용) 여기서 막을 이유가 없다.
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        console.log('[DataContext] Session found without user context, loading data...')
-        fetchData()
-      } else {
-        setLoading(false)
-      }
-    })
+      if (!session) console.log('[DataContext] 세션 없음 — 로그인 없이 로드합니다.')
+      fetchData()
+    }).catch(() => fetchData())
   }, [user, authLoading, openModalCount, fetchData, clients.length, activities.length, sales.length])
 
 

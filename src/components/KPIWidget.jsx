@@ -233,10 +233,21 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
 
     // Managed client IDs \u2014 \ud56d\ubaa9\ubcc4 \uc81c\uc678\ub294 \uc5ec\uae30\uc11c \uac78\uc9c0 \uc54a\ub294\ub2e4.
     // \uc5ec\uae30\uc11c \ube7c\uba74 \ub9e4\ucd9c\u00b7\ubd80\ubb38\uae30\uc5ec KPI\uc5d0\uc11c\uae4c\uc9c0 \uc2e4\uc801\uc774 \uc0ac\ub77c\uc9c4\ub2e4.
+    /**
+     * 담당 거래처 id 목록.
+     *
+     * 예전에는 `myAccounts.map(c => c.id)` 였는데 `myAccounts`는 **id 문자열 배열**이라
+     * 전부 undefined가 됐다. 로그인이 되면 오히려 KPI가 전부 0이 되는 상태였다
+     * (로그인이 없어 myAccounts가 비면 아래 폴백이 돌아 우연히 맞았다).
+     * 이름이 '이헌일'로 코드에 박혀 있어 다른 담당자가 봐도 이헌일 실적이 나왔다.
+     */
     const managedClientIds = useMemo(() => {
-        return (myAccounts && myAccounts.length > 0)
-            ? myAccounts.map(c => c.id)
-            : (clients || []).filter(c => c.sales_rep === '\uc774\ud5cc\uc77c').map(c => c.id)
+        const fromAccounts = (myAccounts || [])
+            .map(a => (typeof a === 'string' ? a : a?.id))
+            .filter(Boolean)
+        if (fromAccounts.length > 0) return fromAccounts
+        if (!salesRepName) return []          // 내가 누구인지 모르면 아무것도 내 것이 아니다
+        return (clients || []).filter(c => c.sales_rep === salesRepName).map(c => c.id)
     }, [clients, salesRepName, myAccounts])
 
     // currentWeek is needed both in kpiData useMemo AND in JSX header
