@@ -156,18 +156,24 @@ end $$;
 
 -- 내 프로필은 내가, 남의 프로필은 관리자만
 create policy "profiles select" on public.profiles for select to authenticated
-    using (id = auth.uid() or public.is_admin());
+    using (id = (select auth.uid()) or (select public.is_admin()));
 
 -- 내 이름은 내가 고칠 수 있다. **역할은 못 바꾼다** (스스로 관리자가 되면 안 된다).
 -- my_role()은 SECURITY DEFINER라 여기서 profiles를 읽어도 재귀하지 않는다.
 create policy "profiles update self" on public.profiles for update to authenticated
-    using (id = auth.uid())
-    with check (id = auth.uid() and role = public.my_role());
+    using (id = (select auth.uid()))
+    with check (id = (select auth.uid()) and role = (select public.my_role()));
 
 create policy "profiles admin all" on public.profiles for all to authenticated
-    using (public.is_admin()) with check (public.is_admin());
+    using ((select public.is_admin())) with check ((select public.is_admin()));
 
 -- ========================== 5. 업무 표 전체 ==========================
+--
+-- **판정 함수는 반드시 `(select ...)`로 감싼다.**
+-- 그냥 `using (public.can_read())`라고 쓰면 Postgres가 이것을 행 필터로 보고
+-- **행마다 한 번씩** 부른다. 매출이 15,221행이니 조회 한 번에 함수가 15,221번
+-- 돌고, 그때마다 profiles를 다시 읽는다. 대시보드 한 번 여는 데 몇 배가 느려졌다.
+-- `(select ...)`로 감싸면 InitPlan이 되어 **조회당 한 번만** 평가된다.
 --
 -- 읽기  : 로그인한 활성 계정 전부
 --         (영업사원 3명이 전사 매출을 함께 본다. KPI 수익성이 전사 기준이고,
@@ -203,13 +209,13 @@ begin
         end loop;
 
         execute format(
-            'create policy "%1$s select" on public.%1$I for select to authenticated using (public.can_read())', t);
+            'create policy "%1$s select" on public.%1$I for select to authenticated using ((select public.can_read()))', t);
         execute format(
-            'create policy "%1$s insert" on public.%1$I for insert to authenticated with check (public.can_write())', t);
+            'create policy "%1$s insert" on public.%1$I for insert to authenticated with check ((select public.can_write()))', t);
         execute format(
-            'create policy "%1$s update" on public.%1$I for update to authenticated using (public.can_write()) with check (public.can_write())', t);
+            'create policy "%1$s update" on public.%1$I for update to authenticated using ((select public.can_write())) with check ((select public.can_write()))', t);
         execute format(
-            'create policy "%1$s delete" on public.%1$I for delete to authenticated using (public.is_admin())', t);
+            'create policy "%1$s delete" on public.%1$I for delete to authenticated using ((select public.is_admin()))', t);
     end loop;
 end $$;
 

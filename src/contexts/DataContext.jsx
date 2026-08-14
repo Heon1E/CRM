@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -918,9 +918,25 @@ export const DataProvider = ({ children }) => {
   }, [user, migrateLegacyClientData, processGroupedSales])
 
   // 자동 로드 (모달이 열려있을 때는 실행하지 않음)
+  //
+  // **한 번만 부른다.** 매출 15,221행을 16쪽으로 나눠 받는 무거운 조회라
+  // 두 번 돌면 첫 화면이 그대로 두 배 느려진다. 예전에는 `clients.length`가
+  // 아직 0인 사이에 effect가 다시 돌아 두 번 부를 수 있었다 —
+  // 조회가 끝나기 전에는 그 조건이 막아 주지 못한다.
+  // 누구로 불렀는지 기억한다. 로그인 화면에서 한 번 부르고 가드를 세워 두면
+  // 로그인한 뒤 다시 못 부르는 함정이 있다 (DataProvider가 /login까지 감싼다).
+  const fetchedFor = useRef(null)
   useEffect(() => {
     if (authLoading) return
     if (openModalCount > 0) return
+
+    // 로그인 전에는 부르지 않는다. RLS가 어차피 빈 결과를 주는데,
+    // 매출 16쪽을 로그인 화면에서 헛되이 받아 올 이유가 없다.
+    if (!user?.id) {
+      fetchedFor.current = null
+      if (loading) setLoading(false)
+      return
+    }
 
     // [Manual Refresh Policy] 이미 데이터가 로드되어 있다면 재요청 안 함
     if (clients.length > 0 || activities.length > 0 || sales.length > 0) {
@@ -928,22 +944,10 @@ export const DataProvider = ({ children }) => {
       return
     }
 
-    // user 객체가 있으면 바로 로드
-    if (user) {
-      fetchData()
-      return
-    }
-
-    // **로그인이 없어도 로드한다.**
-    // 예전에는 세션이 없으면 아무것도 부르지 않고 끝냈다. 로그인 화면을 떼어낸 뒤
-    // 세션이 영영 생기지 않게 되면서, 거래처·매출·활동이 통째로 빈 배열로 남았다.
-    // 그 결과 상단 카드가 '—', KPI가 0, 영업 코치가 0건으로 나왔다.
-    // 데이터는 RLS로 보호되므로(anon 허용) 여기서 막을 이유가 없다.
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) console.log('[DataContext] 세션 없음 — 로그인 없이 로드합니다.')
-      fetchData()
-    }).catch(() => fetchData())
-  }, [user, authLoading, openModalCount, fetchData, clients.length, activities.length, sales.length])
+    if (fetchedFor.current === user.id) return
+    fetchedFor.current = user.id
+    fetchData()
+  }, [user?.id, authLoading, openModalCount, fetchData, clients.length, activities.length, sales.length])
 
 
   // 5. CRUD 액션
