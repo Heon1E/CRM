@@ -7,40 +7,70 @@
 -- 이 파일이 그것을 닫는다.
 --
 -- Supabase SQL Editor에 붙여넣어 한 번에 실행할 것.
--- 실행하면 로그인하지 않은 접근은 전부 차단된다 — 앱에 로그인 화면이
--- 붙어 있어야 한다 (이 커밋에 함께 들어 있다).
+-- **몇 번을 다시 돌려도 안전하다.** 이미 있는 것은 건드리지 않고 모자란 것만 채운다.
 --
 -- ⚠ 실행 전에 읽을 것
---   `api/telegram-webhook.js`·`api/daily-digest.js`는 서버에서 도는데,
---   지금은 키가 없으면 VITE_ anon 키로 폴백한다. 이 파일을 실행한 뒤에는
---   anon으로 아무것도 못 하므로 **Vercel 환경변수에
---   `SUPABASE_SERVICE_ROLE_KEY`를 반드시 넣어야** 봇과 아침 브리핑이 산다.
+--   `api/telegram-webhook.js`·`api/daily-digest.js`는 서버에서 도는데
+--   키가 없으면 VITE_ anon 키로 폴백한다. 이 파일을 실행한 뒤에는 anon으로
+--   아무것도 못 하므로 **Vercel 환경변수에 `SUPABASE_SERVICE_ROLE_KEY`를
+--   반드시 넣어야** 봇과 아침 브리핑이 산다.
 --   (Supabase > Project Settings > API > service_role. VITE_ 접두어 금지.)
+--
+-- 이미 겪은 문제 두 가지 — 같은 실수를 반복하지 말 것
+--   1. `profiles` 표가 예전부터 있었다. `create table if not exists`는 조용히
+--      건너뛰므로 뒤따르는 `sales_rep` 참조가 42703으로 죽는다.
+--      → 컬럼은 전부 `add column if not exists`로 따로 채운다.
+--   2. 그 표의 기존 정책이 **자기 자신을 조회**해 42P17(무한 재귀)이 났다.
+--      → 정책 안에서는 `profiles`를 직접 읽지 않는다. 판정은 전부
+--        SECURITY DEFINER 함수를 거친다 (RLS를 우회하므로 재귀가 없다).
 -- ---------------------------------------------------------------------------
 
--- ========================== 역할 ==========================
+-- ========================== 0. 지금 상태 보기 ==========================
+-- 실행하면 결과창에 현재 profiles 컬럼이 뜬다. 문제가 생기면 이걸 먼저 확인.
+select column_name, data_type
+from information_schema.columns
+where table_schema = 'public' and table_name = 'profiles'
+order by ordinal_position;
+
+-- ========================== 1. 표와 컬럼 ==========================
+create table if not exists public.profiles (
+    id uuid primary key references auth.users(id) on delete cascade
+);
+
+-- 이미 있던 표일 수 있으므로 컬럼은 하나씩 채운다.
+-- `role`은 일부러 text로 둔다 — 예전 표에 enum이 아닌 text로 있을 수 있고,
+-- 그때 형이 어긋나면 정책이 통째로 깨진다. 값은 아래 제약으로 지킨다.
+alter table public.profiles add column if not exists email      text;
+alter table public.profiles add column if not exists full_name  text;
+alter table public.profiles add column if not exists sales_rep  text;
+alter table public.profiles add column if not exists role       text;
+alter table public.profiles add column if not exists active     boolean;
+alter table public.profiles add column if not exists created_at timestamptz;
+alter table public.profiles add column if not exists updated_at timestamptz;
+
+-- 비어 있는 값 채우기 (기존 행이 있을 수 있다)
+update public.profiles set role       = 'sales' where role is null;
+update public.profiles set active     = true    where active is null;
+update public.profiles set created_at = now()   where created_at is null;
+update public.profiles set updated_at = now()   where updated_at is null;
+
+alter table public.profiles alter column role       set default 'sales';
+alter table public.profiles alter column active     set default true;
+alter table public.profiles alter column created_at set default now();
+alter table public.profiles alter column updated_at set default now();
+alter table public.profiles alter column role   set not null;
+alter table public.profiles alter column active set not null;
+
+-- 역할 값은 셋 중 하나
 do $$ begin
-    create type public.app_role as enum ('admin', 'sales', 'viewer');
+    alter table public.profiles
+        add constraint profiles_role_check check (role in ('admin', 'sales', 'viewer'));
 exception when duplicate_object then null;
 end $$;
 
--- 로그인 계정 하나에 프로필 한 줄.
--- `sales_rep`은 `clients.sales_rep`과 맞물리는 **한글 이름**이다.
--- 이 값이 있어야 '내 담당'이 잡힌다 (예전에는 이메일에서 이름을 추측했다).
-create table if not exists public.profiles (
-    id         uuid primary key references auth.users(id) on delete cascade,
-    email      text,
-    full_name  text,
-    sales_rep  text,
-    role       public.app_role not null default 'sales',
-    active     boolean not null default true,
-    created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now()
-);
-
 create index if not exists idx_profiles_rep on public.profiles (sales_rep);
 
--- 계정이 생기면 프로필을 자동으로 만든다.
+-- ========================== 2. 계정 생성 시 프로필 ==========================
 -- **맨 처음 생기는 계정은 admin이다** — 관리자를 손으로 심을 방법이 없으면
 -- 아무도 들어올 수 없다. 두 번째부터는 sales로 들어오고 admin이 올려 준다.
 create or replace function public.handle_new_user()
@@ -52,12 +82,13 @@ declare
     first_user boolean;
 begin
     select count(*) = 0 into first_user from public.profiles;
-    insert into public.profiles (id, email, full_name, role)
+    insert into public.profiles (id, email, full_name, role, active)
     values (
         new.id,
         new.email,
         coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-        case when first_user then 'admin'::public.app_role else 'sales'::public.app_role end
+        case when first_user then 'admin' else 'sales' end,
+        true
     )
     on conflict (id) do nothing;
     return new;
@@ -68,10 +99,20 @@ create trigger on_auth_user_created
     after insert on auth.users
     for each row execute function public.handle_new_user();
 
--- ========================== 판정 함수 ==========================
--- SECURITY DEFINER라 정책 안에서 profiles를 읽어도 재귀에 걸리지 않는다.
+-- 이미 가입돼 있는데 프로필이 없는 계정을 채운다 (이 파일을 늦게 돌린 경우)
+insert into public.profiles (id, email, full_name, role, active)
+select u.id, u.email,
+       coalesce(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)),
+       case when not exists (select 1 from public.profiles) then 'admin' else 'sales' end,
+       true
+from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id);
+
+-- ========================== 3. 판정 함수 ==========================
+-- **정책 안에서 profiles를 직접 읽으면 무한 재귀(42P17)가 난다.**
+-- SECURITY DEFINER 함수는 RLS를 우회하므로 안전하다. 판정은 전부 여기를 거친다.
 create or replace function public.my_role()
-returns public.app_role
+returns text
 language sql stable security definer set search_path = public
 as $$ select role from public.profiles where id = auth.uid() and active $$;
 
@@ -98,37 +139,47 @@ returns text
 language sql stable security definer set search_path = public
 as $$ select sales_rep from public.profiles where id = auth.uid() and active $$;
 
--- ========================== profiles 자신의 접근제어 ==========================
+-- ========================== 4. profiles 자신의 접근제어 ==========================
 alter table public.profiles enable row level security;
 
-drop policy if exists "profiles read"        on public.profiles;
-drop policy if exists "profiles update self" on public.profiles;
-drop policy if exists "profiles admin all"   on public.profiles;
+-- 예전 정책을 **이름을 모르더라도** 전부 걷어낸다.
+-- 재귀를 일으키던 정책이 여기에 있었다.
+do $$
+declare p record;
+begin
+    for p in select policyname from pg_policies
+             where schemaname = 'public' and tablename = 'profiles'
+    loop
+        execute format('drop policy if exists %I on public.profiles', p.policyname);
+    end loop;
+end $$;
 
 -- 내 프로필은 내가, 남의 프로필은 관리자만
-create policy "profiles read" on public.profiles for select to authenticated
+create policy "profiles select" on public.profiles for select to authenticated
     using (id = auth.uid() or public.is_admin());
 
--- 내 이름은 내가 고칠 수 있다. **역할은 못 바꾼다** (스스로 관리자가 되면 안 된다)
+-- 내 이름은 내가 고칠 수 있다. **역할은 못 바꾼다** (스스로 관리자가 되면 안 된다).
+-- my_role()은 SECURITY DEFINER라 여기서 profiles를 읽어도 재귀하지 않는다.
 create policy "profiles update self" on public.profiles for update to authenticated
     using (id = auth.uid())
-    with check (id = auth.uid() and role = (select role from public.profiles where id = auth.uid()));
+    with check (id = auth.uid() and role = public.my_role());
 
 create policy "profiles admin all" on public.profiles for all to authenticated
     using (public.is_admin()) with check (public.is_admin());
 
--- ========================== 업무 표 전체에 같은 규칙 ==========================
+-- ========================== 5. 업무 표 전체 ==========================
 --
 -- 읽기  : 로그인한 활성 계정 전부
 --         (영업사원 3명이 전사 매출을 함께 본다. KPI 수익성이 전사 기준이고,
 --          담당이 비어 있는 거래처가 1,064곳이라 담당별로 막으면 화면이 텅 빈다.
---          회사가 커져 담당별 격리가 필요해지면 이 정책만 좁히면 된다.)
+--          회사가 커져 담당별 격리가 필요해지면 can_read()만 좁히면 된다.)
 -- 쓰기  : admin + sales
 -- 지우기: **admin만.** 되돌릴 수단이 아직 없으므로 지우기는 좁게 연다.
 --
 do $$
 declare
     t text;
+    p record;
     tables text[] := array[
         'clients', 'sales', 'activities', 'products', 'client_contacts',
         'schedules', 'receivables', 'issues',
@@ -137,7 +188,6 @@ declare
     ];
 begin
     foreach t in array tables loop
-        -- 없는 표는 건너뛴다 (마이그레이션을 다 돌리지 않았을 수 있다)
         if to_regclass(format('public.%I', t)) is null then
             raise notice '건너뜀 (표 없음): %', t;
             continue;
@@ -145,15 +195,12 @@ begin
 
         execute format('alter table public.%I enable row level security', t);
 
-        -- 예전에 깔아 둔 전체 허용 정책을 걷어낸다
-        execute format('drop policy if exists "read %1$s"  on public.%1$I', t);
-        execute format('drop policy if exists "write %1$s" on public.%1$I', t);
-        execute format('drop policy if exists "Enable all access for all users" on public.%I', t);
-        execute format('drop policy if exists "Allow all" on public.%I', t);
-        execute format('drop policy if exists "%1$s select" on public.%1$I', t);
-        execute format('drop policy if exists "%1$s insert" on public.%1$I', t);
-        execute format('drop policy if exists "%1$s update" on public.%1$I', t);
-        execute format('drop policy if exists "%1$s delete" on public.%1$I', t);
+        -- 이름을 모르는 옛 정책까지 전부 걷어낸다 (anon 전체 허용이 여기 있었다)
+        for p in select policyname from pg_policies
+                 where schemaname = 'public' and tablename = t
+        loop
+            execute format('drop policy if exists %I on public.%I', p.policyname, t);
+        end loop;
 
         execute format(
             'create policy "%1$s select" on public.%1$I for select to authenticated using (public.can_read())', t);
@@ -166,7 +213,7 @@ begin
     end loop;
 end $$;
 
--- ========================== 사진 보관함 ==========================
+-- ========================== 6. 사진 보관함 ==========================
 -- 품목 사진은 견적서에 박혀 나가므로 읽기는 열어 둔다 (카탈로그 사진이라 민감하지 않다).
 -- 올리고 지우는 것은 로그인한 사람만.
 drop policy if exists "product images read"  on storage.objects;
@@ -180,12 +227,9 @@ create policy "product images write" on storage.objects for all
     using (bucket_id = 'product-images')
     with check (bucket_id = 'product-images');
 
--- ========================== 확인 ==========================
--- 실행 후 아래를 돌려 anon 정책이 남아 있지 않은지 본다.
---
---   select tablename, policyname, roles
---   from pg_policies
---   where schemaname = 'public' and 'anon' = any(roles)
---   order by tablename;
---
--- 한 줄도 안 나와야 정상이다.
+-- ========================== 7. 확인 ==========================
+-- anon으로 열려 있는 정책이 남아 있는지. **한 줄도 안 나와야 정상이다.**
+select tablename, policyname, roles
+from pg_policies
+where schemaname = 'public' and 'anon' = any(roles)
+order by tablename;

@@ -628,6 +628,21 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 ## 로그인 · 역할 · 접근제어
 
 `execution/sql/auth_and_roles.sql`을 Supabase SQL Editor에서 **한 번 실행해야** 한다.
+**몇 번을 다시 돌려도 안전하다** — 이미 있는 것은 건드리지 않고 모자란 것만 채운다.
+
+처음 돌렸을 때 두 번 걸렸다. 같은 실수를 반복하지 말 것:
+
+1. **`profiles` 표가 예전부터 있었다.** 저장소 SQL에는 정의가 없는데 DB에는
+   있었다(Supabase 템플릿이나 손으로 만든 것). `create table if not exists`는
+   조용히 건너뛰므로 뒤따르는 `sales_rep` 참조가 `42703`으로 죽었다.
+   → 컬럼은 전부 `add column if not exists`로 따로 채운다.
+2. **그 표의 기존 정책이 자기 자신을 조회해 `42P17`(무한 재귀)이 났다.**
+   → 정책 안에서 `profiles`를 직접 읽지 않는다. 판정은 전부 SECURITY DEFINER
+   함수(`my_role()`/`is_admin()`/`can_write()`)를 거친다 — RLS를 우회하므로
+   재귀가 없다. 옛 정책은 이름을 모르더라도 `pg_policies`를 훑어 전부 지운다.
+
+`role`은 enum이 아니라 **text + check 제약**이다. 예전 표에 text로 있을 수 있고
+형이 어긋나면 정책이 통째로 깨지기 때문이다.
 실행 전에는 `profiles` 표가 없어 앱이 '준비되지 않았습니다'를 띄운다.
 
 - 역할 세 가지: `admin`(전부 + 삭제 + 계정관리) / `sales`(읽기·쓰기) / `viewer`(읽기만)
