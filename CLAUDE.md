@@ -27,6 +27,25 @@ npm run test:e2e:headed
 업로드 UI는 **Settings 페이지의 BULK DATA OPERATIONS 패널**에 있다 (`/sales`가 아니다).
 브라우저 확인용 dev 서버 설정은 `.claude/launch.json`(`crm-dev`, 포트 5173).
 
+## 브랜드 — 회사 e카탈로그가 기준이다
+
+전문 디자이너가 만든 `IND_eCatalog_2026.pdf`에서 값을 뽑아 옮겼다. 규격은 `DESIGN.md`,
+구현은 `src/index.css`의 `--ind-*` 토큰. **문서·화면·PPT가 같은 값을 써야 한 회사가
+만든 것처럼 보인다.**
+
+- 초록 `#007538` / 먹색 `#3e3a39`(순검정 아님) / 헤어라인 `#dcdddd` / 패널 `#f2f3f3`
+- 한글 나눔스퀘어 네오 + 영문·숫자 Montserrat. `public/fonts/`에 **직접 담았다** —
+  CDN에 기대면 인쇄 시 글꼴이 안 와서 견적서가 다른 모양으로 나간다.
+- 옅은 회색 `#9fa0a0`은 **캡션 전용**이다. 흰 배경에서 2.6:1이라 본문·라벨에 쓰면
+  종이에서 안 읽힌다 (실제로 견적서 라벨에 썼다가 `#595757`로 되돌렸다).
+- 표는 **초록 머리 + 흰 글씨 + 줄무늬**. 칸마다 검은 실선을 두르지 않는다
+  (관공서 양식처럼 보인다). 근거는 카탈로그 p3 적재용량 비교표.
+
+적용 상태: 견적서·발주서 완료 / **CRM 화면은 아직 옛 Oracle 레드 그대로**.
+
+PDF에서 값을 다시 뽑아야 하면 PyMuPDF로 `page.get_text("dict")`의 span 색·크기와
+`page.get_drawings()`의 채움색을 세면 된다. 저장소에는 남기지 않았다(일회성).
+
 ## 디자인 시스템
 
 **`src/index.css`가 단일 기준이다.** `DESIGN.md` 스펙(Indigo Purple `#833CF6`, 8px radius, Inter)을 구현한다.
