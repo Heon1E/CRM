@@ -795,6 +795,15 @@ textarea:focus {
     }
 }
 
+/* 목록의 문서번호 — 눌러서 여는 것임을 보이게 한다 */
+.doc-no-btn {
+    padding: 0;
+    font-family: var(--font-brand-en);
+    font-weight: 600;
+    color: var(--ind-green);
+}
+.doc-no-btn:hover { text-decoration: underline; }
+
 /* ---------------------------------------------------------------------------
    견적서 · 발주서 인쇄 (A4)
 

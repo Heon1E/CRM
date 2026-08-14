@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { Plus, Printer, Trash2, Loader2, Save, X, FileText, ArrowLeft } from 'lucide-react'
+import { Plus, Printer, Trash2, Loader2, Save, X, FileText, ArrowLeft, Search } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { useAuth } from '../contexts/AuthContext'
 import { resolveSalesRep } from '../utils/salesRep'
+import { saveWithFreshNo, todayLocal } from '../utils/docNumber'
 import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { ProductPicker, AccessoryPicker, Thumb } from '../components/ItemPicker'
 import { QuoteSheet } from '../components/DocumentSheet'
@@ -22,10 +23,6 @@ import { QuoteSheet } from '../components/DocumentSheet'
 const VAT_RATE = 0.1
 const won = (v) => Math.round(Number(v) || 0).toLocaleString('ko-KR')
 const num = (v) => { const n = Number(String(v).replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? n : 0 }
-const todayStr = () => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 const STATUS = ['작성중', '발송', '수주', '실패', '취소']
 const STATUS_COLOR = { 작성중: '#6B7280', 발송: '#1D4ED8', 수주: '#1C6B3C', 실패: '#B91C1C', 취소: '#6B7280' }
@@ -53,6 +50,8 @@ const Quotes = () => {
     const [pickFor, setPickFor] = useState(null)   // 품목 고르기 대상 줄
     const [accFor, setAccFor] = useState(null)     // 악세서리 고르기 대상 줄
     const [printing, setPrinting] = useState(null) // { head, lines }
+    const [q, setQ] = useState('')                 // 번호·거래처 검색
+    const [statusFilter, setStatusFilter] = useState('전체')
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -95,12 +94,26 @@ const Quotes = () => {
         return { subtotal, vat, total: subtotal + vat }
     }, [editing])
 
+    // 번호는 여기서 짓지 않는다. 저장할 때 DB를 보고 붙인다 (utils/docNumber.js).
+    // 미리 지어 두면 창을 열어 둔 사이에 남이 같은 번호를 써 버린다.
+    // 목록은 300건까지 쌓인다. 찾을 수단이 없으면 목록이 아니라 더미다.
+    const shown = useMemo(() => {
+        const term = q.trim().toLowerCase()
+        return list.filter((r) => {
+            if (statusFilter !== '전체' && r.status !== statusFilter) return false
+            if (!term) return true
+            return String(r.quote_no || '').toLowerCase().includes(term)
+                || String(r.client_name || '').toLowerCase().includes(term)
+        })
+    }, [list, q, statusFilter])
+
+    const shownTotal = useMemo(() => shown.reduce((a, r) => a + num(r.total), 0), [shown])
+
     const newQuote = () => {
-        const seq = String(list.filter((q) => q.quote_date === todayStr()).length + 1).padStart(2, '0')
         setEditing({
             head: {
-                quote_no: `Q-${todayStr().replace(/-/g, '')}-${seq}`,
-                quote_date: todayStr(), valid_days: 30,
+                quote_no: '',
+                quote_date: todayLocal(), valid_days: 30,
                 client_id: null, client_name: '', contact_name: '', contact_phone: '',
                 status: '작성중', notes: '', sales_rep: myRep || '',
             },
@@ -160,14 +173,25 @@ const Quotes = () => {
             }
 
             let quoteId = h.id
+            let quoteNo = h.quote_no
             if (quoteId) {
                 const { error } = await supabase.from('quotes').update(payload).eq('id', quoteId)
                 if (error) throw error
                 await supabase.from('quote_items').delete().eq('quote_id', quoteId)
             } else {
-                const { data, error } = await supabase.from('quotes').insert([payload]).select().single()
-                if (error) throw error
-                quoteId = data.id
+                // 번호는 저장 직전에 DB를 보고 짓는다. 겹치면 다시 지어 재시도한다.
+                const { no, result } = await saveWithFreshNo(
+                    supabase,
+                    { table: 'quotes', column: 'quote_no', prefix: 'Q', date: payload.quote_date },
+                    async (candidate) => {
+                        const { data, error } = await supabase
+                            .from('quotes').insert([{ ...payload, quote_no: candidate }]).select().single()
+                        if (error) throw error
+                        return data
+                    },
+                )
+                quoteId = result.id
+                quoteNo = no
             }
 
             const rows = lines.map((l, i) => ({
@@ -181,7 +205,7 @@ const Quotes = () => {
             const { error: itemErr } = await supabase.from('quote_items').insert(rows)
             if (itemErr) throw itemErr
 
-            await showSuccess(`견적서 ${h.quote_no} 저장했습니다.`)
+            await showSuccess(`견적서 ${quoteNo} 저장했습니다.`)
             setEditing(null)
             await load()
         } catch (e) {
@@ -246,7 +270,7 @@ const Quotes = () => {
             <div className="win" style={{ margin: 12 }}>
                 <div className="win-title">
                     <span>{h.id ? '견적서 수정' : '새 견적서'}</span>
-                    <span className="meta">{h.quote_no}</span>
+                    <span className="meta">{h.quote_no || '저장하면 번호가 매겨집니다'}</span>
                 </div>
 
                 <div className="toolbar">
@@ -386,7 +410,19 @@ const Quotes = () => {
 
             <div className="toolbar">
                 <button className="tb-btn primary" onClick={newQuote}><Plus size={14} /> 새 견적서</button>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginLeft: 6 }}>
+                    <Search size={14} style={{ color: 'var(--text-muted)' }} />
+                    <input value={q} onChange={(e) => setQ(e.target.value)}
+                        placeholder="견적번호 · 거래처" style={{ width: 180 }} />
+                </span>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option>전체</option>
+                    {STATUS.map((x) => <option key={x}>{x}</option>)}
+                </select>
                 {loading && <Loader2 size={14} className="animate-spin" />}
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {shown.length}건 · 합계 <b style={{ color: 'var(--text-primary)' }}>{won(shownTotal)}</b>
+                </span>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -402,27 +438,27 @@ const Quotes = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {list.map((q) => (
-                            <tr key={q.id}>
-                                <td><button className="rowbtn" style={{ padding: 0 }} onClick={() => openQuote(q)}>{q.quote_no}</button></td>
-                                <td className="dt">{String(q.quote_date).slice(0, 10)}</td>
-                                <td>{q.client_name}</td>
-                                <td className="num">{won(q.total)}</td>
+                        {shown.map((r) => (
+                            <tr key={r.id}>
+                                <td><button className="rowbtn doc-no-btn" onClick={() => openQuote(r)}>{r.quote_no}</button></td>
+                                <td className="dt">{String(r.quote_date).slice(0, 10)}</td>
+                                <td>{r.client_name}</td>
+                                <td className="num">{won(r.total)}</td>
                                 <td>
-                                    <span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[q.status] || '#6B7280' }}>
-                                        {q.status}
+                                    <span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[r.status] || '#6B7280' }}>
+                                        {r.status}
                                     </span>
                                 </td>
                                 <td onClick={(e) => e.stopPropagation()}>
-                                    <button className="rowbtn" onClick={() => print(q)} title="인쇄 / PDF"><Printer size={13} /></button>
-                                    <button className="rowbtn" onClick={() => removeQuote(q)} title="삭제"><Trash2 size={13} /></button>
+                                    <button className="rowbtn" onClick={() => print(r)} title="인쇄 / PDF"><Printer size={13} /></button>
+                                    <button className="rowbtn" onClick={() => removeQuote(r)} title="삭제"><Trash2 size={13} /></button>
                                 </td>
                             </tr>
                         ))}
-                        {list.length === 0 && !loading && (
+                        {shown.length === 0 && !loading && (
                             <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-secondary)' }}>
                                 <FileText size={20} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.5 }} />
-                                아직 작성한 견적서가 없습니다.
+                                {list.length === 0 ? '아직 작성한 견적서가 없습니다.' : '조건에 맞는 견적서가 없습니다.'}
                             </td></tr>
                         )}
                     </tbody>
