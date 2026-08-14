@@ -266,11 +266,11 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
     const lastActivity = sortedActivities[0]
 
     if (loading || isFetchingClient) {
-        return <div className="p-8 text-center text-gray-400">정보를 불러오는 중...</div>
+        return <div className="p-8 text-center text-gray-500">정보를 불러오는 중...</div>
     }
 
     if (!resolvedClient) {
-        return <div className="p-8 text-center text-gray-400">고객 정보를 찾을 수 없습니다.</div>
+        return <div className="p-8 text-center text-gray-500">고객 정보를 찾을 수 없습니다.</div>
     }
 
     return (
@@ -314,7 +314,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                                     <span className="text-indigo-600 font-bold">{formatCurrency(prod.lastPrice)}</span>
                                 </div>
                             ))}
-                            {topProducts.length === 0 && <p className="text-xs text-slate-400">데이터 없음</p>}
+                            {topProducts.length === 0 && <p className="text-xs text-slate-500">데이터 없음</p>}
                         </div>
                     </div>
                     {/* Last Activity */}
@@ -328,7 +328,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                                 </div>
                                 <p className="text-xs text-indigo-800 line-clamp-2">{lastActivity.description}</p>
                             </div>
-                        ) : <p className="text-xs text-slate-400">활동 없음</p>}
+                        ) : <p className="text-xs text-slate-500">활동 없음</p>}
                     </div>
                 </div>
             </div>
@@ -338,14 +338,14 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                 <div className="bg-white p-3 rounded border border-slate-200 flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-green-50 flex items-center justify-center text-green-600"><Phone className="w-4 h-4" /></div>
                     <div className="overflow-hidden">
-                        <p className="text-[10px] text-slate-400 uppercase font-bold">Phone</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Phone</p>
                         <p className="text-sm font-bold text-slate-700 truncate">{primaryContact.phone || '-'}</p>
                     </div>
                 </div>
                 <div className="bg-white p-3 rounded border border-slate-200 flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-blue-50 flex items-center justify-center text-blue-600"><Mail className="w-4 h-4" /></div>
                     <div className="overflow-hidden">
-                        <p className="text-[10px] text-slate-400 uppercase font-bold">Email</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold">Email</p>
                         <p className="text-sm font-bold text-slate-700 truncate">{primaryContact.email || '-'}</p>
                     </div>
                 </div>
@@ -375,14 +375,14 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                                 <span className="text-xs font-bold text-slate-700">{item.itemName}</span>
                                 <span className="text-xs font-bold text-slate-600">{formatCurrency(item.totalAmount)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-[10px] text-slate-400">
+                            <div className="flex justify-between items-center text-[10px] text-slate-500">
                                 <span>{new Date(item.date).toLocaleDateString()} · {item.quantity}개 ({formatCurrency(item.unitPrice)})</span>
                                 <span className="max-w-[100px] truncate">{item.notes}</span>
                             </div>
                         </div>
                     ))}
                     {flatSalesItems.length === 0 && (
-                        <div className="p-8 text-center text-xs text-slate-400">구매 이력이 없습니다.</div>
+                        <div className="p-8 text-center text-xs text-slate-500">구매 이력이 없습니다.</div>
                     )}
                 </div>
             </div>

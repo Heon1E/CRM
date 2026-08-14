@@ -13,7 +13,7 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
 
     if (!sortedActivities.length) {
         return (
-            <div className="p-5 text-center text-gray-400 text-xs font-medium">
+            <div className="p-5 text-center text-gray-500 text-xs font-medium">
                 No recent activities recorded.
             </div>
         )

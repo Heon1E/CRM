@@ -57,7 +57,7 @@ class ErrorBoundary extends React.Component {
                             Reload Application
                         </button>
 
-                        <p className="mt-4 text-[10px] text-gray-400">
+                        <p className="mt-4 text-[10px] text-gray-500">
                             Error Code: RENDER_EXCEPTION_0x1
                         </p>
                     </div>

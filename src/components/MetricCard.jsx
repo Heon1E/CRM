@@ -60,7 +60,7 @@ const MetricCard = ({
               <span className="text-xs font-medium text-slate-500">
                 {trend === 'up' ? '↑' : '↓'} {trendValue}
               </span>
-              <span className="text-xs text-slate-400 ml-2">전월 대비</span>
+              <span className="text-xs text-slate-500 ml-2">전월 대비</span>
             </div>
           )}
         </div>

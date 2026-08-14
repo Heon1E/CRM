@@ -761,8 +761,14 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                                         </span>
                                                     )}
                                                 </div>
+                                                {/* 배지 바탕을 흰색 위에 얹는다. 반투명 틴트만 주면 카드의
+                                                    파란 호버색이 비쳐 대비가 4.2:1까지 떨어진다. */}
                                                 <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
-                                                    style={{ backgroundColor: `${grade.color}20`, color: grade.color }}>
+                                                    style={{
+                                                        backgroundColor: '#fff',
+                                                        backgroundImage: `linear-gradient(${grade.color}1f, ${grade.color}1f)`,
+                                                        color: grade.color,
+                                                    }}>
                                                     {grade.grade}
                                                 </span>
                                             </>

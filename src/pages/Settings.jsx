@@ -340,7 +340,7 @@ const Settings = () => {
                       type="text"
                       value={settings.company_name}
                       onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-300"
+                      className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-500"
                       placeholder="ENTER_COMPANY_NAME"
                     />
                   </div>
@@ -350,7 +350,7 @@ const Settings = () => {
                       type="email"
                       value={settings.email}
                       onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-300"
+                      className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-500"
                       placeholder="admin@example.com"
                     />
                   </div>
@@ -482,7 +482,7 @@ const Settings = () => {
                   {/* Maintenance Section */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-oem-border">
                     <div className="bg-oem-bg-app p-4 border border-oem-border rounded-sm">
-                      <h4 className="text-sm font-bold text-amber-600 mb-2 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
                         <RefreshCw className="w-4 h-4" /> PRODUCT SYNCHRONIZATION
                       </h4>
                       <p className="text-[10px] text-oem-text-secondary mb-3">
@@ -513,10 +513,10 @@ const Settings = () => {
                     </div>
 
                     <div className="bg-red-50 p-4 border border-red-200 rounded-sm">
-                      <h4 className="text-sm font-bold text-red-600 mb-2 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
                         <TriangleAlert className="w-4 h-4" /> DANGER ZONE
                       </h4>
-                      <p className="text-[10px] text-red-800/70 mb-3">
+                      <p className="text-[10px] text-red-800 mb-3">
                         Permanently delete ALL client data, including related sales and activities. This action cannot be undone.
                       </p>
                       <button

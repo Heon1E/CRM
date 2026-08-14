@@ -12,7 +12,7 @@ const IssueTracker = ({ maxItems = null }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
   if (loading) {
-    return <div className="text-gray-300 text-sm">로딩 중...</div>
+    return <div className="text-gray-500 text-sm">로딩 중...</div>
   }
 
   // 완료된 건은 필터링 (대시보드에서만)
@@ -87,7 +87,7 @@ const IssueTracker = ({ maxItems = null }) => {
                       e.stopPropagation()
                       setEditingIssueId(issue.id)
                     }}
-                    className="p-1.5 text-gray-300 hover:text-oem-blue hover:bg-blue-50 rounded-sm transition-all"
+                    className="p-1.5 text-gray-500 hover:text-oem-blue hover:bg-blue-50 rounded-sm transition-all"
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
@@ -98,7 +98,7 @@ const IssueTracker = ({ maxItems = null }) => {
         </div>
       ) : (
         <div className="text-center py-6 border border-dashed border-gray-200 rounded-sm bg-gray-50">
-          <p className="text-[11px] text-gray-400 font-medium">No active issues found.</p>
+          <p className="text-[11px] text-gray-500 font-medium">No active issues found.</p>
         </div>
       )}
 

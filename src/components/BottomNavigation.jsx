@@ -23,7 +23,7 @@ const BottomNavigation = () => {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors ${isActive ? 'text-oem-blue' : 'text-gray-400 hover:text-gray-600'
+              className={`flex-1 flex flex-col items-center justify-center py-1 transition-colors ${isActive ? 'text-oem-blue' : 'text-gray-500 hover:text-gray-600'
                 }`}
             >
               <item.icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current opacity-20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />

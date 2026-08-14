@@ -329,7 +329,7 @@ const Clients = () => {
           </button>
           <button
             onClick={() => setSelectedIds(new Set())}
-            className="text-slate-400 hover:text-white text-xs ml-2"
+            className="text-slate-500 hover:text-white text-xs ml-2"
           >
             Cancel
           </button>
@@ -537,7 +537,7 @@ const Clients = () => {
                             <td className="text-center py-3">
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${coerceClientStatus(primaryContact?.status) === '매출'
                                 ? 'bg-green-100 text-green-700'
-                                : 'bg-slate-100 text-slate-500'
+                                : 'bg-slate-100 text-slate-600'
                                 }`}>
                                 {primaryContact?.status?.toUpperCase() || 'UNKNOWN'}
                               </span>
@@ -558,7 +558,7 @@ const Clients = () => {
                                 className="p-1.5 hover:bg-blue-50 rounded-md transition-colors group/btn"
                                 title="Edit Client"
                               >
-                                <Edit className="w-4 h-4 text-slate-400 group-hover/btn:text-blue-600" />
+                                <Edit className="w-4 h-4 text-slate-500 group-hover/btn:text-blue-600" />
                               </button>
                             </td>
                           </tr>
@@ -566,7 +566,7 @@ const Clients = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan="7" className="p-12 text-center text-slate-400">
+                        <td colSpan="7" className="p-12 text-center text-slate-500">
                           No Data
                         </td>
                       </tr>
@@ -589,7 +589,7 @@ const Clients = () => {
             {selectedClientId && (
               <div className="w-1/2 flex flex-col bg-white border border-oem-border rounded-lg shadow-lg overflow-hidden relative animate-in slide-in-from-right-10 duration-300">
                 <div className="absolute top-2 right-2 z-10">
-                  <button onClick={() => setSelectedClientId(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+                  <button onClick={() => setSelectedClientId(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-500">
                     X
                   </button>
                 </div>

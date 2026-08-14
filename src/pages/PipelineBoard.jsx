@@ -503,7 +503,7 @@ const PipelineBoard = () => {
                         <div className="p-3 border-b border-oem-border bg-oem-bg-header/30">
                           <div className="flex items-center justify-between">
                             <h3 className="font-bold text-sm text-oem-text-secondary">{stage}</h3>
-                            <span className="bg-oem-border text-oem-text-secondary text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            <span className="bg-oem-grey-medium text-oem-text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
                               {stageClients.length}
                             </span>
                           </div>
@@ -613,7 +613,7 @@ const PipelineBoard = () => {
                                       <h4 className="font-bold text-sm text-gray-500 mb-1">
                                         {client.company}
                                       </h4>
-                                      <div className="text-[10px] text-gray-400">
+                                      <div className="text-[10px] text-gray-500">
                                         {client.contact_person || '-'}
                                       </div>
                                     </div>

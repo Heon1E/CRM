@@ -229,7 +229,7 @@ const Pricing = () => {
                         <div key={index} className="bg-white border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors cursor-pointer" onClick={() => toggleFaq(index)}>
                             <div className="flex justify-between items-center w-full text-left font-bold text-slate-900 group">
                                 <span className="group-hover:text-[#007538] transition-colors">{faq.question}</span>
-                                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
+                                <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
                             </div>
                             {openFaq === index && (
                                 <p className="mt-4 text-slate-600 text-sm leading-relaxed animate-fade-in-down">

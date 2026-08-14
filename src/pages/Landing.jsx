@@ -59,7 +59,7 @@ const PricingCard = ({ plan, price, desc, features, cta, popular, ctaStyle, annu
                 ) : (
                     <div>
                         <span className={`text-4xl font-black ${popular ? 'text-white' : 'text-gray-900'}`}>{price}</span>
-                        <span className={`text-sm ml-1 ${popular ? 'text-blue-200' : 'text-gray-400'}`}>
+                        <span className={`text-sm ml-1 ${popular ? 'text-blue-200' : 'text-gray-500'}`}>
                             {t('pricing.perMonth')}
                         </span>
                         {annual && price !== '$0' && price !== '₩0' && (
@@ -102,7 +102,7 @@ const TestimonialCard = ({ quote, name, company }) => (
         <p className="text-sm text-gray-600 leading-relaxed mb-5 italic">"{quote}"</p>
         <div>
             <p className="text-xs font-bold text-gray-900">{name}</p>
-            <p className="text-[10px] text-gray-400 font-medium">{company}</p>
+            <p className="text-[10px] text-gray-500 font-medium">{company}</p>
         </div>
     </div>
 )
@@ -143,9 +143,9 @@ const Landing = () => {
                     </Link>
                     {/* Menu */}
                     <div className="hidden md:flex items-center gap-8">
-                        <a href="#features" className="text-sm text-gray-300 hover:text-white transition-colors">{t('nav.features')}</a>
-                        <a href="#pricing" className="text-sm text-gray-300 hover:text-white transition-colors">{t('nav.pricing')}</a>
-                        <Link to="/login" className="text-sm text-gray-300 hover:text-white transition-colors">{t('nav.signIn')}</Link>
+                        <a href="#features" className="text-sm text-gray-500 hover:text-white transition-colors">{t('nav.features')}</a>
+                        <a href="#pricing" className="text-sm text-gray-500 hover:text-white transition-colors">{t('nav.pricing')}</a>
+                        <Link to="/login" className="text-sm text-gray-500 hover:text-white transition-colors">{t('nav.signIn')}</Link>
                     </div>
                     {/* Right actions */}
                     <div className="flex items-center gap-3">
@@ -179,7 +179,7 @@ const Landing = () => {
                             {t('landing.heroTitleHighlight')}
                         </span>
                     </h1>
-                    <p className="text-lg text-gray-400 leading-relaxed max-w-2xl mx-auto mb-10">
+                    <p className="text-lg text-gray-500 leading-relaxed max-w-2xl mx-auto mb-10">
                         {t('landing.heroSubtitle')}
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
@@ -241,10 +241,10 @@ const Landing = () => {
             {/* ── SOCIAL PROOF ── */}
             <section className="bg-gray-50 py-12 border-y border-gray-100">
                 <div className="max-w-5xl mx-auto px-6 text-center">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">{t('landing.socialProof')}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-8">{t('landing.socialProof')}</p>
                     <div className="flex flex-wrap justify-center gap-8 items-center">
                         {['Accenture', 'Deloitte', 'Samsung', 'LG Corp', 'Kakao'].map((name) => (
-                            <span key={name} className="text-lg font-black text-gray-300 hover:text-gray-400 transition-colors">{name}</span>
+                            <span key={name} className="text-lg font-black text-gray-500 hover:text-gray-500 transition-colors">{name}</span>
                         ))}
                     </div>
                 </div>
@@ -350,7 +350,7 @@ const Landing = () => {
                 </div>
                 <div className="max-w-3xl mx-auto text-center relative z-10">
                     <h2 className="text-4xl font-black text-white mb-4">{t('landing.ctaBannerTitle')}</h2>
-                    <p className="text-gray-400 mb-8">{t('landing.ctaBannerSub')}</p>
+                    <p className="text-gray-500 mb-8">{t('landing.ctaBannerSub')}</p>
                     <Link
                         to="/login"
                         className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5"
@@ -382,11 +382,11 @@ const Landing = () => {
                             { title: 'Legal', links: ['Privacy', 'Terms', 'Security', 'Cookies'] },
                         ].map(col => (
                             <div key={col.title}>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{col.title}</p>
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">{col.title}</p>
                                 <ul className="space-y-2">
                                     {col.links.map(link => (
                                         <li key={link}>
-                                            <a href="#" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">{link}</a>
+                                            <a href="#" className="text-xs text-gray-500 hover:text-gray-500 transition-colors">{link}</a>
                                         </li>
                                     ))}
                                 </ul>

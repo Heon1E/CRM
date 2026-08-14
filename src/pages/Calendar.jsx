@@ -35,8 +35,8 @@ const Calendar = () => {
                 title: holiday.name,
                 date: holiday.date,
                 display: 'block',
-                backgroundColor: '#ef4444', // red
-                borderColor: '#ef4444',
+                backgroundColor: '#c81e1e', // 공휴일 빨강 — 흰 글씨가 4.5:1을 넘도록 #ef4444에서 한 단계 눌렀다
+                borderColor: '#c81e1e',
                 classNames: ['holiday-event']
             }))
         )
@@ -63,7 +63,7 @@ const Calendar = () => {
                         }}
                         events={events} // Pass events directly
                         eventContent={(arg) => {
-                            const isHoliday = arg.event.backgroundColor === '#ef4444'
+                            const isHoliday = arg.event.backgroundColor === '#c81e1e'
                             return (
                                 <div className={`text-xs px-1 overflow-hidden truncate ${isHoliday ? 'font-bold' : ''}`}>
                                     {isHoliday ? '🇰🇷 ' : ''}{arg.event.title}

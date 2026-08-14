@@ -88,12 +88,15 @@
   /* --- Text --- */
   --text-primary: #16191d;
   --text-secondary: #5b626c;
-  --text-muted: #868d97;
+  --text-muted: #5f6773;
 
   /* --- Brand (회사 e카탈로그) — 값은 --ind-* 를 따른다 --- */
   --accent: #007538;
   --accent-dark: #005c2b;
-  --accent-light: #2f9160;
+  /* 밝은 배경 위 '글씨'로 쓰인다(내비 활성, 패널 제목). 초록 중에 이보다 밝으면서
+     4.5:1을 넘는 값이 없어 --accent와 같은 값으로 둔다. 더 옅은 '면'이 필요하면
+     --accent-subtle을 쓸 것. */
+  --accent-light: #007538;
   --accent-glow: rgba(0, 117, 56, 0.18);
   --accent-subtle: #e6f2ea;
 
@@ -155,10 +158,13 @@
   --border-light: #d6dae0;
   --text-primary: #16191d;
   --text-secondary: #5b626c;
-  --text-muted: #868d97;
+  --text-muted: #5f6773;
   --accent: #007538;
   --accent-dark: #005c2b;
-  --accent-light: #2f9160;
+  /* 밝은 배경 위 '글씨'로 쓰인다(내비 활성, 패널 제목). 초록 중에 이보다 밝으면서
+     4.5:1을 넘는 값이 없어 --accent와 같은 값으로 둔다. 더 옅은 '면'이 필요하면
+     --accent-subtle을 쓸 것. */
+  --accent-light: #007538;
   --accent-glow: rgba(0, 117, 56, 0.18);
   --accent-subtle: #e6f2ea;
 }

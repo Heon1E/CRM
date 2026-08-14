@@ -29,7 +29,7 @@ const BackgroundTaskIndicator = () => {
         <span className="text-xs md:text-sm font-medium text-slate-800 text-center">
           AI 분석 중... ({activeTasks.length}개 작업)
         </span>
-        <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-slate-400 flex-shrink-0 animate-pulse" />
+        <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-slate-500 flex-shrink-0 animate-pulse" />
       </div>
     </div>
   )

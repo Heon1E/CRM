@@ -239,7 +239,7 @@ const MyAccounts = () => {
 
                 {/* Search */}
                 <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
                         type="text"
                         value={searchTerm}
@@ -325,7 +325,7 @@ const MyAccounts = () => {
                         <tbody>
                             {filteredClients.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-8 text-gray-400 text-sm">
+                                    <td colSpan={7} className="text-center py-8 text-gray-500 text-sm">
                                         {searchTerm ? '검색 결과가 없습니다' : '담당 거래처가 없습니다'}
                                     </td>
                                 </tr>
@@ -335,7 +335,7 @@ const MyAccounts = () => {
                                         key={client.id}
                                         className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group"
                                     >
-                                        <td className="px-3 py-2 text-[11px] text-gray-400">{idx + 1}</td>
+                                        <td className="px-3 py-2 text-[11px] text-gray-500">{idx + 1}</td>
                                         <td className="px-3 py-2">
                                             <button
                                                 onClick={() => navigate(`/clients/${client.id}`)}
@@ -346,7 +346,7 @@ const MyAccounts = () => {
                                                     <ArrowUpRight className="w-3 h-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
                                                 </p>
                                                 {client.contactPerson && (
-                                                    <p className="text-[10px] text-gray-400">{client.contactPerson}</p>
+                                                    <p className="text-[10px] text-gray-500">{client.contactPerson}</p>
                                                 )}
                                             </button>
                                         </td>
@@ -356,7 +356,7 @@ const MyAccounts = () => {
                                                     setSelectedClientForSales(client)
                                                     setIsSalesModalOpen(true)
                                                 }}
-                                                className={`font-bold hover:underline transition-colors ${client.thisMonthSales > 0 ? 'text-oem-blue' : 'text-gray-400 font-normal hover:text-oem-blue'}`}
+                                                className={`font-bold hover:underline transition-colors ${client.thisMonthSales > 0 ? 'text-oem-blue' : 'text-gray-500 font-normal hover:text-oem-blue'}`}
                                                 title="당월 매출 상세 보기"
                                             >
                                                 {formatMoney(client.thisMonthSales)}
@@ -374,7 +374,7 @@ const MyAccounts = () => {
                                         <td className="px-3 py-2 text-right">
                                             {client.lastYearSamePeriodSales > 0 || client.thisYearSales > 0 ? (
                                                 <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${client.yoyChange > 0 ? 'text-green-600' :
-                                                    client.yoyChange < 0 ? 'text-red-500' : 'text-gray-400'
+                                                    client.yoyChange < 0 ? 'text-red-500' : 'text-gray-500'
                                                     }`}>
                                                     {client.yoyChange > 0 ? <TrendingUp className="w-3 h-3" /> :
                                                         client.yoyChange < 0 ? <TrendingDown className="w-3 h-3" /> :
@@ -382,7 +382,7 @@ const MyAccounts = () => {
                                                     {client.yoyChange > 0 ? '+' : ''}{client.yoyChange}%
                                                 </span>
                                             ) : (
-                                                <span className="text-[10px] text-gray-300">—</span>
+                                                <span className="text-[10px] text-gray-500">—</span>
                                             )}
                                         </td>
                                         {/* KPI 분류 */}

@@ -72,7 +72,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
         disabled={currentPage === 1}
         className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors touch-manipulation ${
           currentPage === 1
-            ? 'border-[color:var(--border)] text-[color:var(--text-secondary)] cursor-not-allowed'
+            ? 'border-[color:var(--border)] text-[color:var(--text-muted)] cursor-not-allowed'
             : 'border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)]'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -103,7 +103,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
             onClick={() => handlePageClick(page)}
             className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors touch-manipulation ${
               page === currentPage
-                ? 'bg-[color:var(--accent)] text-[color:var(--text-primary)] border-[color:var(--accent)] font-semibold'
+                ? 'bg-[color:var(--accent)] text-white border-[color:var(--accent)] font-semibold'
                 : 'border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)]'
             }`}
             style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -134,7 +134,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
         disabled={currentPage === totalPages}
         className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors touch-manipulation ${
         currentPage === totalPages
-          ? 'border-[color:var(--border)] text-[color:var(--text-secondary)] cursor-not-allowed'
+          ? 'border-[color:var(--border)] text-[color:var(--text-muted)] cursor-not-allowed'
           : 'border-[color:var(--border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-subtle)]'
         }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}

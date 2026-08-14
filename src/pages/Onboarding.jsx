@@ -42,11 +42,11 @@ const StepIndicator = ({ steps, current }) => (
                     <div className="flex flex-col items-center">
                         <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${done ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' :
                                 active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100' :
-                                    'bg-gray-100 text-gray-400'
+                                    'bg-gray-100 text-gray-500'
                             }`}>
                             {done ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                         </div>
-                        <span className={`text-[10px] font-bold mt-1.5 ${active ? 'text-blue-600' : done ? 'text-emerald-600' : 'text-gray-400'}`}>
+                        <span className={`text-[10px] font-bold mt-1.5 ${active ? 'text-blue-600' : done ? 'text-emerald-600' : 'text-gray-500'}`}>
                             {step.title}
                         </span>
                     </div>
@@ -200,7 +200,7 @@ const Step3 = ({ data, setData, locale }) => {
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
             </div>
-            <p className="text-[11px] text-gray-400 text-center">
+            <p className="text-[11px] text-gray-500 text-center">
                 {isEn ? '✓ You can skip this step and add clients later from the dashboard.' : '✓ 이 단계를 건너뛰고 나중에 대시보드에서 고객을 추가할 수 있습니다.'}
             </p>
         </div>
@@ -282,7 +282,7 @@ const Onboarding = () => {
                         <span className="text-2xl font-black text-white">Xavian</span>
                         <span className="text-2xl font-black text-blue-400">CRM</span>
                     </div>
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-gray-500">
                         {isEn ? `Welcome! Let's set up your workspace in 2 minutes.` : `환영합니다! 2분 안에 워크스페이스를 설정해 드릴게요.`}
                     </p>
                 </div>
@@ -318,7 +318,7 @@ const Onboarding = () => {
                         ) : (
                             <button
                                 onClick={() => navigate('/')}
-                                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-sm text-gray-500 hover:text-gray-600 transition-colors"
                             >
                                 {isEn ? 'Skip setup' : '설정 건너뛰기'}
                             </button>
@@ -328,7 +328,7 @@ const Onboarding = () => {
                             <button
                                 onClick={() => setStep(s => s + 1)}
                                 disabled={!canNext()}
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold px-7 py-3 rounded-xl text-sm transition-all"
+                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-white font-bold px-7 py-3 rounded-xl text-sm transition-all"
                             >
                                 {isEn ? 'Continue' : '계속'}
                                 <ArrowRight className="w-4 h-4" />

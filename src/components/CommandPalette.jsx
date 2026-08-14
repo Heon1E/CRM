@@ -99,11 +99,11 @@ const CommandPalette = () => {
 
                 {/* Search Input */}
                 <div className="flex items-center px-4 py-3 border-b border-slate-100">
-                    <Search className="w-5 h-5 text-slate-400 mr-3" />
+                    <Search className="w-5 h-5 text-slate-500 mr-3" />
                     <input
                         ref={inputRef}
                         type="text"
-                        className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-400 text-lg"
+                        className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-500 text-lg"
                         placeholder="Type a command or search..."
                         value={query}
                         onChange={e => {
@@ -113,7 +113,7 @@ const CommandPalette = () => {
                         onKeyDown={handleInputKeyDown}
                     />
                     <div className="flex items-center gap-1">
-                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-semibold text-slate-400 bg-slate-100 border border-slate-200 rounded">ESC</kbd>
+                        <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded">ESC</kbd>
                     </div>
                 </div>
 
@@ -136,7 +136,7 @@ const CommandPalette = () => {
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <p className={`text-sm font-medium truncate ${idx === selectedIndex ? 'font-bold' : ''}`}>{item.name}</p>
-                                        {item.sub && <p className="text-xs text-slate-400 truncate">Contact: {item.sub}</p>}
+                                        {item.sub && <p className="text-xs text-slate-500 truncate">Contact: {item.sub}</p>}
                                     </div>
                                     {idx === selectedIndex && (
                                         <ArrowRight className="w-4 h-4 text-indigo-400" />
@@ -145,7 +145,7 @@ const CommandPalette = () => {
                             )
                         })
                     ) : (
-                        <div className="py-8 text-center text-slate-400">
+                        <div className="py-8 text-center text-slate-500">
                             <Command className="w-8 h-8 mx-auto mb-2 opacity-20" />
                             <p className="text-sm">No results found.</p>
                         </div>
@@ -153,7 +153,7 @@ const CommandPalette = () => {
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-medium">
                     <span>ProTip: Use arrows to navigate, Enter to select</span>
                     <span>Open Quick Actions with Ctrl+K</span>
                 </div>

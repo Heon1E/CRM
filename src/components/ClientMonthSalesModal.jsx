@@ -79,7 +79,7 @@ const ClientMonthSalesModal = ({ isOpen, onClose, client, salesData, currentMont
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors bg-white hover:bg-gray-100 p-1.5 rounded-lg border border-transparent hover:border-gray-200"
+                        className="text-gray-500 hover:text-gray-600 transition-colors bg-white hover:bg-gray-100 p-1.5 rounded-lg border border-transparent hover:border-gray-200"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -113,8 +113,8 @@ const ClientMonthSalesModal = ({ isOpen, onClose, client, salesData, currentMont
                             <tbody className="divide-y divide-gray-100">
                                 {thisMonthItems.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="px-4 py-12 text-center text-gray-400">
-                                            <Package className="w-8 h-8 mx-auto text-gray-300 mb-3" />
+                                        <td colSpan={4} className="px-4 py-12 text-center text-gray-500">
+                                            <Package className="w-8 h-8 mx-auto text-gray-500 mb-3" />
                                             <p className="text-sm">이번 달 매출 내역이 없습니다.</p>
                                         </td>
                                     </tr>

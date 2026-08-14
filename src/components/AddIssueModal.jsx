@@ -128,7 +128,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
             placeholder="Describe the issue..."
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-[10px] text-gray-400 font-mono">
+          <div className="mt-1 text-right text-[10px] text-gray-500 font-mono">
             {charCount}/1000
           </div>
         </div>

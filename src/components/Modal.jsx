@@ -51,7 +51,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', docked = false, 
             <h3 className="text-sm font-bold text-oem-text-primary uppercase tracking-tight">{title}</h3>
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 text-gray-500 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
               title="Close"
             >
               <X className="w-5 h-5" />
