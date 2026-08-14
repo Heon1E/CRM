@@ -6,8 +6,13 @@ import NotificationPermissionPrompt from './NotificationPermissionPrompt'
 import BackgroundTaskIndicator from './BackgroundTaskIndicator'
 import BottomNavigation from './BottomNavigation'
 import CommandPalette from './CommandPalette'
+import { useTableLabels } from '../hooks/useTableLabels'
 
 const Layout = ({ children }) => {
+  // 모바일에서 표가 카드로 접힐 때 붙는 칸 이름을 심는다.
+  // 목록 화면이 7개라 페이지마다 적지 않고 <thead>에서 읽어 온다.
+  useTableLabels()
+
   // Guard Clause: children이 없으면 빈 화면 방지 (.cursorrules 규칙 준수)
   if (!children) {
     return (

@@ -25,3 +25,4 @@ OAuth_id_pw.txt
 
 # 개발용 자동 로그인 값이 들어 있다. 절대 커밋 금지.
 .env.local
+/public/_listtest.html

@@ -766,15 +766,118 @@ textarea:focus {
   select,
   textarea {
     font-size: 16px !important;
+    /* 손가락으로 누를 수 있는 크기. 16px는 iOS가 포커스 시 화면을 확대하는 것을 막는다. */
+    min-height: 44px;
   }
 
-  /* 표는 줄바꿈 없이 가로로 밀어서 본다 */
+  /* ---------------------------------------------------------------------
+     목록은 모바일에서 **카드로 접힌다.**
+
+     예전에는 표를 그대로 두고 가로로 밀어서 봤다. 현장에서 쓰는 도구인데
+     옆으로 밀어야 값이 보이고, 행 높이가 26px이라 손가락으로 누르기 어려웠다.
+     (실측: /clients 44개, /sales 48개, /receivables 47개가 44px 미만이었다.)
+
+     표 마크업은 그대로 두고 CSS로만 접는다 — 7개 화면을 각각 고쳐 쓰면
+     서로 달라지고, 열이 바뀔 때마다 두 벌을 맞춰야 한다.
+     칸 이름은 `useTableLabels`가 `<thead>`를 읽어 `data-label`에 심어 준다.
+     --------------------------------------------------------------------- */
   .grid-scroll {
-    overflow-x: auto;
+    overflow-x: visible;
   }
 
-  table.dgrid {
-    min-width: 720px;
+  table.dgrid,
+  table.dgrid tbody,
+  table.dgrid tr,
+  table.dgrid td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  table.dgrid thead {
+    display: none;          /* 칸 이름은 각 줄 왼쪽에 붙는다 */
+  }
+
+  table.dgrid tbody tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    margin-bottom: 8px;
+    padding: 4px 2px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  table.dgrid tbody tr:nth-child(even) {
+    background: var(--bg-card);   /* 카드에서는 줄무늬가 의미를 잃는다 */
+  }
+
+  table.dgrid td {
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    padding: 0 10px;
+    height: auto;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    white-space: normal;
+    text-align: right;
+  }
+
+  table.dgrid td:last-child {
+    border-bottom: 0;
+  }
+
+  /* 칸 이름 */
+  table.dgrid td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    font-size: 11.5px;
+    text-align: left;
+  }
+
+  /* 첫 칸은 그 줄의 제목이다. 이름표 없이 크게. */
+  table.dgrid td:first-child {
+    justify-content: flex-start;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 44px;
+  }
+
+  table.dgrid td:first-child::before {
+    content: none;
+  }
+
+  /* 값이 없는 칸과 버튼만 있는 칸은 이름표를 붙이지 않는다 */
+  table.dgrid td:empty {
+    display: none;
+  }
+
+  table.dgrid td.actions::before {
+    content: none;
+  }
+
+  table.dgrid td.actions {
+    justify-content: flex-end;
+    gap: 6px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  /* 손가락으로 누를 수 있는 크기 */
+  .tb-btn,
+  .rowbtn {
+    min-height: 44px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .toolbar {
+    gap: 6px;
+    padding: 6px 8px;
   }
 
   .lines table {
