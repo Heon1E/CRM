@@ -625,9 +625,49 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 지금은 비었을 때 `rawSalesData`로 채우도록 폴백을 뒀다.
 **근본 해결은 두 벌 조회를 하나로 합치는 것이다** — 1.5만 행을 두 번 읽고 있다.
 
-## 로그인이 없다 — '내가 누구인지'는 화면에서 고른다
+## 로그인 · 역할 · 접근제어
 
-로그인 화면을 떼어낸 뒤 `user`가 늘 `null`이라 두 가지가 조용히 망가져 있었다.
+`execution/sql/auth_and_roles.sql`을 Supabase SQL Editor에서 **한 번 실행해야** 한다.
+실행 전에는 `profiles` 표가 없어 앱이 '준비되지 않았습니다'를 띄운다.
+
+- 역할 세 가지: `admin`(전부 + 삭제 + 계정관리) / `sales`(읽기·쓰기) / `viewer`(읽기만)
+- **맨 처음 만들어지는 계정이 자동으로 admin**이다. 관리자를 손으로 심을 방법이
+  없으면 아무도 못 들어온다. 두 번째부터는 sales로 들어오고 admin이 올려 준다.
+- **읽기는 전사 공통이다.** KPI 수익성이 전사 기준이고 담당이 빈 거래처가 1,064곳이라
+  담당별로 막으면 화면이 텅 빈다. 회사가 커지면 `can_read()`만 좁히면 된다.
+- **삭제는 admin만.** 되돌릴 수단(감사 로그·휴지통)이 아직 없어 좁게 열어 뒀다.
+- 역할 변경은 화면이 아니라 **DB에서 막는다** (`profiles` RLS). 화면에서 숨겨도
+  요청을 직접 보내면 그만이다. 자기 역할은 스스로 못 바꾼다.
+
+로그인은 **아이디 + 비밀번호**다. Supabase Auth는 이메일을 요구하므로
+`toLoginEmail()`이 `VITE_LOGIN_DOMAIN`(기본 `idibc.local`)을 붙여 준다.
+`heoniree` → `heoniree@idibc.local`. 계정·권한 관리는 설정 화면의 **계정 · 권한**.
+
+### 서버 함수는 서비스 롤 키가 필요하다
+
+`api/telegram-webhook.js`·`api/daily-digest.js`가 anon 키로 폴백하고 있었다.
+RLS를 닫은 뒤로는 **`SUPABASE_SERVICE_ROLE_KEY`가 없으면 동작하지 않는다.**
+Vercel 환경변수에 넣을 것 (VITE_ 접두어 금지). 없으면 시작할 때 콘솔에 경고가 뜬다.
+
+### 개발 중 자동 로그인
+
+`src/hooks/useDevAutoLogin.js`. `.env.local`에 아래를 적으면 개발 서버에서만
+자동으로 로그인한다. **`import.meta.env.DEV` 안에 있어 배포 빌드에서는 통째로
+잘려 나간다** (빌드 산출물에 문자열이 남지 않는 것을 확인했다).
+
+```
+VITE_DEV_AUTOLOGIN_ID=<아이디>
+VITE_DEV_AUTOLOGIN_PW=<비밀번호>
+```
+
+**비밀번호를 저장소에 넣지 말 것.** 이 저장소는 공개돼 있다. `.env.local`은
+`.gitignore` 대상이다. 배포된 앱에서도 Supabase가 세션을 담아 두고 토큰을
+갱신하므로 로그인은 사실상 한 번만 하면 된다.
+
+## '내가 누구인지' — 담당자 이름
+
+로그인을 떼어냈던 동안 `user`가 늘 `null`이라 두 가지가 조용히 망가져 있었다
+(지금은 로그인이 돌아왔고, 아래는 그때 고친 내용이다).
 
 1. **`DataContext`가 데이터를 아예 안 불러왔다.** 세션이 없으면 `setLoading(false)`로
    끝내고 있었다. 거래처·매출·활동이 통째로 빈 배열이라 상단 카드가 '—',

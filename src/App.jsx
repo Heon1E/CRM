@@ -1,7 +1,8 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { useDevAutoLogin } from './hooks/useDevAutoLogin'
 import { DataProvider } from './contexts/DataContext'
 import { BackgroundTaskProvider } from './contexts/BackgroundTaskContext'
 import { I18nProvider } from './contexts/I18nContext'
@@ -61,9 +62,38 @@ const DocumentTitleUpdater = () => {
   return null
 }
 
-// 인증 상태에 따른 라우팅 컴포넌트
+/**
+ * 로그인해야 볼 수 있는 화면들.
+ *
+ * 예전에는 인증을 확인하지 않고 바로 그렸다. 배포 번들에 anon 키가 박혀 있고
+ * RLS도 anon 전체 허용이라, **주소를 아는 사람은 누구나 거래처·매출·채권을
+ * 전부 볼 수 있었다.** 이제 세션이 없으면 로그인 화면으로 보낸다.
+ *
+ * 개발 중에는 `.env.local`에 `VITE_DEV_AUTOLOGIN_ID`/`VITE_DEV_AUTOLOGIN_PW`를
+ * 넣어 두면 자동으로 로그인한다 (`useDevAutoLogin`). **개발 서버에서만 동작하고
+ * 배포 빌드에는 들어가지 않는다.**
+ */
 const ProtectedRoutes = () => {
-  // Mock Auth provides user immediately, allowing us to render Layout directly
+  const { user, loading } = useAuth()
+  const location = useLocation()
+
+  useDevAutoLogin()
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--text-secondary)', fontSize: 13,
+      }}>
+        불러오는 중…
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  }
+
   return (
     <ErrorBoundary>
       <Layout>

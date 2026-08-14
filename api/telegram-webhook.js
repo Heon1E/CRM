@@ -21,7 +21,7 @@
  *   - Gemini/DB 키: 이미 있는 VITE_ 값을 그대로 쓴다.
  *
  * 선택 (없어도 동작):
- *   SUPABASE_SERVICE_ROLE_KEY  넣으면 RLS를 우회한다. 없으면 anon 키로 동작한다.
+ *   SUPABASE_SERVICE_ROLE_KEY  **필수.** RLS를 닫은 뒤로 anon 키로는 동작하지 않는다.
  *   TELEGRAM_ALLOWED_CHAT_IDS  DB 대신 환경변수로 허용 목록을 고정하고 싶을 때.
  */
 
@@ -47,6 +47,14 @@ const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 // service_role이 있으면 쓰고, 없으면 anon 키로 동작한다.
 // schedules / telegram_inbox / activities 는 anon에도 쓰기가 열려 있다.
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+// RLS를 닫은 뒤로 anon 키로는 아무것도 못 읽고 못 쓴다 (execution/sql/auth_and_roles.sql).
+// 서비스 롤 키가 없으면 조용히 실패하는 대신 눈에 띄게 알린다 — 봇이 말없이
+// 죽어 있으면 며칠 뒤에야 알게 된다.
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[설정 필요] SUPABASE_SERVICE_ROLE_KEY 가 없습니다. '
+        + 'RLS가 닫혀 있어 anon 키로는 동작하지 않습니다. '
+        + 'Vercel 환경변수에 넣어 주세요 (VITE_ 접두어 없이).')
+}
 const KST_OFFSET = '+09:00'
 
 // ---------------------------------------------------------------------------

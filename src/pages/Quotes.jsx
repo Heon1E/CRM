@@ -35,8 +35,8 @@ const emptyLine = () => ({
 
 const Quotes = () => {
     const { clients } = useData()
-    const { user } = useAuth()
-    const myRep = useMemo(() => resolveSalesRep(user), [user])
+    const { user, salesRep: authSalesRep } = useAuth()
+    const myRep = useMemo(() => authSalesRep || resolveSalesRep(user), [user, authSalesRep])
 
     const [list, setList] = useState([])
     const [products, setProducts] = useState([])

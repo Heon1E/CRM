@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { resolveSalesRep, SALES_REP_OPTIONS } from '../utils/salesRep'
 
 export const useDashboardData = () => {
-  const { user } = useAuth()
+  const { user, salesRep: authSalesRep } = useAuth()
   const { clients, activities, sales, loading: dataLoading } = useData()
 
   const [myAccounts, setMyAccounts] = useState([])
@@ -24,7 +24,8 @@ export const useDashboardData = () => {
     window.addEventListener('my-rep-changed', onChange)
     return () => window.removeEventListener('my-rep-changed', onChange)
   }, [])
-  const getUserSalesRep = useMemo(() => resolveSalesRep(user), [user, repTick])
+  // 프로필에 적힌 이름이 우선이다. 계정과 무관하게 화면에서 고른 값은 그 다음.
+  const getUserSalesRep = useMemo(() => authSalesRep || resolveSalesRep(user), [user, authSalesRep, repTick])
 
   // 유틸리티: 주간 매출 데이터 계산
   const getWeeklySalesDataForClients = useCallback((salesData) => {

@@ -11,6 +11,7 @@ import SalesExcelUpload from '../components/SalesExcelUpload'
 import ErpScreenshotImport from '../components/ErpScreenshotImport'
 import InboxPanel from '../components/InboxPanel'
 import ProductImages from '../components/ProductImages'
+import UserAdmin from '../components/UserAdmin'
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
 import { exportClientsToExcel } from '../utils/excelExport'
 import { exportSalesToExcel } from '../utils/excelExport'
@@ -425,6 +426,11 @@ const Settings = () => {
                 {/* 견적서에 나갈 품목·악세서리 사진 */}
                 <div className="mt-6">
                   <ProductImages />
+
+                  {/* 계정·권한 — 관리자만 내용이 보인다 */}
+                  <div style={{ marginTop: 12 }}>
+                    <UserAdmin />
+                  </div>
                 </div>
               </Panel>
 

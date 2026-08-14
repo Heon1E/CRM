@@ -5,7 +5,9 @@ import { Rocket, HelpCircle, Mail, Lock, Eye } from 'lucide-react'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { signInWithGoogle, user } = useAuth()
+  const { signIn, signUp, signInWithGoogle, user } = useAuth()
+  const [loginId, setLoginId] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [authMode, setAuthMode] = useState('login') // 'login' or 'signup'
@@ -36,9 +38,32 @@ const Login = () => {
     }
   }
 
-  const handleEmailAuth = (e) => {
+  /**
+   * 아이디 + 비밀번호. 아이디만 넣으면 AuthContext가 도메인을 붙여 준다.
+   * (예전에는 '준비 중입니다'만 띄우고 Google로만 들어갈 수 있었다.)
+   */
+  const handleEmailAuth = async (e) => {
     e.preventDefault()
-    setError('현재 이메일 로그인은 준비 중입니다. Google 로그인을 이용해주세요.')
+    setError('')
+    if (!loginId.trim() || !password) {
+      setError('아이디와 비밀번호를 넣어 주세요.')
+      return
+    }
+    setLoading(true)
+    const fn = authMode === 'signup' ? signUp : signIn
+    const result = await fn(loginId.trim(), password)
+    setLoading(false)
+    if (!result.success) {
+      setError(result.error || (authMode === 'signup' ? '계정을 만들지 못했습니다.' : '로그인하지 못했습니다.'))
+      return
+    }
+    if (authMode === 'signup') {
+      setError('')
+      setAuthMode('login')
+      alert('계정을 만들었습니다. 같은 아이디로 로그인하세요.')
+      return
+    }
+    navigate('/')
   }
 
   return (
@@ -126,14 +151,17 @@ const Login = () => {
             <form onSubmit={handleEmailAuth} className="space-y-5">
               {/* Email Field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="email">Email Address</label>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="email">아이디</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
                   <input
                     id="email"
-                    type="email"
+                    type="text"
+                    autoComplete="username"
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#007538]/20 focus:border-[#007538] outline-none transition-all text-slate-900 sm:text-sm"
-                    placeholder="name@company.com"
+                    placeholder="아이디 또는 이메일"
                   />
                 </div>
               </div>
@@ -141,7 +169,7 @@ const Login = () => {
               {/* Password Field */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="password">Password</label>
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="password">비밀번호</label>
                   {authMode === 'login' && (
                     <a href="#" className="text-xs font-semibold text-[#007538] hover:underline">Forgot password?</a>
                   )}
@@ -151,6 +179,9 @@ const Login = () => {
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#007538]/20 focus:border-[#007538] outline-none transition-all text-slate-900 sm:text-sm"
                     placeholder="••••••••"
                   />

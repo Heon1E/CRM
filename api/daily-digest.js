@@ -24,6 +24,14 @@ export const config = { maxDuration: 60 }
 
 const SUPA_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+// RLS를 닫은 뒤로 anon 키로는 아무것도 못 읽고 못 쓴다 (execution/sql/auth_and_roles.sql).
+// 서비스 롤 키가 없으면 조용히 실패하는 대신 눈에 띄게 알린다 — 봇이 말없이
+// 죽어 있으면 며칠 뒤에야 알게 된다.
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('[설정 필요] SUPABASE_SERVICE_ROLE_KEY 가 없습니다. '
+        + 'RLS가 닫혀 있어 anon 키로는 동작하지 않습니다. '
+        + 'Vercel 환경변수에 넣어 주세요 (VITE_ 접두어 없이).')
+}
 const DAY = 86_400_000
 const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토']
 

@@ -21,8 +21,8 @@ const PAGE_SIZE = 20
 const Clients = () => {
   // Common Data & Actions
   const { clients: contextClients, loading: contextLoading, sales, activities, deleteClient } = useData()
-  const { user } = useAuth()
-  const myRep = useMemo(() => resolveSalesRep(user), [user])
+  const { user, salesRep: authSalesRep } = useAuth()
+  const myRep = useMemo(() => authSalesRep || resolveSalesRep(user), [user, authSalesRep])
 
   // Local State
   const [searchInput, setSearchInput] = useState('') // Search input value (not yet submitted)
