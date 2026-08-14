@@ -33,23 +33,23 @@ const Pricing = () => {
     return (
         <div className="bg-[#F8FAFC] text-slate-900 min-h-screen font-['Inter',sans-serif]">
             {/* Navigation */}
-            <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#833CF6]/10">
+            <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#007538]/10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between h-16 items-center">
                         <Link to="/landing" className="flex items-center gap-2 group">
-                            <div className="bg-[#833CF6] rounded-lg p-1">
+                            <div className="bg-[#007538] rounded-lg p-1">
                                 <Rocket className="w-5 h-5 text-white" />
                             </div>
-                            <span className="font-bold text-xl tracking-tight text-slate-900 group-hover:text-[#833CF6] transition-colors">Xavian CRM</span>
+                            <span className="font-bold text-xl tracking-tight text-slate-900 group-hover:text-[#007538] transition-colors">Xavian CRM</span>
                         </Link>
                         <div className="hidden md:flex items-center space-x-8">
-                            <Link to="/landing" className="text-sm font-medium text-slate-600 hover:text-[#833CF6] transition-colors">Product</Link>
-                            <Link to="/landing" className="text-sm font-medium text-slate-600 hover:text-[#833CF6] transition-colors">Features</Link>
-                            <Link to="/pricing" className="text-sm font-bold text-[#833CF6] transition-colors">Pricing</Link>
+                            <Link to="/landing" className="text-sm font-medium text-slate-600 hover:text-[#007538] transition-colors">Product</Link>
+                            <Link to="/landing" className="text-sm font-medium text-slate-600 hover:text-[#007538] transition-colors">Features</Link>
+                            <Link to="/pricing" className="text-sm font-bold text-[#007538] transition-colors">Pricing</Link>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Link to="/login" className="text-sm font-medium text-slate-600 px-4 py-2 hover:text-[#833CF6]">Sign In</Link>
-                            <Link to="/login" className="bg-[#833CF6] text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-[#722EE0] transition-all shadow-lg shadow-[#833CF6]/20">
+                            <Link to="/login" className="text-sm font-medium text-slate-600 px-4 py-2 hover:text-[#007538]">Sign In</Link>
+                            <Link to="/login" className="bg-[#007538] text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-[#005C2B] transition-all shadow-lg shadow-[#007538]/20">
                                 Get Started
                             </Link>
                         </div>
@@ -68,9 +68,9 @@ const Pricing = () => {
                         <span className={`text-sm font-medium ${!isAnnual ? 'text-slate-900' : 'text-slate-500'}`}>Monthly</span>
                         <button
                             onClick={() => setIsAnnual(!isAnnual)}
-                            className="relative inline-flex h-8 w-16 items-center rounded-full bg-[#833CF6]/10 cursor-pointer focus:outline-none"
+                            className="relative inline-flex h-8 w-16 items-center rounded-full bg-[#007538]/10 cursor-pointer focus:outline-none"
                         >
-                            <div className={`h-6 w-6 rounded-full bg-[#833CF6] shadow-sm transform transition-transform duration-200 ease-in-out ${isAnnual ? 'translate-x-9' : 'translate-x-1'}`} />
+                            <div className={`h-6 w-6 rounded-full bg-[#007538] shadow-sm transform transition-transform duration-200 ease-in-out ${isAnnual ? 'translate-x-9' : 'translate-x-1'}`} />
                         </button>
                         <span className={`text-sm font-medium flex items-center gap-2 ${isAnnual ? 'text-slate-900' : 'text-slate-500'}`}>
                             Annually
@@ -100,7 +100,7 @@ const Pricing = () => {
                         <div className="space-y-4">
                             {['5 Core features', 'Basic CRM', 'Email tracking', 'Mobile app', 'Standard support'].map((feature, i) => (
                                 <div key={i} className="flex items-center gap-3 text-sm text-slate-600">
-                                    <CheckCircle2 className="text-[#833CF6] w-5 h-5 flex-shrink-0" />
+                                    <CheckCircle2 className="text-[#007538] w-5 h-5 flex-shrink-0" />
                                     {feature}
                                 </div>
                             ))}
@@ -108,8 +108,8 @@ const Pricing = () => {
                     </div>
 
                     {/* Pro Plan */}
-                    <div className="bg-white border-2 border-[#833CF6] rounded-xl p-8 flex flex-col relative shadow-xl shadow-[#833CF6]/10 transform md:-translate-y-4">
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#833CF6] text-white text-xs font-bold px-4 py-1.5 rounded-full">MOST POPULAR</div>
+                    <div className="bg-white border-2 border-[#007538] rounded-xl p-8 flex flex-col relative shadow-xl shadow-[#007538]/10 transform md:-translate-y-4">
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#007538] text-white text-xs font-bold px-4 py-1.5 rounded-full">MOST POPULAR</div>
                         <div className="mb-6">
                             <h3 className="text-lg font-bold text-slate-900">Pro</h3>
                             <p className="text-sm text-slate-500 mt-1">Advanced sales tools</p>
@@ -118,13 +118,13 @@ const Pricing = () => {
                             <span className="text-4xl font-black">${isAnnual ? '63' : '79'}</span>
                             <span className="text-slate-500 font-medium">/mo</span>
                         </div>
-                        <Link to="/login" className="w-full py-3 rounded-lg bg-[#833CF6] text-white font-bold text-sm hover:bg-[#722EE0] transition-all shadow-lg shadow-[#833CF6]/20 mb-8 text-center flex items-center justify-center">
+                        <Link to="/login" className="w-full py-3 rounded-lg bg-[#007538] text-white font-bold text-sm hover:bg-[#005C2B] transition-all shadow-lg shadow-[#007538]/20 mb-8 text-center flex items-center justify-center">
                             Start Free Trial
                         </Link>
                         <div className="space-y-4">
                             {['Everything in Starter', 'Unlimited clients', 'Advanced reporting', 'Custom automations', 'Priority support'].map((feature, i) => (
                                 <div key={i} className="flex items-center gap-3 text-sm text-slate-900 font-medium">
-                                    <CheckCircle2 className="text-[#833CF6] w-5 h-5 flex-shrink-0" />
+                                    <CheckCircle2 className="text-[#007538] w-5 h-5 flex-shrink-0" />
                                     {feature}
                                 </div>
                             ))}
@@ -141,13 +141,13 @@ const Pricing = () => {
                             <span className="text-4xl font-black">Custom</span>
                             <span className="text-slate-500 font-medium">/year</span>
                         </div>
-                        <Link to="/login" className="w-full py-3 rounded-lg border-2 border-[#833CF6]/20 text-[#833CF6] font-bold text-sm hover:bg-[#833CF6]/5 transition-colors mb-8 text-center flex items-center justify-center">
+                        <Link to="/login" className="w-full py-3 rounded-lg border-2 border-[#007538]/20 text-[#007538] font-bold text-sm hover:bg-[#007538]/5 transition-colors mb-8 text-center flex items-center justify-center">
                             Contact Sales
                         </Link>
                         <div className="space-y-4">
                             {['Custom integrations', 'SSO & SAML', 'Dedicated manager', '99.9% Uptime SLA', 'Security compliance'].map((feature, i) => (
                                 <div key={i} className="flex items-center gap-3 text-sm text-slate-600">
-                                    <CheckCircle2 className="text-[#833CF6] w-5 h-5 flex-shrink-0" />
+                                    <CheckCircle2 className="text-[#007538] w-5 h-5 flex-shrink-0" />
                                     {feature}
                                 </div>
                             ))}
@@ -166,7 +166,7 @@ const Pricing = () => {
                             <tr className="border-b border-slate-200">
                                 <th className="py-4 px-6 text-sm font-bold text-slate-900">Feature</th>
                                 <th className="py-4 px-6 text-sm font-bold text-slate-600 text-center w-[15%]">Starter</th>
-                                <th className="py-4 px-6 text-sm font-bold text-[#833CF6] text-center w-[15%]">Pro</th>
+                                <th className="py-4 px-6 text-sm font-bold text-[#007538] text-center w-[15%]">Pro</th>
                                 <th className="py-4 px-6 text-sm font-bold text-slate-600 text-center w-[15%]">Enterprise</th>
                             </tr>
                         </thead>
@@ -177,21 +177,21 @@ const Pricing = () => {
                             </tr>
                             <tr className="border-b border-slate-100">
                                 <td className="py-4 px-6 text-sm">Lead Management</td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
                             </tr>
                             <tr className="border-b border-slate-100">
                                 <td className="py-4 px-6 text-sm">Opportunity Tracking</td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
                             </tr>
                             <tr className="border-b border-slate-100">
                                 <td className="py-4 px-6 text-sm">Productivity Tools</td>
-                                <td className="text-center py-4 text-slate-300">—</td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4 text-slate-500">—</td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
                             </tr>
 
                             {/* Automation Category */}
@@ -206,15 +206,15 @@ const Pricing = () => {
                             </tr>
                             <tr className="border-b border-slate-100">
                                 <td className="py-4 px-6 text-sm">Custom Workflows</td>
-                                <td className="text-center py-4 text-slate-300">—</td>
+                                <td className="text-center py-4 text-slate-500">—</td>
                                 <td className="text-center py-4 text-sm font-medium">Up to 20</td>
                                 <td className="text-center py-4 text-sm font-medium">Unlimited</td>
                             </tr>
                             <tr className="border-b border-slate-100">
                                 <td className="py-4 px-6 text-sm">AI Lead Scoring</td>
-                                <td className="text-center py-4 text-slate-300">—</td>
-                                <td className="text-center py-4 text-slate-300">—</td>
-                                <td className="text-center py-4"><Check className="text-[#833CF6] w-5 h-5 mx-auto" /></td>
+                                <td className="text-center py-4 text-slate-500">—</td>
+                                <td className="text-center py-4 text-slate-500">—</td>
+                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
                             </tr>
                         </tbody>
                     </table>
@@ -228,7 +228,7 @@ const Pricing = () => {
                     {faqs.map((faq, index) => (
                         <div key={index} className="bg-white border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors cursor-pointer" onClick={() => toggleFaq(index)}>
                             <div className="flex justify-between items-center w-full text-left font-bold text-slate-900 group">
-                                <span className="group-hover:text-[#833CF6] transition-colors">{faq.question}</span>
+                                <span className="group-hover:text-[#007538] transition-colors">{faq.question}</span>
                                 <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
                             </div>
                             {openFaq === index && (
@@ -245,18 +245,18 @@ const Pricing = () => {
             <footer className="bg-white border-t border-slate-200 py-12">
                 <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-2">
-                        <div className="bg-[#833CF6]/20 rounded-lg p-1">
-                            <Rocket className="w-5 h-5 text-[#833CF6]" />
+                        <div className="bg-[#007538]/20 rounded-lg p-1">
+                            <Rocket className="w-5 h-5 text-[#007538]" />
                         </div>
                         <span className="font-bold text-lg tracking-tight text-slate-900">Xavian CRM</span>
                     </div>
                     <div className="flex gap-8">
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#833CF6] transition-colors">Terms</a>
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#833CF6] transition-colors">Privacy</a>
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#833CF6] transition-colors">Help</a>
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#833CF6] transition-colors">Status</a>
+                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Terms</a>
+                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Privacy</a>
+                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Help</a>
+                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Status</a>
                     </div>
-                    <p className="text-sm text-slate-400">© 2024 Xavian CRM Inc. All rights reserved.</p>
+                    <p className="text-sm text-slate-500">© 2024 Xavian CRM Inc. All rights reserved.</p>
                 </div>
             </footer>
         </div>

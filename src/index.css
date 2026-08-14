@@ -3,10 +3,12 @@
 
    방향: 브라우저에서 돌지만 '설치된 PC 업무 프로그램'처럼 보이고 동작해야 한다.
    - 조밀한 표(행 26px), 칸마다 실선
-   - Windows 기본 글꼴 (웹폰트 없음 — 이게 네이티브 느낌의 핵심)
-   - Oracle 계열 붉은색 강조, 2px 라운드
    - 숫자는 오른쪽 정렬 + 고정폭
    - 모바일도 같은 밀도. 좁으면 가로 스크롤로 처리한다 (카드로 바꾸지 않는다)
+
+   색과 글꼴은 **회사 e카탈로그가 기준이다** (`DESIGN.md`).
+   예전엔 Oracle 계열 붉은색에 윈도우 기본 글꼴이었는데, 견적서·명함·카탈로그와
+   따로 놀았다. 지금은 초록 #007538 + 나눔스퀘어 네오로 맞췄다.
 
    변수 '이름'은 기존 컴포넌트가 참조 중이라 유지하고 '값'만 바꾼다.
    ========================================= */
@@ -88,15 +90,15 @@
   --text-secondary: #5b626c;
   --text-muted: #868d97;
 
-  /* --- Brand (Oracle 계열) --- */
-  --accent: #c74634;
-  --accent-dark: #a3341f;
-  --accent-light: #d8695a;
-  --accent-glow: rgba(199, 70, 52, 0.18);
-  --accent-subtle: #fbeeeb;
+  /* --- Brand (회사 e카탈로그) — 값은 --ind-* 를 따른다 --- */
+  --accent: #007538;
+  --accent-dark: #005c2b;
+  --accent-light: #2f9160;
+  --accent-glow: rgba(0, 117, 56, 0.18);
+  --accent-subtle: #e6f2ea;
 
   /* --- Semantic --- */
-  --success: #1c6b3c;
+  --success: #146b46;
   --success-subtle: #e8f3ec;
   --warning: #8a5a00;
   --warning-subtle: #fdf3e0;
@@ -121,7 +123,10 @@
 
   --row-h: 26px;
 
-  --font-ui: "Segoe UI", "Malgun Gothic", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-ui: "NanumSquareNeo", "Segoe UI", "Malgun Gothic", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* 표의 숫자는 고정폭을 유지한다. 자릿수가 어긋나면 금액을 눈으로 못 맞춘다.
+     카탈로그는 Montserrat를 쓰지만 조밀한 데이터 표가 없어 이 요구가 없었다.
+     문서(.doc-*)에서는 --font-brand-en(Montserrat)을 쓴다. */
   --font-data: "Consolas", "Cascadia Mono", "D2Coding", "Malgun Gothic", monospace;
 
   /* Legacy OEM aliases */
@@ -151,11 +156,11 @@
   --text-primary: #16191d;
   --text-secondary: #5b626c;
   --text-muted: #868d97;
-  --accent: #c74634;
-  --accent-dark: #a3341f;
-  --accent-light: #d8695a;
-  --accent-glow: rgba(199, 70, 52, 0.18);
-  --accent-subtle: #fbeeeb;
+  --accent: #007538;
+  --accent-dark: #005c2b;
+  --accent-light: #2f9160;
+  --accent-glow: rgba(0, 117, 56, 0.18);
+  --accent-subtle: #e6f2ea;
 }
 
 @tailwind base;

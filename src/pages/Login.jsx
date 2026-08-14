@@ -47,10 +47,10 @@ const Login = () => {
       {/* Header */}
       <header className="absolute top-0 w-full flex items-center justify-between px-6 sm:px-12 py-6 z-20">
         <Link to="/landing" className="flex items-center gap-2 group">
-          <div className="bg-[#833CF6] text-white p-1.5 rounded-lg shadow-sm">
+          <div className="bg-[#007538] text-white p-1.5 rounded-lg shadow-sm">
             <Rocket className="w-5 h-5" />
           </div>
-          <h2 className="text-slate-900 text-xl font-bold leading-tight tracking-tight group-hover:text-[#833CF6] transition-colors">{appTitle}</h2>
+          <h2 className="text-slate-900 text-xl font-bold leading-tight tracking-tight group-hover:text-[#007538] transition-colors">{appTitle}</h2>
         </Link>
         <button className="text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1 text-sm font-medium">
           <HelpCircle className="w-4 h-4" />
@@ -63,7 +63,7 @@ const Login = () => {
 
         {/* Left Panel - Branding & Testimonial (Desktop) */}
         <div className="hidden lg:flex w-1/2 p-12 flex-col justify-center relative">
-          <div className="relative overflow-hidden rounded-2xl bg-[#833CF6] h-full max-h-[800px] w-full flex flex-col justify-end p-12 shadow-2xl shadow-[#833CF6]/20">
+          <div className="relative overflow-hidden rounded-2xl bg-[#007538] h-full max-h-[800px] w-full flex flex-col justify-end p-12 shadow-2xl shadow-[#007538]/20">
             {/* Abstract Pattern Overlay */}
             <div className="absolute inset-0 opacity-20 pointer-events-none">
               <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
@@ -111,13 +111,13 @@ const Login = () => {
             <div className="flex p-1 bg-slate-100 rounded-lg mb-8">
               <button
                 onClick={() => setAuthMode('login')}
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${authMode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${authMode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
               >
                 Log in
               </button>
               <button
                 onClick={() => setAuthMode('signup')}
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${authMode === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${authMode === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
               >
                 Sign up
               </button>
@@ -132,7 +132,7 @@ const Login = () => {
                   <input
                     id="email"
                     type="email"
-                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#833CF6]/20 focus:border-[#833CF6] outline-none transition-all text-slate-900 sm:text-sm"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#007538]/20 focus:border-[#007538] outline-none transition-all text-slate-900 sm:text-sm"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -143,7 +143,7 @@ const Login = () => {
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="password">Password</label>
                   {authMode === 'login' && (
-                    <a href="#" className="text-xs font-semibold text-[#833CF6] hover:underline">Forgot password?</a>
+                    <a href="#" className="text-xs font-semibold text-[#007538] hover:underline">Forgot password?</a>
                   )}
                 </div>
                 <div className="relative">
@@ -151,7 +151,7 @@ const Login = () => {
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#833CF6]/20 focus:border-[#833CF6] outline-none transition-all text-slate-900 sm:text-sm"
+                    className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#007538]/20 focus:border-[#007538] outline-none transition-all text-slate-900 sm:text-sm"
                     placeholder="••••••••"
                   />
                   <button
@@ -167,7 +167,7 @@ const Login = () => {
               {/* CTA Button */}
               <button
                 type="submit"
-                className="w-full py-3.5 bg-[#833CF6] hover:bg-[#722EE0] text-white font-bold rounded-lg shadow-lg shadow-[#833CF6]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-[#007538] hover:bg-[#005C2B] text-white font-bold rounded-lg shadow-lg shadow-[#007538]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 disabled={loading}
               >
                 {authMode === 'login' ? 'Log in' : 'Create account'}
@@ -180,7 +180,7 @@ const Login = () => {
                 <div className="w-full border-t border-slate-200"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase tracking-widest">
-                <span className="bg-white px-4 text-slate-400 font-medium">Or continue with</span>
+                <span className="bg-white px-4 text-slate-500 font-medium">Or continue with</span>
               </div>
             </div>
 
@@ -189,7 +189,7 @@ const Login = () => {
               <button
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="flex items-center justify-center gap-3 w-full py-3.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-[#833CF6]/20 outline-none"
+                className="flex items-center justify-center gap-3 w-full py-3.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors focus:ring-2 focus:ring-[#007538]/20 outline-none"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -204,7 +204,7 @@ const Login = () => {
             {/* Footer */}
             <p className="mt-8 text-center text-sm text-slate-500">
               {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
-              <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="font-bold text-[#833CF6] hover:underline">
+              <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="font-bold text-[#007538] hover:underline">
                 {authMode === 'login' ? "Sign up" : "Log in"}
               </button>
             </p>
