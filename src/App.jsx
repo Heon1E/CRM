@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -8,25 +8,33 @@ import { BackgroundTaskProvider } from './contexts/BackgroundTaskContext'
 import { I18nProvider } from './contexts/I18nContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
-import Clients from './pages/Clients'
-import ClientDetail from './pages/ClientDetail'
-import Activities from './pages/Activities'
-import Sales from './pages/Sales'
-import Receivables from './pages/Receivables'
-import Quotes from './pages/Quotes'
-import PurchaseOrders from './pages/PurchaseOrders'
-import Products from './pages/Products'
-import Issues from './pages/Issues'
-import Settings from './pages/Settings'
-import PipelineBoard from './pages/PipelineBoard'
-import Login from './pages/Login'
-import Landing from './pages/Landing'
-import Pricing from './pages/Pricing'
-import Onboarding from './pages/Onboarding'
-import ShareProcessing from './pages/ShareProcessing'
-import Map from './pages/Map'
-import Calendar from './pages/Calendar'
-import MyAccounts from './pages/MyAccounts'
+
+/* ---------------------------------------------------------------------------
+   화면은 **열 때 받는다.**
+
+   예전에는 전부 한 덩어리(2.3MB)로 묶여서, 대시보드만 보려 해도 견적서·지도·
+   요금표까지 다 받아야 했다. 첫 화면이 그만큼 늦어진다.
+   대시보드만 미리 넣고 나머지는 그 화면으로 갈 때 받는다.
+--------------------------------------------------------------------------- */
+const Clients = lazy(() => import('./pages/Clients'))
+const ClientDetail = lazy(() => import('./pages/ClientDetail'))
+const Activities = lazy(() => import('./pages/Activities'))
+const Sales = lazy(() => import('./pages/Sales'))
+const Receivables = lazy(() => import('./pages/Receivables'))
+const Quotes = lazy(() => import('./pages/Quotes'))
+const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
+const Products = lazy(() => import('./pages/Products'))
+const Issues = lazy(() => import('./pages/Issues'))
+const Settings = lazy(() => import('./pages/Settings'))
+const PipelineBoard = lazy(() => import('./pages/PipelineBoard'))
+const Login = lazy(() => import('./pages/Login'))
+const Landing = lazy(() => import('./pages/Landing'))
+const Pricing = lazy(() => import('./pages/Pricing'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const ShareProcessing = lazy(() => import('./pages/ShareProcessing'))
+const Map = lazy(() => import('./pages/Map'))
+const Calendar = lazy(() => import('./pages/Calendar'))
+const MyAccounts = lazy(() => import('./pages/MyAccounts'))
 
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -53,6 +61,15 @@ const DocumentTitleUpdater = () => {
 
   return null
 }
+
+const PageLoading = () => (
+  <div style={{
+    minHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'var(--text-secondary)', fontSize: 13,
+  }}>
+    불러오는 중…
+  </div>
+)
 
 /**
  * 로그인해야 볼 수 있는 화면들.
@@ -89,6 +106,8 @@ const ProtectedRoutes = () => {
   return (
     <ErrorBoundary>
       <Layout>
+        {/* 화면 묶음이 도착할 때까지 자리를 지킨다 */}
+        <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/clients" element={<Clients />} />
@@ -107,6 +126,7 @@ const ProtectedRoutes = () => {
           <Route path="/share-processing" element={<ShareProcessing />} />
           <Route path="/my-accounts" element={<MyAccounts />} />
         </Routes>
+        </Suspense>
       </Layout>
     </ErrorBoundary>
   )
@@ -120,6 +140,7 @@ function App() {
           <BackgroundTaskProvider>
             <Router>
               <DocumentTitleUpdater />
+              <Suspense fallback={<PageLoading />}>
               <Routes>
                 <Route path="/landing" element={<Landing />} />
                 <Route path="/pricing" element={<Pricing />} />
@@ -127,6 +148,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/*" element={<ProtectedRoutes />} />
               </Routes>
+              </Suspense>
             </Router>
             <Toaster
               position="top-center"
