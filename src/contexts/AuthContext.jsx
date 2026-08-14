@@ -24,43 +24,60 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  /**
+   * 세션만 본다. **여기서 DB를 부르면 안 된다.**
+   *
+   * `onAuthStateChange` 콜백은 Supabase의 auth 잠금 안에서 돈다. 그 안에서
+   * `supabase.from(...)`을 await 하면 그 쿼리가 다시 세션을 기다리면서 서로 물려
+   * **교착에 빠진다** — 콜백이 끝나지 않으니 `setLoading(false)`도 영영 안 돌고
+   * 화면이 '불러오는 중…'에서 멈춘다. 실제로 그렇게 멈췄다.
+   * 프로필은 아래 별도 effect에서 읽는다.
+   */
   useEffect(() => {
     let alive = true
 
-    // 프로필(역할·담당자 이름)까지 같이 읽는다. 이게 있어야 '내 담당'이 잡힌다.
-    const loadProfile = async (u) => {
-      if (!u) { if (alive) setProfile(null); return }
-      const { data, error } = await supabase
-        .from('profiles').select('*').eq('id', u.id).maybeSingle()
-      if (!alive) return
-      if (error) {
-        // profiles 표가 아직 없을 수 있다 (마이그레이션 전). 로그인 자체는 막지 않는다.
-        console.warn('[Auth] 프로필을 읽지 못했습니다:', error.message)
-        setProfile(null)
-      } else {
-        setProfile(data || null)
-      }
-    }
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (!alive) return
+        setUser(session?.user ?? null)
+      })
+      .catch((e) => console.warn('[Auth] 세션을 읽지 못했습니다:', e?.message))
+      .finally(() => { if (alive) setLoading(false) })
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const u = session?.user ?? null
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!alive) return
-      setUser(u)
-      await loadProfile(u)
-      if (alive) setLoading(false)
+      setUser(session?.user ?? null)
+      setLoading(false)
     })
 
-    // 세션 변경 감지 (로그인/로그아웃)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const u = session?.user ?? null
-      if (!alive) return
-      setUser(u)
-      await loadProfile(u)
-      if (alive) setLoading(false)
-    })
+    // 네트워크가 응답하지 않아도 화면이 영원히 멈춰 있으면 안 된다.
+    // 8초가 지나면 로그인 화면이라도 보여 준다.
+    const bail = setTimeout(() => {
+      if (alive) setLoading((v) => (v ? false : v))
+    }, 8000)
 
-    return () => { alive = false; subscription.unsubscribe() }
+    return () => { alive = false; clearTimeout(bail); subscription.unsubscribe() }
   }, [])
+
+  /** 프로필(역할·담당자 이름) — 화면을 막지 않고 따로 읽는다 */
+  useEffect(() => {
+    let alive = true
+    if (!user?.id) { setProfile(null); return }
+
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+      .then(({ data, error }) => {
+        if (!alive) return
+        if (error) {
+          // profiles 표가 아직 없을 수 있다 (마이그레이션 전). 로그인 자체는 막지 않는다.
+          console.warn('[Auth] 프로필을 읽지 못했습니다:', error.message)
+          setProfile(null)
+        } else {
+          setProfile(data || null)
+        }
+      })
+
+    return () => { alive = false }
+  }, [user?.id])
 
   const signInWithGoogle = async () => {
     try {

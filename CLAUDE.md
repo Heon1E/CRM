@@ -672,6 +672,17 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 `toLoginEmail()`이 `VITE_LOGIN_DOMAIN`(기본 `idibc.local`)을 붙여 준다.
 `heoniree` → `heoniree@idibc.local`. 계정·권한 관리는 설정 화면의 **계정 · 권한**.
 
+### `onAuthStateChange` 안에서 DB를 부르면 안 된다
+
+콜백은 Supabase의 auth 잠금 안에서 돈다. 그 안에서 `supabase.from(...)`을
+`await` 하면 그 쿼리가 다시 세션을 기다리면서 서로 물려 **교착에 빠진다**.
+콜백이 끝나지 않으니 `setLoading(false)`도 영영 안 돌고 화면이
+'불러오는 중…'에서 멈춘다. **실제로 그렇게 멈춰서 앱이 안 열렸다.**
+
+세션 콜백에서는 `setUser`/`setLoading`만 한다. 프로필은 `user?.id`를 보는
+별도 effect에서 읽고, 그 결과가 화면을 막지 않게 한다.
+네트워크가 응답하지 않을 때를 대비해 8초 안전장치도 뒀다.
+
 ### 서버 함수는 서비스 롤 키가 필요하다
 
 `api/telegram-webhook.js`·`api/daily-digest.js`가 anon 키로 폴백하고 있었다.
