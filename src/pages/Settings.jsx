@@ -13,6 +13,8 @@ import InboxPanel from '../components/InboxPanel'
 import ProductImages from '../components/ProductImages'
 import UserAdmin from '../components/UserAdmin'
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
+
+const ROLE_LABEL = { admin: '관리자', sales: '영업', viewer: '조회 전용' }
 import { exportClientsToExcel } from '../utils/excelExport'
 import { exportSalesToExcel } from '../utils/excelExport'
 
@@ -35,7 +37,7 @@ const Panel = ({ title, children, className = "" }) => (
 
 const Settings = () => {
   const { products, deleteProduct, loading, registerMissingProductsFromSales } = useData()
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [activeTab, setActiveTab] = useState('general') // 'general' or 'products'
   const [editingProductId, setEditingProductId] = useState(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -297,12 +299,16 @@ const Settings = () => {
         {/* Page Header */}
         <div className="flex items-center justify-between border-b border-oem-border pb-3">
           <div>
+            {/* 예전엔 'ADMIN_MODE'라고 박아 두었다. 실제 권한과 무관한 장식이라
+                관리자가 아닌데도 관리자처럼 보여 혼동을 줬다. 진짜 권한을 보여준다. */}
             <h1 className="text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
-              SYSTEM CONFIGURATION
-              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">ADMIN_MODE</span>
+              설정
+              <span className="text-[11px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal">
+                {ROLE_LABEL[role] || '권한 확인 중'}
+              </span>
             </h1>
-            <p className="text-[11px] text-oem-text-secondary mt-1 font-medium italic">
-              Global system preferences and master data management.
+            <p className="text-[11px] text-oem-text-secondary mt-1">
+              회사 정보, 알림, 품목·거래처 일괄 등록을 관리합니다.
             </p>
           </div>
         </div>
@@ -316,7 +322,7 @@ const Settings = () => {
               : 'border-transparent text-oem-text-secondary hover:text-oem-text-primary'
               }`}
           >
-            GENERAL_SETTINGS
+            일반
           </button>
           <button
             onClick={() => setActiveTab('products')}
@@ -325,7 +331,7 @@ const Settings = () => {
               : 'border-transparent text-oem-text-secondary hover:text-oem-text-primary'
               }`}
           >
-            PRODUCT_MASTER
+            품목 관리
           </button>
         </div>
 
@@ -333,10 +339,10 @@ const Settings = () => {
         <div className="animate-fade-in">
           {activeTab === 'general' && (
             <>
-              <Panel title="General Preferences">
+              <Panel title="회사 정보">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
                   <div>
-                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">Company Name</label>
+                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">회사명</label>
                     <input
                       type="text"
                       value={settings.company_name}
@@ -346,7 +352,7 @@ const Settings = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">Primary Email</label>
+                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">대표 이메일</label>
                     <input
                       type="email"
                       value={settings.email}
@@ -358,7 +364,7 @@ const Settings = () => {
                 </div>
               </Panel>
 
-              <Panel title="Notification Rules">
+              <Panel title="알림">
                 <div className="space-y-3 max-w-lg">
                   <label className="flex items-center gap-3 p-3 border border-oem-border rounded-sm hover:border-oem-blue/50 transition-colors cursor-pointer bg-white">
                     <input
@@ -367,7 +373,7 @@ const Settings = () => {
                       onChange={(e) => setSettings({ ...settings, email_notification: e.target.checked })}
                       className="rounded-sm border-gray-300 text-oem-blue focus:ring-oem-blue"
                     />
-                    <span className="text-sm font-medium">Enable Email Notifications</span>
+                    <span className="text-sm font-medium">이메일 알림 받기</span>
                   </label>
                   <label className="flex items-center gap-3 p-3 border border-oem-border rounded-sm hover:border-oem-blue/50 transition-colors cursor-pointer bg-white">
                     <input
@@ -376,7 +382,7 @@ const Settings = () => {
                       onChange={(e) => setSettings({ ...settings, new_client_notification: e.target.checked })}
                       className="rounded-sm border-gray-300 text-oem-blue focus:ring-oem-blue"
                     />
-                    <span className="text-sm font-medium">Notify on New Client Registration</span>
+                    <span className="text-sm font-medium">새 거래처가 등록되면 알림</span>
                   </label>
                   <label className="flex items-center gap-3 p-3 border border-oem-border rounded-sm hover:border-oem-blue/50 transition-colors cursor-pointer bg-white">
                     <input
@@ -385,7 +391,7 @@ const Settings = () => {
                       onChange={(e) => setSettings({ ...settings, sales_goal_notification: e.target.checked })}
                       className="rounded-sm border-gray-300 text-oem-blue focus:ring-oem-blue"
                     />
-                    <span className="text-sm font-medium">Notify on Sales Goal Achievement</span>
+                    <span className="text-sm font-medium">매출 목표를 달성하면 알림</span>
                   </label>
                 </div>
               </Panel>
@@ -394,7 +400,7 @@ const Settings = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-oem-bg-app p-4 rounded-sm border border-oem-border">
                     <h3 className="text-sm font-bold text-oem-text-primary mb-2 flex items-center gap-2">
-                      BATCH_CLIENT_IMPORT
+                      거래처 일괄 등록
                     </h3>
                     <p className="text-[11px] text-oem-text-secondary mb-4">
                       Upload Excel/CSV to bulk register client profiles. Key personnel will be auto-assigned.
@@ -403,7 +409,7 @@ const Settings = () => {
                   </div>
                   <div className="bg-oem-bg-app p-4 rounded-sm border border-oem-border">
                     <h3 className="text-sm font-bold text-oem-text-primary mb-2 flex items-center gap-2">
-                      BATCH_SALES_IMPORT
+                      매출 일괄 등록
                     </h3>
                     <p className="text-[11px] text-oem-text-secondary mb-4">
                       Import transaction history via Excel. Ensures exact match on Client Name.
@@ -489,7 +495,7 @@ const Settings = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-oem-border">
                     <div className="bg-oem-bg-app p-4 border border-oem-border rounded-sm">
                       <h4 className="text-sm font-bold text-amber-800 mb-2 flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4" /> PRODUCT SYNCHRONIZATION
+                        <RefreshCw className="w-4 h-4" /> 품목 동기화
                       </h4>
                       <p className="text-[10px] text-oem-text-secondary mb-3">
                         Scans sales records for unregistered products and adds them to the Product Master. Backfills product IDs.
@@ -520,14 +526,14 @@ const Settings = () => {
 
                     <div className="bg-red-50 p-4 border border-red-200 rounded-sm">
                       <h4 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
-                        <TriangleAlert className="w-4 h-4" /> DANGER ZONE
+                        <TriangleAlert className="w-4 h-4" /> 되돌릴 수 없는 작업
                       </h4>
                       <p className="text-[10px] text-red-800 mb-3">
                         Permanently delete ALL client data, including related sales and activities. This action cannot be undone.
                       </p>
                       <button
                         onClick={async () => {
-                          const confirmed = await showConfirm('Are you sure you want to delete ALL client data? This is irreversible.', 'CRITICAL WARNING', 'DELETE EVERYTHING', 'CANCEL')
+                          const confirmed = await showConfirm('거래처 자료를 전부 지웁니다. 되돌릴 수 없습니다.', '경고', '전부 지우기', '취소')
                           if (!confirmed) return
                           try {
                             setSettingsLoading(true)
@@ -544,7 +550,7 @@ const Settings = () => {
                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-sm transition-colors flex items-center justify-center gap-2"
                         disabled={settingsLoading}
                       >
-                        <Trash2 className="w-3.5 h-3.5" /> DELETE_ALL_DATA
+                        <Trash2 className="w-3.5 h-3.5" /> 전체 삭제
                       </button>
                     </div>
                   </div>
@@ -557,7 +563,7 @@ const Settings = () => {
                   className="oem-btn-secondary px-4 py-2"
                   disabled={settingsLoading}
                 >
-                  DISCARD_CHANGES
+                  되돌리기
                 </button>
                 <button
                   onClick={handleSave}
@@ -579,7 +585,7 @@ const Settings = () => {
                   className="oem-btn-primary flex items-center gap-2 px-3 py-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>ADD_PRODUCT</span>
+                  <span>품목 추가</span>
                 </button>
               </div>
 
@@ -591,7 +597,7 @@ const Settings = () => {
                         <th className="pl-4 text-left">PRODUCT_NAME</th>
                         <th className="text-left w-[20%]">TYPE</th>
                         <th className="text-left w-[20%]">STANDARD</th>
-                        <th className="text-center w-[150px]">ACTIONS</th>
+                        <th className="text-center w-[150px]">관리</th>
                       </tr>
                     </thead>
                     <tbody>
