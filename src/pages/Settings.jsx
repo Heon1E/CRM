@@ -12,6 +12,7 @@ import ErpScreenshotImport from '../components/ErpScreenshotImport'
 import InboxPanel from '../components/InboxPanel'
 import ProductImages from '../components/ProductImages'
 import UserAdmin from '../components/UserAdmin'
+import TrashAndAudit from '../components/TrashAndAudit'
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
 
 const ROLE_LABEL = { admin: '관리자', sales: '영업', viewer: '조회 전용' }
@@ -436,6 +437,11 @@ const Settings = () => {
                   {/* 계정·권한 — 관리자만 내용이 보인다 */}
                   <div style={{ marginTop: 12 }}>
                     <UserAdmin />
+                  </div>
+
+                  {/* 휴지통 · 변경 이력 — 지운 것을 되돌릴 수 있어야 한다 */}
+                  <div style={{ marginTop: 12 }}>
+                    <TrashAndAudit />
                   </div>
                 </div>
               </Panel>

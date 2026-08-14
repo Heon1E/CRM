@@ -559,6 +559,9 @@ export const DataProvider = ({ children }) => {
 
 
   // 4. 데이터 전체 페칭 헬퍼 (Supabase 1000건 제한 우회)
+  // 마이그레이션 전 경고를 표마다 반복하지 않기 위한 표시
+  const softDeleteWarned = useRef(false)
+
   const fetchAllRecords = async (table, selectStr = '*', orderCol = 'id', ascending = true, filters = null) => {
     let allData = []
     let from = 0
@@ -577,7 +580,17 @@ export const DataProvider = ({ children }) => {
           query = filters(query)
         }
 
-        const { data, error } = await query
+        // 휴지통에 든 행은 빼고 가져온다.
+        // 마이그레이션(soft_delete_and_audit.sql) 전에는 이 칸이 없으므로,
+        // 없다고 하면 조건 없이 한 번 더 시도한다. 앱이 먼저 죽으면 안 된다.
+        let { data, error } = await query.is('deleted_at', null)
+        if (error && (error.code === '42703' || /deleted_at/.test(error.message || ''))) {
+          if (!softDeleteWarned.current) {
+            console.warn('[DataContext] deleted_at 칸이 없습니다. soft_delete_and_audit.sql 을 실행하세요.')
+            softDeleteWarned.current = true
+          }
+          ;({ data, error } = await query)
+        }
         if (error) throw error
         if (!data || data.length === 0) {
           console.log(`[DataContext] No more data for ${table} after ${allData.length} records.`)
@@ -1400,54 +1413,34 @@ export const DataProvider = ({ children }) => {
   }, [])
 
   // 거래처 삭제 (외래 키 제약 조건 처리)
+  /**
+   * 거래처 지우기 — **휴지통으로 보낸다.**
+   *
+   * 예전에는 담당자·활동·매출을 진짜로 지우고 거래처를 지웠다. 거래처 하나를
+   * 잘못 누르면 그 회사의 매출 기록이 통째로 사라지고 되돌릴 방법이 없었다.
+   * 지금은 `deleted_at`만 채운다. 화면에서는 사라지지만 행은 남아 있어
+   * 설정 > 휴지통에서 되살릴 수 있다.
+   *
+   * 딸린 자료(활동·매출·담당자)도 함께 표시해 둔다 — 거래처만 되살리고
+   * 매출은 안 돌아오면 되살린 의미가 없다.
+   */
   const deleteClient = useCallback(async (clientId) => {
+    const stamp = { deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null }
     try {
-      // 1. 연결된 데이터를 먼저 삭제 (외래 키 제약 조건 처리)
-      // client_contacts 삭제
-      const { error: contactsError } = await supabase
-        .from('client_contacts')
-        .delete()
-        .eq('client_id', clientId)
-
-      if (contactsError) {
-        console.error('담당자 삭제 오류:', contactsError)
-        throw contactsError
+      for (const [table, col] of [
+        ['client_contacts', 'client_id'],
+        ['activities', 'client_id'],
+        ['sales', 'client_id'],
+      ]) {
+        const { error } = await supabase.from(table).update(stamp).eq(col, clientId).is('deleted_at', null)
+        if (error) throw new Error(`${table}: ${error.message}`)
       }
 
-      // activities 삭제
-      const { error: activitiesError } = await supabase
-        .from('activities')
-        .delete()
-        .eq('client_id', clientId)
-
-      if (activitiesError) {
-        console.error('활동 삭제 오류:', activitiesError)
-        throw activitiesError
-      }
-
-      // sales 삭제
-      const { error: salesError } = await supabase
-        .from('sales')
-        .delete()
-        .eq('client_id', clientId)
-
-      if (salesError) {
-        console.error('매출 삭제 오류:', salesError)
-        throw salesError
-      }
-
-      // 2. 거래처 삭제
       const { error: clientError } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientId)
+        .from('clients').update(stamp).eq('id', clientId)
+      if (clientError) throw clientError
 
-      if (clientError) {
-        console.error('거래처 삭제 오류:', clientError)
-        throw clientError
-      }
-
-      // 3. 로컬 상태 업데이트
+      // 화면에서는 즉시 사라진다
       setClients(prev => prev.filter(c => c.id !== clientId))
       setActivities(prev => prev.filter(a => (a.client_id || a.clientId) !== clientId))
       setSales(prev => prev.filter(s => (s.client_id || s.clientId) !== clientId))
@@ -1457,6 +1450,21 @@ export const DataProvider = ({ children }) => {
       console.error('거래처 삭제 중 오류:', error)
       throw error
     }
+  }, [user?.id])
+
+  /** 휴지통에서 되살리기 — 거래처와 딸린 자료를 함께 되돌린다 */
+  const restoreClient = useCallback(async (clientId) => {
+    const undo = { deleted_at: null, deleted_by: null }
+    for (const [table, col] of [
+      ['clients', 'id'],
+      ['client_contacts', 'client_id'],
+      ['activities', 'client_id'],
+      ['sales', 'client_id'],
+    ]) {
+      const { error } = await supabase.from(table).update(undo).eq(col, clientId)
+      if (error) throw new Error(`${table}: ${error.message}`)
+    }
+    return { success: true }
   }, [])
 
   // 거래처 일괄 등록 함수 (중복 방지 로직 포함)
@@ -2051,7 +2059,7 @@ export const DataProvider = ({ children }) => {
   const value = {
     products, clients, activities, sales, issues, loading, isOnline, pendingSyncCount,
     addClient, updateClient, replaceClientContacts, addSale, updateSale, deleteSale, getStats, getWeeklySalesData,
-    fetchClientContacts, deleteClient, addClientsBulk, addProductsBulk,
+    fetchClientContacts, deleteClient, restoreClient, addClientsBulk, addProductsBulk,
     registerMissingClients, // 매출 업로드 시 신규 거래처 자동 등록
     applySalesReconciliation, // 대사 결과 반영 (삭제/수정/등록)
     addActivity, updateActivity, deleteActivity, addIssue, updateIssue, deleteIssue,
