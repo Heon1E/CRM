@@ -50,7 +50,8 @@ const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPAB
 // RLS를 닫은 뒤로 anon 키로는 아무것도 못 읽고 못 쓴다 (execution/sql/auth_and_roles.sql).
 // 서비스 롤 키가 없으면 조용히 실패하는 대신 눈에 띄게 알린다 — 봇이 말없이
 // 죽어 있으면 며칠 뒤에야 알게 된다.
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+const HAS_SERVICE_KEY = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+if (!HAS_SERVICE_KEY) {
     console.error('[설정 필요] SUPABASE_SERVICE_ROLE_KEY 가 없습니다. '
         + 'RLS가 닫혀 있어 anon 키로는 동작하지 않습니다. '
         + 'Vercel 환경변수에 넣어 주세요 (VITE_ 접두어 없이).')
@@ -95,9 +96,25 @@ const sb = async (path, { method = 'GET', body, prefer } = {}) => {
         body: body ? JSON.stringify(body) : undefined
     })
     const text = await res.text()
-    if (!res.ok) throw new Error(`${path} ${res.status}: ${text.slice(0, 200)}`)
+    if (!res.ok) {
+        const err = new Error(`${path} ${res.status}: ${text.slice(0, 200)}`)
+        // RLS 거부. 서비스 롤 키가 없으면 여기로 온다.
+        err.denied = res.status === 401 || res.status === 403 || text.includes('42501')
+        throw err
+    }
     return text ? JSON.parse(text) : null
 }
+
+/**
+ * 서비스 롤 키가 없으면 RLS에 막혀 아무것도 못 한다.
+ * **조회는 오류가 아니라 빈 결과로 돌아오므로** 허용 목록이 비어 보이고,
+ * 그 다음 등록에서야 권한 오류로 드러난다. 그때 이 안내를 보낸다.
+ */
+const SETUP_HINT =
+    '⚠️ <b>봇이 데이터베이스에 접근하지 못합니다.</b>\n\n'
+    + 'Vercel 환경변수에 <b>SUPABASE_SERVICE_ROLE_KEY</b>를 넣어 주세요.\n'
+    + 'Supabase → Project Settings → API → service_role 값입니다.\n'
+    + '(VITE_ 접두어 없이 넣고, 넣은 뒤 재배포해야 합니다.)'
 
 async function tgSend(chatId, text) {
     if (!process.env.TELEGRAM_BOT_TOKEN) return
@@ -380,7 +397,11 @@ export default async function handler(req, res) {
                 return ok()
             } catch (e) {
                 console.error('[telegram] 자동 등록 실패', e.message)
-                await tgSend(chatId, `등록에 실패했습니다. Supabase에서 schedules_and_inbox.sql 을 실행했는지 확인해 주세요.\n(이 대화의 chat id: <b>${chatId}</b>)`)
+                // **RLS 거부는 조회에서 '빈 결과'로 온다.** 그래서 여기까지 와서야 드러난다 —
+                // 허용 목록이 비어 보였을 뿐 실은 못 읽은 것이다.
+                await tgSend(chatId, (e.denied || !HAS_SERVICE_KEY)
+                    ? SETUP_HINT
+                    : `등록에 실패했습니다. Supabase에서 schedules_and_inbox.sql 을 실행했는지 확인해 주세요.`)
                 return ok()
             }
         }
@@ -522,7 +543,10 @@ export default async function handler(req, res) {
         return ok()
     } catch (e) {
         console.error('[telegram] 처리 실패', e)
-        await tgSend(chatId, `읽지 못했습니다: ${e.message}\n사진이면 더 크게 찍어 다시 보내주세요.`)
+        // 권한에 막힌 것을 '사진이 흐려서'로 안내하면 며칠을 헤맨다. 원인을 그대로 말한다.
+        await tgSend(chatId, (e.denied || !HAS_SERVICE_KEY)
+            ? SETUP_HINT
+            : `읽지 못했습니다: ${e.message}\n사진이면 더 크게 찍어 다시 보내주세요.`)
         return ok()
     }
 }

@@ -722,6 +722,12 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 RLS를 닫은 뒤로는 **`SUPABASE_SERVICE_ROLE_KEY`가 없으면 동작하지 않는다.**
 Vercel 환경변수에 넣을 것 (VITE_ 접두어 금지). 없으면 시작할 때 콘솔에 경고가 뜬다.
 
+실제로 이것 때문에 봇이 멈췄다. 증상이 헷갈리게 나왔다 — **RLS 거부는 조회에서
+'빈 결과'로 오므로** `bot_allowlist`가 비어 보였고, 봇은 '처음 쓰는 사람'으로
+판단해 자동 등록을 시도했다가 권한 오류로 죽으면서 *"schedules_and_inbox.sql을
+실행했는지 확인하라"* 는 엉뚱한 안내를 냈다. 지금은 401/403/42501을 알아보고
+서비스 롤 키를 넣으라고 정확히 안내한다.
+
 ### 개발 중 자동 로그인
 
 `src/hooks/useDevAutoLogin.js`. `.env.local`에 아래를 적으면 개발 서버에서만
