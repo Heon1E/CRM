@@ -71,8 +71,9 @@ export const ForecastService = {
             // 2. Run Engine
             const result = calculateRevenueForecast(sales)
 
-            // DEBUG LOGGING
-            if (result.debug) {
+            // 진단용 출력. console.table로 20행짜리 배열을 세 번 찍는 일이라
+            // 그 자체로 눈에 띄게 느리다. 개발 중에만 남긴다.
+            if (import.meta.env.DEV && result.debug) {
                 console.group('AI Forecast Debug Report (v7.0)')
                 console.log('%c Revenue Audit', 'font-weight: bold; color: #4F46E5')
                 console.table(result.debug.audit)
@@ -96,10 +97,12 @@ export const ForecastService = {
                 }
 
                 console.log(`Scale Factor: ${result.debug.clampedScale} (Raw: ${result.debug.rawScale.toFixed(3)})`)
-                if (result.incompleteFlag) {
-                    console.warn('올해 매출 입력이 거의 없어 YTD 보정을 건너뛰었습니다. 예측 신뢰도가 낮습니다.')
-                }
                 console.groupEnd()
+            }
+
+            // 이 경고만은 배포에서도 남긴다 — 숫자를 믿으면 안 되는 상황이다.
+            if (result.incompleteFlag) {
+                console.warn('올해 매출 입력이 거의 없어 YTD 보정을 건너뛰었습니다. 예측 신뢰도가 낮습니다.')
             }
 
             // 3. Save to DB

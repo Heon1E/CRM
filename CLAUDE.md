@@ -698,6 +698,14 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 `using ((select public.can_read()))`로 감싸면 InitPlan이 되어 **조회당 한 번만**
 평가된다. 정책을 새로 쓸 때 빠뜨리기 쉬우니 주의.
 
+### `fetchData`는 동시에 두 번 돌지 않는다
+
+매출 15,221행을 16쪽으로 나눠 받는 무거운 조회다. 화면·훅·모달이 제각각
+`refreshData()`를 부르고 effect까지 겹치면 **같은 조회가 네 번 돈다** — 실제로
+콘솔에 `Fetched 15221 records for sales`가 네 번 찍혔고, 그게 체감 3~4배의
+정체였다. `inFlight` ref에 진행 중인 약속을 담아 두고, 이미 돌고 있으면 그것을
+그대로 돌려준다. 부르는 쪽은 아무것도 몰라도 된다.
+
 ### 데이터는 로그인한 뒤에 한 번만 부른다
 
 `DataContext`는 `DataProvider`가 `/login`까지 감싸고 있어서 로그인 화면에서도

@@ -798,8 +798,20 @@ export const DataProvider = ({ children }) => {
     }
   }, [user])
 
+  /**
+   * 진행 중인 조회를 담아 둔다.
+   *
+   * 매출 15,221행을 16쪽으로 나눠 받는 무거운 조회다. 화면·훅·모달이 제각각
+   * `refreshData()`를 부르고 effect까지 겹치면 **같은 조회가 네 번 돈다**
+   * (실제로 콘솔에 `Fetched 15221 records for sales`가 네 번 찍혔다).
+   * 이미 돌고 있으면 그 약속을 그대로 돌려준다 — 부르는 쪽은 아무것도 몰라도 된다.
+   */
+  const inFlight = useRef(null)
+
   // 4. 데이터 로드 및 동기화 함수
   const fetchData = useCallback(async () => {
+    if (inFlight.current) return inFlight.current
+    const run = (async () => {
     setLoading(true)
     try {
       const now = new Date()
@@ -832,7 +844,7 @@ export const DataProvider = ({ children }) => {
           }
           results[key] = []
         } else {
-          console.log(`[DataContext] Fetched ${data?.length || 0} records for ${key}`)
+          if (import.meta.env.DEV) console.log(`[DataContext] Fetched ${data?.length || 0} records for ${key}`)
           results[key] = data || []
         }
       }
@@ -915,6 +927,9 @@ export const DataProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
+    })()
+    inFlight.current = run
+    try { return await run } finally { inFlight.current = null }
   }, [user, migrateLegacyClientData, processGroupedSales])
 
   // 자동 로드 (모달이 열려있을 때는 실행하지 않음)
