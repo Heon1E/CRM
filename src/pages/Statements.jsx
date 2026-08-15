@@ -28,7 +28,7 @@ const monthRange = (offset = 0) => {
 }
 
 const Statements = () => {
-    const { clients, sales, ensureSalesDetail } = useData()
+    const { clients, sales, ensureSalesDetail, salesDetailReady } = useData()
 
     // 명세서는 날짜·품목·수량·단가를 한 줄씩 보여준다 — 상세가 있어야 한다
     useEffect(() => { ensureSalesDetail() }, [ensureSalesDetail])
@@ -54,16 +54,42 @@ const Statements = () => {
 
     const client = useMemo(() => (clients || []).find((c) => c.id === clientId), [clients, clientId])
 
-    /** 고른 거래처의 그 기간 매출. 날짜순으로 세운다 — 고객이 장부와 맞춰 본다. */
+    /**
+     * 고른 거래처의 그 기간 매출. 날짜순으로 세운다 — 고객이 장부와 맞춰 본다.
+     *
+     * **`sales`는 주문 단위로 묶여 있다.** 한 주문에 품목이 여럿이면 `items[]`에
+     * 들어 있고, 묶음 자체에는 `item_name`·`quantity`·`unit_price`가 없다.
+     * 예전에는 묶음을 그대로 표에 넣어서 **품목이 `-`, 수량·단가가 `0`으로**
+     * 나갔다(금액만 맞았다). 고객이 자기 장부와 맞춰 보는 문서라 치명적이다.
+     * 품목 한 줄씩 펼친다.
+     */
     const rows = useMemo(() => {
         if (!clientId) return []
-        return (sales || [])
-            .filter((s) => {
-                if (s.client_id !== clientId) return false
-                const d = String(s.sale_date || s.date || '').slice(0, 10)
-                return d >= range.from && d <= range.to
-            })
-            .sort((a, b) => String(a.sale_date).localeCompare(String(b.sale_date)))
+        const groups = (sales || []).filter((s) => {
+            if (s.client_id !== clientId) return false
+            const d = String(s.sale_date || s.date || '').slice(0, 10)
+            return d >= range.from && d <= range.to
+        })
+        const lines = groups.flatMap((g) => {
+            const date = String(g.sale_date || g.date || '').slice(0, 10)
+            const items = Array.isArray(g.items) ? g.items.filter(Boolean) : []
+            // 품목이 아직 안 왔으면(상세 로드 전) 묶음 한 줄로라도 금액은 맞춘다
+            if (items.length === 0) {
+                return [{
+                    sale_date: date, item_name: g.displayItemName || '',
+                    quantity: 0, unit_price: 0,
+                    total_amount: Number(g.total_amount ?? g.totalAmount) || 0,
+                }]
+            }
+            return items.map((it) => ({
+                sale_date: date,
+                item_name: it.item_name || it.itemName || '',
+                quantity: Number(it.quantity) || 0,
+                unit_price: Number(it.unit_price) || 0,
+                total_amount: Number(it.total_amount) || (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
+            }))
+        })
+        return lines.sort((a, b) => String(a.sale_date).localeCompare(String(b.sale_date)))
     }, [sales, clientId, range])
 
     const totals = useMemo(() => {
@@ -151,8 +177,11 @@ const Statements = () => {
                 <button className="tb-btn" onClick={() => setRange(monthRange(-1))}>지난달</button>
                 <button className="tb-btn" onClick={() => setRange(monthRange(0))}>이번달</button>
 
-                <button className="tb-btn primary" onClick={openPrint} disabled={loading || !clientId}>
-                    {loading ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} 명세서 만들기
+                {/* 품목이 오기 전에는 만들지 못하게 막는다 — 품목 없는 명세서는
+                    고객이 장부와 맞춰 볼 수 없다 (DataContext의 ensureSalesDetail) */}
+                <button className="tb-btn primary" onClick={openPrint} disabled={loading || !clientId || !salesDetailReady}>
+                    {(loading || !salesDetailReady) ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+                    {salesDetailReady ? ' 명세서 만들기' : ' 품목 불러오는 중…'}
                 </button>
             </div>
 
