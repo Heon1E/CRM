@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useData } from '../contexts/DataContext'
-import { supabase } from '../lib/supabase'
 import { resolveSalesRep, SALES_REP_OPTIONS } from '../utils/salesRep'
 
 export const useDashboardData = () => {
@@ -63,85 +62,47 @@ export const useDashboardData = () => {
     return weeks
   }, [])
 
-  // 1. 총 거래처 개수 조회
+  // 1. 총 거래처 개수
+  //
+  // 예전에는 여기서 count 조회를 따로 했다. DataContext가 거래처를 이미 전부
+  // 들고 있으므로 세기만 하면 된다 — 조회 한 번이 그냥 사라진다.
   useEffect(() => {
-    const fetchTotalClientsCount = async () => {
-      try {
-        const { count, error } = await supabase
-          .from('clients')
-          .select('*', { count: 'exact', head: true })
+    setTotalClientsCount((clients || []).length)
+  }, [clients])
 
-        if (error) throw error
-        setTotalClientsCount(count || 0)
-      } catch (error) {
-        console.error('총 거래처 개수 조회 오류:', error)
-        setTotalClientsCount(clients.length)
-      }
-    }
-    fetchTotalClientsCount()
-  }, [clients.length])
+  // 2. 내 담당 (sales_rep 기준)
+  //
+  // 예전에는 거래처와 이번 달 매출을 **다시 조회**했다. 둘 다 DataContext가
+  // 이미 들고 있는 것이라 순수한 낭비였고, 매출은 `select *`로 그 달 전체를
+  // 받아서 브라우저에서 걸렀다. 이제 들고 있는 것에서 뽑는다.
+  const myAccountIds = useMemo(() => {
+    if (!getUserSalesRep) return []
+    return (clients || []).filter((c) => c.sales_rep === getUserSalesRep).map((c) => c.id)
+  }, [clients, getUserSalesRep])
 
-  // 2. My Data (Sales Rep 기준)
+  useEffect(() => { setMyAccounts(myAccountIds) }, [myAccountIds])
+
   useEffect(() => {
-    const fetchMyData = async () => {
-      if (!getUserSalesRep) {
-        setMyAccounts([])
-        setMyMonthlySales(0)
-        setMyWeeklySalesData([])
-        return
-      }
-
-      try {
-        const { data: myClientsData, error: clientsError } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('sales_rep', getUserSalesRep)
-
-        if (clientsError) throw clientsError
-
-        const myClientIds = (myClientsData || []).map(c => c.id)
-        setMyAccounts(myClientIds)
-
-        if (myClientIds.length === 0) {
-          setMyMonthlySales(0)
-          setMyWeeklySalesData([])
-          return
-        }
-
-        const now = new Date()
-        const currentYear = now.getFullYear()
-        const currentMonth = now.getMonth() + 1
-        const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
-        // 실제 해당 월의 마지막 날 계산 (월+1의 0번째 날 = 이번 달 마지막 날)
-        const lastDayOfMonth = new Date(currentYear, currentMonth, 0).getDate()
-        const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${lastDayOfMonth}`
-
-        const { data: allSalesData, error: salesError } = await supabase
-          .from('sales')
-          .select('*')
-          .gte('sale_date', startDate)
-          .lte('sale_date', endDate)
-
-        if (salesError) throw salesError
-
-        const mySalesData = (allSalesData || []).filter(sale =>
-          myClientIds.includes(sale.client_id)
-        )
-
-        const monthlyTotal = (mySalesData || []).reduce((sum, sale) => {
-          return sum + (sale.total_amount || 0)
-        }, 0)
-        setMyMonthlySales(monthlyTotal)
-
-        const weeklyData = getWeeklySalesDataForClients(mySalesData || [])
-        setMyWeeklySalesData(weeklyData)
-      } catch (error) {
-        console.error('My Data 조회 오류:', error)
-      }
+    if (myAccountIds.length === 0) {
+      setMyMonthlySales(0)
+      setMyWeeklySalesData([])
+      return
     }
+    const mine = new Set(myAccountIds)
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = now.getMonth()
 
-    fetchMyData()
-  }, [getUserSalesRep, getWeeklySalesDataForClients])
+    const mySales = (sales || []).filter((s2) => mine.has(s2.client_id))
+    const monthTotal = mySales.reduce((sum, s2) => {
+      const d = new Date(s2.sale_date || s2.date || s2.created_at)
+      if (d.getFullYear() !== y || d.getMonth() !== m) return sum
+      return sum + (Number(s2.total_amount) || 0)
+    }, 0)
+
+    setMyMonthlySales(monthTotal)
+    setMyWeeklySalesData(getWeeklySalesDataForClients(mySales))
+  }, [myAccountIds, sales, getWeeklySalesDataForClients])
 
   // 3. 전체 매출 데이터
   //
@@ -157,35 +118,29 @@ export const useDashboardData = () => {
     date: sale.sale_date || sale.date,
   })), [sales])
 
-  // 4. Upcoming Events
+  // 4. 다가오는 후속조치 (activities.next_action_date)
+  //
+  // 예전에는 여기서 activities를 다시 조회했다(거래처 JOIN까지). DataContext가
+  // 이미 들고 있으므로 뽑아 쓰기만 하면 된다. 덤으로 휴지통에 든 활동이
+  // 자동으로 빠진다 — 직접 조회는 그걸 거르지 않았다.
+  const clientNameById = useMemo(() => {
+    const m = new Map()
+    for (const c of clients || []) m.set(c.id, c.company)
+    return m
+  }, [clients])
+
   useEffect(() => {
-    const fetchUpcomingEvents = async () => {
-      try {
-        // Activities with next_action_date
-        const { data: activitiesData, error: activitiesError } = await supabase
-          .from('activities')
-          .select('*, clients(id, company)') // JOIN 사용
-          .not('next_action_date', 'is', null)
-          .order('next_action_date', { ascending: true })
-          .limit(20)
-
-        if (activitiesError) throw activitiesError
-
-        const mergedEvents = (activitiesData || []).map(activity => ({
-          ...activity,
-          clientName: activity.clients?.company || '알 수 없음',
-          scheduleDate: activity.next_action_date
-        }))
-
-        setUpcomingEvents(mergedEvents)
-      } catch (error) {
-        console.error('Upcoming Events 조회 오류:', error)
-        setUpcomingEvents([])
-      }
-    }
-
-    fetchUpcomingEvents()
-  }, [])
+    const events = (activities || [])
+      .filter((a) => a.next_action_date)
+      .sort((a, b) => String(a.next_action_date).localeCompare(String(b.next_action_date)))
+      .slice(0, 20)
+      .map((a) => ({
+        ...a,
+        clientName: clientNameById.get(a.client_id) || a.client_name || '알 수 없음',
+        scheduleDate: a.next_action_date,
+      }))
+    setUpcomingEvents(events)
+  }, [activities, clientNameById])
 
   // Top Clients Calculation
   const topClients = useMemo(() => {
