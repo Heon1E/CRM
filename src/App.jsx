@@ -22,6 +22,7 @@ const Activities = lazy(() => import('./pages/Activities'))
 const Sales = lazy(() => import('./pages/Sales'))
 const Receivables = lazy(() => import('./pages/Receivables'))
 const Quotes = lazy(() => import('./pages/Quotes'))
+const Statements = lazy(() => import('./pages/Statements'))
 const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'))
 const Products = lazy(() => import('./pages/Products'))
 const Issues = lazy(() => import('./pages/Issues'))
@@ -50,7 +51,7 @@ const DocumentTitleUpdater = () => {
       '/pipeline': '영업기회', '/sales': '매출', '/my-accounts': '내 담당',
       '/map': '지도', '/activities': '영업활동', '/calendar': '일정',
       '/products': '품목', '/issues': '이슈', '/settings': '설정',
-      '/quotes': '견적서', '/purchase-orders': '발주서', '/receivables': '채권관리',
+      '/quotes': '견적서', '/statements': '거래명세서', '/purchase-orders': '발주서', '/receivables': '채권관리',
     }
     let title = '아이앤디 CRM'
     const sub = path.startsWith('/clients/') ? '거래처 상세' : TITLES[path]
@@ -116,6 +117,7 @@ const ProtectedRoutes = () => {
           <Route path="/sales" element={<Sales />} />
           <Route path="/receivables" element={<Receivables />} />
           <Route path="/quotes" element={<Quotes />} />
+          <Route path="/statements" element={<Statements />} />
           <Route path="/purchase-orders" element={<PurchaseOrders />} />
           <Route path="/products" element={<Products />} />
           <Route path="/issues" element={<Issues />} />

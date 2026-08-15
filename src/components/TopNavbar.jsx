@@ -29,6 +29,7 @@ const TopNavbar = () => {
     { path: '/clients', label: '거래처' },
     { path: '/sales', label: '매출' },
     { path: '/quotes', label: '견적서' },
+    { path: '/statements', label: '거래명세서' },
     { path: '/purchase-orders', label: '발주서' },
     { path: '/receivables', label: '채권관리' },
     { path: '/activities', label: '영업활동' },

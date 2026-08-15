@@ -289,4 +289,101 @@ export const PurchaseOrderSheet = ({ order, items = [], company = {} }) => (
     </div>
 )
 
+/**
+ * 거래명세서 — 한 거래처에 그 기간 동안 나간 것을 적어 보낸다
+ *
+ * **새 표를 만들지 않는다.** 이미 쌓여 있는 매출 자료를 기간·거래처로 잘라
+ * 보여주는 문서다. 따로 저장하면 매출과 명세서가 어긋나는 순간 어느 쪽이
+ * 맞는지 알 수 없게 된다.
+ *
+ * 고객은 이걸 받아 자기 장부와 맞춰 보고 결제한다. 그래서 **날짜·품목·수량·
+ * 단가가 한 줄씩** 보여야 하고, 견적서와 달리 사진은 넣지 않는다.
+ */
+export const StatementSheet = ({ statement, items = [], company = {} }) => (
+    <div className="doc-sheet">
+        <Head company={company} eyebrow="Statement" name="거래명세서" />
+        <IdLine
+            noLabel="거래처" no={statement.client_name}
+            dateLabel="기간" date={`${dateK(statement.from)} ~ ${dateK(statement.to)}`}
+        />
+
+        <Parties
+            toTitle="수신"
+            to={{ name: statement.client_name, contact: statement.contact_name, phone: statement.contact_phone }}
+            company={company}
+        />
+
+        <h2 className="doc-h2">거래 내역</h2>
+        <table className="doc-grid">
+            <thead>
+                <tr>
+                    <th style={{ width: '9%' }}>번호</th>
+                    <th style={{ width: '16%' }}>일자</th>
+                    <th>품목</th>
+                    <th style={{ width: '12%' }}>수량</th>
+                    <th style={{ width: '16%' }}>단가</th>
+                    <th style={{ width: '18%' }}>금액</th>
+                </tr>
+            </thead>
+            <tbody>
+                {items.map((it, i) => (
+                    <tr key={it.id || i}>
+                        <td className="ctr num">{i + 1}</td>
+                        <td className="ctr num">{dateK(it.sale_date)}</td>
+                        <td>
+                            <div className="item-name">{it.item_name || '-'}</div>
+                            {it.notes && <div className="item-spec">{it.notes}</div>}
+                        </td>
+                        <td className="num">{won(it.quantity)}</td>
+                        <td className="num">{won(it.unit_price)}</td>
+                        <td className="num">{won(it.total_amount)}</td>
+                    </tr>
+                ))}
+                {items.length === 0 && <Empty cols={6} />}
+            </tbody>
+        </table>
+
+        <Totals subtotal={statement.subtotal} vat={statement.vat} total={statement.total} />
+
+        {/* 채권 자료가 있을 때만 붙인다. 없으면 명세만 나가도 문서로 성립한다. */}
+        {statement.receivable && (
+            <>
+                <h2 className="doc-h2" style={{ marginTop: '6mm' }}>미수 현황</h2>
+                <table className="doc-terms">
+                    <tbody>
+                        <tr>
+                            <th>기준월</th><td className="num">{statement.receivable.base_month}</td>
+                        </tr>
+                        <tr>
+                            <th>잔액</th><td className="num">{won(statement.receivable.balance)}</td>
+                        </tr>
+                        {Number(statement.receivable.overdue_amount) > 0 && (
+                            <tr>
+                                <th>연체 금액</th>
+                                <td className="num">
+                                    {won(statement.receivable.overdue_amount)}
+                                    {statement.receivable.aging_months > 0 &&
+                                        ` (${statement.receivable.aging_months}개월 경과)`}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </>
+        )}
+
+        {statement.notes && (
+            <>
+                <h2 className="doc-h2" style={{ marginTop: '6mm' }}>비고</h2>
+                <p style={{ margin: 0, fontSize: '9pt', whiteSpace: 'pre-wrap' }}>{statement.notes}</p>
+            </>
+        )}
+
+        {company.quote_terms && <p className="doc-terms-note">{company.quote_terms}</p>}
+
+        <Sign company={company} />
+        <Foot company={company} />
+    </div>
+)
+
 export default QuoteSheet
