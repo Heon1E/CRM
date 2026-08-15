@@ -141,30 +141,56 @@ export const splitCsvLine = (line) => {
 }
 
 /**
+ * 열 이름으로 자리를 찾는다.
+ *
+ * **정확히 일치하는 것을 먼저 찾는다.** 부분 일치만 쓰면 실제 파일에서 어긋난다:
+ *   `Phone` 으로 찾으면 → `Phonetic First Name` 이 먼저 걸린다
+ *   `E-mail` 로 찾으면  → `E-mail 1 - Label` 이 `E-mail 1 - Value` 보다 앞에 있다
+ * 둘 다 구글 주소록 최신 내보내기(36열)에서 실제로 나온다.
+ */
+export const findColumn = (head, candidates) => {
+    const norm = (h) => String(h || '').trim().toLowerCase()
+    const cols = head.map(norm)
+    // 1) 정확히 같은 이름
+    for (const c of candidates) {
+        const i = cols.indexOf(norm(c))
+        if (i >= 0) return i
+    }
+    // 2) 부분 일치 — 단 'label' 열은 값이 아니라 이름표라 건너뛴다
+    for (const c of candidates) {
+        const i = cols.findIndex((h) => h.includes(norm(c)) && !h.endsWith('label'))
+        if (i >= 0) return i
+    }
+    return -1
+}
+
+/**
  * 구글 주소록 CSV → 연락처 배열
- * 열 이름이 언어·버전마다 달라서 **뜻으로 찾는다** (Phone 1 - Value / 전화 1 - 값 …)
+ *
+ * 열 이름이 버전·언어마다 다르다. 최신(36열)은 `First Name`·`Organization Name`,
+ * 예전은 `Given Name`·`Organization 1 - Name`이다. 둘 다 받는다.
  */
 export const parseGoogleCsv = (text) => {
-    const lines = String(text || '').replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim())
+    const lines = String(text || '').replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim())
     if (lines.length < 2) return []
     const head = splitCsvLine(lines[0]).map((h) => h.trim())
 
-    const find = (...pats) => head.findIndex((h) =>
-        pats.some((p) => h.toLowerCase().includes(p.toLowerCase())))
-
-    const iName = find('Name', '이름')
-    const iGiven = find('Given Name', '이름(');
-    const iFamily = find('Family Name', '성')
-    const iOrg = find('Organization 1 - Name', 'Organization Name', '조직 1 - 이름', '회사')
-    const iTitle = find('Organization 1 - Title', 'Organization Title', '직책')
-    const iPhone = find('Phone 1 - Value', '전화 1 - 값', 'Phone')
-    const iMail = find('E-mail 1 - Value', '이메일 1 - 값', 'E-mail')
+    const iFirst = findColumn(head, ['First Name', 'Given Name', '이름'])
+    const iLast = findColumn(head, ['Last Name', 'Family Name', '성'])
+    const iFileAs = findColumn(head, ['File As', 'Name'])
+    const iOrg = findColumn(head, ['Organization Name', 'Organization 1 - Name', '조직 1 - 이름', '회사'])
+    const iTitle = findColumn(head, ['Organization Title', 'Organization 1 - Title', '직책'])
+    const iPhone = findColumn(head, ['Phone 1 - Value', '전화 1 - 값'])
+    const iMail = findColumn(head, ['E-mail 1 - Value', '이메일 1 - 값'])
 
     const out = []
     for (const line of lines.slice(1)) {
         const cols = splitCsvLine(line)
         const at = (i) => (i >= 0 ? (cols[i] || '').trim() : '')
-        const name = at(iName) || `${at(iFamily)}${at(iGiven)}`.trim()
+
+        // 한국 이름은 성+이름을 붙인다. 전체가 First에 들어 있으면 Last가 비어
+        // 그대로 나오고, 나뉘어 있으면 '김'+'연구' = '김연구'가 된다.
+        const name = `${at(iLast)}${at(iFirst)}`.trim() || at(iFileAs)
         const phone = normalizePhone(at(iPhone).split(':::')[0])
         if (!name && !phone) continue
         out.push({
@@ -223,4 +249,54 @@ export const matchContacts = (contacts, clients) => {
         else unmatched.push({ ...c, why: '거래처를 찾지 못함' })
     }
     return { matched, unmatched }
+}
+
+/**
+ * 거래처 후보 제안 — **자동으로 붙이지 않는다.**
+ *
+ * 실제 휴대폰 연락처를 보면 회사명 칸이 대개 비어 있고(1,099명 중 996명),
+ * 회사명이 있어도 거래처가 아닌 경우가 많다(노무법인·특허사무소·유니폼 등).
+ * 대신 이름에 회사가 들어가는 습관이 있다 — `남양화학 장부장`, `인지산업 사장`.
+ *
+ * 그래서 이름·회사명 어디든 거래처 이름이 들어 있으면 **후보로만** 올린다.
+ * 자동 반영은 위험하다: `와이파인텍 김창수`가 `파인텍`으로 잡히는데 다른
+ * 회사일 수 있다. 사람이 보고 정한다.
+ */
+export const suggestClient = (contact, clientKeys) => {
+    const hay = companyKey(`${contact.org || ''} ${contact.name || ''}`)
+    if (!hay) return null
+    let best = null
+    for (const c of clientKeys) {
+        // 두 글자 회사명은 아무 데나 걸린다. 세 글자부터 본다.
+        if (c.key.length < 3) continue
+        if (!hay.includes(c.key)) continue
+        if (!best || c.key.length > best.key.length) best = c   // 길게 맞는 쪽이 더 정확하다
+    }
+    return best ? { clientId: best.id, clientName: best.company, exact: false } : null
+}
+
+/** 거래처 이름을 비교하기 좋게 미리 접어 둔다 */
+export const buildClientKeys = (clients) =>
+    (clients || [])
+        .map((c) => ({ id: c.id, company: c.company, key: companyKey(c.company) }))
+        .filter((c) => c.key)
+
+/**
+ * 자동 매칭 + 후보 제안을 한 번에.
+ * @returns `{ matched, suggested, rest }`
+ *   matched   회사명이 정확히 맞음 — 바로 넣어도 된다
+ *   suggested 이름·회사에 거래처가 들어 있음 — **사람이 확인해야 한다**
+ *   rest      단서 없음
+ */
+export const matchWithSuggestions = (contacts, clients) => {
+    const { matched, unmatched } = matchContacts(contacts, clients)
+    const keys = buildClientKeys(clients)
+    const suggested = []
+    const rest = []
+    for (const c of unmatched) {
+        const s = suggestClient(c, keys)
+        if (s) suggested.push({ ...c, ...s })
+        else rest.push(c)
+    }
+    return { matched, suggested, rest }
 }

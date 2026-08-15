@@ -130,3 +130,46 @@ test('빈 입력에도 죽지 않는다', () => {
     assert.deepEqual(parseGoogleCsv(''), [])
     assert.deepEqual(matchContacts(null, null).matched, [])
 })
+
+/* ── 후보 제안 ─────────────────────────────────────────────────────────── */
+import { suggestClient, buildClientKeys, matchWithSuggestions } from '../src/utils/contactImport.js'
+
+const CLIENTS = [
+    { id: 'c1', company: '남양화학' },
+    { id: 'c2', company: '(주)피유시스' },
+    { id: 'c3', company: 'KCC' },
+]
+
+test('이름에 회사가 들어 있으면 후보로 올린다', () => {
+    const keys = buildClientKeys(CLIENTS)
+    assert.equal(suggestClient({ name: '남양화학 장부장' }, keys).clientId, 'c1')
+    assert.equal(suggestClient({ name: '피유시스 우민서 팀장' }, keys).clientId, 'c2')
+    assert.equal(suggestClient({ name: '김철수' }, keys), null)
+})
+
+test('두 글자 회사명은 아무 데나 걸리므로 제안하지 않는다', () => {
+    const keys = buildClientKeys([{ id: 'x', company: '한솔' }])
+    // '한솔'은 두 글자라 건너뛴다 — '김한솔'이라는 사람 이름에도 걸린다
+    assert.equal(suggestClient({ name: '김한솔' }, keys), null)
+})
+
+test('길게 맞는 쪽을 고른다', () => {
+    const keys = buildClientKeys([{ id: 'a', company: '피유시스' }, { id: 'b', company: '(주)피유시스코리아' }])
+    assert.equal(suggestClient({ name: '피유시스코리아 김부장' }, keys).clientId, 'b')
+})
+
+test('후보는 자동 반영이 아니다 — exact가 false다', () => {
+    const keys = buildClientKeys(CLIENTS)
+    assert.equal(suggestClient({ name: 'KCC 텍스 광주' }, keys).exact, false)
+})
+
+test('정확 일치 / 후보 / 단서 없음을 나눈다', () => {
+    const r = matchWithSuggestions([
+        { name: '김부장', org: '남양화학' },      // 정확
+        { name: '피유시스 우민서', org: '' },      // 후보
+        { name: '이모씨', org: '' },              // 단서 없음
+    ], CLIENTS)
+    assert.equal(r.matched.length, 1)
+    assert.equal(r.suggested.length, 1)
+    assert.equal(r.rest.length, 1)
+})

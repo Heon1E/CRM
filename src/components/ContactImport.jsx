@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Upload, Loader2, Check, X, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
-import { parseContacts, matchContacts } from '../utils/contactImport'
+import { parseContacts, matchWithSuggestions } from '../utils/contactImport'
 import { showError, showSuccess } from '../utils/alert'
 
 /**
@@ -20,8 +20,10 @@ const ContactImport = () => {
     const { clients, refreshData } = useData()
     const [rows, setRows] = useState(null)
     const [busy, setBusy] = useState(false)
-    const [picks, setPicks] = useState({})     // 못 맞춘 것에 사람이 고른 거래처
+    const [picks, setPicks] = useState({})     // 사람이 고른 거래처 (키: 목록 내 위치)
     const [fileName, setFileName] = useState('')
+    const [clientQ, setClientQ] = useState('')  // 거래처 고르기 검색
+    const [showRest, setShowRest] = useState(false)
 
     const read = async (file) => {
         if (!file) return
@@ -34,7 +36,7 @@ const ContactImport = () => {
                 return
             }
             setFileName(file.name)
-            setRows(matchContacts(parsed, clients))
+            setRows(matchWithSuggestions(parsed, clients))
             setPicks({})
         } catch (e) {
             await showError(e.message || '파일을 읽지 못했습니다.')
@@ -43,14 +45,33 @@ const ContactImport = () => {
         }
     }
 
-    /** 실제로 넣을 것 = 자동으로 맞은 것 + 사람이 고른 것 */
+    /**
+     * 실제로 넣을 것 = 회사명이 정확히 맞은 것 + 사람이 고른 것.
+     * **후보는 자동으로 들어가지 않는다.** 고른 것만 들어간다.
+     */
     const toSave = useMemo(() => {
         if (!rows) return []
-        const picked = rows.unmatched
-            .map((c, i) => (picks[i] ? { ...c, clientId: picks[i] } : null))
+        const pick = (list, prefix) => list
+            .map((c, i) => (picks[`${prefix}${i}`] ? { ...c, clientId: picks[`${prefix}${i}`] } : null))
             .filter(Boolean)
-        return [...rows.matched, ...picked]
+        return [...rows.matched, ...pick(rows.suggested, 's'), ...pick(rows.rest, 'r')]
     }, [rows, picks])
+
+    /** 거래처 고르기 — 1,150곳을 다 띄우면 못 찾는다 */
+    const clientOptions = useMemo(() => {
+        const t = clientQ.trim().toLowerCase()
+        const list = t
+            ? (clients || []).filter((c) => String(c.company || '').toLowerCase().includes(t))
+            : (clients || [])
+        return list.slice(0, 200)
+    }, [clients, clientQ])
+
+    const ClientPicker = ({ k }) => (
+        <select value={picks[k] || ''} onChange={(e) => setPicks((p) => ({ ...p, [k]: e.target.value }))}>
+            <option value="">넣지 않음</option>
+            {clientOptions.map((cl) => <option key={cl.id} value={cl.id}>{cl.company}</option>)}
+        </select>
+    )
 
     const apply = async () => {
         if (toSave.length === 0) { await showError('넣을 연락처가 없습니다.'); return }
@@ -137,15 +158,27 @@ const ContactImport = () => {
             ) : (
                 <div style={{ padding: 12 }}>
                     <div className="statusbar" style={{ marginBottom: 8 }}>
-                        <span>읽은 연락처 {rows.matched.length + rows.unmatched.length}명</span>
-                        <span style={{ color: 'var(--success)', fontWeight: 700 }}>거래처 확인 {rows.matched.length}명</span>
-                        <span>확인 필요 {rows.unmatched.length}명</span>
+                        <span>읽은 연락처 {rows.matched.length + rows.suggested.length + rows.rest.length}명</span>
+                        <span style={{ color: 'var(--success)', fontWeight: 700 }}>회사명 일치 {rows.matched.length}명</span>
+                        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>후보 {rows.suggested.length}명</span>
+                        <span>단서 없음 {rows.rest.length}명</span>
+                    </div>
+
+                    <div className="toolbar" style={{ gap: 6, border: '1px solid var(--border-light)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>거래처 찾기</span>
+                        <input value={clientQ} onChange={(e) => setClientQ(e.target.value)}
+                            placeholder="회사명 일부" style={{ width: 180 }} />
+                        <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                            아래 고르는 칸의 목록이 좁혀집니다
+                        </span>
                     </div>
 
                     {rows.matched.length > 0 && (
                         <>
-                            <h4 style={{ margin: '10px 0 5px', fontSize: 12.5 }}>거래처를 찾은 연락처</h4>
-                            <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                            <h4 style={{ margin: '12px 0 5px', fontSize: 12.5 }}>
+                                회사명이 정확히 맞은 연락처 — 바로 들어갑니다
+                            </h4>
+                            <div style={{ maxHeight: 200, overflowY: 'auto' }}>
                                 <table className="dgrid">
                                     <thead>
                                         <tr>
@@ -156,7 +189,7 @@ const ContactImport = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rows.matched.slice(0, 200).map((c, i) => (
+                                        {rows.matched.map((c, i) => (
                                             <tr key={i}>
                                                 <td>{c.name}</td>
                                                 <td>{c.title || '-'}</td>
@@ -170,48 +203,76 @@ const ContactImport = () => {
                         </>
                     )}
 
-                    {rows.unmatched.length > 0 && (
+                    {rows.suggested.length > 0 && (
                         <>
                             <h4 style={{ margin: '14px 0 5px', fontSize: 12.5 }}>
-                                거래처를 못 찾은 연락처 — 고르면 함께 들어갑니다
+                                이름에 거래처가 들어 있는 연락처 — <b style={{ color: 'var(--warning)' }}>확인하고 고르세요</b>
                             </h4>
+                            <p style={{ margin: '0 0 5px', fontSize: 11.5, color: 'var(--text-secondary)' }}>
+                                자동으로 넣지 않습니다. `와이파인텍`이 `파인텍`으로 잡히는 것처럼 다른 회사일 수 있습니다.
+                            </p>
                             <div style={{ maxHeight: 260, overflowY: 'auto' }}>
                                 <table className="dgrid">
                                     <thead>
                                         <tr>
-                                            <th style={{ minWidth: 100 }}>이름</th>
+                                            <th style={{ minWidth: 150 }}>이름</th>
                                             <th style={{ minWidth: 120 }}>전화</th>
-                                            <th style={{ minWidth: 130 }}>휴대폰의 회사명</th>
+                                            <th style={{ minWidth: 130 }}>짐작한 거래처</th>
                                             <th style={{ minWidth: 180 }}>거래처 고르기</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rows.unmatched.slice(0, 300).map((c, i) => (
+                                        {rows.suggested.map((c, i) => (
                                             <tr key={i}>
                                                 <td>{c.name}</td>
                                                 <td className="num">{c.phone || '-'}</td>
-                                                <td style={{ color: 'var(--text-secondary)' }}>{c.org || '—'}</td>
+                                                <td style={{ color: 'var(--warning)' }}>{c.clientName}</td>
                                                 <td>
-                                                    <select value={picks[i] || ''}
-                                                        onChange={(e) => setPicks((p) => ({ ...p, [i]: e.target.value }))}>
-                                                        <option value="">넣지 않음</option>
-                                                        {(clients || []).slice(0, 400).map((cl) => (
-                                                            <option key={cl.id} value={cl.id}>{cl.company}</option>
-                                                        ))}
-                                                    </select>
+                                                    <ClientPicker k={`s${i}`} />
+                                                    {!picks[`s${i}`] && (
+                                                        <button className="rowbtn" style={{ marginLeft: 4 }}
+                                                            onClick={() => setPicks((p) => ({ ...p, [`s${i}`]: c.clientId }))}>
+                                                            맞음
+                                                        </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                            {rows.unmatched.length > 300 && (
-                                <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '6px 0 0' }}>
-                                    300명까지 보여줍니다. 휴대폰 연락처에는 거래처가 아닌 사람도 많으니
-                                    자동으로 맞은 것부터 넣고 나머지는 필요할 때 넣으세요.
-                                </p>
-                            )}
                         </>
+                    )}
+
+                    <h4 style={{ margin: '14px 0 5px', fontSize: 12.5 }}>
+                        단서 없는 연락처 {rows.rest.length}명
+                        <button className="rowbtn" style={{ marginLeft: 6 }} onClick={() => setShowRest((v) => !v)}>
+                            {showRest ? '접기' : '펼쳐서 고르기'}
+                        </button>
+                    </h4>
+                    {showRest && (
+                        <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                            <table className="dgrid">
+                                <thead>
+                                    <tr>
+                                        <th style={{ minWidth: 130 }}>이름</th>
+                                        <th style={{ minWidth: 120 }}>전화</th>
+                                        <th style={{ minWidth: 120 }}>휴대폰의 회사명</th>
+                                        <th style={{ minWidth: 180 }}>거래처 고르기</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.rest.slice(0, 400).map((c, i) => (
+                                        <tr key={i}>
+                                            <td>{c.name}</td>
+                                            <td className="num">{c.phone || '-'}</td>
+                                            <td style={{ color: 'var(--text-secondary)' }}>{c.org || '—'}</td>
+                                            <td><ClientPicker k={`r${i}`} /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
 
                     <div style={{ marginTop: 10 }}>
