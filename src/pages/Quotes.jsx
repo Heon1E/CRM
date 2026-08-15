@@ -469,8 +469,27 @@ const Quotes = () => {
                         ))}
                         {shown.length === 0 && !loading && (
                             <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-secondary)' }}>
+                                {/*
+                                  빈 화면이 '없습니다' 한 줄로 끝나면 무엇을 해야 할지
+                                  알 수 없다. 기능을 다 만들어 놓고도 안 쓰이는 이유다.
+                                  여기서 바로 시작할 수 있게 한다.
+                                */}
                                 <FileText size={20} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.5 }} />
-                                {list.length === 0 ? '아직 작성한 견적서가 없습니다.' : '조건에 맞는 견적서가 없습니다.'}
+                                {list.length === 0 ? (
+                                    <>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                                            아직 작성한 견적서가 없습니다
+                                        </div>
+                                        <div style={{ fontSize: 12.5, lineHeight: 1.8 }}>
+                                            품목·수량을 고르면 사진이 들어간 견적서가 만들어집니다.<br />
+                                            인쇄에서 <b>PDF로 저장</b>을 고르면 거래처명이 붙은 파일로 받습니다.<br />
+                                            저장하면 <b>영업기회</b>에도 자동으로 올라갑니다 — 따로 적을 필요가 없습니다.
+                                        </div>
+                                        <button className="tb-btn primary" style={{ marginTop: 12 }} onClick={newQuote}>
+                                            <Plus size={13} /> 첫 견적서 만들기
+                                        </button>
+                                    </>
+                                ) : '조건에 맞는 견적서가 없습니다.'}
                             </td></tr>
                         )}
                     </tbody>

@@ -386,7 +386,20 @@ const PurchaseOrders = () => {
                         {shown.length === 0 && !loading && (
                             <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--text-secondary)' }}>
                                 <FileText size={20} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.5 }} />
-                                {list.length === 0 ? '아직 작성한 발주서가 없습니다.' : '조건에 맞는 발주서가 없습니다.'}
+                                {list.length === 0 ? (
+                                    <>
+                                        <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                                            아직 작성한 발주서가 없습니다
+                                        </div>
+                                        <div style={{ fontSize: 12.5, lineHeight: 1.8 }}>
+                                            협력업체에 보내는 문서입니다. 견적서와 달리 사진 없이 나갑니다.<br />
+                                            인쇄에서 <b>PDF로 저장</b>을 고르면 업체명이 붙은 파일로 받습니다.
+                                        </div>
+                                        <button className="tb-btn primary" style={{ marginTop: 12 }} onClick={newOrder}>
+                                            <Plus size={13} /> 첫 발주서 만들기
+                                        </button>
+                                    </>
+                                ) : '조건에 맞는 발주서가 없습니다.'}
                             </td></tr>
                         )}
                     </tbody>
