@@ -4,6 +4,9 @@ import { Search, Edit, Download, Users, Camera, Trash2, Plus } from 'lucide-reac
 import { useData } from '../contexts/DataContext'
 import { useAuth } from '../contexts/AuthContext'
 import { resolveSalesRep } from '../utils/salesRep'
+import {
+  FILTERS, filterCompanies, loadViews, saveViews, addView, removeView, describe,
+} from '../utils/clientFilters'
 import { supabase } from '../lib/supabase'
 import EditClientModal from '../components/EditClientModal'
 import AddClientModal from '../components/AddClientModal'
@@ -37,6 +40,9 @@ const Clients = () => {
   const [localClients, setLocalClients] = useState([])
   const [localLoading, setLocalLoading] = useState(false)
   const [page, setPage] = useState(1)
+  // 거래처가 1,150곳인데 검색창 하나뿐이었다. 자주 쓰는 조건을 단추로 둔다.
+  const [activeFilters, setActiveFilters] = useState([])
+  const [views, setViews] = useState(() => loadViews())
   const [totalCount, setTotalCount] = useState(0)
 
   // Context 데이터를 localClients에 동기화
@@ -210,17 +216,28 @@ const Clients = () => {
     })
 
     // 회사명 하나에 여러 행이 묶여 있을 수 있으므로 합산한다
+    // 마지막 '거래'일 — 마지막 '접촉'(last)과 다르다. 휴면 판정은 거래 기준이다.
+    const lastSaleAt = new Map()
+    ;(sales || []).forEach((s2) => {
+      const id = s2.client_id
+      if (!id) return
+      const ms = new Date(s2.sale_date || s2.date || s2.created_at).getTime()
+      if (Number.isFinite(ms) && ms > (lastSaleAt.get(id) || 0)) lastSaleAt.set(id, ms)
+    })
+
     const byCompany = new Map()
     Object.entries(groupedClients).forEach(([company, rows]) => {
-      let rev = 0, acts = 0, last = 0, mine = false
+      let rev = 0, acts = 0, last = 0, lastSale = 0, mine = false, hasContact = false
       rows.forEach((c) => {
         rev += revenue.get(c.id) || 0
         acts += actCount.get(c.id) || 0
         last = Math.max(last, lastAct.get(c.id) || 0)
+        lastSale = Math.max(lastSale, lastSaleAt.get(c.id) || 0)
         if (myRep && c.sales_rep === myRep) mine = true
+        if (c.contact_person || c.phone) hasContact = true
       })
       const tier = (mine && rev > 0) ? 0 : (acts > 0 ? 1 : 2)
-      byCompany.set(company, { tier, rev, acts, last })
+      byCompany.set(company, { tier, rev, acts, last, lastSale: lastSale || null, mine, hasContact })
     })
     return byCompany
   }, [groupedClients, sales, activities, myRep])
@@ -240,12 +257,17 @@ const Clients = () => {
     })
   }, [groupedClients, companyRank])
 
+  // 조건에 맞는 회사만 남긴다. 정렬(챙길 순서)은 그대로 유지된다.
+  const shownCompanies = useMemo(
+    () => filterCompanies(sortedCompanies, companyRank, activeFilters),
+    [sortedCompanies, companyRank, activeFilters])
+
   const visibleGroupedClients = useMemo(() => {
-    return sortedCompanies.reduce((acc, company) => {
+    return shownCompanies.reduce((acc, company) => {
       acc[company] = groupedClients[company]
       return acc
     }, {})
-  }, [sortedCompanies, groupedClients])
+  }, [shownCompanies, groupedClients])
 
   // Bulk Selection State
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -357,11 +379,11 @@ const Clients = () => {
         <div className="oem-panel shadow-sm" style={{ borderLeft: '4px solid var(--accent)' }}>
           <div className="p-4 flex flex-col lg:flex-row gap-4 lg:items-center">
             <div className="flex-1 flex items-center gap-3">
-              <label className="text-[11px] font-bold text-oem-text-secondary uppercase tracking-widest whitespace-nowrap">Filter By Company</label>
+              <label className="text-[11px] font-bold text-oem-text-secondary whitespace-nowrap">거래처 찾기</label>
               <div className="relative flex-1 group">
                 <input
                   type="text"
-                  placeholder="Query company records..."
+                  placeholder="회사명으로 찾기"
                   value={searchInput}
                   onChange={handleSearchChange}
                   onKeyDown={handleSearchKeyDown}
@@ -378,10 +400,64 @@ const Clients = () => {
                 </span>
               </div>
               <div className="flex flex-col">
-                <span>조회 시각</span>
-                <span className="text-oem-text-primary font-bold text-sm tracking-tighter">{(new Date().getTime() % 100).toFixed(2)}ms</span>
+                <span>지금 보이는 곳</span>
+                <span className="text-oem-text-primary font-bold text-sm tracking-tighter">{shownCompanies.length}곳</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* 조건 거르기 + 저장된 보기 */}
+        <div className="win" style={{ marginTop: 8 }}>
+          <div className="toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
+            {FILTERS.map((f) => {
+              const on = activeFilters.includes(f.key)
+              return (
+                <button
+                  key={f.key}
+                  title={f.hint}
+                  className={`tb-btn${on ? ' primary' : ''}`}
+                  onClick={() => setActiveFilters((prev) =>
+                    prev.includes(f.key) ? prev.filter((k) => k !== f.key) : [...prev, f.key])}
+                >
+                  {f.label}
+                </button>
+              )
+            })}
+            {activeFilters.length > 0 && (
+              <button className="tb-btn" onClick={() => setActiveFilters([])}>조건 지우기</button>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-secondary)' }}>
+              {shownCompanies.length}곳 / 전체 {sortedCompanies.length}곳
+            </span>
+          </div>
+
+          <div className="toolbar" style={{ flexWrap: 'wrap', gap: 6, borderTop: 0 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>저장한 보기</span>
+            {views.length === 0 && (
+              <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                자주 쓰는 조건을 저장해 두면 한 번에 불러옵니다.
+              </span>
+            )}
+            {views.map((v) => (
+              <span key={v.name} style={{ display: 'inline-flex' }}>
+                <button className="tb-btn" title={describe(v.filters)}
+                  onClick={() => { setActiveFilters(v.filters || []); setSearchInput(v.search || ''); setSearchTerm(v.search || '') }}>
+                  {v.name}
+                </button>
+                <button className="rowbtn" title="이 보기를 지웁니다"
+                  onClick={() => { const next = removeView(views, v.name); setViews(next); saveViews(next) }}>×</button>
+              </span>
+            ))}
+            <button className="tb-btn" style={{ marginLeft: 'auto' }}
+              onClick={() => {
+                const name = window.prompt('이 조건에 이름을 붙여 저장합니다.', describe(activeFilters))
+                if (!name) return
+                const next = addView(views, name, activeFilters, searchInput)
+                setViews(next); saveViews(next)
+              }}>
+              지금 조건 저장
+            </button>
           </div>
         </div>
 
