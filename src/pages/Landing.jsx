@@ -94,18 +94,6 @@ const PricingCard = ({ plan, price, desc, features, cta, popular, ctaStyle, annu
 }
 
 // ─── Testimonial Card ─────────────────────────────────────────────────────────
-const TestimonialCard = ({ quote, name, company }) => (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <div className="flex gap-1 mb-4">
-            {[...Array(5)].map((_, i) => <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />)}
-        </div>
-        <p className="text-sm text-gray-600 leading-relaxed mb-5 italic">"{quote}"</p>
-        <div>
-            <p className="text-xs font-bold text-gray-900">{name}</p>
-            <p className="text-[10px] text-gray-500 font-medium">{company}</p>
-        </div>
-    </div>
-)
 
 // ─── Main Landing Page ────────────────────────────────────────────────────────
 const Landing = () => {
@@ -121,7 +109,6 @@ const Landing = () => {
         { icon: Smartphone, key: 'mobile' },
     ]
 
-    const testimonials = t('testimonials')
     const planFeatures = t('planFeatures')
 
     const getPrice = (plan) => {
@@ -205,7 +192,8 @@ const Landing = () => {
                             <div className="w-3 h-3 rounded-full bg-red-500/70"></div>
                             <div className="w-3 h-3 rounded-full bg-yellow-500/70"></div>
                             <div className="w-3 h-3 rounded-full bg-green-500/70"></div>
-                            <span className="ml-3 text-xs text-gray-500 font-mono">app.xavian.io/dashboard</span>
+                            {/* 'app.xavian.io/dashboard' 라고 적혀 있었다. 우리 주소가 아니다. */}
+                            <span className="ml-3 text-xs text-gray-500 font-mono">아이앤디 CRM · 대시보드</span>
                         </div>
                         <div className="p-6 grid grid-cols-4 gap-4">
                             {[
@@ -238,17 +226,14 @@ const Landing = () => {
                 </div>
             </section>
 
-            {/* ── SOCIAL PROOF ── */}
-            <section className="bg-gray-50 py-12 border-y border-gray-100">
-                <div className="max-w-5xl mx-auto px-6 text-center">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-8">{t('landing.socialProof')}</p>
-                    <div className="flex flex-wrap justify-center gap-8 items-center">
-                        {['Accenture', 'Deloitte', 'Samsung', 'LG Corp', 'Kakao'].map((name) => (
-                            <span key={name} className="text-lg font-black text-gray-500 hover:text-gray-500 transition-colors">{name}</span>
-                        ))}
-                    </div>
-                </div>
-            </section>
+            {/*
+              여기에 'TRUSTED BY 500+ SALES TEAMS WORLDWIDE'와 함께
+              Accenture · Deloitte · Samsung · LG Corp · Kakao 가 우리 고객처럼
+              적혀 있었다. **한 곳도 우리 고객이 아니다.** 남의 상호를 보증인처럼
+              쓰는 것은 사실이 아닐 뿐 아니라 상표·부당표시 문제가 된다.
+              템플릿에 딸려 온 자리이므로 통째로 뺀다. 실제 고객이 생기면
+              그때 허락을 받아 적는다.
+            */}
 
             {/* ── FEATURES ── */}
             <section id="features" className="py-24 px-6 bg-white">
@@ -328,20 +313,12 @@ const Landing = () => {
                 </div>
             </section>
 
-            {/* ── TESTIMONIALS ── */}
-            <section className="py-24 px-6 bg-white">
-                <div className="max-w-5xl mx-auto">
-                    <div className="text-center mb-16">
-                        <h2 className="text-4xl font-black text-gray-900 mb-4">{t('landing.testimonialsTitle')}</h2>
-                        <div className="w-16 h-1 bg-blue-600 rounded-full mx-auto"></div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {testimonials.map((item, i) => (
-                            <TestimonialCard key={i} quote={item.quote} name={item.name} company={item.company} />
-                        ))}
-                    </div>
-                </div>
-            </section>
+            {/*
+              지어낸 고객 후기 세 건이 있었다 — Sarah Chen(TechVenture),
+              Mark Williams(GrowthLab), Priya Sharma(ScaleUp Co.).
+              **셋 다 없는 사람이다.** 없는 사람의 말을 지어 붙일 수는 없다.
+              실제 후기가 생기면 그때 넣는다.
+            */}
 
             {/* ── CTA BANNER ── */}
             <section className="bg-[#0f172a] py-24 px-6 relative overflow-hidden">

@@ -22,12 +22,12 @@ const translations = {
             ctaPrimary: 'Start Free Trial',
             ctaSecondary: 'Watch Demo',
             trustBadge: 'No credit card required • 14-day free trial • Cancel anytime',
-            socialProof: 'Trusted by 500+ sales teams worldwide',
+            socialProof: '',   // 없는 고객 수를 적지 않는다
             featuresTitle: 'Everything your sales team needs',
             pricingTitle: 'Simple, Transparent Pricing',
             testimonialsTitle: 'What our customers say',
             ctaBannerTitle: 'Ready to transform your sales?',
-            ctaBannerSub: 'Join 500+ teams already growing with Xavian CRM',
+            ctaBannerSub: 'Built and used at IND Co., Ltd.',
             footerCopy: '© 2025 Xavian CRM. All rights reserved.',
         },
         // Features
@@ -59,10 +59,7 @@ const translations = {
         },
         // Testimonials
         testimonials: [
-            { quote: 'Xavian CRM transformed how our team manages relationships. Revenue up 40% in 6 months.', name: 'Sarah Chen', company: 'TechVenture Inc.' },
-            { quote: 'The pipeline visualization is incredible. We closed 3x more deals in Q3 than ever before.', name: 'Mark Williams', company: 'GrowthLab' },
-            { quote: 'Finally a CRM that actually makes sense. Our onboarding took less than a day.', name: 'Priya Sharma', company: 'ScaleUp Co.' },
-        ],
+            ],
         // Dashboard
         dashboard: {
             title: 'Executive Dashboard',
@@ -108,7 +105,7 @@ const translations = {
             pricingTitle: '심플하고 투명한 요금제',
             testimonialsTitle: '고객들의 이야기',
             ctaBannerTitle: '영업을 혁신할 준비가 됐나요?',
-            ctaBannerSub: 'Xavian CRM으로 성장 중인 500+ 팀과 함께하세요',
+            ctaBannerSub: '아이앤디 주식회사가 직접 만들어 쓰고 있습니다',
             footerCopy: '© 2025 Xavian CRM. 모든 권리 보유.',
         },
         features: {
@@ -136,10 +133,7 @@ const translations = {
             enterprise: ['무제한 사용자', '무제한 연락처', '맞춤 파이프라인 단계', '전담 지원', '무제한 저장공간'],
         },
         testimonials: [
-            { quote: 'Xavian CRM이 우리 팀의 고객 관리 방식을 완전히 바꿨습니다. 6개월 만에 매출이 40% 올랐어요.', name: '이지영', company: '테크벤처 주식회사' },
-            { quote: '파이프라인 시각화가 정말 훌륭합니다. 3분기에 역대 최고의 성과를 달성했어요.', name: '김민준', company: '그로스랩' },
-            { quote: '드디어 진짜 쓸모 있는 CRM을 찾았습니다. 온보딩이 하루도 안 걸렸어요.', name: '박수현', company: '스케일업 코리아' },
-        ],
+            ],
         dashboard: {
             title: '경영 대시보드',
             subtitle: 'XAVIAN CRM 관리 시스템',
