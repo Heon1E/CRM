@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, TrendingDown, PhoneOff, Sprout, Target, ChevronRight, RotateCcw, Flame, CheckCircle2, EyeOff, Undo2 } from 'lucide-react'
+import { AlertTriangle, TrendingDown, PhoneOff, Sprout, Target, ChevronRight, RotateCcw, Flame, CheckCircle2, EyeOff, Undo2, GitBranch } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { getCoachOverrides, toggleCoachOverride, clearCoachOverride, overrideFor } from '../utils/coachOverrides'
+import { createDealFromCoach } from '../services/dealSync'
 import { getAllCachedStages } from '../services/clientBriefingService'
 import ClientBriefing from './ClientBriefing'
 
@@ -259,6 +261,30 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
     const areaCount = (area) => area.groups.reduce((a, g) => a + G[g.key].length, 0)
 
     const hide = (row) => setOverrides(toggleCoachOverride(row.id, 'hide', '화면에서 제외'))
+
+    /**
+     * 코치가 잡아 준 곳을 곧장 파이프라인에 올린다.
+     *
+     * 코치는 '지금 챙길 곳'을 찾아 주는데, 거기서 파이프라인으로 옮기려면
+     * 이름·금액을 손으로 다시 적어야 했다. 그 한 단계가 실제로는 안 하게 되는
+     * 지점이다 — 그래서 여기서 바로 만든다.
+     */
+    const toDeal = async (row, groupLabel) => {
+        try {
+            await createDealFromCoach({
+                clientId: row.id,
+                clientName: row.name,
+                title: groupLabel || '영업 기회',
+                // 코치 행에는 'amount'가 없다. 최근 3개월 실적을 기대값 출발점으로 쓴다.
+                amount: row.recent || row.thisYear || 0,
+                owner: salesRepName || null,
+                note: `영업 코치 '${groupLabel}'에서 올림`,
+            })
+            toast.success(`'${row.name}'을(를) 파이프라인에 올렸습니다.`)
+        } catch (e) {
+            toast.error(`파이프라인에 올리지 못했습니다: ${e.message}`)
+        }
+    }
     const unhide = (id) => setOverrides(clearCoachOverride(id))
     const total = AREAS.reduce((a, ar) => a + areaCount(ar), 0)
 
@@ -411,6 +437,14 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
                                                                         </span>
                                                                     </span>
                                                                     <ChevronRight size={13} style={{ opacity: 0.4, flexShrink: 0 }} />
+                                                                </button>
+                                                                <button
+                                                                    className="rowbtn"
+                                                                    onClick={(ev) => { ev.stopPropagation(); toDeal(r, g.title) }}
+                                                                    title="파이프라인에 영업 기회로 올리기"
+                                                                    style={{ flexShrink: 0 }}
+                                                                >
+                                                                    <GitBranch size={12} />
                                                                 </button>
                                                                 <button
                                                                     className="rowbtn"

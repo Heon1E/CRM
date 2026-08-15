@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { resolveSalesRep } from '../utils/salesRep'
 import { saveWithFreshNo, todayLocal } from '../utils/docNumber'
 import { printAs, quoteFileName } from '../utils/printDoc'
+import { syncQuoteToDeal } from '../services/dealSync'
 import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { ProductPicker, AccessoryPicker, Thumb } from '../components/ItemPicker'
 import { QuoteSheet } from '../components/DocumentSheet'
@@ -206,7 +207,13 @@ const Quotes = () => {
             const { error: itemErr } = await supabase.from('quote_items').insert(rows)
             if (itemErr) throw itemErr
 
-            await showSuccess(`견적서 ${quoteNo} 저장했습니다.`)
+            // 견적을 냈다 = 파이프라인의 '제안' 단계다. 손으로 또 넣게 하면
+            // 아무도 안 넣고 보드가 비어 버린다.
+            const sync = await syncQuoteToDeal({ ...payload, id: quoteId, quote_no: quoteNo })
+            await showSuccess(
+                sync.created ? `견적서 ${quoteNo} 저장했습니다. 파이프라인에 '${sync.stage}' 기회로 올렸습니다.`
+                    : sync.updated ? `견적서 ${quoteNo} 저장했습니다. 파이프라인 기회도 갱신했습니다.`
+                        : `견적서 ${quoteNo} 저장했습니다.`)
             setEditing(null)
             await load()
         } catch (e) {
