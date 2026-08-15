@@ -7,6 +7,7 @@
  *
  * 보내는 것:
  *   1. 오늘 일정 (schedules)
+ *   +  이번 주 마감 예정 기회 · 멈춘 기회 (deals)
  *   2. 오늘 마감인 후속조치
  *   3. 기한이 지난 후속조치 (오래 밀린 것부터)
  *   4. 오래 방치된 거래처 경고 (과거 실적이 있는데 접촉이 끊긴 곳)
@@ -75,6 +76,12 @@ export default async function handler(req, res) {
         if (!chats.length) return res.status(200).json({ ok: true, sent: 0, note: '등록된 대화 없음' })
 
         // ---- 자료 ----
+        // deals는 아직 안 만들었을 수 있다(마이그레이션 전). 실패해도 브리핑은 나가야 한다.
+        // 단계는 한글이라 URL에 넣으면 인코딩 문제가 생기기 쉽다. 받아서 여기서 거른다.
+        const dealsP = sb('deals?select=id,client_name,title,stage,amount,expected_close,'
+            + 'stage_changed_at,created_at,owner&deleted_at=is.null&limit=500')
+            .catch(() => [])
+
         const [clients, activities, schedules] = await Promise.all([
             sb('clients?select=id,company,sales_rep&limit=5000'),
             // 후속조치 판정에 과거 접촉 이력이 필요하다. 1년치면 충분하다.
@@ -86,7 +93,34 @@ export default async function handler(req, res) {
                 `&status=neq.취소&order=starts_at.asc&limit=50`),
         ])
 
+        const OPEN = ['리드', '접촉', '제안', '샘플', '협상']
+        const deals = (await dealsP).filter((d) => OPEN.includes(d.stage))
+
         const nameOf = new Map(clients.map((c) => [c.id, c.company]))
+
+        // ---- 파이프라인 ----
+        // 아침에 알아야 할 건 두 가지다: 이번 주에 떨어질 것, 그리고 멈춰 있는 것.
+        const weekEnd = new Date(new Date(`${today}T00:00:00+09:00`).getTime() + 7 * DAY)
+            .toISOString().slice(0, 10)
+        const closingSoon = deals
+            .filter((d) => d.expected_close && d.expected_close <= weekEnd)
+            .sort((a2, b2) => String(a2.expected_close).localeCompare(String(b2.expected_close)))
+
+        // 정체 기준은 단계마다 다르다. 샘플은 원래 오래 걸린다 —
+        // 똑같이 두면 샘플 건이 전부 떠서 경고가 의미를 잃는다.
+        const STALE = { 리드: 21, 접촉: 21, 제안: 30, 샘플: 60, 협상: 21 }
+        const stuck = deals
+            .filter((d) => {
+                const since = d.stage_changed_at || d.created_at
+                if (!since) return false
+                const days = Math.floor((Date.now() - new Date(since).getTime()) / DAY)
+                return days > (STALE[d.stage] ?? 30)
+            })
+            .map((d) => ({
+                ...d,
+                days: Math.floor((Date.now() - new Date(d.stage_changed_at || d.created_at).getTime()) / DAY),
+            }))
+            .sort((a2, b2) => b2.days - a2.days)
 
         // ---- 후속조치 ----
         // 기한일 이후에 그 거래처와 접촉했으면 처리된 것으로 본다.
@@ -148,12 +182,29 @@ export default async function handler(req, res) {
             if (overdue.length > 6) lines.push(`  … 외 ${overdue.length - 6}건`)
         }
 
+        if (closingSoon.length) {
+            lines.push('', `🎯 <b>이번 주 마감 예정 ${closingSoon.length}건</b>`)
+            closingSoon.slice(0, 6).forEach((d) => {
+                const late = d.expected_close < today ? ' ⚠️기한 지남' : ''
+                lines.push(`• ${d.client_name} — ${d.title} (${d.stage}, ${fmtMan(d.amount)})${late}`)
+            })
+            if (closingSoon.length > 6) lines.push(`  … 외 ${closingSoon.length - 6}건`)
+        }
+
+        if (stuck.length) {
+            lines.push('', `🐢 <b>멈춘 기회 ${stuck.length}건</b>`)
+            stuck.slice(0, 5).forEach((d) => {
+                lines.push(`• ${d.client_name} — ${d.title} (${d.stage} ${d.days}일째)`)
+            })
+            if (stuck.length > 5) lines.push(`  … 외 ${stuck.length - 5}건`)
+        }
+
         if (stale.length) {
             lines.push('', `🕸 <b>오래 못 간 곳</b>`)
             stale.forEach((s) => lines.push(`• ${s.name} — 마지막 접촉 ${s.last}`))
         }
 
-        if (schedules.length + due.length + overdue.length === 0) {
+        if (schedules.length + due.length + overdue.length + closingSoon.length + stuck.length === 0) {
             lines.push('', '오늘 잡힌 일정도, 하기로 한 것도 없습니다.')
             lines.push('CRM 영업 코치에서 챙길 곳을 확인해 보세요.')
         }
