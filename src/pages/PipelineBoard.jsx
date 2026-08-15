@@ -1,649 +1,371 @@
-import React, { useState, useMemo, useEffect } from 'react'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { useData } from '../contexts/DataContext'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { Plus, RefreshCw, Loader2, Trash2, AlertTriangle, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { CheckCircle2, TrendingUp, ArrowRight, Mail } from 'lucide-react'
-import Toast from '../components/Toast'
-import { showConfirm } from '../utils/alert'
-import { PIPELINE_STATUSES, isPipelineCandidate, normalizeStatus, coerceClientStatus } from '../utils/clientStatus'
+import { useData } from '../contexts/DataContext'
+import { useAuth } from '../contexts/AuthContext'
+import { resolveSalesRep, SALES_REP_OPTIONS } from '../utils/salesRep'
+import {
+    STAGES, CLOSED, ALL_STAGES, isOpen, isStale, isOverdue, daysInStage,
+    probabilityOf, summarize, groupByStage,
+} from '../utils/dealStages'
+import { showError, showSuccess, showConfirm } from '../utils/alert'
+
+/**
+ * 파이프라인 — 영업 기회를 단계로 세운다
+ *
+ * 예전에는 **거래처를 `clients.status`로 묶어** 보여줬다. 그래서 거래처 하나가
+ * 단계 하나만 가질 수 있었고(한 곳과 두 건을 동시에 진행하면 표현 불가),
+ * 금액도 예상 시기도 없었으며, 성사되면 status가 바뀌면서 그 건의 기록이
+ * 통째로 사라져 수주율을 낼 수 없었다.
+ *
+ * 지금은 `deals` 표를 쓴다 — Pipedrive·HubSpot·Salesforce가 전부 '기회'를
+ * 별도 레코드로 두는 이유가 그것이다. 거래처는 관계이고, 기회는 건별로 뜬다.
+ */
+const won = (v) => Math.round(Number(v) || 0).toLocaleString('ko-KR')
+const eok = (v) => `${((Number(v) || 0) / 1e8).toFixed(1)}억`
+const todayStr = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const emptyDeal = (owner) => ({
+    client_id: null, client_name: '', title: '', stage: '리드',
+    amount: 0, probability: '', expected_close: '', owner: owner || '',
+    next_action: '', next_action_date: '', notes: '',
+})
 
 const PipelineBoard = () => {
-  const { clients, loading, updateClient, addSale, sales } = useData()
-  const [toast, setToast] = useState(null)
+    const { clients } = useData()
+    const { user, salesRep: authRep, canWrite } = useAuth()
+    const myRep = useMemo(() => authRep || resolveSalesRep(user), [user, authRep])
 
-  // 영업 단계 정의
-  const mainStages = ['잠재고객', '연락중', '미팅예정', '견적제출', '협상중']
-  const endStages = ['거래 종료', '영업 대기']
-  const stages = PIPELINE_STATUSES
+    const [deals, setDeals] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [notReady, setNotReady] = useState(false)
+    const [editing, setEditing] = useState(null)
+    const [saving, setSaving] = useState(false)
+    const [dragId, setDragId] = useState(null)
+    const [mineOnly, setMineOnly] = useState(false)
 
-  // 모바일 탭 상태
-  const [currentMobileStage, setCurrentMobileStage] = useState(mainStages[0])
-  const mobileTabs = [...mainStages, '계약 성사', ...endStages]
-
-  // 파이프라인 대상자 필터링 & 매출 데이터 결합
-  const activeClients = useMemo(() => {
-    if (!clients || !Array.isArray(clients)) return []
-
-    // 각 거래처별 매출 계산
-    const clientRevenueMap = new Map()
-    if (sales && Array.isArray(sales)) {
-      sales.forEach(sale => {
-        const clientId = sale.clientId || sale.client_id
-        if (clientId) {
-          const amount = Number(sale.totalAmount || sale.total_amount || 0)
-          clientRevenueMap.set(String(clientId), (clientRevenueMap.get(String(clientId)) || 0) + amount)
-        }
-      })
-    }
-
-    return clients
-      .filter((client) => {
-        const status = normalizeStatus(client.status)
-        return stages.includes(status)
-      })
-      .map(client => ({
-        ...client,
-        revenue: clientRevenueMap.get(String(client.id)) || client.orderAmount || 0
-      }))
-  }, [clients, stages, sales])
-
-  // 수동 휴면 VIP 발굴 함수
-  const handleDiscoverDormantVIPs = async () => {
-    try {
-      setToast('휴면 VIP 고객을 검색하는 중...')
-
-      const now = new Date()
-      const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-      const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0]
-
-      console.log('[Pipeline Discovery] Dormant period threshold (1 year):', oneYearAgoStr)
-
-      // 1. 전체 매출 데이터 조회 (페이지네이션으로 모든 데이터 가져오기)
-      let allSales = []
-      let hasMore = true
-      let page = 0
-      const pageSize = 1000
-
-      while (hasMore) {
-        const { data: salesPage, error: salesError } = await supabase
-          .from('sales')
-          .select('client_id, sale_date, total_amount')
-          .order('sale_date', { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
-
-        if (salesError) throw salesError
-
-        if (salesPage && salesPage.length > 0) {
-          allSales = allSales.concat(salesPage)
-          page++
-          // 마지막 페이지인지 확인
-          if (salesPage.length < pageSize) {
-            hasMore = false
-          }
+    const load = useCallback(async () => {
+        setLoading(true)
+        const { data, error } = await supabase
+            .from('deals').select('*').order('updated_at', { ascending: false }).limit(500)
+        if (error) {
+            if (error.code === 'PGRST205' || /does not exist|could not find the table/i.test(error.message || '')) {
+                setNotReady(true)
+            } else {
+                await showError(error.message)
+            }
         } else {
-          hasMore = false
+            setNotReady(false)
+            setDeals(data || [])
         }
-      }
+        setLoading(false)
+    }, [])
 
+    useEffect(() => { load() }, [load])
 
-      if (!allSales || allSales.length === 0) {
-        setToast('매출 데이터가 없습니다.')
-        return
-      }
+    const shown = useMemo(
+        () => (mineOnly && myRep ? deals.filter((d) => d.owner === myRep) : deals),
+        [deals, mineOnly, myRep])
 
-      console.log('[Pipeline Discovery] Total sales records:', allSales.length)
+    const sum = useMemo(() => summarize(shown), [shown])
+    const byStage = useMemo(() => groupByStage(shown), [shown])
 
-      // 가장 오래된 매출 날짜 확인
-      const oldestSale = allSales[allSales.length - 1]
-      const newestSale = allSales[0]
-      console.log('[Pipeline Discovery] Date range:', {
-        oldest: oldestSale?.sale_date,
-        newest: newestSale?.sale_date
-      })
+    /** 단계 옮기기 — 보드에서 끌어다 놓으면 바로 저장된다 */
+    const moveTo = async (id, stage) => {
+        const deal = deals.find((d) => d.id === id)
+        if (!deal || deal.stage === stage) return
+        // 화면을 먼저 바꾼다. 되돌아오는 것을 기다리면 끌어 놓는 맛이 안 난다.
+        setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, stage, stage_changed_at: new Date().toISOString() } : d)))
 
-      // 2. 거래처별로 매출 집계 (누적 매출 & 마지막 거래일)
-      const clientStatsMap = new Map()
-
-      allSales.forEach(sale => {
-        const clientId = sale.client_id
-        if (!clientId) return
-
-        const amount = Number(sale.total_amount || 0)
-        const saleDate = sale.sale_date
-
-        if (!clientStatsMap.has(clientId)) {
-          clientStatsMap.set(clientId, {
-            clientId: clientId,
-            totalRevenue: 0,
-            lastOrderDate: null
-          })
+        let patch = { stage }
+        if (stage === '실패') {
+            const reason = window.prompt('실패 사유를 적어 주세요. (수주율을 볼 때 근거가 됩니다)', deal.lost_reason || '')
+            if (reason === null) { await load(); return }   // 취소하면 되돌린다
+            patch.lost_reason = reason
         }
-
-        const stats = clientStatsMap.get(clientId)
-        stats.totalRevenue += amount
-
-        // 마지막 거래일 갱신
-        if (saleDate) {
-          if (!stats.lastOrderDate || saleDate > stats.lastOrderDate) {
-            stats.lastOrderDate = saleDate
-          }
-        }
-      })
-
-      console.log('[Pipeline Discovery] Unique clients with sales:', clientStatsMap.size)
-
-      // 마지막 거래일 분포 확인
-      const lastOrderDates = Array.from(clientStatsMap.values())
-        .map(s => s.lastOrderDate)
-        .filter(d => d)
-        .sort()
-
-      console.log('[Pipeline Discovery] Last order date distribution:', {
-        oldest: lastOrderDates[0],
-        newest: lastOrderDates[lastOrderDates.length - 1],
-        sample: lastOrderDates.slice(0, 10)
-      })
-
-      // 3. 휴면 고객 필터링 (최근 1년 주문 없음 + 누적 매출 있음 + 현재 파이프라인에 없음)
-      const dormantCandidates = Array.from(clientStatsMap.values()).filter(stats => {
-        // 조건 1: 누적 매출이 있어야 함
-        if (stats.totalRevenue <= 0) return false
-
-        // 조건 2: 마지막 주문일이 1년 이전이어야 함
-        if (!stats.lastOrderDate) return false
-        if (stats.lastOrderDate >= oneYearAgoStr) return false
-
-        // [NEW] 조건 3: 현재 파이프라인(활성, 종료, 대기 등)에 이미 있는 고객 제외
-        const clientInDB = clients.find(c => c.id === stats.clientId)
-        if (!clientInDB) return false // 로컬 데이터에 없으면 안전하게 제외
-
-        const currentStatus = normalizeStatus(clientInDB.status)
-        // 파이프라인의 모든 단계(메인 + 종료/대기)에 포함되어 있다면 '이미 관리 중'인 것으로 간주하고 제외
-        const allPipelineStages = [...mainStages, ...endStages]
-        if (allPipelineStages.includes(currentStatus)) return false
-
-        return true
-      })
-
-      console.log('[Pipeline Discovery] Dormant candidates found:', dormantCandidates.length)
-      console.log('[Pipeline Discovery] Sample dormant clients:', dormantCandidates.slice(0, 3))
-
-      if (dormantCandidates.length === 0) {
-        setToast('조건에 맞는 휴면 VIP 고객이 없습니다 (모두 파이프라인에 등록됨).')
-        return
-      }
-
-      // 4. 누적 매출 기준 내림차순 정렬 후 상위 10개 선정
-      const top10VIPs = dormantCandidates
-        .sort((a, b) => b.totalRevenue - a.totalRevenue)
-        .slice(0, 10)
-
-      console.log('[Pipeline Discovery] Top 10 VIPs:', top10VIPs)
-
-      // 5. 기존 '잠재고객' 상태인 클라이언트를 '활성'으로 초기화
-      // (기존 잠재고객을 유지할지, 리셋할지 정책에 따라 다름. 여기서는 "새로운 리스트"를 위해 기존 것을 비우는 로직 유지)
-      const { data: currentPotentials, error: potentialsError } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('status', '잠재고객')
-
-      if (potentialsError) throw potentialsError
-
-      const idsToReset = (currentPotentials || []).map(c => c.id)
-
-      // 6. 새로운 Top 10을 '잠재고객'으로 설정
-      const idsToSet = top10VIPs.map(stats => stats.clientId)
-
-      // 7. Bulk Update 실행
-      if (idsToReset.length > 0) {
-        const { error: resetError } = await supabase
-          .from('clients')
-          .update({ status: '활성' }) // 잠재고객 -> 일반 활성 상태로 되돌림
-          .in('id', idsToReset)
-        if (resetError) throw resetError
-      }
-
-      if (idsToSet.length > 0) {
-        const { error: setError } = await supabase
-          .from('clients')
-          .update({ status: '잠재고객' })
-          .in('id', idsToSet)
-        if (setError) throw setError
-      }
-
-      setToast(`${top10VIPs.length}개의 휴면 VIP 고객을 발굴했습니다. 잠시 후 자동으로 새로고침됩니다.`)
-
-      // 데이터 새로고침을 위해 페이지 리로드
-      setTimeout(() => {
-        window.location.reload()
-      }, 2000)
-
-    } catch (error) {
-      console.error('[Discover Dormant VIPs Error]', error)
-      setToast('휴면 VIP 발굴 중 오류가 발생했습니다.')
-    }
-  }
-
-  // 단계별로 클라이언트 그룹화 및 매출액 순 정렬
-  const clientsByStage = useMemo(() => {
-    const grouped = {}
-    stages.forEach((stage) => {
-      grouped[stage] = activeClients
-        .filter((client) => normalizeStatus(client.status) === stage)
-        .sort((a, b) => b.revenue - a.revenue) // 매출액 높은 순 정렬
-    })
-    return grouped
-  }, [activeClients, stages])
-
-  // 드래그 앤 드롭 핸들러
-  const handleDragEnd = async (result) => {
-    const { destination, source, draggableId } = result
-
-    if (!destination) return
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) {
-      return
+        const { error } = await supabase.from('deals').update(patch).eq('id', id)
+        if (error) { await showError(error.message); await load() }
     }
 
-    const clientId = draggableId
-    const client = clients.find((c) => c.id === clientId) // activeClients 대신 전체 clients에서 검색 (안전장치)
+    const save = async () => {
+        const d = editing
+        if (!d.client_name?.trim()) { await showError('거래처를 고르거나 이름을 넣어 주세요.'); return }
+        if (!d.title?.trim()) { await showError('건 이름을 넣어 주세요. (예: 2026 IBC 연간 물량)'); return }
+        setSaving(true)
+        const payload = {
+            client_id: d.client_id || null,
+            client_name: d.client_name.trim(),
+            title: d.title.trim(),
+            stage: d.stage,
+            amount: Number(d.amount) || 0,
+            probability: d.probability === '' ? null : Number(d.probability),
+            expected_close: d.expected_close || null,
+            owner: d.owner || null,
+            next_action: d.next_action || null,
+            next_action_date: d.next_action_date || null,
+            notes: d.notes || null,
+        }
+        const { error } = d.id
+            ? await supabase.from('deals').update(payload).eq('id', d.id)
+            : await supabase.from('deals').insert([payload])
+        setSaving(false)
+        if (error) { await showError(error.message); return }
+        setEditing(null)
+        await showSuccess('저장했습니다.')
+        await load()
+    }
 
-    if (!client) return
+    const remove = async (d) => {
+        if (!(await showConfirm(`'${d.title}'을(를) 지웁니다.`, '삭제'))) return
+        const { error } = await supabase.from('deals')
+            .update({ deleted_at: new Date().toISOString() }).eq('id', d.id)
+        if (error) { await showError(error.message); return }
+        await load()
+    }
 
-    try {
-      // '계약 성사' 영역으로 드롭
-      if (destination.droppableId === 'win-zone') {
-        const confirmed = await showConfirm(
-          '계약이 완료되었습니다. 해당 거래처를 \'매출\' 상태로 전환하고 매출 실적에 반영하시겠습니까?',
-          '축하합니다! 계약 성사',
-          '매출 상태 전환',
-          '취소',
-          'success',
-          '#4f46e5' // Indigo-600
+    if (notReady) {
+        return (
+            <div className="win" style={{ margin: 12 }}>
+                <div className="win-title"><span>파이프라인</span></div>
+                <p style={{ padding: 16, margin: 0, fontSize: 13, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
+                    아직 준비되지 않았습니다. Supabase SQL Editor에서{' '}
+                    <code>execution/sql/deals.sql</code> 을 실행하면 나타납니다.
+                </p>
+            </div>
         )
-
-        if (!confirmed) return
-
-        // 1. 상태 변경
-        await updateClient(clientId, {
-          ...client,
-          status: coerceClientStatus('매출'),
-        })
-
-        // 2. 매출 등록
-        const today = new Date().toISOString().split('T')[0]
-        try {
-          await addSale({
-            rows: [{
-              clientId: clientId,
-              sale_date: today,
-              item_name: '신규 계약', // 기본 품목명
-              quantity: 1,
-              unitPrice: 0,
-              totalAmount: 0, // 금액은 나중에 수정하도록 0으로
-              notes: '파이프라인 계약 성사',
-            }]
-          })
-        } catch (saleError) {
-          console.error('매출 등록 오류:', saleError)
-        }
-
-        setToast('계약이 성사되어 \'매출\' 상태로 전환되었습니다')
-        return
-      }
-
-      // 일반 단계 이동
-      const newStatus = destination.droppableId
-      if (stages.includes(newStatus)) {
-        await updateClient(clientId, {
-          ...client,
-          status: newStatus,
-        })
-      }
-    } catch (error) {
-      console.error('상태 업데이트 중 오류:', error)
-      setToast('상태 업데이트 중 오류가 발생했습니다.')
     }
-  }
 
-  // [NEW] '거래 종료' 표시 여부 상태
-  const [showClosed, setShowClosed] = useState(false)
-
-  // 로딩 상태
-  if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <div className="text-oem-text-secondary text-sm animate-pulse">데이터를 불러오는 중...</div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-oem-bg-app p-4 md:p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
-      <div className="max-w-[1800px] mx-auto space-y-4 md:space-y-6">
-
-        {/* Page Title Section */}
-        <div className="flex items-center justify-between border-b border-oem-border pb-3">
-          <div>
-            <h1 className="text-lg md:text-xl font-bold tracking-tight text-oem-blue flex items-center gap-2">
-              Pipeline Status
-              <span className="text-[10px] bg-oem-bg-header text-oem-text-secondary px-2 py-0.5 rounded-full font-normal hidden md:inline-block">Sales Opportunities</span>
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 text-[10px] md:text-[11px] text-oem-text-secondary font-medium">
-            <span className="hidden md:flex items-center gap-1"><span className="w-2 h-2 bg-oem-green rounded-full"></span> System Healthy</span>
-            <span>Total: {activeClients.length}</span>
-          </div>
-        </div>
-
-        {/* Mobile Tab Navigation (Visible only on small screens) */}
-        <div className="md:hidden flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 no-scrollbar">
-          {mobileTabs.map((stage) => (
-            <button
-              key={stage}
-              onClick={() => setCurrentMobileStage(stage)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[12px] font-bold border transition-colors ${currentMobileStage === stage
-                ? 'bg-oem-blue text-white border-oem-blue'
-                : 'bg-white text-oem-text-secondary border-oem-border'
-                }`}
-            >
-              {stage}
-            </button>
-          ))}
-        </div>
-
-        {/* Pipeline Board */}
-        <div className="overflow-x-auto pb-6">
-          <div className="md:min-w-[1200px]">
-            <DragDropContext onDragEnd={handleDragEnd}>
-              {/* Main Pipeline Row */}
-              <div className="flex flex-col md:flex-row gap-4 items-start mb-6">
-
-                {/* Stages Loop */}
-                {mainStages.map((stage) => {
-                  return (
-                    <div
-                      key={stage}
-                      className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-white border border-oem-border rounded-oem shadow-sm ${currentMobileStage === stage ? 'block' : 'hidden md:flex'
-                        }`}
-                      style={{ minHeight: '600px' }}
-                    >
-                      {/* Column Header */}
-                      <div className="p-3 border-b border-oem-border bg-oem-bg-header/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-bold text-sm text-oem-text-primary">{stage}</h3>
-                          <span className="bg-oem-blue/10 text-oem-blue text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {(clientsByStage[stage] || []).length}
-                          </span>
-                        </div>
-                        {stage === '잠재고객' && (
-                          <button
-                            onClick={handleDiscoverDormantVIPs}
-                            className="w-full px-2 py-1.5 bg-white border border-oem-border hover:border-oem-blue text-oem-text-primary text-[10px] font-bold rounded flex items-center justify-center gap-1 transition-colors"
-                          >
-                            <TrendingUp className="w-3 h-3 text-oem-blue" />
-                            휴면 VIP 발굴
-                          </button>
-                        )}
-                        <div className="h-0.5 w-full bg-oem-border mt-2 rounded-full overflow-hidden">
-                          <div className="h-full bg-oem-blue w-full opacity-50" />
-                        </div>
-                      </div>
-
-                      {/* Droppable Area */}
-                      <Droppable droppableId={stage}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-oem-blue/5' : ''
-                              }`}
-                          >
-                            {(clientsByStage[stage] || []).map((client, index) => (
-                              <Draggable
-                                key={client.id}
-                                draggableId={client.id}
-                                index={index}
-                              >
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className={`bg-white p-3 rounded border border-oem-border hover:border-oem-blue transition-all cursor-grab active:cursor-grabbing group relative ${snapshot.isDragging ? 'shadow-lg rotate-1 border-oem-blue z-50' : ''
-                                      }`}
-                                    style={{ ...provided.draggableProps.style }}
-                                  >
-                                    <div className="flex justify-between items-start mb-1">
-                                      <h4 className="font-bold text-sm text-oem-text-primary group-hover:text-oem-blue transition-colors break-words w-[90%]">
-                                        {client.company}
-                                      </h4>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                      <div className="flex items-center justify-between text-[11px] text-oem-text-secondary">
-                                        <span>{client.contact_person || '-'}</span>
-                                      </div>
-
-                                      {client.revenue > 0 && (
-                                        <div className="text-[11px] text-oem-text-primary font-bold mt-2 pt-1 border-t border-oem-border/50 flex justify-between items-center">
-                                          <span className="text-oem-text-secondary font-normal text-[10px]">누적 매출</span>
-                                          <span>₩{client.revenue.toLocaleString()}</span>
-                                        </div>
-                                      )}
-
-                                      {client.lastOrder && (
-                                        <div className="text-[10px] text-oem-text-secondary text-right pt-0.5">
-                                          {client.lastOrder.split('T')[0]}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
-                    </div>
-                  )
-                })}
-
-                {/* Win Zone */}
-                <div className={`flex-shrink-0 w-full md:w-64 md:pt-8 ${currentMobileStage === '계약 성사' ? 'block' : 'hidden md:block'
-                  }`}>
-                  <Droppable droppableId="win-zone">
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className={`h-[400px] rounded-oem border-2 border-dashed flex flex-col items-center justify-center p-6 transition-all ${snapshot.isDraggingOver
-                          ? 'border-oem-green bg-oem-green/5'
-                          : 'border-oem-border bg-oem-bg-app hover:border-oem-green/50'
-                          }`}
-                      >
-                        <div className={`p-3 rounded-full mb-3 transition-colors ${snapshot.isDraggingOver ? 'bg-oem-green/20' : 'bg-oem-bg-header'
-                          }`}>
-                          <CheckCircle2 className={`w-6 h-6 ${snapshot.isDraggingOver ? 'text-oem-green' : 'text-oem-text-secondary'
-                            }`} />
-                        </div>
-                        <h3 className={`font-bold text-sm mb-1 ${snapshot.isDraggingOver ? 'text-oem-green' : 'text-oem-text-secondary'
-                          }`}>
-                          계약 성사 (Win)
-                        </h3>
-                        <p className="text-[10px] text-center text-oem-text-secondary leading-relaxed">
-                          협상이 완료된 카드를<br />여기로 드롭하세요
-                        </p>
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
+        <div style={{ margin: 12 }}>
+            {/* ── 요약 ─────────────────────────────────────────────── */}
+            <div className="win">
+                <div className="win-title">
+                    <span>파이프라인</span>
+                    <span className="meta">진행 중인 영업 기회</span>
                 </div>
-              </div>
-
-              {/* End Stages Row (Reused for Mobile Tab) */}
-              <div className="flex flex-col md:flex-row gap-4 items-start md:border-t md:border-oem-border md:pt-6 md:mt-6">
-
-                {/* 1. 영업 대기 (항상 표시) */}
-                <div className="w-full md:w-auto">
-                  {(() => {
-                    const stage = '영업 대기'
-                    const isActive = currentMobileStage === stage
-                    const stageClients = clientsByStage[stage] || []
-
-                    return (
-                      <div
-                        key={stage}
-                        className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-oem-bg-app border border-oem-border rounded-oem hover:opacity-100 transition-opacity ${isActive ? 'block' : 'hidden md:flex'}`}
-                        style={{ minHeight: '300px' }}
-                      >
-                        <div className="p-3 border-b border-oem-border bg-oem-bg-header/30">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-sm text-oem-text-secondary">{stage}</h3>
-                            <span className="bg-oem-grey-medium text-oem-text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              {stageClients.length}
-                            </span>
-                          </div>
-                        </div>
-
-                        <Droppable droppableId={stage}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
-                                }`}
-                            >
-                              {stageClients.map((client, index) => (
-                                <Draggable
-                                  key={client.id}
-                                  draggableId={client.id}
-                                  index={index}
-                                >
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      className="bg-white p-3 rounded border border-oem-border shadow-sm"
-                                      style={{ ...provided.draggableProps.style }}
-                                    >
-                                      <h4 className="font-bold text-sm text-oem-text-secondary mb-1">
-                                        {client.company}
-                                      </h4>
-                                      <div className="text-[10px] text-oem-text-secondary">
-                                        {client.contact_person || '-'}
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      </div>
-                    )
-                  })()}
-                </div>
-
-                {/* 2. 거래 종료 (숨김 처리 토글) */}
-                <div className="w-full md:w-auto flex flex-col gap-2">
-                  {/* Toggle Button for Closed Deals */}
-                  <div className="hidden md:flex">
-                    <button
-                      onClick={() => setShowClosed(!showClosed)}
-                      className="text-[11px] font-bold text-oem-text-secondary hover:text-oem-blue flex items-center gap-1 transition-colors"
-                    >
-                      {showClosed ? '▼' : '▶'} 거래 종료된 파이프라인 {showClosed ? '숨기기' : '보기'}
+                <div className="toolbar" style={{ flexWrap: 'wrap', gap: 8 }}>
+                    <button className="tb-btn primary" onClick={() => setEditing(emptyDeal(myRep))} disabled={!canWrite}>
+                        <Plus size={13} /> 새 기회
                     </button>
-                  </div>
-
-                  {/* Closed Stage */}
-                  {(() => {
-                    const stage = '거래 종료'
-                    const isActive = currentMobileStage === stage
-                    const stageClients = clientsByStage[stage] || []
-
-                    // 모바일에서는 탭으로 선택되면 무조건 보이고, 데스크탑에서는 showClosed 상태 따름
-                    const shouldShow = isActive || (showClosed && window.innerWidth >= 768)
-
-                    if (!shouldShow && !isActive) return null
-
-                    return (
-                      <div
-                        key={stage}
-                        className={`flex-shrink-0 w-full md:w-72 flex flex-col bg-gray-50 border border-oem-border rounded-oem opacity-70 hover:opacity-100 transition-opacity ${isActive ? 'block' : 'hidden md:flex'}`}
-                        style={{ minHeight: '300px' }}
-                      >
-                        <div className="p-3 border-b border-oem-border bg-gray-100">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-bold text-sm text-gray-500">{stage}</h3>
-                            <span className="bg-gray-200 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              {stageClients.length}
-                            </span>
-                          </div>
-                        </div>
-
-                        <Droppable droppableId={stage}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.droppableProps}
-                              className={`flex-1 p-2 space-y-2 transition-colors ${snapshot.isDraggingOver ? 'bg-black/5' : ''
-                                }`}
-                            >
-                              {stageClients.map((client, index) => (
-                                <Draggable
-                                  key={client.id}
-                                  draggableId={client.id}
-                                  index={index}
-                                >
-                                  {(provided, snapshot) => (
-                                    <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
-                                      {...provided.dragHandleProps}
-                                      className="bg-white p-3 rounded border border-oem-border shadow-sm grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all"
-                                      style={{ ...provided.draggableProps.style }}
-                                    >
-                                      <h4 className="font-bold text-sm text-gray-500 mb-1">
-                                        {client.company}
-                                      </h4>
-                                      <div className="text-[10px] text-gray-500">
-                                        {client.contact_person || '-'}
-                                      </div>
-                                    </div>
-                                  )}
-                                </Draggable>
-                              ))}
-                              {provided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      </div>
-                    )
-                  })()}
+                    <button className="tb-btn" onClick={load} disabled={loading}>
+                        <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 새로고침
+                    </button>
+                    {myRep && (
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5 }}>
+                            <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
+                            내 것만
+                        </label>
+                    )}
+                    {loading && <Loader2 size={14} className="animate-spin" />}
                 </div>
 
-              </div>
-            </DragDropContext>
-          </div>
-        </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 1, background: 'var(--border-light)' }}>
+                    {[
+                        ['진행 중', `${sum.openCount}건`, eok(sum.openAmount)],
+                        ['기대값', eok(sum.weighted), '금액 × 확률'],
+                        ['수주', `${sum.wonCount}건`, eok(sum.wonAmount)],
+                        ['수주율', sum.winRate === null ? '—' : `${sum.winRate}%`, '닫힌 건 기준'],
+                        ['멈춘 건', `${sum.staleCount}건`, '단계에 오래 머묾'],
+                        ['기한 지남', `${sum.overdueCount}건`, '예상 마감 초과'],
+                    ].map(([label, big, sub]) => (
+                        <div key={label} style={{ background: 'var(--bg-card)', padding: '8px 10px' }}>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{label}</div>
+                            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)' }}>{big}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sub}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-        {toast && (
-          <Toast
-            message={toast}
-            onClose={() => setToast(null)}
-            duration={3000}
-          />
-        )}
-      </div>
-    </div>
-  )
+            {/* ── 보드 ─────────────────────────────────────────────── */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto', paddingBottom: 8 }}>
+                {ALL_STAGES.map((st) => {
+                    const list = byStage[st.key] || []
+                    const total = list.reduce((a, d) => a + (Number(d.amount) || 0), 0)
+                    return (
+                        <div key={st.key}
+                            onDragOver={(e) => { if (dragId) e.preventDefault() }}
+                            onDrop={(e) => { e.preventDefault(); if (dragId) { moveTo(dragId, st.key); setDragId(null) } }}
+                            style={{
+                                flex: '0 0 232px', background: 'var(--bg-subtle)',
+                                border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)',
+                                display: 'flex', flexDirection: 'column', minHeight: 220,
+                            }}>
+                            <div style={{
+                                padding: '6px 9px', borderBottom: '1px solid var(--border-light)',
+                                background: isOpen(st.key) ? 'var(--bg-header)' : 'var(--bg-card)',
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <b style={{ fontSize: 12.5, color: st.key === '수주' ? 'var(--success)' : st.key === '실패' ? 'var(--danger)' : 'var(--text-primary)' }}>
+                                        {st.label}
+                                    </b>
+                                    <span style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{list.length}건</span>
+                                </div>
+                                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                                    {total > 0 ? `${won(total)}원` : '—'}
+                                    {isOpen(st.key) && <span> · {st.prob}%</span>}
+                                </div>
+                            </div>
+
+                            <div style={{ padding: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {list.map((d) => {
+                                    const stale = isStale(d)
+                                    const over = isOverdue(d)
+                                    return (
+                                        <div key={d.id}
+                                            draggable={canWrite}
+                                            onDragStart={() => setDragId(d.id)}
+                                            onDragEnd={() => setDragId(null)}
+                                            onClick={() => setEditing({ ...d, probability: d.probability ?? '' })}
+                                            title={`${daysInStage(d)}일째 ${d.stage}`}
+                                            style={{
+                                                background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                                                borderLeft: `3px solid ${stale ? 'var(--warning)' : over ? 'var(--danger)' : 'var(--accent)'}`,
+                                                borderRadius: 'var(--radius)', padding: '7px 8px', cursor: canWrite ? 'grab' : 'pointer',
+                                            }}>
+                                            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>{d.client_name}</div>
+                                            <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginBottom: 4 }}>{d.title}</div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                                                <span className="num" style={{ fontSize: 12, fontWeight: 700 }}>
+                                                    {Number(d.amount) > 0 ? `${won(d.amount)}` : '금액 미정'}
+                                                </span>
+                                                {isOpen(d.stage) && (
+                                                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{probabilityOf(d)}%</span>
+                                                )}
+                                            </div>
+                                            {(stale || over || d.expected_close) && (
+                                                <div style={{ marginTop: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                                    {over && <span style={{ color: 'var(--danger)', fontWeight: 700 }}>
+                                                        <AlertTriangle size={10} style={{ verticalAlign: -1 }} /> 기한 지남</span>}
+                                                    {stale && !over && <span style={{ color: 'var(--warning)', fontWeight: 700 }}>
+                                                        <Clock size={10} style={{ verticalAlign: -1 }} /> {daysInStage(d)}일째</span>}
+                                                    {d.expected_close && !over && (
+                                                        <span className="dt" style={{ color: 'var(--text-muted)' }}>~{String(d.expected_close).slice(5)}</span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {d.owner && (
+                                                <div style={{ marginTop: 3, fontSize: 10.5, color: 'var(--text-muted)' }}>{d.owner}</div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                                {list.length === 0 && (
+                                    <div style={{ padding: '14px 6px', textAlign: 'center', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                                        {isOpen(st.key) ? '여기로 끌어다 놓으세요' : '아직 없습니다'}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            <p style={{ margin: '8px 2px 0', fontSize: 11.5, color: 'var(--text-secondary)' }}>
+                카드를 끌어다 다른 칸에 놓으면 단계가 바뀝니다. 카드를 누르면 고칩니다.
+                왼쪽 색 막대 — <b style={{ color: 'var(--warning)' }}>노랑</b> 단계에 오래 머문 건,
+                <b style={{ color: 'var(--danger)' }}> 빨강</b> 예상 마감이 지난 건.
+            </p>
+
+            {/* ── 편집 ─────────────────────────────────────────────── */}
+            {editing && (
+                <div onClick={() => setEditing(null)} style={{
+                    position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.4)',
+                    display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '6vh 12px', overflowY: 'auto',
+                }}>
+                    <div className="win" onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 520 }}>
+                        <div className="win-title">
+                            <span>{editing.id ? '기회 고치기' : '새 기회'}</span>
+                            {editing.id && (
+                                <button className="rowbtn" onClick={() => remove(editing)} title="삭제"><Trash2 size={12} /></button>
+                            )}
+                        </div>
+                        <div style={{ padding: 12, display: 'grid', gap: 9 }}>
+                            <label style={{ fontSize: 12 }}>거래처
+                                <select value={editing.client_id || ''}
+                                    onChange={(e) => {
+                                        const c = (clients || []).find((x) => x.id === e.target.value)
+                                        setEditing((d) => ({ ...d, client_id: c?.id || null, client_name: c?.company || d.client_name }))
+                                    }}
+                                    style={{ width: '100%', marginTop: 3 }}>
+                                    <option value="">직접 입력</option>
+                                    {(clients || []).slice(0, 400).map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+                                </select>
+                            </label>
+                            {!editing.client_id && (
+                                <label style={{ fontSize: 12 }}>거래처명
+                                    <input value={editing.client_name}
+                                        onChange={(e) => setEditing((d) => ({ ...d, client_name: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }} />
+                                </label>
+                            )}
+                            <label style={{ fontSize: 12 }}>건 이름
+                                <input value={editing.title} placeholder="예) 2026 IBC 연간 물량"
+                                    onChange={(e) => setEditing((d) => ({ ...d, title: e.target.value }))}
+                                    style={{ width: '100%', marginTop: 3 }} />
+                            </label>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
+                                <label style={{ fontSize: 12 }}>단계
+                                    <select value={editing.stage} onChange={(e) => setEditing((d) => ({ ...d, stage: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }}>
+                                        {ALL_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                                    </select>
+                                </label>
+                                <label style={{ fontSize: 12 }}>담당
+                                    <select value={editing.owner || ''} onChange={(e) => setEditing((d) => ({ ...d, owner: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }}>
+                                        <option value="">지정 안 함</option>
+                                        {SALES_REP_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+                                    </select>
+                                </label>
+                                <label style={{ fontSize: 12 }}>예상 금액 (원)
+                                    <input type="number" value={editing.amount}
+                                        onChange={(e) => setEditing((d) => ({ ...d, amount: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }} />
+                                </label>
+                                <label style={{ fontSize: 12 }}>확률 (%)
+                                    <input type="number" value={editing.probability} placeholder={`기본 ${ALL_STAGES.find((s) => s.key === editing.stage)?.prob ?? 0}`}
+                                        onChange={(e) => setEditing((d) => ({ ...d, probability: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }} />
+                                </label>
+                                <label style={{ fontSize: 12 }}>예상 마감
+                                    <input type="date" value={editing.expected_close || ''}
+                                        onChange={(e) => setEditing((d) => ({ ...d, expected_close: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }} />
+                                </label>
+                                <label style={{ fontSize: 12 }}>다음 조치일
+                                    <input type="date" value={editing.next_action_date || ''}
+                                        onChange={(e) => setEditing((d) => ({ ...d, next_action_date: e.target.value }))}
+                                        style={{ width: '100%', marginTop: 3 }} />
+                                </label>
+                            </div>
+
+                            <label style={{ fontSize: 12 }}>다음에 할 일
+                                <input value={editing.next_action || ''} placeholder="예) 샘플 결과 확인 후 단가 제시"
+                                    onChange={(e) => setEditing((d) => ({ ...d, next_action: e.target.value }))}
+                                    style={{ width: '100%', marginTop: 3 }} />
+                            </label>
+                            <label style={{ fontSize: 12 }}>메모
+                                <textarea rows={3} value={editing.notes || ''}
+                                    onChange={(e) => setEditing((d) => ({ ...d, notes: e.target.value }))}
+                                    style={{ width: '100%', marginTop: 3, resize: 'vertical' }} />
+                            </label>
+                        </div>
+                        <div className="toolbar">
+                            <button className="tb-btn" onClick={() => setEditing(null)}>닫기</button>
+                            <button className="tb-btn primary" onClick={save} disabled={saving || !canWrite} style={{ marginLeft: 'auto' }}>
+                                {saving ? <Loader2 size={13} className="animate-spin" /> : null} 저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    )
 }
 
 export default PipelineBoard
