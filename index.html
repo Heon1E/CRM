@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 
 <head>
   <meta charset="UTF-8" />
@@ -18,25 +18,25 @@
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Xavian ERP" />
-  <meta property="og:title" content="Xavian ERP — Close More Deals, Grow Faster" />
+  <meta property="og:site_name" content="아이앤디 CRM" />
+  <meta property="og:title" content="아이앤디 CRM" />
   <meta property="og:description"
-    content="The all-in-one ERP/CRM built for modern enterprise teams. Enhance visibility, accelerate growth, and outpace the competition." />
+    content="아이앤디 주식회사 영업관리. 거래처 · 매출 · 채권 · 견적을 한 곳에서 봅니다." />
   <meta property="og:url" content="https://crm-dashboard-blush.vercel.app" />
   <meta property="og:image" content="https://crm-dashboard-blush.vercel.app/vite.svg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Xavian ERP Dashboard Preview" />
+  <meta property="og:image:alt" content="아이앤디 CRM 대시보드" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Xavian ERP" />
-  <meta name="twitter:description" content="The all-in-one ERP/CRM for modern enterprise sales teams." />
+  <meta name="twitter:title" content="아이앤디 CRM" />
+  <meta name="twitter:description" content="아이앤디 주식회사 영업관리 시스템" />
   <meta name="twitter:image" content="https://crm-dashboard-blush.vercel.app/vite.svg" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Xavian CRM" />
+  <meta name="apple-mobile-web-app-title" content="아이앤디 CRM" />
 
   <!-- iOS Safari 아이콘 -->
   <link rel="apple-touch-icon" href="/vite.svg" />
@@ -48,6 +48,15 @@
     if (typeof global === 'undefined') {
       window.global = window;
     }
+
+    /*
+     * 구글 지도가 인증·결제 문제로 못 열릴 때 부르는 콜백.
+     * **앱보다 먼저 등록해야 한다** — 구글이 스크립트를 읽자마자 부르므로
+     * React 화면에서 등록하면 이미 지나간 뒤다. 그러면 화면에는 아무 설명 없이
+     * 빈 회색 상자만 남는다(실제로 BillingNotEnabledMapError로 그랬다).
+     */
+    window.__gmAuthFailed = false;
+    window.gm_authFailure = function () { window.__gmAuthFailed = true; };
   </script>
 
 

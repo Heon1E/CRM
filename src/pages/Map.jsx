@@ -31,6 +31,38 @@ const Map = () => {
     const [locationError, setLocationError] = useState(null)
 
 
+    // 구글이 인증·결제 문제로 지도를 못 그릴 때 부르는 콜백. 안 잡으면 회색 상자만 남는다.
+    /*
+     * **구글 지도는 실패해도 조용하다.**
+     *
+     * 결제(Billing)가 꺼져 있으면 `loadError`가 나지 않는다. 대신 구글이
+     * 자기 영어 대화상자("This page can't load Google Maps correctly")를
+     * 지도 위에 덮거나, 아예 빈 회색 상자만 남긴다. 화면에는 '31곳을 지도에
+     * 표시합니다'라고 적혀 있으니 우리 프로그램이 고장 난 것처럼 보인다.
+     *
+     * 두 가지를 다 살핀다 — 구글이 부르는 `gm_authFailure`(index.html에서
+     * 앱보다 먼저 걸어 둔다. 그만큼 일찍 부른다)와, 구글이 덮어 놓은 문구.
+     * 지도를 감추지는 않는다. 흐릿하게라도 뜨면 쓸 수 있기 때문이다.
+     */
+    const [authFailed, setAuthFailed] = useState(() => !!window.__gmAuthFailed)
+    useEffect(() => {
+        if (authFailed) return
+        /*
+         * 구글의 경고 문구는 **간헐적으로만** 뜬다(같은 상태에서 떴다 안 떴다 한다).
+         * 그래서 문구로 판단하면 놓친다. **지도가 실제로 그려졌는지**를 본다 —
+         * 구글 지도가 정상이면 `.gm-style` 요소가 반드시 생긴다.
+         * 8초가 지나도 없으면 못 그린 것이다.
+         */
+        const t = setInterval(() => {
+            if (window.__gmAuthFailed) { setAuthFailed(true); clearInterval(t) }
+        }, 500)
+        const late = setTimeout(() => {
+            if (!document.querySelector('.gm-style')) setAuthFailed(true)
+            clearInterval(t)
+        }, 8000)
+        return () => { clearInterval(t); clearTimeout(late) }
+    }, [authFailed])
+
     const { isLoaded, loadError } = useJsApiLoader({
         id: 'google-map-script',
         googleMapsApiKey: GOOGLE_API_KEY
@@ -234,7 +266,19 @@ const Map = () => {
 
     const statusOptions = ['all', '신규', '거래중', '휴면']
 
-    if (loadError) return <div className="text-red-500 p-10">지도를 불러올 수 없습니다.</div>
+    /*
+     * **구글 지도는 실패해도 조용하다.** 결제가 꺼져 있거나 키가 막히면
+     * `loadError`가 나지 않고 **빈 회색 상자**만 남는다. 화면에는 '31곳을
+     * 지도에 표시합니다'라고 적혀 있으니 고장으로 보인다.
+     * 구글은 그럴 때 `window.gm_authFailure()`를 부른다. 그걸 잡아 이유를 적는다.
+     * (실제로 겪은 것: BillingNotEnabledMapError — 구글 클라우드 결제 미설정)
+     */
+    if (loadError) return <div className="win" style={{ margin: 12 }}>
+        <div className="win-title"><span>거래처 지도</span></div>
+        <p style={{ padding: 16, margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
+            지도를 불러오지 못했습니다. 인터넷 연결과 구글 지도 API 키를 확인하세요.
+        </p>
+    </div>
     if (!isLoaded) return <div className="p-10 text-gray-500">지도를 불러오는 중...</div>
 
     return (
@@ -261,7 +305,7 @@ const Map = () => {
                             className="oem-btn-secondary h-8 py-1.5 flex items-center gap-2"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                            {isSyncing ? 'GEO_SYNCING...' : 'SYNC_COORDINATES'}
+                            {isSyncing ? '좌표 받는 중…' : '주소 좌표 채우기'}
                         </button>
 
                         <div className="flex items-center gap-2 bg-white border border-oem-border rounded-oem px-3 py-1 h-8">
@@ -273,7 +317,7 @@ const Map = () => {
                             >
                                 {statusOptions.map(status => (
                                     <option key={status} value={status}>
-                                        {status === 'all' ? 'ALL_STATUS' : status}
+                                        {status === 'all' ? '전체 상태' : status}
                                     </option>
                                 ))}
                             </select>
@@ -290,6 +334,23 @@ const Map = () => {
                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]"></span> 거래처</span>
                         </div>
                     </div>
+
+                    {/*
+                      구글이 결제 문제로 자기 영어 대화상자를 지도 위에 덮는다.
+                      우리 프로그램이 고장 난 것으로 읽히므로 이유를 한국어로 적는다.
+                      지도는 그대로 둔다 — 흐릿하게라도 뜨면 쓸 수 있다.
+                    */}
+                    {authFailed && (
+                        <div style={{ margin: '4px 4px 0', padding: '10px 12px', borderRadius: 'var(--radius)',
+                                      background: '#fff8e6', border: '1px solid #f0d9a0', fontSize: 12.5, lineHeight: 1.8 }}>
+                            <b>구글 지도 결제가 켜져 있지 않습니다.</b> 지도 위에 뜨는 영어 안내
+                            (&ldquo;This page can&rsquo;t load Google Maps correctly&rdquo;)는 구글이 띄우는 것입니다.
+                            <br />
+                            console.cloud.google.com → 결제(Billing) → 결제 계정 연결.
+                            지도는 무료 사용량이 있지만 결제 수단 등록은 있어야 합니다.
+                            좌표는 이미 <b>{validClients.length}곳</b>에 저장돼 있어 켜는 즉시 보입니다.
+                        </div>
+                    )}
 
                     <div className="flex-1 relative m-1 rounded-oem overflow-hidden border border-oem-border shadow-inner">
                         {/* Current Location Button */}
