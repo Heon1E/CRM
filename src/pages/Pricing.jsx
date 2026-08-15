@@ -1,266 +1,90 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Check, ChevronDown, Rocket } from 'lucide-react'
+import { Rocket, Phone, Mail, MapPin, ArrowRight } from 'lucide-react'
 
-const Pricing = () => {
-    const [isAnnual, setIsAnnual] = useState(false)
-    const [openFaq, setOpenFaq] = useState(null)
+/**
+ * 도입 문의 (`/pricing`)
+ *
+ * 여기에는 요금제 세 칸($0 / $35 / 문의)과 FAQ가 있었다. FAQ 내용이 이랬다 —
+ * "언제든 해지할 수 있나요", "14일 무료 체험이 있습니다", "신용카드·PayPal을
+ * 받습니다", "비영리 단체는 연간 요금 50% 할인". **하나도 사실이 아니다.**
+ * 결제 수단도, 무료 체험도, 해지 절차도 없다.
+ *
+ * 로그인 없이 누구나 볼 수 있는 주소이고 거래처가 볼 수도 있다. 없는 상품을
+ * 파는 화면을 띄워 둘 수는 없으므로, 실제로 말할 수 있는 것만 남긴다.
+ *
+ * 파는 물건이 되면 이 파일을 다시 요금제 화면으로 만들면 된다.
+ */
+const Pricing = () => (
+    <div className="bg-[#F8FAFC] text-slate-900 min-h-screen font-['Inter',sans-serif]">
 
-    const toggleFaq = (index) => {
-        if (openFaq === index) setOpenFaq(null)
-        else setOpenFaq(index)
-    }
-
-    const faqs = [
-        {
-            question: "Can I cancel anytime?",
-            answer: "Yes, you can cancel your subscription at any time from your account settings. If you cancel, your access will continue until the end of your current billing period."
-        },
-        {
-            question: "Is there a free trial?",
-            answer: "Absolutely. We offer a 14-day free trial on our Pro plan so you can experience all the advanced features before committing."
-        },
-        {
-            question: "What payment methods do you accept?",
-            answer: "We accept all major credit cards, PayPal, and for Enterprise plans, we also support bank transfers and invoicing."
-        },
-        {
-            question: "Do you offer discounts for non-profits?",
-            answer: "Yes, we love supporting great causes. Non-profits are eligible for a 50% discount on all our annual plans. Contact our support team to apply."
-        }
-    ]
-
-    return (
-        <div className="bg-[#F8FAFC] text-slate-900 min-h-screen font-['Inter',sans-serif]">
-            {/* Navigation */}
-            <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#007538]/10">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16 items-center">
-                        <Link to="/landing" className="flex items-center gap-2 group">
-                            <div className="bg-[#007538] rounded-lg p-1">
-                                <Rocket className="w-5 h-5 text-white" />
-                            </div>
-                            <span className="font-bold text-xl tracking-tight text-slate-900 group-hover:text-[#007538] transition-colors">Xavian CRM</span>
-                        </Link>
-                        <div className="hidden md:flex items-center space-x-8">
-                            <Link to="/landing" className="text-sm font-medium text-slate-600 hover:text-[#007538] transition-colors">Product</Link>
-                            <Link to="/landing" className="text-sm font-medium text-slate-600 hover:text-[#007538] transition-colors">Features</Link>
-                            <Link to="/pricing" className="text-sm font-bold text-[#007538] transition-colors">Pricing</Link>
+        <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#007538]/10">
+            <div className="max-w-5xl mx-auto px-6">
+                <div className="flex justify-between h-16 items-center">
+                    <Link to="/landing" className="flex items-center gap-2 group min-h-[44px]">
+                        <div className="bg-[#007538] rounded-lg p-1">
+                            <Rocket className="w-5 h-5 text-white" />
                         </div>
-                        <div className="flex items-center gap-3">
-                            <Link to="/login" className="text-sm font-medium text-slate-600 px-4 py-2 hover:text-[#007538]">Sign In</Link>
-                            <Link to="/login" className="bg-[#007538] text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-[#005C2B] transition-all shadow-lg shadow-[#007538]/20">
-                                Get Started
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
-            {/* Header Section */}
-            <section className="py-16 px-4">
-                <div className="max-w-4xl mx-auto text-center space-y-6">
-                    <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">Simple, transparent pricing</h1>
-                    <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                        Everything you need to scale your sales without the complexity. Choose the plan that fits your growth.
-                    </p>
-                    <div className="flex items-center justify-center gap-4 mt-10">
-                        <span className={`text-sm font-medium ${!isAnnual ? 'text-slate-900' : 'text-slate-500'}`}>Monthly</span>
-                        <button
-                            onClick={() => setIsAnnual(!isAnnual)}
-                            className="relative inline-flex h-8 w-16 items-center rounded-full bg-[#007538]/10 cursor-pointer focus:outline-none"
-                        >
-                            <div className={`h-6 w-6 rounded-full bg-[#007538] shadow-sm transform transition-transform duration-200 ease-in-out ${isAnnual ? 'translate-x-9' : 'translate-x-1'}`} />
-                        </button>
-                        <span className={`text-sm font-medium flex items-center gap-2 ${isAnnual ? 'text-slate-900' : 'text-slate-500'}`}>
-                            Annually
-                            <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Save 20%</span>
+                        <span className="font-bold text-xl tracking-tight text-slate-900 group-hover:text-[#007538] transition-colors">
+                            아이앤디 CRM
                         </span>
-                    </div>
+                    </Link>
+                    <Link to="/login"
+                        className="inline-flex items-center gap-2 bg-[#007538] hover:bg-[#005C2B] text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors min-h-[44px]">
+                        로그인 <ArrowRight className="w-4 h-4" />
+                    </Link>
                 </div>
-            </section>
+            </div>
+        </nav>
 
-            {/* Pricing Cards */}
-            <section className="max-w-7xl mx-auto px-4 pb-24">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <main className="max-w-3xl mx-auto px-6 py-20">
+            <h1 className="text-4xl font-black mb-4">도입 문의</h1>
+            <div className="w-16 h-1 bg-[#007538] rounded-full mb-8"></div>
 
-                    {/* Starter Plan */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-8 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-                        <div className="mb-6">
-                            <h3 className="text-lg font-bold text-slate-900">Starter</h3>
-                            <p className="text-sm text-slate-500 mt-1">For growing teams</p>
-                        </div>
-                        <div className="mb-8">
-                            <span className="text-4xl font-black">${isAnnual ? '23' : '29'}</span>
-                            <span className="text-slate-500 font-medium">/mo</span>
-                        </div>
-                        <Link to="/login" className="w-full py-3 rounded-lg border-2 border-slate-100 text-slate-900 font-bold text-sm hover:bg-slate-50 transition-colors mb-8 text-center flex items-center justify-center">
-                            Get Started
-                        </Link>
-                        <div className="space-y-4">
-                            {['5 Core features', 'Basic CRM', 'Email tracking', 'Mobile app', 'Standard support'].map((feature, i) => (
-                                <div key={i} className="flex items-center gap-3 text-sm text-slate-600">
-                                    <CheckCircle2 className="text-[#007538] w-5 h-5 flex-shrink-0" />
-                                    {feature}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+            <p className="text-slate-600 leading-relaxed text-lg mb-6">
+                이 프로그램은 <b className="text-slate-900">아이앤디 주식회사가 자기 영업 업무에 맞춰
+                만들어 쓰고 있는 도구</b>입니다. 밖에 파는 상품이 아니라 요금제가 없습니다.
+            </p>
+            <p className="text-slate-600 leading-relaxed mb-12">
+                IBC · 드럼 · 제리캔을 다루는 회사의 실제 업무를 그대로 담았습니다 —
+                거래처 관리, 매출 대사, 채권 경과월 계산, 견적서 · 발주서 · 거래명세서,
+                ERP 화면 판독. 비슷한 일을 하시는 곳이라면 이야기 나눌 수 있습니다.
+            </p>
 
-                    {/* Pro Plan */}
-                    <div className="bg-white border-2 border-[#007538] rounded-xl p-8 flex flex-col relative shadow-xl shadow-[#007538]/10 transform md:-translate-y-4">
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#007538] text-white text-xs font-bold px-4 py-1.5 rounded-full">가장 많이 씁니다</div>
-                        <div className="mb-6">
-                            <h3 className="text-lg font-bold text-slate-900">Pro</h3>
-                            <p className="text-sm text-slate-500 mt-1">Advanced sales tools</p>
-                        </div>
-                        <div className="mb-8">
-                            <span className="text-4xl font-black">${isAnnual ? '63' : '79'}</span>
-                            <span className="text-slate-500 font-medium">/mo</span>
-                        </div>
-                        <Link to="/login" className="w-full py-3 rounded-lg bg-[#007538] text-white font-bold text-sm hover:bg-[#005C2B] transition-all shadow-lg shadow-[#007538]/20 mb-8 text-center flex items-center justify-center">
-                            Start Free Trial
-                        </Link>
-                        <div className="space-y-4">
-                            {['Everything in Starter', 'Unlimited clients', 'Advanced reporting', 'Custom automations', 'Priority support'].map((feature, i) => (
-                                <div key={i} className="flex items-center gap-3 text-sm text-slate-900 font-medium">
-                                    <CheckCircle2 className="text-[#007538] w-5 h-5 flex-shrink-0" />
-                                    {feature}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-5">아이앤디 주식회사</p>
+                <ul className="space-y-4 text-slate-700">
+                    <li className="flex items-center gap-3">
+                        <Phone className="w-5 h-5 text-[#007538] shrink-0" />
+                        <a href="tel:031-334-9625" className="font-bold hover:text-[#007538] transition-colors min-h-[44px] flex items-center">
+                            031-334-9625
+                        </a>
+                    </li>
+                    <li className="flex items-center gap-3">
+                        <Mail className="w-5 h-5 text-[#007538] shrink-0" />
+                        <a href="mailto:idibc@daum.net" className="font-bold hover:text-[#007538] transition-colors min-h-[44px] flex items-center">
+                            idibc@daum.net
+                        </a>
+                    </li>
+                    <li className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-[#007538] shrink-0 mt-0.5" />
+                        <span className="leading-relaxed">
+                            경기도 용인시 처인구 백암면 삼백로 367-20<br />
+                            <span className="text-sm text-slate-500">대표 이대현 · 사업자등록번호 142-81-76012</span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
 
-                    {/* Enterprise Plan */}
-                    <div className="bg-white border border-slate-200 rounded-xl p-8 flex flex-col shadow-sm hover:shadow-md transition-shadow">
-                        <div className="mb-6">
-                            <h3 className="text-lg font-bold text-slate-900">Enterprise</h3>
-                            <p className="text-sm text-slate-500 mt-1">For large organizations</p>
-                        </div>
-                        <div className="mb-8">
-                            <span className="text-4xl font-black">Custom</span>
-                            <span className="text-slate-500 font-medium">/year</span>
-                        </div>
-                        <Link to="/login" className="w-full py-3 rounded-lg border-2 border-[#007538]/20 text-[#007538] font-bold text-sm hover:bg-[#007538]/5 transition-colors mb-8 text-center flex items-center justify-center">
-                            Contact Sales
-                        </Link>
-                        <div className="space-y-4">
-                            {['Custom integrations', 'SSO & SAML', 'Dedicated manager', '99.9% Uptime SLA', 'Security compliance'].map((feature, i) => (
-                                <div key={i} className="flex items-center gap-3 text-sm text-slate-600">
-                                    <CheckCircle2 className="text-[#007538] w-5 h-5 flex-shrink-0" />
-                                    {feature}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+            <p className="mt-10 text-sm text-slate-500">
+                계정이 필요하시면 관리자에게 요청하세요. 스스로 가입할 수는 없습니다.
+            </p>
+        </main>
 
-                </div>
-            </section>
-
-            {/* Feature Comparison */}
-            <section className="max-w-7xl mx-auto px-4 py-24 border-t border-slate-200">
-                <h2 className="text-3xl font-black text-center mb-16">Compare features</h2>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead>
-                            <tr className="border-b border-slate-200">
-                                <th className="py-4 px-6 text-sm font-bold text-slate-900">Feature</th>
-                                <th className="py-4 px-6 text-sm font-bold text-slate-600 text-center w-[15%]">Starter</th>
-                                <th className="py-4 px-6 text-sm font-bold text-[#007538] text-center w-[15%]">Pro</th>
-                                <th className="py-4 px-6 text-sm font-bold text-slate-600 text-center w-[15%]">Enterprise</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {/* Sales Category */}
-                            <tr className="bg-slate-50/50">
-                                <td className="py-3 px-6 text-xs font-bold uppercase tracking-wider text-slate-500" colSpan="4">Sales</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                                <td className="py-4 px-6 text-sm">Lead Management</td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                                <td className="py-4 px-6 text-sm">Opportunity Tracking</td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                                <td className="py-4 px-6 text-sm">Productivity Tools</td>
-                                <td className="text-center py-4 text-slate-500">—</td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                            </tr>
-
-                            {/* Automation Category */}
-                            <tr className="bg-slate-50/50">
-                                <td className="py-3 px-6 text-xs font-bold uppercase tracking-wider text-slate-500" colSpan="4">Automation</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                                <td className="py-4 px-6 text-sm">Email Templates</td>
-                                <td className="text-center py-4 text-sm font-medium">5</td>
-                                <td className="text-center py-4 text-sm font-medium">Unlimited</td>
-                                <td className="text-center py-4 text-sm font-medium">Unlimited</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                                <td className="py-4 px-6 text-sm">Custom Workflows</td>
-                                <td className="text-center py-4 text-slate-500">—</td>
-                                <td className="text-center py-4 text-sm font-medium">Up to 20</td>
-                                <td className="text-center py-4 text-sm font-medium">Unlimited</td>
-                            </tr>
-                            <tr className="border-b border-slate-100">
-                                <td className="py-4 px-6 text-sm">AI Lead Scoring</td>
-                                <td className="text-center py-4 text-slate-500">—</td>
-                                <td className="text-center py-4 text-slate-500">—</td>
-                                <td className="text-center py-4"><Check className="text-[#007538] w-5 h-5 mx-auto" /></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            {/* FAQ Section */}
-            <section className="max-w-4xl mx-auto px-4 py-24">
-                <h2 className="text-3xl font-black text-center mb-12">Frequently Asked Questions</h2>
-                <div className="space-y-4">
-                    {faqs.map((faq, index) => (
-                        <div key={index} className="bg-white border border-slate-200 rounded-lg p-6 hover:border-slate-300 transition-colors cursor-pointer" onClick={() => toggleFaq(index)}>
-                            <div className="flex justify-between items-center w-full text-left font-bold text-slate-900 group">
-                                <span className="group-hover:text-[#007538] transition-colors">{faq.question}</span>
-                                <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${openFaq === index ? 'rotate-180' : ''}`} />
-                            </div>
-                            {openFaq === index && (
-                                <p className="mt-4 text-slate-600 text-sm leading-relaxed animate-fade-in-down">
-                                    {faq.answer}
-                                </p>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Footer */}
-            <footer className="bg-white border-t border-slate-200 py-12">
-                <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
-                    <div className="flex items-center gap-2">
-                        <div className="bg-[#007538]/20 rounded-lg p-1">
-                            <Rocket className="w-5 h-5 text-[#007538]" />
-                        </div>
-                        <span className="font-bold text-lg tracking-tight text-slate-900">Xavian CRM</span>
-                    </div>
-                    <div className="flex gap-8">
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Terms</a>
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Privacy</a>
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Help</a>
-                        <a href="#" className="text-sm text-slate-500 hover:text-[#007538] transition-colors">Status</a>
-                    </div>
-                    <p className="text-sm text-slate-500">© 2024 Xavian CRM Inc. All rights reserved.</p>
-                </div>
-            </footer>
-        </div>
-    )
-}
+        <footer className="border-t border-slate-200 py-8 px-6">
+            <p className="max-w-3xl mx-auto text-xs text-slate-500">© 2026 아이앤디 주식회사</p>
+        </footer>
+    </div>
+)
 
 export default Pricing
