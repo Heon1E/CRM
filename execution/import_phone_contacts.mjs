@@ -20,6 +20,7 @@ import fs from 'node:fs'
 import { connect } from './_supabase.mjs'
 import {
     parseContacts, matchWithSuggestions, refineContact, companyKey,
+    phoneKey, dedupeByPhone,
 } from '../src/utils/contactImport.js'
 
 const args = process.argv.slice(2)
@@ -93,18 +94,31 @@ const main = async () => {
     const existing = []
     for (let i = 0; i < ids.length; i += 200) {
         const { data, error } = await supabase
-            .from('client_contacts').select('client_id,name').in('client_id', ids.slice(i, i + 200))
+            .from('client_contacts').select('client_id,name,phone').is('deleted_at', null)
+            .in('client_id', ids.slice(i, i + 200))
         if (error) throw error
         existing.push(...(data || []))
     }
     const has = new Set(existing.map((e) => `${e.client_id}|${String(e.name).trim()}`))
+    // **번호가 사람의 기준이다.** 이름이 달라도 번호가 같으면 이미 있는 사람이다.
+    const hasPhone = new Set(existing.filter((e) => phoneKey(e.phone)).map((e) => `${e.client_id}|${phoneKey(e.phone)}`))
     const hasAny = new Set(existing.map((e) => e.client_id))
+
+    // 파일 안에서도 번호가 같으면 한 사람으로 접는다 (거래처별로)
+    const byClient = new Map()
+    for (const c of candidates) {
+        if (!byClient.has(c.clientId)) byClient.set(c.clientId, [])
+        byClient.get(c.clientId).push(c)
+    }
+    const folded = [...byClient.entries()].flatMap(([, list]) => dedupeByPhone(list, list[0].clientName))
 
     const payload = []
     const seenHere = new Set()
-    for (const c of candidates) {
+    for (const c of folded) {
+        const pk = phoneKey(c.phone)
+        if (pk && hasPhone.has(`${c.clientId}|${pk}`)) continue
         const key = `${c.clientId}|${String(c.name).trim()}`
-        if (has.has(key) || seenHere.has(key)) continue     // 파일 안 중복도 막는다
+        if (has.has(key) || seenHere.has(key)) continue
         seenHere.add(key)
         const first = !hasAny.has(c.clientId)
         hasAny.add(c.clientId)

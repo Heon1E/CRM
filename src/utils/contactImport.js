@@ -372,6 +372,109 @@ export const refineContact = (contact, clientName) => {
     }
 }
 
+/* ── 같은 사람 합치기 — 기준은 전화번호다 ─────────────────────────────── */
+
+/**
+ * **전화번호가 사람의 기준이다.**
+ *
+ * 처음 연락할 때는 상대가 누구인지 모른 채 번호만 저장한다(`발주담당`).
+ * 관계가 진행되고 명함을 주고받으면 이름·직급·이메일을 적어 **다시 저장**한다.
+ * 그래서 한 사람이 여러 건으로 남는다. 이름으로 묶으면 못 잡는다 — 이름이
+ * 달라서 두 건이 된 것이기 때문이다.
+ */
+export const phoneKey = (p) => String(p || '').replace(/\D/g, '')
+
+/** 사람 이름이 아니라 '자리'를 적어 둔 것 */
+const GENERIC_NAMES = [
+    '담당자', '발주담당', '발주', '구매팀', '구매', '생산', '자재', '사무실', '대표번호',
+    '회사', '공장', '본사', '경리', '총무', '배송', '납품', '견적', '문의',
+]
+
+/**
+ * 어느 쪽이 더 구체적인 기록인가. 큰 쪽이 이긴다.
+ * 이름이 사람 이름다운 것을 가장 높게 친다 — 그게 이 표의 목적이다.
+ */
+export const contactScore = (c, clientName = '') => {
+    const name = String(c?.name || '').trim()
+    if (!name) return -99
+    const parts = name.split(/\s+/).filter(Boolean)
+    let s = 0
+
+    if (parts.length === 1) s += 2                                    // 홑이름 = 사람 이름일 확률이 높다
+    if (/^[가-힣]{2,4}$/.test(name)) s += 2
+    if (GENERIC_NAMES.includes(name)) s -= 5
+    if (parts.some((p) => GENERIC_NAMES.includes(p))) s -= 3
+    if (/[/·,\-]$/.test(name)) s -= 2                                 // '노재성 공장장/' — 직급이 흘러들어왔다
+    if (parts.length > 1 && parts.some((p) => TITLE_WORDS.includes(p))) s -= 1
+
+    // 회사명을 사람 칸에 적어 둔 것 ('신우첨단소재', '가든프로젝트')
+    const ck = companyKey(clientName)
+    const nk = companyKey(name)
+    if (ck && nk && (ck.includes(nk) || nk.includes(ck))) s -= 4
+
+    if (c?.department_role) s += 2
+    if (c?.email) s += 2
+    return s
+}
+
+/**
+ * 이메일이 여럿이면 **도메인이 성한 쪽**을 고른다.
+ * 실제로 `evakim@mwc.o.kr`(오타)와 `evakim@mwc.co.kr`이 함께 있었다.
+ * 한 글자짜리 도메인 조각은 거의 오타다.
+ */
+const emailLooksSane = (e) => {
+    const at = String(e || '').split('@')
+    if (at.length !== 2) return false
+    const labels = at[1].split('.')
+    return labels.length >= 2 && labels.every((l) => l.length >= 2)
+}
+
+const bestEmail = (list) => {
+    const mails = [...new Set(list.map((c) => (c.email || '').trim()).filter(Boolean))]
+    return mails.find(emailLooksSane) || mails[0] || ''
+}
+
+/**
+ * 같은 번호의 기록들을 한 건으로 접는다.
+ *
+ * **이긴 쪽을 고르고, 빈 칸은 진 쪽에서 채운다.** 통째로 버리면 나중에 적어 둔
+ * 이메일·직급이 사라진다 — 그건 명함에서 옮겨 적은 정보라 가장 아깝다.
+ */
+export const mergeContacts = (list, clientName = '') => {
+    const sorted = [...list].sort((a, b) =>
+        contactScore(b, clientName) - contactScore(a, clientName)
+        || String(b.name || '').length - String(a.name || '').length
+        || (b.email ? 1 : 0) - (a.email ? 1 : 0))
+    const win = sorted[0]
+    return {
+        ...win,
+        name: win.name,
+        department_role: sorted.map((c) => c.department_role).find(Boolean) || null,
+        title: sorted.map((c) => c.title).find(Boolean) || '',
+        email: bestEmail(sorted) || null,
+        phone: sorted.map((c) => c.phone).find(Boolean) || null,
+        is_primary: sorted.some((c) => c.is_primary),
+        _merged: sorted.slice(1),
+    }
+}
+
+/**
+ * 번호가 같은 것끼리 묶어 접는다. 번호가 없는 건 손대지 않는다
+ * (기준이 없으니 합칠 근거도 없다).
+ */
+export const dedupeByPhone = (contacts, clientName = '') => {
+    const groups = new Map()
+    const out = []
+    for (const c of contacts || []) {
+        const k = phoneKey(c.phone)
+        if (!k) { out.push(c); continue }
+        if (!groups.has(k)) groups.set(k, [])
+        groups.get(k).push(c)
+    }
+    for (const g of groups.values()) out.push(g.length === 1 ? g[0] : mergeContacts(g, clientName))
+    return out
+}
+
 /**
  * 자동 매칭 + 후보 제안을 한 번에.
  * @returns `{ matched, suggested, rest }`

@@ -132,7 +132,10 @@ test('빈 입력에도 죽지 않는다', () => {
 })
 
 /* ── 후보 제안 ─────────────────────────────────────────────────────────── */
-import { suggestClient, buildClientKeys, matchWithSuggestions, refineContact, splitTitle } from '../src/utils/contactImport.js'
+import {
+    suggestClient, buildClientKeys, matchWithSuggestions, refineContact, splitTitle,
+    phoneKey, contactScore, mergeContacts, dedupeByPhone,
+} from '../src/utils/contactImport.js'
 
 const CLIENTS = [
     { id: 'c1', company: '남양화학' },
@@ -230,4 +233,68 @@ test('정확 일치 / 후보 / 단서 없음을 나눈다', () => {
     assert.equal(r.matched.length, 1)
     assert.equal(r.suggested.length, 1)
     assert.equal(r.rest.length, 1)
+})
+
+/* ── 같은 사람 합치기 — 기준은 전화번호 ───────────────────────────────── */
+
+test('번호가 같으면 같은 사람이다 — 이름이 달라도', () => {
+    // 처음엔 '발주담당'으로 저장했다가 명함을 받고 이름을 적어 다시 저장한다.
+    // 이름으로 묶으면 못 잡는다. 이름이 달라서 두 건이 된 것이기 때문이다.
+    const merged = dedupeByPhone([
+        { name: '발주담당', phone: '010-3753-7920', department_role: null, email: null },
+        { name: '임인순', phone: '01037537920', department_role: '과장', email: null },
+    ], '(주)제이원')
+    assert.equal(merged.length, 1)
+    assert.equal(merged[0].name, '임인순')
+    assert.equal(merged[0].department_role, '과장')
+})
+
+test('번호가 없으면 합치지 않는다 — 기준이 없다', () => {
+    const r = dedupeByPhone([{ name: '김부장', phone: '' }, { name: '이과장', phone: null }], '어디')
+    assert.equal(r.length, 2)
+})
+
+test('진 쪽의 이메일·직급을 버리지 않는다 — 명함에서 옮겨 적은 것이다', () => {
+    const m = mergeContacts([
+        { id: 1, name: '양수만', phone: '010-3695-7766', department_role: '대표', email: null },
+        { id: 2, name: '수성테크&화학 양수만', phone: '010-3695-7766', department_role: '대표', email: 'yn5200@naver.com' },
+    ], '수성테크')
+    assert.equal(m.name, '양수만')
+    assert.equal(m.email, 'yn5200@naver.com')
+})
+
+test('이메일이 여럿이면 도메인이 성한 쪽을 고른다', () => {
+    // 실제로 evakim@mwc.o.kr(오타)와 evakim@mwc.co.kr이 함께 있었다
+    const m = mergeContacts([
+        { id: 1, name: '김경희', phone: '01049547967', department_role: '차장', email: 'evakim@mwc.o.kr' },
+        { id: 2, name: '김경희 영업2팀장/', phone: '01049547967', department_role: '차장', email: 'evakim@mwc.co.kr' },
+    ], '미원화학')
+    assert.equal(m.email, 'evakim@mwc.co.kr')
+})
+
+test('회사명·자리를 사람 칸에 적어 둔 것은 진다', () => {
+    const co = contactScore({ name: '신우첨단소재' }, '신우첨단소재(주)')
+    const person = contactScore({ name: '채지훈', department_role: '대표이사', email: 'a@b.co.kr' }, '신우첨단소재(주)')
+    assert.ok(person > co)
+    assert.ok(contactScore({ name: '임인순', department_role: '과장' }, '') > contactScore({ name: '발주담당' }, ''))
+})
+
+test('직급이 이름 칸으로 흘러든 것은 진다', () => {
+    const dirty = contactScore({ name: '노재성 공장장/', department_role: '공장장', email: 'a@b.co.kr' }, '수산고분자')
+    const clean = contactScore({ name: '노재성', department_role: '공장장', email: 'a@b.co.kr' }, '수산고분자')
+    assert.ok(clean > dirty)
+})
+
+test('둘 중 하나라도 대표였으면 대표를 지킨다', () => {
+    const m = mergeContacts([
+        { id: 1, name: '발주담당', phone: '01011112222', is_primary: true },
+        { id: 2, name: '임인순', phone: '01011112222', department_role: '과장', is_primary: false },
+    ], '')
+    assert.equal(m.name, '임인순')
+    assert.equal(m.is_primary, true)
+})
+
+test('전화번호 키는 숫자만 본다', () => {
+    assert.equal(phoneKey('010-1234-5678'), phoneKey('01012345678'))
+    assert.equal(phoneKey(''), '')
 })

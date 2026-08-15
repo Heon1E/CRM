@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Upload, Loader2, Check, X, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
-import { parseContacts, matchWithSuggestions, refineContact } from '../utils/contactImport'
+import { parseContacts, matchWithSuggestions, refineContact, phoneKey, dedupeByPhone } from '../utils/contactImport'
 import { showError, showSuccess } from '../utils/alert'
 
 /**
@@ -87,10 +87,25 @@ const ContactImport = () => {
             // 이미 있는 사람은 건드리지 않는다 (손으로 넣은 것이 더 정확하다)
             const ids = [...new Set(toSave.map((c) => c.clientId))]
             const { data: existing } = await supabase
-                .from('client_contacts').select('client_id,name').in('client_id', ids)
+                .from('client_contacts').select('client_id,name,phone').is('deleted_at', null).in('client_id', ids)
             const has = new Set((existing || []).map((e) => `${e.client_id}|${String(e.name).trim()}`))
+            // **번호가 사람의 기준이다.** 이름이 달라도 번호가 같으면 이미 있는 사람이다.
+            const hasPhone = new Set((existing || [])
+                .filter((e) => phoneKey(e.phone)).map((e) => `${e.client_id}|${phoneKey(e.phone)}`))
 
-            const fresh = toSave.filter((c) => !has.has(`${c.clientId}|${String(c.name).trim()}`))
+            // 올린 파일 안에서도 번호가 같으면 한 사람으로 접는다
+            const byClient = new Map()
+            for (const c of toSave) {
+                if (!byClient.has(c.clientId)) byClient.set(c.clientId, [])
+                byClient.get(c.clientId).push(c)
+            }
+            const folded = [...byClient.values()].flatMap((l) => dedupeByPhone(l, l[0].clientName))
+
+            const fresh = folded.filter((c) => {
+                const pk = phoneKey(c.phone)
+                if (pk && hasPhone.has(`${c.clientId}|${pk}`)) return false
+                return !has.has(`${c.clientId}|${String(c.name).trim()}`)
+            })
             if (fresh.length === 0) {
                 await showSuccess('이미 다 들어 있습니다. 새로 넣을 연락처가 없습니다.')
                 return
@@ -161,7 +176,9 @@ const ContactImport = () => {
                         ※ 못 맞춘 연락처는 아래 목록에서 거래처를 직접 고를 수 있습니다.<br />
                         ※ 이미 같은 이름이 있는 거래처는 건너뜁니다.<br />
                         ※ 이름에 회사·직급이 붙어 있으면(<b>범우화학공업 강병국 팀장</b>)
-                        거래처에 넣을 때 <b>사람 이름과 직급으로 나눠</b> 담습니다.
+                        거래처에 넣을 때 <b>사람 이름과 직급으로 나눠</b> 담습니다.<br />
+                        ※ <b>같은 번호는 같은 사람으로 봅니다.</b> 이름이 달라도(처음엔 <b>발주담당</b>,
+                        명함 받고 <b>임인순 과장</b>) 한 건으로 합치고, 더 자세한 쪽을 남깁니다.
                     </p>
                 </div>
             ) : (
