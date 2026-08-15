@@ -28,7 +28,10 @@ const monthRange = (offset = 0) => {
 }
 
 const Statements = () => {
-    const { clients, sales } = useData()
+    const { clients, sales, ensureSalesDetail } = useData()
+
+    // 명세서는 날짜·품목·수량·단가를 한 줄씩 보여준다 — 상세가 있어야 한다
+    useEffect(() => { ensureSalesDetail() }, [ensureSalesDetail])
     const [q, setQ] = useState('')
     const [clientId, setClientId] = useState('')
     const [range, setRange] = useState(() => monthRange(-1))   // 기본은 지난달 — 보통 마감 후 보낸다

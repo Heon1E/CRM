@@ -23,24 +23,30 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
         <>
             <div className="flex flex-col">
                 {sortedActivities.map((act) => {
-                    let badgeColor = 'bg-gray-100 text-gray-600 border-gray-200'
+                    /*
+                     * **다크 테마 잔재였다.** 글자색이 #34D399 · #60A5FA · #C084FC —
+                     * 어두운 배경 위에 쓰라고 만든 밝은 색인데, 배경이 흰색으로
+                     * 바뀌면서 그 위에 그대로 남았다. 브라우저에서 재보니 '미팅'
+                     * 배지가 **대비 1.75**였다(4.5 필요). 사실상 안 보인다.
+                     * 배경 틴트는 그대로 두고 글자만 진한 쪽으로 내린다.
+                     */
+                    let badgeColor = { bg: 'var(--bg-app)', text: 'var(--text-secondary)', border: 'var(--border)' }
                     let Icon = FileText
 
                     switch (act.type) {
                         case '전화':
-                            badgeColor = { bg: 'rgba(59,130,246,0.1)', text: '#60A5FA', border: 'rgba(59,130,246,0.2)' }
+                            badgeColor = { bg: 'rgba(59,130,246,0.1)', text: '#1d4ed8', border: 'rgba(59,130,246,0.25)' }
                             Icon = Phone
                             break
                         case '이메일':
-                            badgeColor = { bg: 'rgba(168,85,247,0.1)', text: '#C084FC', border: 'rgba(168,85,247,0.2)' }
+                            badgeColor = { bg: 'rgba(168,85,247,0.1)', text: '#6d28d9', border: 'rgba(168,85,247,0.25)' }
                             Icon = Mail
                             break
                         case '미팅':
-                            badgeColor = { bg: 'rgba(16,185,129,0.1)', text: '#34D399', border: 'rgba(16,185,129,0.2)' }
+                            badgeColor = { bg: 'rgba(16,185,129,0.1)', text: '#146b46', border: 'rgba(16,185,129,0.25)' }
                             Icon = CheckCircle
                             break
                         default:
-                            badgeColor = { bg: 'var(--bg-app)', text: 'var(--text-secondary)', border: 'var(--border)' }
                             break
                     }
 
@@ -67,7 +73,7 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
                                     </span>
                                 </div>
                                 <p className="text-[11px] font-medium truncate flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                                    <span className={`text-[9px] px-1.5 rounded-sm font-bold uppercase`}
+                                    <span className={`text-xs px-1.5 rounded-sm font-bold`}
                                         style={{ backgroundColor: badgeColor.bg, color: badgeColor.text, border: `1px solid ${badgeColor.border}` }}>
                                         {act.type}
                                     </span>

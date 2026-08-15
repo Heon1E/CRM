@@ -17,7 +17,10 @@ import { coerceClientStatus } from '../utils/clientStatus'
 import { showError } from '../utils/alert'
 
 const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
-    const { clients, sales, activities, loading } = useData()
+    const { clients, sales, activities, loading, ensureSalesDetail } = useData()
+
+    // 거래 내역에 품목이 나와야 한다 — DataContext 참고
+    useEffect(() => { ensureSalesDetail() }, [ensureSalesDetail])
     const [fallbackClient, setFallbackClient] = useState(null)
     const [isFetchingClient, setIsFetchingClient] = useState(false)
     const navigate = useNavigate()

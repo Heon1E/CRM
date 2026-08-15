@@ -28,8 +28,16 @@ const Sales = () => {
   const {
     clients,
     deleteSale,
-    processGroupedSales
+    processGroupedSales,
+    ensureSalesDetail,
+    salesDetailReady
   } = useData()
+
+  /*
+   * 품목·수량·단가는 첫 화면에서 받지 않는다 (대시보드가 안 쓰기 때문에).
+   * 이 화면은 품목을 보여주므로 열릴 때 마저 받는다. — DataContext 참고.
+   */
+  useEffect(() => { ensureSalesDetail() }, [ensureSalesDetail])
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingSale, setEditingSale] = useState(null)

@@ -41,6 +41,8 @@ export const DataProvider = ({ children }) => {
 
   // [Performance Check] 대시보드 통계 미리 계산하여 캐싱 (탭 전환 딜레이 제거)
   const [dashboardStats, setDashboardStats] = useState(null)
+  // 품목·수량·단가까지 다 받았는가 (두 번째 조회가 끝났는가)
+  const [salesDetailReady, setSalesDetailReady] = useState(false)
 
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -570,11 +572,29 @@ export const DataProvider = ({ children }) => {
     try {
       while (true) {
         // console.log(`[DataContext] Fetching ${table}... (Range: ${from} - ${from + step - 1})`)
+        /*
+         * **정렬 기준이 유일해야 한다.** `.order()`를 주는 것만으로는 부족하다.
+         *
+         * 매출은 `sale_date`로 정렬하는데 같은 날짜가 수십 건이다. 값이 같은 행들의
+         * 순서는 정해져 있지 않아서, 1,000행씩 끊어 받으면 **페이지 경계에서 어떤 행은
+         * 두 번 오고 어떤 행은 아예 안 온다.**
+         *
+         * 실측(2026-08-15, 브라우저): `deleted_at is null`을 붙인 조회에서
+         * 15,221행을 받았는데 고유 id는 **15,194개**였다 — 27행 중복, 27행 누락.
+         * 매출 합계가 5,125,000원 많게 나왔다. 조건을 빼면 우연히 맞는다(계획이 바뀐다).
+         *
+         * 화면에서는 이렇게 보였다 — 어떤 거래처의 6/8 주문이 통째로 사라지고,
+         * 다른 거래처의 같은 날 주문이 정확히 두 배가 됐다. KPI 부문기여가
+         * 58% 대신 59%로 나온 원인이다.
+         *
+         * `id`를 마지막 정렬 기준으로 더하면 순서가 유일해져 경계가 흔들리지 않는다.
+         */
         let query = supabase
           .from(table)
           .select(selectStr)
           .order(orderCol, { ascending })
-          .range(from, from + step - 1)
+        if (orderCol !== 'id') query = query.order('id', { ascending: true })
+        query = query.range(from, from + step - 1)
 
         if (filters && typeof filters === 'function') {
           query = filters(query)
@@ -821,6 +841,27 @@ export const DataProvider = ({ children }) => {
    */
   const inFlight = useRef(null)
 
+  /**
+   * 매출은 두 번에 나눠 받는다.
+   *
+   * 브라우저에서 재보니 첫 화면 전송량 6,082KB 중 **`sales`가 4,919KB(81%)**였다.
+   * 나머지가 전부 2.4초에 끝나는데 매출 때문에 3.7초까지 끌린다(16쪽).
+   *
+   * 그런데 무게는 **품목·수량·단가 칸**에 있다. 대시보드·KPI·영업 코치가 쓰는 것은
+   * 거래처·날짜·금액 셋뿐이다. 실측: 10칸 4,740KB / 3칸 1,484KB — **3.2배** 차이다.
+   *
+   * 그래서 처음에는 가벼운 쪽만 받아 화면을 세우고, 품목이 필요한 화면
+   * (매출 목록·거래명세서·거래처 상세)을 위해 **뒤에서 마저 받는다.**
+   * `salesDetailReady`가 false인 동안에는 품목이 아직 없다.
+   *
+   * `id`·`created_at`은 가벼운 쪽에서 뺐다 — 둘이서만 1,455KB다. 빼면 주문 묶음이
+   * `날짜|거래처`가 되어 같은 날 두 번 들어온 주문이 하나로 합쳐지지만, **합계·거래처·
+   * 날짜는 그대로**다. 대시보드·KPI·코치가 보는 것은 그 셋뿐이라 숫자가 바뀌지 않는다
+   * (브라우저에서 대조해 확인했다). 건수가 중요한 매출 목록 화면은 상세를 받는다.
+   */
+  const SALES_LIGHT = 'client_id, sale_date, total_amount'
+  const SALES_FULL = 'id, sale_date, total_amount, client_id, notes, created_at, item_name, product_id, quantity, unit_price'
+
   // 4. 데이터 로드 및 동기화 함수
   const fetchData = useCallback(async () => {
     if (inFlight.current) return inFlight.current
@@ -837,7 +878,8 @@ export const DataProvider = ({ children }) => {
         products: fetchAllRecords('products', '*', 'name'),
         clients: fetchAllRecords('clients', '*', 'company'),
         activities: fetchAllRecords('activities', '*', 'activity_date', false, (q) => q.gte('activity_date', oneYearAgo)),
-        sales: fetchAllRecords('sales', 'id, sale_date, total_amount, client_id, notes, created_at, item_name, product_id, quantity, unit_price', 'sale_date', false), // Fetch specific columns (line-item supported)
+        // **매출은 두 번에 나눠 받는다.** 아래 SALES_LIGHT / SALES_FULL 참고.
+        sales: fetchAllRecords('sales', SALES_LIGHT, 'sale_date', false),
         issues: fetchAllRecords('issues', '*', 'created_at', false),
         contacts: fetchAllRecords('client_contacts', '*', 'is_primary', false)
       }
@@ -916,6 +958,10 @@ export const DataProvider = ({ children }) => {
       const groupedSales = processGroupedSales(rawSales)
       setSales(groupedSales)
 
+      // 여기서 대시보드는 이미 다 선다. 품목은 필요한 화면이 부를 때 받는다
+      // (`ensureSalesDetail`). 자동으로 뒤따라 받으면 총 전송량이 오히려 늘어난다 —
+      // 실측 4,919KB → 7,858KB 였다. 대시보드만 보고 나가는 날이 대부분이다.
+
       // [FIX] 매출 데이터를 기반으로 각 거래처의 총 매출(last_year_revenue) 계산 및 업데이트
       // DB의 last_year_revenue 컬럼을 믿지 않고, 실제 sales 데이터를 집계하여 동적으로 할당함.
       const revenueMap = {}
@@ -944,6 +990,49 @@ export const DataProvider = ({ children }) => {
     inFlight.current = run
     try { return await run } finally { inFlight.current = null }
   }, [user, migrateLegacyClientData, processGroupedSales])
+
+  /**
+   * 품목·수량·단가까지 받아 온다. **품목을 보여주는 화면만 부른다.**
+   *
+   * 매출 목록·거래명세서·거래처 상세·브리핑이 해당한다. 대시보드는 부르지 않는다 —
+   * 거래처·날짜·금액만 쓰기 때문이다. 그래서 대시보드만 보고 나가는 날은
+   * 4,919KB 대신 1,484KB만 받는다.
+   *
+   * 여러 화면이 동시에 불러도 조회는 한 번이다(`detailInFlight`).
+   * 실패해도 화면을 막지 않는다 — 가벼운 쪽으로 이미 돌아가고 있다.
+   */
+  const detailInFlight = useRef(null)
+  const ensureSalesDetail = useCallback(async () => {
+    if (salesDetailReady) return
+    if (detailInFlight.current) return detailInFlight.current
+    const run = (async () => {
+      const { data, error } = await fetchAllRecords('sales', SALES_FULL, 'sale_date', false)
+      if (error || !data) {
+        console.warn('[DataContext] 매출 상세를 받지 못했습니다:', error?.message)
+        return
+      }
+      setSales((prev) => {
+        // 거래처 이름은 이미 붙어 있던 것을 그대로 쓴다 (clients state를 또 훑지 않는다)
+        const nameById = new Map()
+        for (const g of prev) if (g.clientId && g.clientName) nameById.set(g.clientId, g.clientName)
+        return processGroupedSales(data.map((s) => {
+          const qty = Number(s.quantity) || 0
+          const price = Number(s.unit_price) || 0
+          return {
+            ...s,
+            clientId: s.client_id,
+            clientName: nameById.get(s.client_id) || '알 수 없음',
+            totalAmount: Number(s.total_amount) || (qty * price) || 0,
+            date: s.sale_date,
+          }
+        }))
+      })
+      setSalesDetailReady(true)
+      if (import.meta.env.DEV) console.log(`[DataContext] 매출 상세 ${data.length}행 (품목 포함)`)
+    })()
+    detailInFlight.current = run
+    try { return await run } finally { detailInFlight.current = null }
+  }, [salesDetailReady, processGroupedSales])
 
   // 자동 로드 (모달이 열려있을 때는 실행하지 않음)
   //
@@ -2073,7 +2162,11 @@ export const DataProvider = ({ children }) => {
     },
     deleteProduct, // 제품 삭제 함수 추가
     refreshData: fetchData, // 수동 데이터 갱신을 위한 함수 노출
-    dashboardStats // [Performance] 미리 계산된 대시보드 통계
+    dashboardStats, // [Performance] 미리 계산된 대시보드 통계
+    // 품목·수량·단가까지 왔는가 / 받아 오는 함수.
+    // 품목을 보여주는 화면은 effect에서 ensureSalesDetail()을 부르고,
+    // salesDetailReady가 false인 동안 '불러오는 중'을 보여야 한다.
+    salesDetailReady, ensureSalesDetail
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

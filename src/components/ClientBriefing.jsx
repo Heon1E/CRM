@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useData } from '../contexts/DataContext'
 import {
     X, Loader2, RefreshCw, AlertTriangle, Swords, Package,
     ListChecks, Info, ExternalLink, TrendingUp, TrendingDown, Phone, User
@@ -54,6 +55,10 @@ const Section = ({ icon: Icon, title, items, color }) => {
 }
 
 const ClientBriefing = ({ client, sales = [], activities = [], onClose }) => {
+    // 주요 품목을 보여주므로 상세가 필요하다 (첫 화면에서는 받지 않는다 — DataContext)
+    const { ensureSalesDetail } = useData()
+    useEffect(() => { ensureSalesDetail() }, [ensureSalesDetail])
+
     const navigate = useNavigate()
     const [briefing, setBriefing] = useState(null)
     const [loading, setLoading] = useState(false)
