@@ -5,6 +5,7 @@ import { useData } from '../contexts/DataContext'
 import { useAuth } from '../contexts/AuthContext'
 import { resolveSalesRep } from '../utils/salesRep'
 import { saveWithFreshNo, todayLocal } from '../utils/docNumber'
+import { printAs, quoteFileName } from '../utils/printDoc'
 import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { ProductPicker, AccessoryPicker, Thumb } from '../components/ItemPicker'
 import { QuoteSheet } from '../components/DocumentSheet'
@@ -227,10 +228,11 @@ const Quotes = () => {
         setPrinting({ head: q, lines: data || [] })
     }
 
-    // 인쇄 화면이 붙은 뒤에 인쇄창을 연다
+    // 인쇄 화면이 붙은 뒤에 인쇄창을 연다.
+    // 파일 이름을 '견적서_번호_거래처'로 바꿔 두므로 저장하면 그대로 나온다.
     useEffect(() => {
         if (!printing) return
-        const t = setTimeout(() => window.print(), 400)
+        const t = setTimeout(() => printAs(quoteFileName(printing.head)), 400)
         return () => clearTimeout(t)
     }, [printing])
 
@@ -253,9 +255,12 @@ const Quotes = () => {
             <div style={{ background: '#e9ecef', minHeight: '100vh', padding: 16 }}>
                 <div className="toolbar doc-no-print" style={{ maxWidth: '210mm', margin: '0 auto 12px' }}>
                     <button className="tb-btn" onClick={() => setPrinting(null)}><ArrowLeft size={14} /> 돌아가기</button>
-                    <button className="tb-btn primary" onClick={() => window.print()}><Printer size={14} /> 인쇄 / PDF 저장</button>
+                    <button className="tb-btn primary" onClick={() => printAs(quoteFileName(printing.head))}>
+                        <Printer size={14} /> PDF로 저장
+                    </button>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 'auto' }}>
-                        인쇄창에서 '대상'을 <b>PDF로 저장</b>으로 고르면 파일로 나옵니다.
+                        인쇄창에서 '대상'을 <b>PDF로 저장</b>으로 고르세요. 파일 이름은{' '}
+                        <b>{quoteFileName(printing.head)}</b> 으로 나옵니다.
                     </span>
                 </div>
                 <QuoteSheet quote={printing.head} items={printing.lines} company={company} />

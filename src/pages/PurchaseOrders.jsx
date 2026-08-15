@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Plus, Printer, Trash2, Loader2, Save, X, FileText, ArrowLeft, Search } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { saveWithFreshNo, todayLocal } from '../utils/docNumber'
+import { printAs, poFileName } from '../utils/printDoc'
 import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { ProductPicker } from '../components/ItemPicker'
 import { PurchaseOrderSheet } from '../components/DocumentSheet'
@@ -188,7 +189,7 @@ const PurchaseOrders = () => {
 
     useEffect(() => {
         if (!printing) return
-        const t = setTimeout(() => window.print(), 400)
+        const t = setTimeout(() => printAs(poFileName(printing.head)), 400)
         return () => clearTimeout(t)
     }, [printing])
 
@@ -209,7 +210,7 @@ const PurchaseOrders = () => {
             <div style={{ background: '#e9ecef', minHeight: '100vh', padding: 16 }}>
                 <div className="toolbar doc-no-print" style={{ maxWidth: '210mm', margin: '0 auto 12px' }}>
                     <button className="tb-btn" onClick={() => setPrinting(null)}><ArrowLeft size={14} /> 돌아가기</button>
-                    <button className="tb-btn primary" onClick={() => window.print()}><Printer size={14} /> 인쇄 / PDF 저장</button>
+                    <button className="tb-btn primary" onClick={() => printAs(poFileName(printing.head))}><Printer size={14} /> PDF로 저장</button>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 'auto' }}>
                         인쇄창에서 '대상'을 <b>PDF로 저장</b>으로 고르면 파일로 나옵니다.
                     </span>

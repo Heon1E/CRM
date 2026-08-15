@@ -206,6 +206,11 @@ export const QuoteSheet = ({ quote, items = [], company = {} }) => {
                 </tbody>
             </table>
 
+            {/* 회사 정보에 적어 둔 안내문구. 건별로 다른 말은 위 '비고'에 들어간다. */}
+            {company.quote_terms && (
+                <p className="doc-terms-note">{company.quote_terms}</p>
+            )}
+
             <Sign company={company} />
             <Foot company={company} />
         </div>
@@ -274,6 +279,10 @@ export const PurchaseOrderSheet = ({ order, items = [], company = {} }) => (
                 </tr>
             </tbody>
         </table>
+
+        {company.po_terms && (
+            <p className="doc-terms-note">{company.po_terms}</p>
+        )}
 
         <Sign company={company} />
         <Foot company={company} />

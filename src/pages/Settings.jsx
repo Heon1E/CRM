@@ -12,6 +12,7 @@ import ErpScreenshotImport from '../components/ErpScreenshotImport'
 import InboxPanel from '../components/InboxPanel'
 import ProductImages from '../components/ProductImages'
 import UserAdmin from '../components/UserAdmin'
+import CompanyProfilePanel from '../components/CompanyProfilePanel'
 import TrashAndAudit from '../components/TrashAndAudit'
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/alert'
 
@@ -435,6 +436,11 @@ const Settings = () => {
                   <ProductImages />
 
                   {/* 계정·권한 — 관리자만 내용이 보인다 */}
+                  {/* 회사 정보 · 문서 안내문구 — 견적서·발주서에 나가는 값 */}
+                  <div style={{ marginTop: 12 }}>
+                    <CompanyProfilePanel />
+                  </div>
+
                   <div style={{ marginTop: 12 }}>
                     <UserAdmin />
                   </div>
