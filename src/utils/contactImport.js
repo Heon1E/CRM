@@ -61,9 +61,36 @@ export const normalizePhone = (raw) => {
 
 /* ── vCard ─────────────────────────────────────────────────────────────── */
 
-/** 접힌 줄을 이어 붙인다 (다음 줄이 공백/탭으로 시작하면 이어짐) */
-export const unfold = (text) =>
-    String(text || '').replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '')
+/**
+ * 접힌 줄을 이어 붙인다. **두 가지가 서로 다르다. 둘 다 처리해야 한다.**
+ *
+ *   vCard 3.0 접힘 — 다음 줄이 **공백/탭으로 시작**한다.
+ *   vCard 2.1 QP  — 줄 끝이 `=`이고 다음 줄이 **공백 없이** 이어진다.
+ *
+ * 뒤쪽을 놓치면 이어지는 줄에 콜론이 없어 통째로 버려지고, 값이 UTF-8
+ * 한 글자 중간에서 잘린다 (실제로 `범우화학공업 강�=` 로 나왔다).
+ *
+ * `=`로 끝나는 줄을 무조건 잇지는 않는다 — BASE64 사진의 패딩(`==`)도
+ * `=`로 끝난다. **그 줄이 QUOTED-PRINTABLE이라고 밝힌 경우에만** 잇는다.
+ */
+export const unfold = (text) => {
+    const src = String(text || '').replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '')
+    const out = []
+    let qp = false                      // 지금 QP 값 안에서 이어지는 중인가
+    for (const line of src.split('\n')) {
+        const isQpHeader = /^[^:]*;[^:]*ENCODING=QUOTED-PRINTABLE/i.test(line)
+        if (qp) {
+            // 줄 끝의 `=`는 '이어짐' 표시일 뿐이므로 떼고 붙인다.
+            // 남겨 두면 `=EC=` + `=9D` = `=EC==9D`가 되어 디코더가 어긋난다.
+            out[out.length - 1] = out[out.length - 1].slice(0, -1) + line
+        } else {
+            out.push(line)
+            qp = isQpHeader
+        }
+        if (qp) qp = out[out.length - 1].endsWith('=')   // 줄 끝 `=` = 아직 안 끝났다
+    }
+    return out.join('\n')
+}
 
 /**
  * `.vcf` 한 덩어리 → 연락처 배열
@@ -280,6 +307,62 @@ export const buildClientKeys = (clients) =>
     (clients || [])
         .map((c) => ({ id: c.id, company: c.company, key: companyKey(c.company) }))
         .filter((c) => c.key)
+
+/* ── 사람 이름만 남기기 ────────────────────────────────────────────────── */
+
+/**
+ * 업무용 휴대폰은 이름 칸에 **회사·사람·직급을 한 줄로** 적는다.
+ * `범우화학공업 강병국 팀장`, `금호피앤비 여수 구자성 전무(공장장)`.
+ *
+ * 거래처 밑에 넣을 때 회사명이 또 붙어 있으면 `범우화학공업 > 범우화학공업
+ * 강병국`이 되어 읽기 나쁘다. 그래서 **그 거래처 이름과 겹치는 앞부분만**
+ * 걷어낸다 — 아무 말이나 지우지 않는다.
+ */
+const TITLE_WORDS = [
+    '회장', '부회장', '대표이사', '대표', '사장', '부사장', '전무', '상무', '이사', '고문',
+    '본부장', '공장장', '센터장', '연구소장', '소장', '실장', '부문장', '단장', '지점장', '점장',
+    '팀장', '파트장', '부장', '차장', '과장', '대리', '주임', '사원', '반장', '조장',
+    '수석', '책임', '선임', '연구원', '기사', '매니저', '국장', '처장', '차장님',
+]
+
+/** 마지막 토막이 직급이면 떼어낸다 (`전무(공장장)` 처럼 괄호가 붙어도 잡는다) */
+export const splitTitle = (name) => {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+    if (parts.length < 2) return { name: String(name || '').trim(), title: '' }
+    const last = parts[parts.length - 1]
+    const bare = last.replace(/[()[\]/·,]/g, '')
+    const hit = TITLE_WORDS.some((w) => bare.startsWith(w) || bare.endsWith(w))
+    if (!hit) return { name: parts.join(' '), title: '' }
+    return { name: parts.slice(0, -1).join(' '), title: last }
+}
+
+/**
+ * 연락처를 거래처에 넣기 좋게 다듬는다.
+ * @param clientName 붙일 거래처 이름 — **이것과 겹치는 앞부분만** 지운다
+ * @returns `{ name, title }`
+ */
+export const refineContact = (contact, clientName) => {
+    const ckey = companyKey(clientName)
+    let parts = String(contact?.name || '').trim().split(/\s+/).filter(Boolean)
+
+    // 앞에서부터 회사명을 먹어 들어간다. 거래처 이름을 벗어나면 거기서 멈춘다.
+    let eaten = ''
+    while (parts.length > 1) {
+        const k = companyKey(parts[0])
+        // `유한회사`·`주식회사`·`(주)`는 companyKey가 통째로 걷어내 빈 문자가 된다.
+        // 여기서 멈추면 `유한회사 에코 고강호`가 그대로 남는다 — 지나친다.
+        if (!k) { parts = parts.slice(1); continue }
+        if (!ckey.startsWith(eaten + k)) break
+        eaten += k
+        parts = parts.slice(1)
+    }
+
+    const { name, title } = splitTitle(parts.join(' '))
+    return {
+        name: name || String(contact?.name || '').trim(),
+        title: contact?.title || title || '',
+    }
+}
 
 /**
  * 자동 매칭 + 후보 제안을 한 번에.

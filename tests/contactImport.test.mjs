@@ -132,7 +132,7 @@ test('빈 입력에도 죽지 않는다', () => {
 })
 
 /* ── 후보 제안 ─────────────────────────────────────────────────────────── */
-import { suggestClient, buildClientKeys, matchWithSuggestions } from '../src/utils/contactImport.js'
+import { suggestClient, buildClientKeys, matchWithSuggestions, refineContact, splitTitle } from '../src/utils/contactImport.js'
 
 const CLIENTS = [
     { id: 'c1', company: '남양화학' },
@@ -161,6 +161,58 @@ test('길게 맞는 쪽을 고른다', () => {
 test('후보는 자동 반영이 아니다 — exact가 false다', () => {
     const keys = buildClientKeys(CLIENTS)
     assert.equal(suggestClient({ name: 'KCC 텍스 광주' }, keys).exact, false)
+})
+
+/* ── vCard 2.1 QP 소프트 개행 ──────────────────────────────────────────── */
+
+test('QP는 =로 끝나고 공백 없이 다음 줄로 이어진다 (실제 업무폰 파일)', () => {
+    // 접힘(다음 줄 공백 시작)과 다르다. 이걸 놓치면 이어지는 줄이 통째로 버려져
+    // 이름이 UTF-8 한 글자 중간에서 잘린다 — '범우화학공업 강<?>=' 로 나왔었다.
+    const vcf = [
+        'BEGIN:VCARD', 'VERSION:2.1',
+        'FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=EC=97=94=EC=97=90=EC=9D=B4=EC=B9=98=EC=BC=80=EB=AF=B8=EC=B9=BC=20=EC=',
+        '=9D=B4=EC=9C=A4=EA=B2=BD=20=EA=B3=BC=EC=9E=A5',
+        'TEL;CELL:01028541159', 'END:VCARD',
+    ].join('\r\n')
+    const [c] = parseVCard(vcf)
+    assert.equal(c.name, '엔에이치케미칼 이윤경 과장')
+})
+
+test('BASE64 사진의 == 패딩을 QP로 오해하지 않는다', () => {
+    const vcf = ['BEGIN:VCARD', 'VERSION:2.1', 'FN:김부장',
+        'PHOTO;ENCODING=BASE64:AAAA==', 'TEL:01011112222', 'END:VCARD'].join('\r\n')
+    const [c] = parseVCard(vcf)
+    assert.equal(c.name, '김부장')
+    assert.equal(c.phone, '010-1111-2222')
+})
+
+/* ── 사람 이름만 남기기 ────────────────────────────────────────────────── */
+
+test('이름 앞의 회사명을 뗀다 — 그 거래처와 겹치는 만큼만', () => {
+    const r = refineContact({ name: '범우화학공업 강병국 팀장', title: '' }, '범우화학공업(주)')
+    assert.deepEqual(r, { name: '강병국', title: '팀장' })
+})
+
+test('(주)·유한회사는 건너뛰고 이어서 본다', () => {
+    assert.equal(refineContact({ name: '유한회사 에코 고강호 대표' }, '(유)에코').name, '고강호')
+    assert.equal(refineContact({ name: '동희(주) 채병길 이사' }, '동희주식회사').name, '채병길')
+})
+
+test('거래처와 상관없는 말은 지우지 않는다', () => {
+    // '여수'는 금호피앤비화학의 일부가 아니다 — 공장 구분이므로 남긴다
+    assert.equal(refineContact({ name: '금호피앤비 여수 구자성 전무' }, '금호피앤비화학(주)').name, '여수 구자성')
+    // 엉뚱한 거래처를 골랐을 때 이름을 깎아 먹으면 안 된다
+    assert.equal(refineContact({ name: '김철수 부장' }, '전혀다른회사').name, '김철수')
+})
+
+test('vCard의 직급이 있으면 그것을 쓴다 (이름 끝에서 짐작하지 않는다)', () => {
+    const r = refineContact({ name: '코센트 고병국 부장', title: '차장' }, '(주)코센트')
+    assert.deepEqual(r, { name: '고병국', title: '차장' })
+})
+
+test('직급이 아닌 끝말은 떼지 않는다', () => {
+    assert.deepEqual(splitTitle('김진만 주임 이천공장'), { name: '김진만 주임 이천공장', title: '' })
+    assert.deepEqual(splitTitle('김철수'), { name: '김철수', title: '' })
 })
 
 test('정확 일치 / 후보 / 단서 없음을 나눈다', () => {

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Upload, Loader2, Check, X, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
-import { parseContacts, matchWithSuggestions } from '../utils/contactImport'
+import { parseContacts, matchWithSuggestions, refineContact } from '../utils/contactImport'
 import { showError, showSuccess } from '../utils/alert'
 
 /**
@@ -49,13 +49,20 @@ const ContactImport = () => {
      * 실제로 넣을 것 = 회사명이 정확히 맞은 것 + 사람이 고른 것.
      * **후보는 자동으로 들어가지 않는다.** 고른 것만 들어간다.
      */
+    const nameOf = useMemo(() => {
+        const m = new Map((clients || []).map((c) => [c.id, c.company]))
+        return (id) => m.get(id) || ''
+    }, [clients])
+
     const toSave = useMemo(() => {
         if (!rows) return []
         const pick = (list, prefix) => list
             .map((c, i) => (picks[`${prefix}${i}`] ? { ...c, clientId: picks[`${prefix}${i}`] } : null))
             .filter(Boolean)
+        // 거래처가 정해져야 이름을 다듬을 수 있다 — 그 거래처와 겹치는 앞부분만 지운다
         return [...rows.matched, ...pick(rows.suggested, 's'), ...pick(rows.rest, 'r')]
-    }, [rows, picks])
+            .map((c) => ({ ...c, ...refineContact(c, c.clientName || nameOf(c.clientId)) }))
+    }, [rows, picks, nameOf])
 
     /** 거래처 고르기 — 1,150곳을 다 띄우면 못 찾는다 */
     const clientOptions = useMemo(() => {
@@ -152,7 +159,9 @@ const ContactImport = () => {
                         ※ <b>회사명이 거래처와 정확히 맞는 것만</b> 자동으로 붙습니다. 비슷한 이름을
                         알아서 이어 붙이면 엉뚱한 거래처에 남의 연락처가 들어갑니다.<br />
                         ※ 못 맞춘 연락처는 아래 목록에서 거래처를 직접 고를 수 있습니다.<br />
-                        ※ 이미 같은 이름이 있는 거래처는 건너뜁니다.
+                        ※ 이미 같은 이름이 있는 거래처는 건너뜁니다.<br />
+                        ※ 이름에 회사·직급이 붙어 있으면(<b>범우화학공업 강병국 팀장</b>)
+                        거래처에 넣을 때 <b>사람 이름과 직급으로 나눠</b> 담습니다.
                     </p>
                 </div>
             ) : (
@@ -189,14 +198,17 @@ const ContactImport = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {rows.matched.map((c, i) => (
+                                        {rows.matched.map((c, i) => {
+                                            const f = refineContact(c, c.clientName)
+                                            return (
                                             <tr key={i}>
-                                                <td>{c.name}</td>
-                                                <td>{c.title || '-'}</td>
+                                                <td>{f.name}</td>
+                                                <td>{f.title || '-'}</td>
                                                 <td className="num">{c.phone || '-'}</td>
                                                 <td>{c.clientName}</td>
                                             </tr>
-                                        ))}
+                                            )
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
