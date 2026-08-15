@@ -329,11 +329,19 @@ const TITLE_WORDS = [
 export const splitTitle = (name) => {
     const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
     if (parts.length < 2) return { name: String(name || '').trim(), title: '' }
+    const isTitle = (w) => {
+        const bare = String(w).replace(/[()[\]/·,]/g, '')
+        return TITLE_WORDS.some((t) => bare.startsWith(t) || bare.endsWith(t))
+    }
     const last = parts[parts.length - 1]
-    const bare = last.replace(/[()[\]/·,]/g, '')
-    const hit = TITLE_WORDS.some((w) => bare.startsWith(w) || bare.endsWith(w))
-    if (!hit) return { name: parts.join(' '), title: '' }
-    return { name: parts.slice(0, -1).join(' '), title: last }
+    if (isTitle(last)) return { name: parts.slice(0, -1).join(' '), title: last }
+
+    // `김진만 주임 이천공장` — 직급 뒤에 소속이 더 붙는다. 두 번째 토막이
+    // 직급이면 거기서 자른다. 뒤는 통째로 직급 칸에 담는다(버리면 정보가 사라진다).
+    if (parts.length >= 3 && isTitle(parts[1])) {
+        return { name: parts[0], title: parts.slice(1).join(' ') }
+    }
+    return { name: parts.join(' '), title: '' }
 }
 
 /**

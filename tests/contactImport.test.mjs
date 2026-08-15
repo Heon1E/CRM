@@ -211,8 +211,14 @@ test('vCard의 직급이 있으면 그것을 쓴다 (이름 끝에서 짐작하�
 })
 
 test('직급이 아닌 끝말은 떼지 않는다', () => {
-    assert.deepEqual(splitTitle('김진만 주임 이천공장'), { name: '김진만 주임 이천공장', title: '' })
     assert.deepEqual(splitTitle('김철수'), { name: '김철수', title: '' })
+    assert.deepEqual(splitTitle('울산 김태영'), { name: '울산 김태영', title: '' })
+})
+
+test('직급 뒤에 소속이 더 붙으면 두 번째 토막에서 자른다', () => {
+    // `김진만 주임 이천공장` — 소속을 버리지 않고 직급 칸에 함께 담는다
+    assert.deepEqual(splitTitle('김진만 주임 이천공장'), { name: '김진만', title: '주임 이천공장' })
+    assert.deepEqual(splitTitle('김용덕 실장 기술영업'), { name: '김용덕', title: '실장 기술영업' })
 })
 
 test('정확 일치 / 후보 / 단서 없음을 나눈다', () => {
