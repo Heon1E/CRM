@@ -102,15 +102,15 @@ const Statements = () => {
         ? ['거래명세서', printing.client_name, `${printing.from}~${printing.to}`].join('_')
         : ''
 
-    useEffect(() => {
-        if (!printing) return
-        const t = setTimeout(() => printAs(fileName), 400)
-        return () => clearTimeout(t)
-    }, [printing, fileName])
+    /*
+     * **인쇄창을 자동으로 열지 않는다.** 미리보기로 넘어가자마자 인쇄창이
+     * 떠 버리면, 화면을 확인할 새도 없이 '대상'을 고르라는 창이 튀어나와
+     * 놀라게 된다. 문서를 먼저 보고 사람이 누를 때 연다.
+     */
 
     if (printing) {
         return (
-            <div style={{ background: '#e9ecef', minHeight: '100vh', padding: 16 }}>
+            <div className="doc-preview" style={{ background: '#e9ecef', minHeight: '100vh', padding: 16 }}>
                 <div className="toolbar doc-no-print" style={{ maxWidth: '210mm', margin: '0 auto 12px' }}>
                     <button className="tb-btn" onClick={() => setPrinting(null)}><ArrowLeft size={14} /> 돌아가기</button>
                     <button className="tb-btn primary" onClick={() => printAs(fileName)}>

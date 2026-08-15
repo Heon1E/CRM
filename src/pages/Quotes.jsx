@@ -235,13 +235,13 @@ const Quotes = () => {
         setPrinting({ head: q, lines: data || [] })
     }
 
-    // 인쇄 화면이 붙은 뒤에 인쇄창을 연다.
-    // 파일 이름을 '견적서_번호_거래처'로 바꿔 두므로 저장하면 그대로 나온다.
-    useEffect(() => {
-        if (!printing) return
-        const t = setTimeout(() => printAs(quoteFileName(printing.head)), 400)
-        return () => clearTimeout(t)
-    }, [printing])
+    /*
+     * **인쇄창을 자동으로 열지 않는다.**
+     *
+     * 예전에는 미리보기로 넘어가고 400ms 뒤에 인쇄창이 저절로 떴다. 화면을
+     * 확인할 새도 없이 '대상: PDF로 저장 / 프린터' 를 고르라는 창이 튀어나와
+     * 놀라게 된다. 문서를 먼저 보고 사람이 누를 때 연다.
+     */
 
     // ---------------------------------------------------------------- 안내
     if (tableMissing) {
@@ -259,7 +259,7 @@ const Quotes = () => {
     // ---------------------------------------------------------------- 인쇄
     if (printing) {
         return (
-            <div style={{ background: '#e9ecef', minHeight: '100vh', padding: 16 }}>
+            <div className="doc-preview" style={{ background: '#e9ecef', minHeight: '100vh', padding: 16 }}>
                 <div className="toolbar doc-no-print" style={{ maxWidth: '210mm', margin: '0 auto 12px' }}>
                     <button className="tb-btn" onClick={() => setPrinting(null)}><ArrowLeft size={14} /> 돌아가기</button>
                     <button className="tb-btn primary" onClick={() => printAs(quoteFileName(printing.head))}>
@@ -342,27 +342,50 @@ const Quotes = () => {
                             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                                 <Thumb url={l.image_url} alt={l.name} size={64} />
 
-                                <div style={{ flex: 1, minWidth: 200, display: 'grid', gap: 6 }}>
+                                {/* 넓은 화면에서 품목명 칸만 700px까지 늘어나 비율이 이상했다.
+                                    적당히 잡아 두면 숫자 칸과 나란히 읽힌다. */}
+                                <div style={{ flex: '1 1 260px', maxWidth: 520, minWidth: 200, display: 'grid', gap: 6 }}>
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <input value={l.name} placeholder="품목명"
-                                            onChange={(e) => setLine(l.key, { name: e.target.value })} style={{ flex: 1 }} />
+                                            onChange={(e) => setLine(l.key, { name: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
                                         <button className="tb-btn" onClick={() => setPickFor(l.key)}>고르기</button>
                                     </div>
                                     <input value={l.spec || ''} placeholder="규격"
                                         onChange={(e) => setLine(l.key, { spec: e.target.value })} />
                                 </div>
 
-                                <div style={{ display: 'grid', gap: 6, width: 120 }}>
-                                    <input value={l.quantity} placeholder="수량" style={{ textAlign: 'right' }}
-                                        onChange={(e) => setLine(l.key, { quantity: e.target.value })} />
-                                    <input value={l.unit_price} placeholder="단가" style={{ textAlign: 'right' }}
-                                        onChange={(e) => setLine(l.key, { unit_price: e.target.value })} />
-                                    <div style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700 }}>
-                                        {won(num(l.quantity) * num(l.unit_price))}원
+                                {/*
+                                  숫자 칸이 삐져나와 휴지통 단추 밑으로 들어가 있었다.
+                                  칸 폭을 120px로 정해 놨는데 입력칸이 175px로 그려졌다 —
+                                  그리드·플렉스 항목은 기본이 `min-width: auto`라 **정한 폭보다
+                                  커질 수 있다.** `minWidth: 0`을 주어야 폭이 지켜진다.
+                                  (실측: 수량 칸 1409~1584px, 휴지통 1539px — 45px 겹쳤다)
+
+                                  칸 이름도 없어서 어느 것이 수량이고 단가인지 알 수 없었다.
+                                  인쇄되는 표와 같은 순서(수량 · 단가 · 금액)로 이름을 붙인다.
+                                */}
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                                    <label style={{ width: 84, minWidth: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
+                                        수량
+                                        <input value={l.quantity} inputMode="numeric" style={{ textAlign: 'right', width: '100%', minWidth: 0 }}
+                                            onChange={(e) => setLine(l.key, { quantity: e.target.value })} />
+                                    </label>
+                                    <label style={{ width: 110, minWidth: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
+                                        단가
+                                        <input value={l.unit_price} inputMode="numeric" style={{ textAlign: 'right', width: '100%', minWidth: 0 }}
+                                            onChange={(e) => setLine(l.key, { unit_price: e.target.value })} />
+                                    </label>
+                                    <div style={{ width: 130, minWidth: 0, fontSize: 12, color: 'var(--text-secondary)' }}>
+                                        금액
+                                        <div style={{ textAlign: 'right', fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)',
+                                                      height: 30, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                            {won(num(l.quantity) * num(l.unit_price))}원
+                                        </div>
                                     </div>
                                 </div>
 
-                                <button className="rowbtn" onClick={() => removeLine(l.key)} title="이 줄 빼기">
+                                <button className="rowbtn" onClick={() => removeLine(l.key)} title="이 줄 빼기"
+                                    style={{ alignSelf: 'flex-end', marginBottom: 3, marginLeft: 'auto' }}>
                                     <Trash2 size={13} />
                                 </button>
                             </div>
