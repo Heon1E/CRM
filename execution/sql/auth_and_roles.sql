@@ -54,7 +54,9 @@ update public.profiles set active     = true    where active is null;
 update public.profiles set created_at = now()   where created_at is null;
 update public.profiles set updated_at = now()   where updated_at is null;
 
-alter table public.profiles alter column role       set default 'sales';
+-- 새로 생기는 행은 '승인 대기'다. 가입만으로 데이터가 열리면 안 된다
+-- (배포 주소는 공개돼 있다). 관리자가 설정 > 계정 · 권한에서 올려 준다.
+alter table public.profiles alter column role       set default 'pending';
 alter table public.profiles alter column active     set default true;
 alter table public.profiles alter column created_at set default now();
 alter table public.profiles alter column updated_at set default now();
@@ -64,7 +66,7 @@ alter table public.profiles alter column active set not null;
 -- 역할 값은 셋 중 하나
 do $$ begin
     alter table public.profiles
-        add constraint profiles_role_check check (role in ('admin', 'sales', 'viewer'));
+        add constraint profiles_role_check check (role in ('admin', 'sales', 'viewer', 'pending'));
 exception when duplicate_object then null;
 end $$;
 
@@ -72,7 +74,8 @@ create index if not exists idx_profiles_rep on public.profiles (sales_rep);
 
 -- ========================== 2. 계정 생성 시 프로필 ==========================
 -- **맨 처음 생기는 계정은 admin이다** — 관리자를 손으로 심을 방법이 없으면
--- 아무도 들어올 수 없다. 두 번째부터는 sales로 들어오고 admin이 올려 준다.
+-- 아무도 들어올 수 없다. 두 번째부터는 **승인 대기(pending)** 로 들어온다.
+-- pending은 아무것도 못 읽는다. 관리자가 올려 줘야 쓸 수 있다.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -87,7 +90,7 @@ begin
         new.id,
         new.email,
         coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
-        case when first_user then 'admin' else 'sales' end,
+        case when first_user then 'admin' else 'pending' end,
         true
     )
     on conflict (id) do nothing;
@@ -103,7 +106,7 @@ create trigger on_auth_user_created
 insert into public.profiles (id, email, full_name, role, active)
 select u.id, u.email,
        coalesce(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)),
-       case when not exists (select 1 from public.profiles) then 'admin' else 'sales' end,
+       case when not exists (select 1 from public.profiles) then 'admin' else 'pending' end,
        true
 from auth.users u
 where not exists (select 1 from public.profiles p where p.id = u.id);
@@ -121,11 +124,16 @@ returns boolean
 language sql stable security definer set search_path = public
 as $$ select coalesce(public.my_role() = 'admin', false) $$;
 
-/** 읽을 수 있는가 — 로그인했고 활성 계정이면 읽는다 */
+/**
+ * 읽을 수 있는가.
+ *
+ * **'역할이 있으면 읽는다'로 두면 안 된다.** 승인 대기(pending)도 역할이므로
+ * 가입만으로 회사 데이터가 통째로 열린다. 읽을 수 있는 역할을 적어 둔다.
+ */
 create or replace function public.can_read()
 returns boolean
 language sql stable security definer set search_path = public
-as $$ select public.my_role() is not null $$;
+as $$ select coalesce(public.my_role() in ('admin', 'sales', 'viewer'), false) $$;
 
 /** 고칠 수 있는가 — 조회전용(viewer)은 못 고친다 */
 create or replace function public.can_write()

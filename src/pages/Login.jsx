@@ -5,18 +5,27 @@ import { Rocket, HelpCircle, Mail, Lock, Eye } from 'lucide-react'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { signIn, signUp, signInWithGoogle, user } = useAuth()
+  const { signIn, signInWithGoogle, user } = useAuth()
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [authMode, setAuthMode] = useState('login') // 'login' or 'signup'
   const [showPassword, setShowPassword] = useState(false)
 
-  // 동적 앱 타이틀: 회사명이 있으면 '회사이름 CRM', 없으면 기본값 'Xavian CRM'
+  /*
+   * **스스로 가입하는 길을 없앴다.** 이 앱은 사내 도구인데 배포 주소는 공개돼
+   * 있다. 가입 버튼 하나로 거래처 1,150곳과 매출 15,221건을 전부 읽고 쓸 수
+   * 있었다. 계정은 관리자가 만든다.
+   * 화면에서 버튼만 지우면 안 된다 — 요청을 직접 보내면 그만이다.
+   * DB에서도 막았다: 새 계정은 '승인 대기'로 들어와 아무것도 못 읽는다
+   * (execution/sql/pending_role.sql).
+   */
+
+  // 회사명이 있으면 '회사이름 CRM'. 없으면 우리 회사 이름을 쓴다 —
+  // 예전 기본값이 'Xavian CRM'이라 우리 회사 로그인 화면에 남의 이름이 떴다.
   const appTitle = useMemo(() => {
     const companyName = user?.user_metadata?.company_name || user?.app_metadata?.company_name || null
-    return companyName ? `${companyName} CRM` : 'Xavian CRM'
+    return companyName ? `${companyName} CRM` : '아이앤디 CRM'
   }, [user])
 
   const handleGoogleSignIn = async () => {
@@ -50,17 +59,10 @@ const Login = () => {
       return
     }
     setLoading(true)
-    const fn = authMode === 'signup' ? signUp : signIn
-    const result = await fn(loginId.trim(), password)
+    const result = await signIn(loginId.trim(), password)
     setLoading(false)
     if (!result.success) {
-      setError(result.error || (authMode === 'signup' ? '계정을 만들지 못했습니다.' : '로그인하지 못했습니다.'))
-      return
-    }
-    if (authMode === 'signup') {
-      setError('')
-      setAuthMode('login')
-      alert('계정을 만들었습니다. 같은 아이디로 로그인하세요.')
+      setError(result.error || '로그인하지 못했습니다.')
       return
     }
     navigate('/')
@@ -71,16 +73,20 @@ const Login = () => {
 
       {/* Header */}
       <header className="absolute top-0 w-full flex items-center justify-between px-6 sm:px-12 py-6 z-20">
-        <Link to="/landing" className="flex items-center gap-2 group">
+        <Link to="/landing" className="flex items-center gap-2 group min-h-[44px]">
           <div className="bg-[#007538] text-white p-1.5 rounded-lg shadow-sm">
             <Rocket className="w-5 h-5" />
           </div>
           <h2 className="text-slate-900 text-xl font-bold leading-tight tracking-tight group-hover:text-[#007538] transition-colors">{appTitle}</h2>
         </Link>
-        <button className="text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1 text-sm font-medium">
+        {/* 예전에는 아무 일도 하지 않는 'Help' 버튼이었다. 누를 것이 있는 것처럼
+            보이면 누르게 되고, 아무 일도 안 일어나면 고장으로 읽힌다.
+            로그인 화면에서 실제로 필요한 것은 도움을 요청할 곳이다. */}
+        <a href="tel:031-334-9625"
+           className="text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1.5 text-sm font-medium min-h-[44px] px-2">
           <HelpCircle className="w-4 h-4" />
-          <span className="hidden sm:inline">Help</span>
-        </button>
+          <span className="hidden sm:inline">문의 031-334-9625</span>
+        </a>
       </header>
 
       {/* Main Container */}
@@ -97,22 +103,27 @@ const Login = () => {
               </svg>
             </div>
 
-            <div className="relative z-10 space-y-8 max-w-lg">
-              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30">
-                <span className="text-white text-xs font-bold tracking-wide uppercase">Join 10,000+ top performing teams</span>
+            {/*
+              여기에는 원래 지어낸 고객 추천사("Sarah Jenkins, VP of Sales at
+              TechFlow")와 'Join 10,000+ teams'가 박혀 있었다. 둘 다 사실이
+              아니다. 사내 도구의 로그인 화면에 없는 고객의 말을 실어 둘 이유가
+              없고, 거래처가 이 화면을 볼 수도 있다. 실제로 하는 일을 적는다.
+            */}
+            <div className="relative z-10 space-y-7 max-w-lg">
+              {/* 흰색 20%를 깔면 초록이 밝아져 흰 글씨 대비가 3.94로 떨어진다
+                  (12px는 4.5 필요). 어둡게 깔아야 읽힌다 — 브라우저에서 쟀다. */}
+              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/25">
+                <span className="text-white text-xs font-bold tracking-wide">아이앤디 주식회사 영업관리</span>
               </div>
               <p className="text-white text-3xl font-bold leading-snug">
-                "Xavian transformed our sales workflow. We closed 40% more deals in the first quarter alone."
+                거래처 · 매출 · 채권 · 견적을<br />한 곳에서 봅니다.
               </p>
-              <div className="flex items-center gap-4 pt-4">
-                <div className="h-12 w-12 rounded-full bg-slate-200 border-2 border-white/50 flex items-center justify-center font-bold text-slate-600 overflow-hidden">
-                  SJ
-                </div>
-                <div>
-                  <p className="text-white text-base font-bold">Sarah Jenkins</p>
-                  <p className="text-white/80 text-sm">VP of Sales at TechFlow</p>
-                </div>
-              </div>
+              <ul className="space-y-2.5 text-white/90 text-[15px] leading-relaxed">
+                <li>· 매일 아침 오늘 할 일과 지난 약속을 알려 줍니다</li>
+                <li>· 매출이 꺾인 곳과 연락이 끊긴 곳을 짚어 줍니다</li>
+                <li>· 견적서 · 발주서 · 거래명세서를 바로 만듭니다</li>
+                <li>· 결제가 밀린 순서로 채권을 세웁니다</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -122,8 +133,8 @@ const Login = () => {
           <div className="w-full max-w-[440px] bg-white p-8 sm:p-10 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 relative z-10">
 
             <div className="text-center sm:text-left mb-8">
-              <h1 className="text-slate-900 text-3xl font-bold mb-2">Welcome back</h1>
-              <p className="text-slate-500 text-sm">Enter your details to access your dashboard</p>
+              <h1 className="text-slate-900 text-3xl font-bold mb-2">{appTitle}</h1>
+              <p className="text-slate-500 text-sm">아이디와 비밀번호를 넣어 주세요</p>
             </div>
 
             {error && (
@@ -131,22 +142,6 @@ const Login = () => {
                 <p className="text-sm text-red-600 font-medium">{error}</p>
               </div>
             )}
-
-            {/* Tab Control */}
-            <div className="flex p-1 bg-slate-100 rounded-lg mb-8">
-              <button
-                onClick={() => setAuthMode('login')}
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${authMode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
-              >
-                Log in
-              </button>
-              <button
-                onClick={() => setAuthMode('signup')}
-                className={`flex-1 py-2 text-sm font-semibold rounded-md transition-all ${authMode === 'signup' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
-              >
-                Sign up
-              </button>
-            </div>
 
             <form onSubmit={handleEmailAuth} className="space-y-5">
               {/* Email Field */}
@@ -170,16 +165,16 @@ const Login = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="password">비밀번호</label>
-                  {authMode === 'login' && (
-                    <a href="#" className="text-xs font-semibold text-[#007538] hover:underline">Forgot password?</a>
-                  )}
+                  {/* 예전에 href="#" 인 '비밀번호 찾기'가 있었다. 눌러도 아무 일이
+                      일어나지 않는다. 아이디가 회사 내부용(@idibc.local)이라 메일로
+                      보낼 수도 없다. 관리자에게 요청하는 것이 실제 절차다. */}
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#007538]/20 focus:border-[#007538] outline-none transition-all text-slate-900 sm:text-sm"
@@ -188,7 +183,8 @@ const Login = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600 focus:outline-none"
+                    aria-label={showPassword ? '비밀번호 가리기' : '비밀번호 보기'}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-slate-500 hover:text-slate-600 focus:outline-none"
                   >
                     <Eye className="w-5 h-5" />
                   </button>
@@ -201,7 +197,7 @@ const Login = () => {
                 className="w-full py-3.5 bg-[#007538] hover:bg-[#005C2B] text-white font-bold rounded-lg shadow-lg shadow-[#007538]/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 disabled={loading}
               >
-                {authMode === 'login' ? 'Log in' : 'Create account'}
+                {loading ? '들어가는 중…' : '로그인'}
               </button>
             </form>
 
@@ -211,7 +207,7 @@ const Login = () => {
                 <div className="w-full border-t border-slate-200"></div>
               </div>
               <div className="relative flex justify-center text-xs uppercase tracking-widest">
-                <span className="bg-white px-4 text-slate-500 font-medium">Or continue with</span>
+                <span className="bg-white px-4 text-slate-500 font-medium">또는</span>
               </div>
             </div>
 
@@ -228,16 +224,18 @@ const Login = () => {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                 </svg>
-                <span className="text-sm font-semibold text-slate-700">Continue with Google</span>
+                <span className="text-sm font-semibold text-slate-700">구글 계정으로 로그인</span>
               </button>
             </div>
 
-            {/* Footer */}
+            {/*
+              예전에는 여기에 '계정이 없으신가요? Sign up'이 있었다. 그런데 이
+              앱은 사내 도구이고 배포 주소는 공개돼 있다. 스스로 가입하면 곧바로
+              거래처·매출을 전부 읽고 쓸 수 있었다. 계정은 관리자가 만든다.
+              (DB에서도 막았다 — execution/sql/pending_role.sql)
+            */}
             <p className="mt-8 text-center text-sm text-slate-500">
-              {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
-              <button onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')} className="font-bold text-[#007538] hover:underline">
-                {authMode === 'login' ? "Sign up" : "Log in"}
-              </button>
+              계정이 필요하면 관리자에게 요청하세요.
             </p>
           </div>
         </div>

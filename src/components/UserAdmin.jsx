@@ -16,8 +16,11 @@ import { showError, showSuccess } from '../utils/alert'
  * 역할을 못 바꾸게 막는 것은 화면이 아니라 DB다 (`profiles`의 RLS).
  * 화면에서 숨겨도 요청을 직접 보내면 그만이라, 서버에서 막아야 한다.
  */
-const ROLE_LABEL = { admin: '관리자', sales: '영업', viewer: '조회 전용' }
+const ROLE_LABEL = { pending: '승인 대기', admin: '관리자', sales: '영업', viewer: '조회 전용' }
 const ROLE_DESC = {
+    // 새로 가입한 계정은 여기로 들어온다. **아무것도 못 읽는다.**
+    // 배포 주소가 공개돼 있어서, 가입만으로 데이터가 열리면 안 된다.
+    pending: '아무것도 볼 수 없음 — 관리자가 역할을 정해야 합니다',
     admin: '모든 기능 + 삭제 + 계정 관리',
     sales: '읽기 · 쓰기 (삭제 불가)',
     viewer: '읽기만',
@@ -59,7 +62,13 @@ const UserAdmin = () => {
     }
 
     if (tableMissing) {
-        return (
+        // 승인 대기를 맨 위로 — 새로 들어온 계정을 놓치면 안 된다
+    const ORDER = { pending: 0, admin: 1, sales: 2, viewer: 3 }
+    const sorted = [...rows].sort((a, b) =>
+        (ORDER[a.role] ?? 9) - (ORDER[b.role] ?? 9) || String(a.email).localeCompare(String(b.email)))
+    const pending = rows.filter((r) => r.role === 'pending').length
+
+    return (
             <div className="win">
                 <div className="win-title"><span>계정 · 권한</span></div>
                 <p style={{ padding: 16, margin: 0, fontSize: 13, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
@@ -85,8 +94,18 @@ const UserAdmin = () => {
         <div className="win">
             <div className="win-title">
                 <span><Shield size={13} style={{ verticalAlign: -2, marginRight: 4 }} />계정 · 권한</span>
-                <span className="meta">{rows.length}명</span>
+                <span className="meta">
+                    {rows.length}명
+                    {pending > 0 && <b style={{ color: 'var(--warning)', marginLeft: 8 }}>승인 대기 {pending}명</b>}
+                </span>
             </div>
+
+            {pending > 0 && (
+                <div style={{ padding: '9px 12px', background: 'var(--warning-bg, #fff8e6)', fontSize: 12.5, lineHeight: 1.7 }}>
+                    <b>모르는 계정이 있으면 권한을 주지 마세요.</b> 승인 대기 계정은 아무것도 볼 수 없습니다.
+                    쓰지 않을 계정은 Supabase &gt; Authentication &gt; Users 에서 지우면 됩니다.
+                </div>
+            )}
 
             <div className="toolbar">
                 <button className="tb-btn" onClick={load} disabled={loading}>
@@ -107,7 +126,7 @@ const UserAdmin = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map((r) => (
+                        {sorted.map((r) => (
                             <tr key={r.id}>
                                 <td>{String(r.email || '').split('@')[0]}
                                     {r.id === profile?.id && <b style={{ color: 'var(--accent)' }}> (나)</b>}
