@@ -130,7 +130,7 @@ const Activities = () => {
           <span className="flex items-baseline gap-3">
             영업활동
             <span className="meta">
-              ACTIVITY · {statusFilter ? `${statusFilter} · ` : ''}{filteredActivities.length}건
+              {statusFilter ? `${statusFilter} · ` : ''}{filteredActivities.length}건
             </span>
           </span>
         </div>
@@ -150,7 +150,7 @@ const Activities = () => {
         <div className="oem-panel bg-white shadow-sm border-l-4 border-l-oem-blue">
           <div className="p-4 flex flex-col lg:flex-row gap-4 lg:items-center">
             <div className="flex-1 flex items-center gap-3">
-              <label className="text-[11px] font-bold text-oem-text-secondary uppercase tracking-widest whitespace-nowrap">Filter By Client</label>
+              <label className="text-xs font-bold text-oem-text-secondary tracking-wide whitespace-nowrap">거래처로 거르기</label>
               <div className="relative flex-1 group">
                 <input
                   type="text"
@@ -194,7 +194,7 @@ const Activities = () => {
                         {new Date(date).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' })}
                       </span>
                       <div className="h-px flex-1 bg-oem-border"></div>
-                      <span className="text-[10px] font-bold text-oem-text-secondary">{dateActivities.length} RECS</span>
+                      <span className="text-[10px] font-bold text-oem-text-secondary">{dateActivities.length}건</span>
                     </div>
 
                     {/* Timeline Interaction Table (Desktop) */}
@@ -207,7 +207,7 @@ const Activities = () => {
                                 ? 'bg-oem-bg-header text-oem-text-secondary'
                                 : 'bg-oem-red/10 text-oem-red border-oem-red/20'
                                 }`}>
-                                {activity.status === '완료' ? 'DONE' : 'PEND'}
+                                {activity.status === '완료' ? '완료' : '예정'}
                               </span>
                             </td>
                             <td className="w-24">
@@ -242,7 +242,7 @@ const Activities = () => {
                                 ? 'bg-oem-bg-header text-oem-text-secondary'
                                 : 'bg-oem-red/10 text-oem-red border-oem-red/20'
                                 }`}>
-                                {activity.status === '완료' ? 'DONE' : 'PEND'}
+                                {activity.status === '완료' ? '완료' : '예정'}
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-oem-blue"></span>
@@ -280,7 +280,7 @@ const Activities = () => {
 
             {hasMore && (
               <div className="p-8 text-center bg-oem-bg-header/20">
-                <span className="text-[11px] font-bold text-oem-text-secondary animate-pulse uppercase tracking-widest italic">Streaming Buffer Data...</span>
+                <span className="text-xs font-bold text-oem-text-secondary animate-pulse tracking-wide">더 불러오는 중…</span>
               </div>
             )}
           </div>

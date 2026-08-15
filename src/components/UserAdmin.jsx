@@ -62,13 +62,7 @@ const UserAdmin = () => {
     }
 
     if (tableMissing) {
-        // 승인 대기를 맨 위로 — 새로 들어온 계정을 놓치면 안 된다
-    const ORDER = { pending: 0, admin: 1, sales: 2, viewer: 3 }
-    const sorted = [...rows].sort((a, b) =>
-        (ORDER[a.role] ?? 9) - (ORDER[b.role] ?? 9) || String(a.email).localeCompare(String(b.email)))
-    const pending = rows.filter((r) => r.role === 'pending').length
-
-    return (
+        return (
             <div className="win">
                 <div className="win-title"><span>계정 · 권한</span></div>
                 <p style={{ padding: 16, margin: 0, fontSize: 13, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
@@ -89,6 +83,14 @@ const UserAdmin = () => {
             </div>
         )
     }
+
+    // 승인 대기를 맨 위로 — 새로 들어온 계정을 놓치면 안 된다.
+    // (이 세 줄이 `if (tableMissing)` 안에 들어가 있어서 설정 화면이
+    //  `pending is not defined`로 죽었다. 화면을 열어 보지 않았으면 몰랐다.)
+    const ORDER = { pending: 0, admin: 1, sales: 2, viewer: 3 }
+    const sorted = [...rows].sort((a, b) =>
+        (ORDER[a.role] ?? 9) - (ORDER[b.role] ?? 9) || String(a.email).localeCompare(String(b.email)))
+    const pending = rows.filter((r) => r.role === 'pending').length
 
     return (
         <div className="win">
