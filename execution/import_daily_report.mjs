@@ -19,30 +19,15 @@
  * 기본은 미리보기다. --apply 없이는 아무것도 바꾸지 않는다.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import xlsx from 'xlsx'
 import fs from 'fs'
 import path from 'path'
+import { connect } from './_supabase.mjs'
 
 // ---------------------------------------------------------------------------
 // 환경
 // ---------------------------------------------------------------------------
-const loadEnv = () => {
-    for (const file of ['.env.local', '.env']) {
-        const p = path.resolve(process.cwd(), file)
-        if (!fs.existsSync(p)) continue
-        const env = Object.fromEntries(
-            fs.readFileSync(p, 'utf8').split('\n')
-                .map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
-                .map((l) => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1).replace(/^["']|["']$/g, '')] })
-        )
-        if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) return env
-    }
-    throw new Error('.env.local 또는 .env에서 Supabase 설정을 찾지 못했습니다.')
-}
-
-const env = loadEnv()
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+const { supabase } = await connect({ write: process.argv.includes('--apply') })
 
 const args = process.argv.slice(2)
 const APPLY = args.includes('--apply')

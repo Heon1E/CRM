@@ -1,16 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
-
-dotenv.config({ path: '.env.local' })
-
+import { connect } from './_supabase.mjs'
 const supabaseUrl = process.env.VITE_SUPABASE_URL
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY
 
 console.log('URL:', supabaseUrl)
 console.log('KEY:', supabaseAnonKey ? 'exists' : 'missing')
 
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
+const { supabase: supabase } = await connect({ write: process.argv.includes('--apply') })
 async function test() {
     const { data, count, error } = await supabase
         .from('clients')

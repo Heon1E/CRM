@@ -18,9 +18,9 @@
  * 공개 저장소에 이미지 몇 MB를 얹을 이유가 없다.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
+import { connect } from './_supabase.mjs'
 
 const BUCKET = 'product-images'
 const PREFIX = 'catalog'
@@ -162,7 +162,7 @@ const main = async () => {
             if (i > 0 && !(s.slice(0, i) in env)) env[s.slice(0, i)] = s.slice(i + 1).replace(/^["']|["']$/g, '')
         }
     }
-    const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+    const { supabase: sb } = await connect({ write: apply })
 
     const { data: products, error } = await sb
         .from('products').select('id,name,type,image_url').order('name').limit(2000)

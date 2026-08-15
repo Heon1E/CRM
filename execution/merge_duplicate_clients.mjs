@@ -20,9 +20,9 @@
  *   - 되돌릴 수 있도록 실행 내역을 .tmp/merge_clients_<시각>.json에 남긴다.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
+import { connect } from './_supabase.mjs'
 
 // ---------- 설정 ----------
 const loadEnv = () => {
@@ -47,7 +47,7 @@ const loadEnv = () => {
 const CLIENT_REF_TABLES = ['sales', 'activities', 'client_contacts', 'weekly_shipment_adjustments']
 
 const env = loadEnv()
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+const { supabase } = await connect({ write: process.argv.includes('--apply') })
 const APPLY = process.argv.includes('--apply')
 
 // ---------- 정규화 (앱과 동일 기준) ----------

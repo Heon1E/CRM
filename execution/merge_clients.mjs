@@ -1,8 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { connect } from './_supabase.mjs'
 
 // Load environment variables manually
 const __filename = fileURLToPath(import.meta.url)
@@ -23,8 +23,7 @@ envContent.split('\n').forEach(line => {
 const supabaseUrl = envConfig.VITE_SUPABASE_URL
 const supabaseKey = envConfig.VITE_SUPABASE_ANON_KEY
 
-const supabase = createClient(supabaseUrl, supabaseKey)
-
+const { supabase: supabase } = await connect({ write: process.argv.includes('--apply') })
 const TARGET_ID = 'ded930fa-a035-4d14-8315-99d0e5c99c1e' // Main Client (42 sales)
 const SOURCE_ID_WITH_DATA = 'e7fc4ec4-a630-49d4-9be6-c71b51804c80' // Duplicate (2 sales, 3 activities)
 const IDS_TO_DELETE = [

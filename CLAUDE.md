@@ -104,6 +104,26 @@ DESIGN.md 보라 — 네 가지가 뒤섞여 어느 것도 완성되지 않은 �
 12px 미만 글씨, 배경/글자 대비비. 특히 **색을 일괄 변경한 뒤에는 대비비 검사를 반드시 돌릴 것** —
 배경만 밝게 바뀌고 흰 글씨가 남으면 텍스트가 사라진다.
 
+## execution/ 스크립트는 서비스 롤 키가 필요하다
+
+RLS를 닫은 뒤로 anon 키로는 아무것도 못 읽는다. 그런데 **RLS 거부는 오류가
+아니라 빈 결과**로 오기 때문에, 스크립트가 *"고칠 게 없습니다"* 라고 조용히
+끝나 버린다 — 아무 일도 안 했는데 다 된 것처럼 보이는 가장 위험한 실패다.
+(`repair_orphan_sales.mjs`가 "복구할 게 없습니다"라고 하면 그대로 믿게 된다.)
+
+그래서 **접속을 `execution/_supabase.mjs`로 모았다.** `connect()`가
+서비스 롤 키를 우선 쓰고, 읽히는지 실제로 찔러 본 뒤 0행이면 **바로 멈춘다.**
+
+```
+# .env.local (gitignore 대상)
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+Supabase > Project Settings > API > service_role.
+**`VITE_` 접두어를 붙이면 안 된다** — 붙이면 브라우저 번들에 박혀 배포된다.
+
+새 스크립트를 만들 때도 `createClient`를 직접 부르지 말고 `connect()`를 쓸 것.
+
 ## 알려진 손상 파일
 
 `src/components/SalesCalendar.jsx`는 한글이 깨져(U+FFFD 85개) 문법 오류가 있는 상태다.

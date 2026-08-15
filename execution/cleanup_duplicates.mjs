@@ -1,8 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { connect } from './_supabase.mjs'
 
 // Load environment variables manually
 const __filename = fileURLToPath(import.meta.url)
@@ -23,8 +23,7 @@ envContent.split('\n').forEach(line => {
 const supabaseUrl = envConfig.VITE_SUPABASE_URL
 const supabaseKey = envConfig.VITE_SUPABASE_ANON_KEY
 
-const supabase = createClient(supabaseUrl, supabaseKey)
-
+const { supabase: supabase } = await connect({ write: process.argv.includes('--apply') })
 async function cleanupDuplicates() {
     console.log('Fetching all clients for duplicate cleanup...')
 

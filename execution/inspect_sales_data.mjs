@@ -1,13 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js'
+import { connect } from './_supabase.mjs'
 
 
-const supabase = createClient(
-    'https://dfukyqrradgmytyqxvnw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdWt5cXJyYWRnbXl0eXF4dm53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1MTExNzEsImV4cCI6MjA4MzA4NzE3MX0.YNMZJLVEXyFVMSlHjVPCRAZz-hB6PHf5wrUKj91BBkg'
-)
-
-
+const { supabase: supabase } = await connect({ write: process.argv.includes('--apply') })
 async function inspectSales() {
 
 

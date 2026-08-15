@@ -17,26 +17,11 @@
  * 이미 연락처가 있는 거래처는 건드리지 않는다 (손으로 넣은 것이 더 정확하다).
  */
 
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
+import { connect } from './_supabase.mjs'
 
-const loadEnv = () => {
-    for (const file of ['.env.local', '.env']) {
-        const p = path.resolve(process.cwd(), file)
-        if (!fs.existsSync(p)) continue
-        const env = Object.fromEntries(
-            fs.readFileSync(p, 'utf8').split('\n')
-                .map((l) => l.trim()).filter((l) => l && !l.startsWith('#'))
-                .map((l) => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1).replace(/^["']|["']$/g, '')] })
-        )
-        if (env.VITE_SUPABASE_URL && env.VITE_SUPABASE_ANON_KEY) return env
-    }
-    throw new Error('.env.local 또는 .env에서 Supabase 설정을 찾지 못했습니다.')
-}
-
-const env = loadEnv()
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+const { supabase } = await connect({ write: process.argv.includes('--apply') })
 const APPLY = process.argv.includes('--apply')
 
 const fetchAll = async (build, ps = 1000) => {

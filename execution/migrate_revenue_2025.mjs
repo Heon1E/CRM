@@ -1,12 +1,8 @@
-import { createClient } from '@supabase/supabase-client';
-import dotenv from 'dotenv';
+// 이 파일은 예전에 `@supabase/supabase-client`(오타, 실재하지 않는 패키지)를
+// import하고 있어 **한 번도 돌지 않았다.** 접속을 공용 모듈로 바꾸면서 함께 고친다.
+import { connect } from './_supabase.mjs'
 
-dotenv.config();
-
-const supabase = createClient(
-    process.env.VITE_SUPABASE_URL,
-    process.env.VITE_SUPABASE_ANON_KEY
-);
+const { supabase } = await connect({ write: process.argv.includes('--apply') })
 
 async function migrateRevenue() {
     console.log('🚀 Starting Revenue Migration (2025)...');

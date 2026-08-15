@@ -1,8 +1,8 @@
 
-import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { connect } from './_supabase.mjs'
 
 // Load environment variables manually
 const __filename = fileURLToPath(import.meta.url)
@@ -28,8 +28,7 @@ if (!supabaseUrl || !supabaseKey) {
     process.exit(1)
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey)
-
+const { supabase: supabase } = await connect({ write: process.argv.includes('--apply') })
 async function checkDuplicates() {
     console.log('Searching for clients matching "현대산업"...')
 

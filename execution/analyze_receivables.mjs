@@ -24,11 +24,11 @@
  * --apply 없이는 DB를 바꾸지 않는다. 같은 달을 다시 올리면 덮어쓴다.
  */
 
-import { createClient } from '@supabase/supabase-js'
 import xlsx from 'xlsx'
 import fs from 'fs'
 import path from 'path'
 import { parseReceivablesLedger, agingBucket } from '../src/utils/receivablesLedger.js'
+import { connect } from './_supabase.mjs'
 
 const loadEnv = () => {
     for (const file of ['.env.local', '.env']) {
@@ -118,7 +118,7 @@ console.log(`     채권관리 화면의 'KPI에 저장' 버튼으로 넣을 수
 // 2) CRM 매출과 대조
 // ---------------------------------------------------------------------------
 const env = loadEnv()
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+const { supabase } = await connect({ write: process.argv.includes('--apply') })
 const fetchAll = async (build, ps = 1000) => {
     let from = 0, out = []
     for (;;) {

@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-    'https://dfukyqrradgmytyqxvnw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmdWt5cXJyYWRnbXl0eXF4dm53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0NTE4NDksImV4cCI6MjA1MzAyNzg0OX0.6yuwNsKNCM0BwAXxbJSUFONlzvM0CTSc-QCdW21HJlQ'
-)
-
+import { connect } from './_supabase.mjs'
+const { supabase: supabase } = await connect({ write: process.argv.includes('--apply') })
 async function checkAddresses() {
     const { data, error } = await supabase
         .from('clients')
