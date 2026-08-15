@@ -93,13 +93,13 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       setCharCount(0)
       onClose()
     } catch (error) {
-      console.error('ISSUE 추가 중 오류:', error)
-      await showError('ISSUE 추가 중 오류가 발생했습니다.')
+      console.error('이슈 추가 중 오류:', error)
+      await showError('이슈 추가 중 오류가 발생했습니다.')
     }
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="ISSUE 추가" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="이슈 추가" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
@@ -169,13 +169,13 @@ const AddIssueModal = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="oem-btn-secondary px-4 py-2"
           >
-            CANCEL
+            취소
           </button>
           <button
             type="submit"
             className="oem-btn-primary px-4 py-2"
           >
-            SAVE ISSUE
+            저장
           </button>
         </div>
       </form>

@@ -217,7 +217,7 @@ const Activities = () => {
                               </div>
                             </td>
                             <td className="w-64 font-bold text-oem-text-primary group-hover:text-oem-blue transition-colors">
-                              {activity.clientName || 'UNASSIGNED_CLIENT'}
+                              {activity.clientName || '거래처 없음'}
                             </td>
                             <td className="text-oem-text-primary font-medium italic">
                               {activity.title || activity.description || '(No context provided)'}
@@ -255,7 +255,7 @@ const Activities = () => {
                           </div>
 
                           <h3 className="font-bold text-oem-text-primary text-sm mb-1">
-                            {activity.clientName || 'UNASSIGNED_CLIENT'}
+                            {activity.clientName || '거래처 없음'}
                           </h3>
 
                           <p className="text-sm text-oem-text-primary/90 font-medium leading-snug break-words">

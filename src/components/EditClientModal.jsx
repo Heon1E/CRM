@@ -412,7 +412,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
           <div className="col-span-1 md:col-span-2 oracle-raised bg-[#d0d0d0] p-2 space-y-2">
             <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">주소</label>
             <div className="flex gap-2 items-center">
-              <label className="w-20">POSTAL_CODE:</label>
+              <label className="w-20">우편번호</label>
               <input
                 type="text"
                 value={formData.postal_code}
@@ -428,7 +428,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
               </button>
             </div>
             <div className="flex gap-2 items-center">
-              <label className="w-20">ADDRESS_1:</label>
+              <label className="w-20">주소</label>
               <input
                 type="text"
                 value={formData.address}
@@ -437,7 +437,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
               />
             </div>
             <div className="flex gap-2 items-center">
-              <label className="w-20">ADDRESS_2:</label>
+              <label className="w-20">상세주소</label>
               <input
                 type="text"
                 value={formData.address_detail}
@@ -467,11 +467,11 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
               <thead className="bg-gray-200 sticky top-0">
                 <tr>
                   <th className="w-6">KM</th>
-                  <th>NAME</th>
-                  <th>ROLE</th>
-                  <th>PHONE</th>
-                  <th>EMAIL</th>
-                  <th className="w-6">DEL</th>
+                  <th>이름</th>
+                  <th>직급</th>
+                  <th>전화</th>
+                  <th>이메일</th>
+                  <th className="w-6">삭제</th>
                 </tr>
               </thead>
               <tbody>
@@ -629,7 +629,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
               type="submit"
               className="oracle-raised bg-blue-800 text-white px-6 py-1 font-bold hover:bg-blue-700"
             >
-              SAVE / COMMIT
+              저장
             </button>
           </div>
         </div>

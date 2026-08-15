@@ -251,7 +251,7 @@ ${currentText}`
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="EDIT ACTIVITY" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="활동 수정" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-oem-text-primary">
         <div>
           <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
@@ -412,7 +412,7 @@ ${currentText}`
               {isAILoading ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>PROCESSING...</span>
+                  <span>저장 중…</span>
                 </>
               ) : (
                 <>
@@ -451,13 +451,13 @@ ${currentText}`
               onClick={onClose}
               className="px-4 py-2 text-xs font-bold text-oem-text-primary bg-white border border-oem-border hover:bg-gray-50 rounded-sm transition-colors"
             >
-              CANCEL
+              취소
             </button>
             <button
               type="submit"
               className="px-6 py-2 text-xs font-bold text-white bg-oem-blue hover:bg-oem-blue-hover rounded-sm shadow-sm transition-colors"
             >
-              SAVE CHANGES
+              저장
             </button>
           </div>
         </div>

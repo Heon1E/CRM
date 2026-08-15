@@ -477,7 +477,7 @@ ${currentText}`
               {isAILoading ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>PROCESSING...</span>
+                  <span>저장 중…</span>
                 </>
               ) : (
                 <>
@@ -508,8 +508,8 @@ ${currentText}`
             onChange={(e) => setRegisterAsIssue(e.target.checked)}
             className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
           />
-          <label htmlFor="registerAsIssue" className="text-sm font-bold text-oem-text-primary cursor-pointer uppercase">
-            REGISTER AS ISSUE
+          <label htmlFor="registerAsIssue" className="text-sm font-bold text-oem-text-primary cursor-pointer">
+            이슈로도 등록
           </label>
           <span className="text-xs text-oem-text-secondary ml-1">
             (Automatically adds this activity to the Issue Tracker)

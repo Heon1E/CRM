@@ -110,11 +110,24 @@ const Clients = () => {
     }
   }, [page, searchTerm, contextLoading, contextClients?.length])
 
-  // 실제 렌더링에 사용할 최종 클라이언트 목록
-  // 1페이지면서 검색어가 없을 때는 전역 컨텍스트의 첫 페이지만 슬라이싱해서 보여줌
-  const clients = (searchTerm || page > 1)
-    ? localClients
-    : (contextClients?.length > 0 ? contextClients.slice(0, PAGE_SIZE) : localClients)
+  /*
+   * **전체를 놓고 정렬한 뒤에 쪽을 나눈다.**
+   *
+   * 예전에는 `contextClients.slice(0, PAGE_SIZE)` — 가나다순 앞 20줄만 잘라서
+   * 넘겼다. 그래서 아래의 '챙겨야 할 순서' 정렬도, 저장된 보기 필터도
+   * **그 20줄 안에서만** 돌았다. 화면에는 결국 가나다순이 나왔다.
+   * (실측: 이헌일 담당이 81곳인데 첫 쪽이 전부 담당 미지정이었다.)
+   *
+   * DataContext가 1,150곳을 이미 들고 있으므로 서버를 다시 부를 이유도 없다.
+   * 검색도 여기서 거른다 — 서버 왕복이 사라진다.
+   * 컨텍스트가 비었을 때만(오프라인·RLS 문제) 예전 조회로 떨어진다.
+   */
+  const clients = useMemo(() => {
+    const all = (contextClients?.length > 0) ? contextClients : localClients
+    if (!searchTerm) return all
+    const q = searchTerm.trim().toLowerCase()
+    return all.filter((c) => String(c.company || '').toLowerCase().includes(q))
+  }, [contextClients, localClients, searchTerm])
   const isLoading = contextLoading && clients.length === 0
 
   // ===== Helper Functions =====
@@ -262,12 +275,20 @@ const Clients = () => {
     () => filterCompanies(sortedCompanies, companyRank, activeFilters),
     [sortedCompanies, companyRank, activeFilters])
 
+  // 정렬·필터가 끝난 다음에 자른다. 순서가 살아 있어야 첫 쪽이 '챙길 곳'이 된다.
+  // 걸러진 결과가 바뀌면 첫 쪽으로 — 3쪽을 보다가 조건을 좁히면 빈 쪽이 남는다
+  useEffect(() => { setPage(1) }, [activeFilters, searchTerm])
+
+  const pagedCompanies = useMemo(
+    () => shownCompanies.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [shownCompanies, page])
+
   const visibleGroupedClients = useMemo(() => {
-    return shownCompanies.reduce((acc, company) => {
+    return pagedCompanies.reduce((acc, company) => {
       acc[company] = groupedClients[company]
       return acc
     }, {})
-  }, [shownCompanies, groupedClients])
+  }, [pagedCompanies, groupedClients])
 
   // Bulk Selection State
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -364,7 +385,7 @@ const Clients = () => {
         <div className="win-title" style={{ border: '1px solid var(--border)', borderBottom: 0 }}>
           <span className="flex items-baseline gap-3">
             거래처 관리
-            <span className="meta">CLIENT · 전체 {totalCount.toLocaleString()}개</span>
+            <span className="meta">거래처 {sortedCompanies.length.toLocaleString()}곳</span>
           </span>
         </div>
 
@@ -466,7 +487,7 @@ const Clients = () => {
           <div className="oem-panel-header">
             <span>거래처 목록</span>
             <div className="flex items-center gap-4 text-[10px] font-medium text-oem-text-secondary">
-              <span>PAGE {page} OF {Math.ceil(totalCount / PAGE_SIZE)}</span>
+              <span>{page} / {Math.max(1, Math.ceil(shownCompanies.length / PAGE_SIZE))} 쪽</span>
               <span className="w-px h-3 bg-oem-border"></span>
               <span className="text-oem-blue font-bold">준비됨</span>
             </div>
@@ -560,7 +581,7 @@ const Clients = () => {
                           onChange={handleSelectAll}
                         />
                       </th>
-                      <th className="w-12 text-center py-2">SEQ</th>
+                      <th className="w-12 text-center py-2">번호</th>
                       <th className="w-80 py-2">회사명</th>
                       {!selectedClientId && <th className="py-2 ">담당자</th>}
                       <th className="w-24 py-2 text-center">상태</th>
@@ -605,7 +626,7 @@ const Clients = () => {
                             {!selectedClientId && (
                               <td className="py-3 ">
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="font-medium">{primaryContact?.contact_person || 'UNASSIGNED'}</span>
+                                  <span className="font-medium">{primaryContact?.contact_person || '담당자 없음'}</span>
                                   <span className="text-[10px] text-oem-text-secondary italic">{primaryContact?.email || '-'}</span>
                                 </div>
                               </td>
@@ -653,7 +674,7 @@ const Clients = () => {
               {/* Pagination (Compact Mode when split) */}
               <div className="mt-2 flex justify-center">
                 <Pagination
-                  totalCount={totalCount}
+                  totalCount={shownCompanies.length}
                   pageSize={PAGE_SIZE}
                   currentPage={page}
                   onPageChange={setPage}

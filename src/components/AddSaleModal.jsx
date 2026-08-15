@@ -412,12 +412,12 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
             <table className="w-full text-[10px] border-collapse">
               <thead className="bg-[#c0c0c0] sticky top-0">
                 <tr>
-                  <th className="border-r border-b border-gray-400 w-8">ITEM</th>
-                  <th className="border-r border-b border-gray-400">PRODUCT_NAME / SEARCH</th>
-                  <th className="border-r border-b border-gray-400 w-16">QTY</th>
+                  <th className="border-r border-b border-gray-400 w-8">번호</th>
+                  <th className="border-r border-b border-gray-400">품목 (검색)</th>
+                  <th className="border-r border-b border-gray-400 w-16">수량</th>
                   <th className="border-r border-b border-gray-400 w-24 text-right">단가</th>
-                  <th className="border-r border-b border-gray-400 w-24 text-right">TOTAL</th>
-                  <th className="border-b border-gray-400 w-6">DEL</th>
+                  <th className="border-r border-b border-gray-400 w-24 text-right">금액</th>
+                  <th className="border-b border-gray-400 w-6">삭제</th>
                 </tr>
               </thead>
               <tbody>
@@ -485,7 +485,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="font-bold text-black uppercase tracking-tight">TRANSACTION_NOTES:</label>
+          <label className="font-bold text-black uppercase tracking-tight">비고</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -501,7 +501,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
             onClick={onClose}
             className="oracle-raised bg-gray-200 px-6 py-1 font-bold hover:bg-gray-100"
           >
-            EXIT / CANCEL
+            취소
           </button>
           <button
             type="submit"

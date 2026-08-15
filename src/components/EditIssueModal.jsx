@@ -152,8 +152,8 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
       await showSuccess('ISSUE가 수정되었습니다.')
       onClose()
     } catch (error) {
-      console.error('ISSUE 수정 중 오류:', error)
-      await showError('ISSUE 수정 중 오류가 발생했습니다.')
+      console.error('이슈 수정 중 오류:', error)
+      await showError('이슈 수정 중 오류가 발생했습니다.')
     }
   }
 
@@ -179,7 +179,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="ISSUE 수정" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="이슈 수정" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
@@ -257,7 +257,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
               onClick={onClose}
               className="oem-btn-secondary px-4 py-2"
             >
-              CANCEL
+              취소
             </button>
             <button
               type="submit"
