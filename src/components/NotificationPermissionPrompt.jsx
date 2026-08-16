@@ -57,7 +57,7 @@ const NotificationPermissionPrompt = () => {
         try {
           const { showLocalNotification } = await import('../utils/pushNotification')
           await showLocalNotification('알림 권한 허용됨', {
-            body: 'Xavian CRM의 알림을 받을 준비가 되었습니다!',
+            body: '아이앤디 CRM 알림을 받을 준비가 되었습니다.',
             icon: '/vite.svg',
             tag: 'permission-granted',
             requireInteraction: false,

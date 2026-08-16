@@ -279,7 +279,7 @@ const Onboarding = () => {
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-1 mb-2">
-                        <span className="text-2xl font-black text-white">Xavian</span>
+                        <span className="text-2xl font-black text-white">아이앤디</span>
                         <span className="text-2xl font-black text-blue-400">CRM</span>
                     </div>
                     <p className="text-sm text-gray-500">

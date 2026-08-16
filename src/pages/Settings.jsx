@@ -66,7 +66,7 @@ const Settings = () => {
       // [수정] 데모 사용자일 경우 DB 연동 스킵 (FK 에러 방지)
       if (user.id === DEMO_USER_ID) {
         setSettings({
-          company_name: 'Xavian CRM (Demo)',
+          company_name: '아이앤디 주식회사',
           email: 'demo@example.com',
           email_notification: true,
           new_client_notification: true,
@@ -102,7 +102,7 @@ const Settings = () => {
           // 데이터가 없으면 기본값 INSERT 시도
           const defaultSettings = {
             user_id: user.id,
-            company_name: 'Xavian CRM',
+            company_name: '아이앤디 주식회사',
             email: '',
             email_notification: true,
             new_client_notification: true,
@@ -119,13 +119,25 @@ const Settings = () => {
             // 409 Conflict 또는 23505 Unique Violation은 무시 (이미 존재함)
             if (insertError.code === '23505' || insertError.status === 409) {
               console.log('ℹ️ [loadSettings] 기본 설정이 이미 존재합니다. (Insert Skipped)')
+            } else if (insertError.code === '42501' || /row-level security/i.test(insertError.message || '')) {
+              /*
+               * `settings` 표에 쓰기 정책이 없다. RLS를 닫을 때 업무 표 16개만
+               * 열어 줬는데 이 표가 빠졌다. **막혀도 화면은 기본값으로 돈다** —
+               * 알림 켜고 끄는 개인 설정이라 업무를 막지 않는다.
+               * 콘솔에 붉은 오류로 남기면 진짜 고장으로 읽히므로 한 번만 알린다.
+               * 고치려면 execution/sql/settings_rls.sql 을 실행한다.
+               */
+              if (!window.__settingsRlsWarned) {
+                window.__settingsRlsWarned = true
+                console.warn('[설정] 개인 설정을 저장할 수 없습니다 (RLS). 기본값으로 표시합니다. execution/sql/settings_rls.sql 참고')
+              }
             } else {
               console.error('❌ [loadSettings] 기본 설정 생성 실패:', insertError)
             }
 
             // UI는 기본값으로 표시
             setSettings({
-              company_name: 'Xavian CRM',
+              company_name: '아이앤디 주식회사',
               email: '',
               email_notification: true,
               new_client_notification: true,
@@ -133,7 +145,7 @@ const Settings = () => {
             })
           } else {
             setSettings({
-              company_name: insertData.company_name || 'Xavian CRM',
+              company_name: insertData.company_name || '아이앤디 주식회사',
               email: insertData.email || '',
               email_notification: insertData.email_notification !== false,
               new_client_notification: insertData.new_client_notification !== false,
@@ -224,7 +236,7 @@ const Settings = () => {
     // 데모 사용자 처리
     if (user.id === DEMO_USER_ID) {
       setSettings({
-        company_name: 'Xavian CRM (Demo)',
+        company_name: '아이앤디 주식회사',
         email: 'demo@example.com',
         email_notification: true,
         new_client_notification: true,

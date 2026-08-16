@@ -57,14 +57,15 @@ const Navbar = () => {
     }
   }, [user])
 
-  // 동적 앱 타이틀: Supabase settings의 company_name이 있으면 '회사이름 CRM', 없으면 기본값 'Xavian CRM'
+  // 동적 앱 타이틀: settings의 company_name이 있으면 '회사이름 CRM'.
+  // 없으면 우리 회사 이름을 쓴다 — 예전 기본값이 'Xavian CRM'이라 남의 이름이 떴다.
   const appTitle = useMemo(() => {
     if (companyName && companyName.trim()) {
       return `${companyName.trim()} CRM`
     }
     // user.user_metadata.company_name 또는 user.app_metadata.company_name 확인 (백업)
     const userCompanyName = user?.user_metadata?.company_name || user?.app_metadata?.company_name || null
-    return userCompanyName ? `${userCompanyName} CRM` : 'Xavian CRM'
+    return userCompanyName ? `${userCompanyName} CRM` : '아이앤디 CRM'
   }, [user, companyName])
 
   // 메뉴 순서: Dashboard -> Activities -> Pipeline -> Sales -> Clients -> Settings
@@ -166,7 +167,7 @@ const Navbar = () => {
           backup_version: '1.0',
           user_email: user.email || '',
           user_id: user.id || '',
-          company_name: companyName || 'Xavian CRM'
+          company_name: companyName || '아이앤디 주식회사'
         },
         data: {
           products: productsResult.data || [],
@@ -189,12 +190,12 @@ const Navbar = () => {
       // JSON 문자열로 변환 (가독성을 위해 들여쓰기 적용)
       const jsonString = JSON.stringify(backupData, null, 2)
 
-      // 파일 이름 생성: backup_YYYYMMDD_XavianCRM.json
+      // 파일 이름 생성: backup_YYYYMMDD_아이앤디CRM.json
       const now = new Date()
       const year = now.getFullYear()
       const month = String(now.getMonth() + 1).padStart(2, '0')
       const day = String(now.getDate()).padStart(2, '0')
-      const fileName = `backup_${year}${month}${day}_XavianCRM.json`
+      const fileName = `backup_${year}${month}${day}_아이앤디CRM.json`
 
       // Blob 생성 및 다운로드
       const blob = new Blob([jsonString], { type: 'application/json' })
