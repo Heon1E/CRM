@@ -126,8 +126,23 @@ Supabase > Project Settings > API > service_role.
 
 ## 알려진 손상 파일
 
-`src/components/SalesCalendar.jsx`는 한글이 깨져(U+FFFD 85개) 문법 오류가 있는 상태다.
-**어디에서도 import되지 않아** 빌드는 통과한다. 되살리려면 인코딩부터 복구해야 한다.
+`src/components/SalesCalendar.jsx`는 한글이 깨져 있다 — **U+FFFD 277개**(예전에
+85개라고 적어 뒀는데 실제로는 그렇다). 어디에서도 import되지 않아 빌드는 통과하고
+배포 산출물에도 들어가지 않는다.
+
+**손으로 고칠 필요는 없다. 성한 판본이 이력에 있다:**
+
+```bash
+git show 918acefb:src/components/SalesCalendar.jsx > /tmp/onbak.jsx   # U+FFFD 0개
+```
+
+`f2b1084a`("AI Agent 채팅 인터페이스")에서 인코딩이 깨졌다. 그 뒤 실제 변경은
+셋뿐이다 — ①하드코딩된 구글 키를 env로 뺀 것 ②`embedded`/`onDateSelect` 등
+props 추가 ③붙여넣기(Ctrl+V) 지원. 되살리려면 성한 판본에 이 셋을 다시 얹으면 된다.
+
+**다만 지금은 쓰지 않는다.** 달력은 `ScheduleCalendar.jsx`(대시보드)와
+`pages/Calendar.jsx`가 맡고 있고, 이 파일은 `@fullcalendar/google-calendar`와
+구글 지도 키에 얽혀 있다. 되살릴지는 사람이 정할 일이다.
 
 ## 아키텍처
 
@@ -141,7 +156,7 @@ Supabase > Project Settings > API > service_role.
 
 **라우팅**: `src/App.jsx`. `/`(Dashboard), `/clients/:id`, `/sales`, `/pipeline`, `/map`, `/calendar`, `/order-entry` 등은 `ProtectedRoute` 하위. `/landing`, `/pricing`, `/login`은 공개.
 
-**외부 연동**: Supabase(DB/Auth/RLS), Google Gemini(`src/services/geminiService.js`, `aiSalesCoach.js`), Google Maps(`/map`), FullCalendar, Tesseract.js(명함 OCR), xlsx(엑셀 업로드/내보내기).
+**외부 연동**: Supabase(DB/Auth/RLS), Google Gemini(`src/services/geminiService.js`, `aiSalesCoach.js`), 카카오 지도(`/map`, `src/utils/kakaoMap.js`), FullCalendar, Tesseract.js(명함 OCR), xlsx(엑셀 업로드/내보내기).
 
 ## 데이터 모델 주의사항
 
@@ -463,9 +478,16 @@ localStorage에 `{ clientId: { new?: true, churn?: true } }` 형태로 저장한
 
 ## 환경 변수
 
-`.env` / `.env.local` (커밋 금지). Supabase URL/anon key, Google Maps API key, Gemini API key,
+`.env` / `.env.local` (커밋 금지). Supabase URL/anon key, 카카오 지도 키
+(`VITE_KAKAO_MAP_KEY`), Gemini API key,
 `VITE_GEMINI_MODEL`. 상세는 `directives/ENV_SETUP_GUIDE.md`.
 
+> **공개 저장소 이력에 구글 API 키 하나가 박혀 있다** — `AIzaSyDXVuNub5…`
+> (`SalesCalendar.jsx`에 하드코딩돼 있던 것). 이 저장소는 공개돼 있으므로
+> **그 키는 폐기해야 한다.** 지금 `.env`에 든 키는 이력에 없다(확인함).
+> 카카오로 옮긴 뒤로 구글 지도 키는 어디에서도 쓰지 않으므로 **둘 다 지워도 된다.**
+> 찾는 법: `git log --all -S"AIzaSy"`
+>
 > **`VITE_` 접두어가 붙은 값은 빌드 결과물에 그대로 박혀 배포된다.** `dist/assets/*.js`에서 문자열로
 > 추출 가능하므로, 브라우저에 노출돼도 되는 값만 넣을 것. Supabase anon key는 RLS로 보호되므로 정상이지만,
 > **Gemini 키는 노출 시 제3자가 사용자 계정으로 API를 호출할 수 있다.**
