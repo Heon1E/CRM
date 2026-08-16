@@ -60,21 +60,34 @@ const fmtMan = (v) => `${Math.round((Number(v) || 0) / 10000).toLocaleString('ko
 /**
  * Vercel Cron이 부른 것인가.
  *
- * **예전에는 `x-vercel-cron` 헤더 하나만 봤다.** 크론이 실제로 불러도 401로
- * 막혀 **아무 일도 안 일어났다** — 8/12에 설정하고 나흘 동안 브리핑이 한 번도
- * 오지 않은 원인이다. 401은 조용해서 밖에서는 알 수가 없다.
+ * **`x-vercel-cron` 헤더는 흉내 낼 수 있다.** Vercel이 바깥에서 온
+ * `x-vercel-*` 헤더를 지워 줄 것이라고 생각했는데, 배포된 주소에 대고
+ * 직접 확인해 보니 아니었다:
  *
- * Vercel이 남기는 표시가 하나가 아니다. 셋 다 본다:
- *   - `x-vercel-cron` 헤더
- *   - `User-Agent: vercel-cron/1.0`
- *   - `CRON_SECRET`을 넣어 두면 `Authorization: Bearer <값>`
- * 하나라도 맞으면 크론으로 본다. 표시가 바뀌어도 나머지가 받쳐 준다.
+ *     curl -H "x-vercel-cron: 1" https://…/api/daily-digest   → 200
+ *
+ * 이 주소는 공개돼 있다. 즉 **누구나 브리핑을 마음대로 쏘아 보낼 수 있었다.**
+ * User-Agent(`vercel-cron/1.0`)도 마찬가지라 쓰지 않는다.
+ *
+ * 그래서 **`CRON_SECRET`이 있으면 그것만 믿는다.** Vercel은 이 환경변수가
+ * 있으면 크론 호출에 `Authorization: Bearer <값>`을 붙여 준다 — 공식 방법이고
+ * 바깥에서는 값을 모르니 흉내 낼 수 없다.
+ *
+ * `CRON_SECRET`이 없으면 예전처럼 헤더를 보되, **열려 있다고 경고를 남긴다.**
+ * 조용히 열어 두는 것이 가장 나쁘다.
  */
 const isVercelCron = (req) => {
-    if (req.headers['x-vercel-cron']) return true
-    if (/vercel-cron/i.test(String(req.headers['user-agent'] || ''))) return true
     const secret = process.env.CRON_SECRET
-    if (secret && req.headers.authorization === `Bearer ${secret}`) return true
+    if (secret) {
+        // 비밀값이 있으면 그것만 통과시킨다. 헤더는 더 이상 보지 않는다.
+        return req.headers.authorization === `Bearer ${secret}`
+    }
+    if (req.headers['x-vercel-cron']) {
+        console.warn('[daily-digest] CRON_SECRET 이 없습니다. x-vercel-cron 헤더는 '
+            + '바깥에서 흉내 낼 수 있어 누구나 브리핑을 보낼 수 있습니다. '
+            + 'Vercel 환경변수에 CRON_SECRET 을 넣어 주세요.')
+        return true
+    }
     return false
 }
 
@@ -244,8 +257,15 @@ export default async function handler(req, res) {
     const key = (req.query?.key) || new URL(req.url, 'http://x').searchParams.get('key')
     if (!cron && key !== deriveSecret(botToken)) {
         // 막을 때 이유를 남긴다. 예전에는 조용히 401만 내서 크론이 막힌 줄도 몰랐다.
-        console.warn('[daily-digest] 거절 — ua:', req.headers['user-agent'],
-            '/ x-vercel-cron:', req.headers['x-vercel-cron'])
+        // 무엇을 받았는지 남긴다. Vercel이 실제로 어떤 표시를 보내는지
+        // 이 줄을 보고 알 수 있다 (Vercel > 프로젝트 > Logs).
+        console.warn('[daily-digest] 거절',
+            JSON.stringify({
+                ua: req.headers['user-agent'] || null,
+                xVercelCron: req.headers['x-vercel-cron'] || null,
+                hasAuth: Boolean(req.headers.authorization),
+                cronSecretSet: Boolean(process.env.CRON_SECRET),
+            }))
         return res.status(401).json({ ok: false })
     }
 
