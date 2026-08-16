@@ -363,7 +363,7 @@ const Settings = () => {
                       value={settings.company_name}
                       onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
                       className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-500"
-                      placeholder="ENTER_COMPANY_NAME"
+                      placeholder="예) 아이앤디"
                     />
                   </div>
                   <div>
@@ -600,7 +600,7 @@ const Settings = () => {
                   className="oem-btn-primary px-6 py-2"
                   disabled={settingsLoading}
                 >
-                  {settingsLoading ? 'SAVING...' : 'SAVE_CONFIGURATION'}
+                  {settingsLoading ? '저장 중…' : '설정 저장'}
                 </button>
               </div>
             </>
