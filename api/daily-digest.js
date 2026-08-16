@@ -57,23 +57,37 @@ const tgSend = async (chatId, text) => {
 
 const fmtMan = (v) => `${Math.round((Number(v) || 0) / 10000).toLocaleString('ko-KR')}만원`
 
-export default async function handler(req, res) {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN
-    if (!botToken) return res.status(500).json({ error: 'BOT_TOKEN_MISSING' })
+/**
+ * Vercel Cron이 부른 것인가.
+ *
+ * **예전에는 `x-vercel-cron` 헤더 하나만 봤다.** 크론이 실제로 불러도 401로
+ * 막혀 **아무 일도 안 일어났다** — 8/12에 설정하고 나흘 동안 브리핑이 한 번도
+ * 오지 않은 원인이다. 401은 조용해서 밖에서는 알 수가 없다.
+ *
+ * Vercel이 남기는 표시가 하나가 아니다. 셋 다 본다:
+ *   - `x-vercel-cron` 헤더
+ *   - `User-Agent: vercel-cron/1.0`
+ *   - `CRON_SECRET`을 넣어 두면 `Authorization: Bearer <값>`
+ * 하나라도 맞으면 크론으로 본다. 표시가 바뀌어도 나머지가 받쳐 준다.
+ */
+const isVercelCron = (req) => {
+    if (req.headers['x-vercel-cron']) return true
+    if (/vercel-cron/i.test(String(req.headers['user-agent'] || ''))) return true
+    const secret = process.env.CRON_SECRET
+    if (secret && req.headers.authorization === `Bearer ${secret}`) return true
+    return false
+}
 
-    // Vercel Cron이 부른 것이거나, 봇 토큰을 아는 사람이 부른 것만 받는다.
-    const isCron = Boolean(req.headers['x-vercel-cron'])
-    const key = (req.query?.key) || new URL(req.url, 'http://x').searchParams.get('key')
-    if (!isCron && key !== deriveSecret(botToken)) {
-        return res.status(401).json({ ok: false })
-    }
-
-    try {
+/**
+ * 오늘의 브리핑 글을 만든다. **보내지는 않는다** — 부르는 쪽이 보낸다.
+ * 크론과 텔레그램 `/브리핑` 명령이 같은 글을 쓰게 하려고 떼어 놓았다.
+ */
+export async function buildDigest() {
+    {
         const today = kstToday()
         const dow = WEEKDAY[new Date(`${today}T00:00:00+09:00`).getUTCDay()]
 
         const chats = await sb('bot_allowlist?select=chat_id')
-        if (!chats.length) return res.status(200).json({ ok: true, sent: 0, note: '등록된 대화 없음' })
 
         // ---- 자료 ----
         // deals는 아직 안 만들었을 수 있다(마이그레이션 전). 실패해도 브리핑은 나가야 한다.
@@ -211,13 +225,36 @@ export default async function handler(req, res) {
 
         lines.push('', '<i>일정은 여기로 보내면 바로 등록됩니다. 예: 내일 오후 2시 한국화학 방문</i>')
 
-        const text = lines.join('\n')
-        for (const c of chats) await tgSend(String(c.chat_id), text)
+        return {
+            text: lines.join('\n'),
+            chats: chats.map((c) => String(c.chat_id)),
+            counts: {
+                schedules: schedules.length, due: due.length, overdue: overdue.length,
+                closingSoon: closingSoon.length, stuck: stuck.length, stale: stale.length,
+            },
+        }
+    }
+}
 
-        return res.status(200).json({
-            ok: true, sent: chats.length,
-            counts: { schedules: schedules.length, due: due.length, overdue: overdue.length, stale: stale.length }
-        })
+export default async function handler(req, res) {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
+    if (!botToken) return res.status(500).json({ error: 'BOT_TOKEN_MISSING' })
+
+    const cron = isVercelCron(req)
+    const key = (req.query?.key) || new URL(req.url, 'http://x').searchParams.get('key')
+    if (!cron && key !== deriveSecret(botToken)) {
+        // 막을 때 이유를 남긴다. 예전에는 조용히 401만 내서 크론이 막힌 줄도 몰랐다.
+        console.warn('[daily-digest] 거절 — ua:', req.headers['user-agent'],
+            '/ x-vercel-cron:', req.headers['x-vercel-cron'])
+        return res.status(401).json({ ok: false })
+    }
+
+    try {
+        const { text, chats, counts } = await buildDigest()
+        if (!chats.length) return res.status(200).json({ ok: true, sent: 0, note: '등록된 대화 없음' })
+        for (const c of chats) await tgSend(c, text)
+        console.log('[daily-digest] 보냄', { cron, sent: chats.length, counts })
+        return res.status(200).json({ ok: true, sent: chats.length, counts })
     } catch (e) {
         console.error('[daily-digest] 실패', e)
         return res.status(500).json({ error: 'SERVER_ERROR', message: e.message })

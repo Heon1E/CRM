@@ -425,7 +425,8 @@ export default async function handler(req, res) {
             '<b>일일업무보고서 사진</b> → 활동에 등록 (영업계획은 제외)\n' +
             '<b>매출·미수금 화면 사진</b> → 받은함에 담아둠\n' +
             '   (중복 검사를 거쳐야 해서 앱에서 확인 후 반영)\n\n' +
-            '<b>/today</b> 오늘 일정   <b>/week</b> 이번주 일정\n\n' +
+            '<b>/today</b> 오늘 일정   <b>/week</b> 이번주 일정\n' +
+            '<b>/브리핑</b> 아침 브리핑 지금 받기\n\n' +
             `chat id: <code>${chatId}</code>`
         )
         return ok()
