@@ -5,37 +5,75 @@
 
 ---
 
-## 1. 🔴 지금 열려 있는 구멍 — Supabase 가입 막기
+## 1. ✅ Supabase 가입 막기 — 끝났습니다
 
-**주소를 아는 누구나 계정을 만들어 거래처 1,150곳·매출 15,221건을 읽고 쓸 수
-있습니다.** 배포 주소(`crm-dashboard-blush.vercel.app`)는 공개돼 있습니다.
+확인했습니다(계정을 만들지 않고 인증 설정만 읽었습니다):
 
-DB 쪽은 이미 막았습니다(`pending_role.sql` 실행 완료 — 새 계정은 아무것도 못 봅니다).
-바깥 한 겹이 남았습니다:
+```
+disable_signup : true    ← 새로 가입할 수 없습니다
+```
 
-> Supabase 대시보드 → **Authentication** → **Sign In / Providers** → **Email**
-> → **"Allow new users to sign up" 끄기**
+이제 두 겹이 다 막혔습니다 — 바깥은 가입 자체가 안 되고, 혹시 뚫려도
+새 계정은 `pending`이라 아무것도 못 봅니다.
 
-같은 화면에서 **Google** provider도 쓰지 않으실 거면 끄십시오.
-(대표님 구글 계정 `heoniree@gmail.com`으로 로그인하실 거면 켜 두셔야 합니다.)
+참고로 **구글 로그인은 켜져 있습니다.** 가입이 막혀 있으므로 새 구글 계정은
+들어오지 못하고, 대표님 `heoniree@gmail.com`은 이미 있는 계정이라 그대로
+쓰실 수 있습니다. 그대로 두시면 됩니다.
 
 ---
 
-## 2. 🔴 Vercel 환경변수 — 텔레그램 봇·아침 브리핑이 멈춰 있습니다
+## 2. 🔴 Vercel 환경변수 2개
 
-`api/telegram-webhook.js`와 `api/daily-digest.js`는 RLS를 우회해야 하므로
-서비스 롤 키가 필요합니다. 없으면 **아무 응답도 못 합니다.**
+### 어디로 가는가
 
-> Vercel → 프로젝트 → **Settings** → **Environment Variables** → 추가
+> **https://vercel.com/heonirees-projects/crm-dashboard/settings/environment-variables**
 >
-> ```
-> 이름 : SUPABASE_SERVICE_ROLE_KEY
-> 값   : Supabase → Project Settings → API → service_role 의 값
-> ```
->
-> **`VITE_` 를 붙이면 안 됩니다.** 붙이면 브라우저 번들에 박혀 공개됩니다.
+> (또는 vercel.com → `crm-dashboard` 프로젝트 → 위쪽 **Settings** 탭
+> → 왼쪽 메뉴 **Environment Variables**)
 
-넣으신 뒤 재배포(Redeploy)해야 반영됩니다.
+### 넣을 것 ① — 텔레그램 봇·아침 브리핑용
+
+| 칸 | 넣을 값 |
+|---|---|
+| **Key** | `SUPABASE_SERVICE_ROLE_KEY` |
+| **Value** | 아래에서 복사 |
+| **Environments** | **Production · Preview · Development 셋 다 체크** |
+
+값 가져오는 곳:
+> **https://supabase.com/dashboard/project/dfukyqrradgmytyqxvnw/settings/api**
+> → **Project API keys** → **`service_role`** 줄의 **Reveal** 을 누르고 복사
+> (`anon` 말고 **service_role** 입니다. `eyJ...` 로 시작하는 긴 문자열)
+
+> ⚠️ **이름 앞에 `VITE_` 를 붙이면 안 됩니다.**
+> 붙이면 브라우저에 그대로 박혀 공개됩니다. 이 키는 RLS를 통째로 우회하므로
+> 노출되면 누구나 전 데이터를 읽고 지울 수 있습니다.
+
+### 넣을 것 ② — 배포된 사이트의 지도용
+
+| 칸 | 넣을 값 |
+|---|---|
+| **Key** | `VITE_KAKAO_MAP_KEY` |
+| **Value** | `.env`에 넣으신 값 그대로 (`7393…` 로 시작하는 32자) |
+| **Environments** | **셋 다 체크** |
+
+이건 반대로 **`VITE_` 가 반드시 붙어야** 합니다 — 브라우저가 읽는 값입니다.
+카카오 JS 키는 공개돼도 되는 키이고, 도메인 등록으로 보호됩니다.
+
+### 마지막 — 재배포
+
+**환경변수는 넣기만 하면 반영되지 않습니다.** 이미 배포된 것은 예전 값으로 굳어 있습니다.
+
+> Vercel 위쪽 **Deployments** 탭 → 맨 위 배포의 오른쪽 **⋯** → **Redeploy**
+> → (Use existing Build Cache 체크 해제 권장) → **Redeploy**
+
+### 잘 됐는지 확인하는 법
+
+재배포가 끝나면 알려 주세요. 제가 확인하겠습니다. 직접 보시려면:
+
+- 지도 — 배포 주소에서 `/map` 을 열었을 때 "카카오 지도 키가 없습니다" 안내가
+  **사라지고** 지도가 뜨면 성공입니다.
+- 텔레그램 — 봇에게 아무 말이나 보냈을 때 답이 오면 성공입니다.
+  (`SUPABASE_SERVICE_ROLE_KEY` 가 없으면 봇이 조용하거나 오류를 냅니다.)
 
 ---
 
