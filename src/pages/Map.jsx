@@ -1,501 +1,339 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api'
 import { supabase } from '../lib/supabase'
-import { MapPin, Filter, RefreshCw, Calendar, Navigation, Loader } from 'lucide-react'
+import { MapPin, Filter, RefreshCw, Calendar, Navigation, Loader, X } from 'lucide-react'
 import { showSuccess, showError } from '../utils/alert'
+import { loadKakaoMaps, geocodeAddress, kakaoKey } from '../utils/kakaoMap'
 
+/**
+ * 거래처 지도 — 카카오
+ *
+ * 구글에서 옮겨 왔다. 이유는 `src/utils/kakaoMap.js` 머리말에 적었다
+ * (구글·네이버는 무료 사용량이 있어도 **결제 수단 등록**을 요구한다).
+ * 저장된 좌표는 그대로 쓴다 — 둘 다 WGS84다.
+ */
 
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 const HQ_ADDRESS = '경기도 용인시 처인구 백암면 삼백로 367-20'
-
-const containerStyle = {
-    width: '100%',
-    height: '100%'
-}
-
-const defaultCenter = {
-    lat: 37.1623, // Approximate center near Yongin
-    lng: 127.3688
-}
+const DEFAULT_CENTER = { lat: 37.1623, lng: 127.3688 }   // 용인 근처
 
 const Map = () => {
-    const [map, setMap] = useState(null)
+    const mapBoxRef = useRef(null)
+    const mapRef = useRef(null)
+    const overlaysRef = useRef([])
+
+    const [maps, setMaps] = useState(null)
+    const [sdkError, setSdkError] = useState(null)
     const [clients, setClients] = useState([])
-    const [loading, setLoading] = useState(true)
     const [statusFilter, setStatusFilter] = useState('all')
     const [selectedClient, setSelectedClient] = useState(null)
     const [hqLocation, setHqLocation] = useState(null)
     const [isSyncing, setIsSyncing] = useState(false)
     const [userLocation, setUserLocation] = useState(null)
     const [locationLoading, setLocationLoading] = useState(false)
-    const [locationError, setLocationError] = useState(null)
 
-
-    // 구글이 인증·결제 문제로 지도를 못 그릴 때 부르는 콜백. 안 잡으면 회색 상자만 남는다.
-    /*
-     * **구글 지도는 실패해도 조용하다.**
-     *
-     * 결제(Billing)가 꺼져 있으면 `loadError`가 나지 않는다. 대신 구글이
-     * 자기 영어 대화상자("This page can't load Google Maps correctly")를
-     * 지도 위에 덮거나, 아예 빈 회색 상자만 남긴다. 화면에는 '31곳을 지도에
-     * 표시합니다'라고 적혀 있으니 우리 프로그램이 고장 난 것처럼 보인다.
-     *
-     * 두 가지를 다 살핀다 — 구글이 부르는 `gm_authFailure`(index.html에서
-     * 앱보다 먼저 걸어 둔다. 그만큼 일찍 부른다)와, 구글이 덮어 놓은 문구.
-     * 지도를 감추지는 않는다. 흐릿하게라도 뜨면 쓸 수 있기 때문이다.
-     */
-    const [authFailed, setAuthFailed] = useState(() => !!window.__gmAuthFailed)
+    /* ── SDK ──────────────────────────────────────────────────────────── */
     useEffect(() => {
-        if (authFailed) return
-        /*
-         * 구글의 경고 문구는 **간헐적으로만** 뜬다(같은 상태에서 떴다 안 떴다 한다).
-         * 그래서 문구로 판단하면 놓친다. **지도가 실제로 그려졌는지**를 본다 —
-         * 구글 지도가 정상이면 `.gm-style` 요소가 반드시 생긴다.
-         * 8초가 지나도 없으면 못 그린 것이다.
-         */
-        const t = setInterval(() => {
-            if (window.__gmAuthFailed) { setAuthFailed(true); clearInterval(t) }
-        }, 500)
-        const late = setTimeout(() => {
-            if (!document.querySelector('.gm-style')) setAuthFailed(true)
-            clearInterval(t)
-        }, 8000)
-        return () => { clearInterval(t); clearTimeout(late) }
-    }, [authFailed])
+        let alive = true
+        loadKakaoMaps()
+            .then((m) => { if (alive) setMaps(m) })
+            .catch((e) => { if (alive) setSdkError(e.message) })
+        return () => { alive = false }
+    }, [])
 
-    const { isLoaded, loadError } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: GOOGLE_API_KEY
-    })
-
+    /* ── 데이터 ───────────────────────────────────────────────────────── */
     const fetchClients = useCallback(async () => {
         try {
-            setLoading(true)
+            const { data: clientsData, error } = await supabase
+                .from('clients').select('*').is('deleted_at', null)
+            if (error) throw error
 
-            // 1. Fetch Clients
-            const { data: clientsData, error: clientsError } = await supabase
-                .from('clients')
-                .select('*')
-
-            if (clientsError) throw clientsError
-
-            // 2. Fetch Future Activities (Next Schedules)
+            // 앞으로의 약속(다음 조치일)을 거래처에 붙인다 — 지도에서 바로 보이게
             const today = new Date().toISOString().split('T')[0]
-            const { data: activitiesData, error: activitiesError } = await supabase
+            const { data: acts } = await supabase
                 .from('activities')
                 .select('client_id, next_action_date, next_action_detail')
                 .gte('next_action_date', today)
                 .order('next_action_date', { ascending: true })
 
-            if (activitiesError) throw activitiesError
-
-            // 3. Map activities to clients (earliest future activity first)
-            const clientsWithSchedules = (clientsData || []).map(client => {
-                const nextActivity = (activitiesData || []).find(a => a.client_id === client.id)
+            setClients((clientsData || []).map((c) => {
+                const next = (acts || []).find((a) => a.client_id === c.id)
                 return {
-                    ...client,
-                    nextSchedule: nextActivity ? {
-                        date: nextActivity.next_action_date,
-                        detail: nextActivity.next_action_detail
-                    } : null
+                    ...c,
+                    nextSchedule: next
+                        ? { date: next.next_action_date, detail: next.next_action_detail }
+                        : null,
                 }
-            })
-
-            setClients(clientsWithSchedules)
-        } catch (error) {
-            console.error('거래처 데이터 로드 오류:', error)
-        } finally {
-            setLoading(false)
+            }))
+        } catch (e) {
+            console.error('거래처 데이터 로드 오류:', e)
         }
     }, [])
 
-    useEffect(() => {
-        fetchClients()
-    }, [fetchClients])
+    useEffect(() => { fetchClients() }, [fetchClients])
 
-    // Find HQ Location
+    const validClients = useMemo(
+        () => clients.filter((c) => c.latitude && c.longitude), [clients])
+
+    const filteredClients = useMemo(
+        () => (statusFilter === 'all' ? validClients : validClients.filter((c) => c.status === statusFilter)),
+        [validClients, statusFilter])
+
+    /* ── 지도 만들기 ──────────────────────────────────────────────────── */
     useEffect(() => {
-        if (isLoaded && window.google) {
-            const geocoder = new window.google.maps.Geocoder()
-            geocoder.geocode({ address: HQ_ADDRESS }, (results, status) => {
-                if (status === 'OK' && results[0]) {
-                    const loc = results[0].geometry.location
-                    setHqLocation({ lat: loc.lat(), lng: loc.lng() })
-                }
-            })
+        if (!maps || !mapBoxRef.current || mapRef.current) return
+        mapRef.current = new maps.Map(mapBoxRef.current, {
+            center: new maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng),
+            level: 12,
+        })
+    }, [maps])
+
+    // 본사 위치
+    useEffect(() => {
+        if (!maps || hqLocation) return
+        geocodeAddress(maps, HQ_ADDRESS).then((p) => { if (p) setHqLocation(p) })
+    }, [maps, hqLocation])
+
+    /* ── 마커 ─────────────────────────────────────────────────────────── */
+    //
+    // 카카오의 기본 마커는 큰 압정 모양이라 31곳이 겹치면 지도가 안 보인다.
+    // 매출 규모에 따라 크기가 달라지는 **점**으로 그린다 (구글에서 쓰던 방식과 같다).
+    // CustomOverlay를 쓰면 이미지 파일 없이 CSS로 그릴 수 있다.
+    useEffect(() => {
+        const map = mapRef.current
+        if (!maps || !map) return
+
+        overlaysRef.current.forEach((o) => o.setMap(null))
+        overlaysRef.current = []
+
+        const dot = (color, px, ring) => {
+            const el = document.createElement('div')
+            el.style.cssText = `width:${px}px;height:${px}px;border-radius:50%;background:${color};`
+                + `border:${ring}px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;`
+            return el
         }
-    }, [isLoaded])
 
-    // Batch Geocode Missing Coords
+        const add = (pos, el, z) => {
+            const ov = new maps.CustomOverlay({
+                position: new maps.LatLng(pos.lat, pos.lng),
+                content: el, yAnchor: 0.5, xAnchor: 0.5, zIndex: z,
+            })
+            ov.setMap(map)
+            overlaysRef.current.push(ov)
+        }
+
+        if (hqLocation) {
+            const el = dot('#111827', 16, 3)
+            el.title = '본사'
+            add(hqLocation, el, 9999)
+        }
+        if (userLocation) {
+            const el = dot('#2563eb', 14, 3)
+            el.title = '내 위치'
+            add(userLocation, el, 10000)
+        }
+
+        filteredClients.forEach((c) => {
+            const rev = Number(c.last_year_revenue || 0)
+            const px = rev > 100_000_000 ? 18 : rev > 50_000_000 ? 15 : rev > 10_000_000 ? 12 : 9
+            const el = dot(c.status === '휴면' ? '#9ca3af' : '#d90000', px, 2)
+            el.title = c.company
+            el.addEventListener('click', () => setSelectedClient(c))
+            add({ lat: c.latitude, lng: c.longitude }, el, Math.floor(rev / 10000))
+        })
+
+        // 보이는 범위를 마커에 맞춘다
+        if (filteredClients.length || hqLocation) {
+            const b = new maps.LatLngBounds()
+            if (hqLocation) b.extend(new maps.LatLng(hqLocation.lat, hqLocation.lng))
+            filteredClients.forEach((c) => b.extend(new maps.LatLng(c.latitude, c.longitude)))
+            map.setBounds(b)
+        }
+    }, [maps, filteredClients, hqLocation, userLocation])
+
+    /* ── 주소 → 좌표 채우기 ───────────────────────────────────────────── */
     const handleSyncAddresses = async () => {
-        if (!isLoaded || !window.google) return
+        if (!maps) return
+        const todo = clients.filter((c) => c.address && (!c.latitude || !c.longitude))
+        if (todo.length === 0) { await showSuccess('좌표를 채울 거래처가 없습니다.'); return }
 
         setIsSyncing(true)
-        const clientsToUpdate = clients.filter(c => c.address && (!c.latitude || !c.longitude))
-
-        if (clientsToUpdate.length === 0) {
-            alert('좌표 업데이트가 필요한 거래처가 없습니다.')
-            setIsSyncing(false)
-            return
+        let done = 0, failed = 0
+        for (const c of todo) {
+            const p = await geocodeAddress(maps, c.address)
+            if (p) {
+                const { error } = await supabase.from('clients')
+                    .update({ latitude: p.lat, longitude: p.lng }).eq('id', c.id)
+                if (!error) done++; else failed++
+            } else {
+                failed++
+            }
+            // 하루 10만 건이라 여유가 크지만, 몰아치면 순간 제한에 걸린다
+            await new Promise((r) => setTimeout(r, 120))
         }
-
-        const geocoder = new window.google.maps.Geocoder()
-        let updatedCount = 0
-
-        for (const client of clientsToUpdate) {
-            await new Promise((resolve) => {
-                geocoder.geocode({ address: client.address }, async (results, status) => {
-                    if (status === 'OK' && results[0]) {
-                        const loc = results[0].geometry.location
-                        const { error } = await supabase
-                            .from('clients')
-                            .update({
-                                latitude: loc.lat(),
-                                longitude: loc.lng()
-                            })
-                            .eq('id', client.id)
-
-                        if (!error) updatedCount++
-                    }
-                    // Google API Rate Limit prevention
-                    setTimeout(resolve, 300)
-                })
-            })
-        }
-
         await fetchClients()
         setIsSyncing(false)
-        alert(`${updatedCount}개의 거래처 좌표가 업데이트되었습니다.`)
+        await showSuccess(`좌표 ${done}곳을 채웠습니다.${failed ? ` (${failed}곳은 주소로 찾지 못했습니다)` : ''}`)
     }
 
-    // Get Current Location
+    /* ── 내 위치 ──────────────────────────────────────────────────────── */
     const handleGetCurrentLocation = () => {
-        if (!navigator.geolocation) {
-            setLocationError('이 브라우저는 위치 서비스를 지원하지 않습니다')
-            showError('이 브라우저는 위치 서비스를 지원하지 않습니다')
-            return
-        }
-
+        if (!navigator.geolocation) { showError('이 브라우저는 위치 서비스를 지원하지 않습니다.'); return }
         setLocationLoading(true)
-        setLocationError(null)
-
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords
-                const newLocation = { lat: latitude, lng: longitude }
-                setUserLocation(newLocation)
-
-                // Center map on user location
-                if (map) {
-                    map.panTo(newLocation)
-                    map.setZoom(14) // Zoom in to show nearby clients
+            (pos) => {
+                const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                setUserLocation(p)
+                if (mapRef.current && maps) {
+                    mapRef.current.setCenter(new maps.LatLng(p.lat, p.lng))
+                    mapRef.current.setLevel(6)
                 }
-
                 setLocationLoading(false)
-                showSuccess('현재 위치를 찾았습니다')
+                showSuccess('현재 위치를 찾았습니다.')
             },
-            (error) => {
+            (err) => {
                 setLocationLoading(false)
-                let errorMessage = '위치를 가져올 수 없습니다'
-
-                switch (error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMessage = '위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.'
-                        break
-                    case error.POSITION_UNAVAILABLE:
-                        errorMessage = '위치 정보를 사용할 수 없습니다'
-                        break
-                    case error.TIMEOUT:
-                        errorMessage = '위치 요청 시간이 초과되었습니다'
-                        break
-                }
-
-                setLocationError(errorMessage)
-                showError(errorMessage)
+                showError(err.code === err.PERMISSION_DENIED
+                    ? '위치 권한이 거부되었습니다. 브라우저 설정에서 허용해 주세요.'
+                    : '위치를 가져올 수 없습니다.')
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
+    }
+
+    /* ── 키가 없을 때 ─────────────────────────────────────────────────── */
+    if (!kakaoKey() || sdkError === 'NO_KEY') {
+        return (
+            <div className="win" style={{ margin: 12 }}>
+                <div className="win-title"><span>거래처 지도</span></div>
+                <div style={{ padding: 16, fontSize: 13, lineHeight: 1.95, color: 'var(--text-secondary)' }}>
+                    <b style={{ color: 'var(--text-primary)' }}>카카오 지도 키가 없습니다.</b><br />
+                    카드 등록 없이 무료로 받을 수 있습니다 (지도 30만 건/일, 주소→좌표 10만 건/일).
+                    <ol style={{ margin: '8px 0 10px', paddingLeft: 18 }}>
+                        <li><b>developers.kakao.com</b> 로그인 → 내 애플리케이션 → 애플리케이션 추가</li>
+                        <li>앱 설정 → <b>플랫폼</b> → Web 등록:
+                            <code> http://localhost:5173 </code>와 배포 주소를 모두 넣습니다</li>
+                        <li>앱 키에서 <b>JavaScript 키</b>를 복사</li>
+                        <li><code>.env</code>에 <code>VITE_KAKAO_MAP_KEY=복사한값</code> 추가 후 dev 서버 재시작</li>
+                        <li>배포에도 쓰려면 Vercel 환경변수에 같은 이름으로 추가</li>
+                    </ol>
+                    좌표는 이미 <b>{validClients.length}곳</b>에 저장돼 있어 키만 넣으면 바로 보입니다.
+                </div>
+            </div>
         )
     }
 
-
-    const onLoad = useCallback(function callback(map) {
-        setMap(map)
-    }, [])
-
-    const onUnmount = useCallback(function callback(map) {
-        setMap(null)
-    }, [])
-
-    // 마커 필터링 (Only show clients with valid coords)
-    const validClients = useMemo(() => {
-        return clients.filter(c => c.latitude && c.longitude)
-    }, [clients])
-
-    const filteredClients = useMemo(() => {
-        return statusFilter === 'all'
-            ? validClients
-            : validClients.filter(client => client.status === statusFilter)
-    }, [validClients, statusFilter])
-
-    // 지도 범위 조정
-    useEffect(() => {
-        if (map && isLoaded) {
-            const bounds = new window.google.maps.LatLngBounds()
-
-            // Add HQ
-            if (hqLocation) {
-                bounds.extend(hqLocation)
-            }
-
-            // Add Clients
-            if (filteredClients.length > 0) {
-                filteredClients.forEach(client => {
-                    bounds.extend({ lat: client.latitude, lng: client.longitude })
-                })
-            }
-
-            if (!bounds.isEmpty()) {
-                map.fitBounds(bounds)
-            }
-        }
-    }, [map, filteredClients, hqLocation, isLoaded])
+    if (sdkError) {
+        return (
+            <div className="win" style={{ margin: 12 }}>
+                <div className="win-title"><span>거래처 지도</span></div>
+                <p style={{ padding: 16, margin: 0, fontSize: 13, lineHeight: 1.9, color: 'var(--text-secondary)' }}>
+                    카카오 지도를 불러오지 못했습니다.<br />
+                    카카오 개발자 사이트의 <b>플랫폼 → Web</b>에 지금 주소
+                    (<code>{window.location.origin}</code>)가 등록돼 있는지 확인해 주세요.
+                    등록되지 않은 주소에서는 키가 거부됩니다.
+                </p>
+            </div>
+        )
+    }
 
     const statusOptions = ['all', '신규', '거래중', '휴면']
 
-    /*
-     * **구글 지도는 실패해도 조용하다.** 결제가 꺼져 있거나 키가 막히면
-     * `loadError`가 나지 않고 **빈 회색 상자**만 남는다. 화면에는 '31곳을
-     * 지도에 표시합니다'라고 적혀 있으니 고장으로 보인다.
-     * 구글은 그럴 때 `window.gm_authFailure()`를 부른다. 그걸 잡아 이유를 적는다.
-     * (실제로 겪은 것: BillingNotEnabledMapError — 구글 클라우드 결제 미설정)
-     */
-    if (loadError) return <div className="win" style={{ margin: 12 }}>
-        <div className="win-title"><span>거래처 지도</span></div>
-        <p style={{ padding: 16, margin: 0, fontSize: 13, color: 'var(--text-secondary)' }}>
-            지도를 불러오지 못했습니다. 인터넷 연결과 구글 지도 API 키를 확인하세요.
-        </p>
-    </div>
-    if (!isLoaded) return <div className="p-10 text-gray-500">지도를 불러오는 중...</div>
-
     return (
-        <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen">
+        <div className="p-3 md:p-6 bg-oem-bg-app text-oem-text-primary mt-[50px] min-h-screen">
             <div className="max-w-[1600px] mx-auto flex flex-col h-[calc(100vh-120px)] space-y-4">
 
-                {/* Page Header */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
                     <div>
-                        <h1 className="text-xl font-bold text-oem-blue tracking-tight flex items-center gap-2">
-                            거래처 지도
-                        </h1>
-                        <p className="text-[11px] text-oem-text-secondary mt-1 overflow-hidden whitespace-nowrap overflow-ellipsis">
+                        <h1 className="text-xl font-bold text-oem-blue tracking-tight">거래처 지도</h1>
+                        <p className="text-xs text-oem-text-secondary mt-1">
                             {validClients.length > 0
                                 ? <>주소 좌표가 등록된 거래처 <b className="text-oem-blue">{validClients.length}곳</b>을 지도에 표시합니다.</>
-                                : <>아직 좌표가 등록된 거래처가 없습니다. 거래처 상세에서 주소를 넣으면 지도에 나타납니다.</>}
+                                : <>아직 좌표가 등록된 거래처가 없습니다. 아래 <b>주소 좌표 채우기</b>를 누르면 주소로 찾아 넣습니다.</>}
                         </p>
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                        <button
-                            onClick={handleSyncAddresses}
-                            disabled={isSyncing}
-                            className="oem-btn-secondary h-8 py-1.5 flex items-center gap-2"
-                        >
+                        <button onClick={handleSyncAddresses} disabled={isSyncing || !maps}
+                            className="oem-btn-secondary h-8 py-1.5 flex items-center gap-2">
                             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                             {isSyncing ? '좌표 받는 중…' : '주소 좌표 채우기'}
                         </button>
 
                         <div className="flex items-center gap-2 bg-white border border-oem-border rounded-oem px-3 py-1 h-8">
                             <Filter className="w-3.5 h-3.5 text-oem-text-secondary" />
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="bg-transparent text-[11px] font-bold text-oem-text-primary outline-none uppercase"
-                            >
-                                {statusOptions.map(status => (
-                                    <option key={status} value={status}>
-                                        {status === 'all' ? '전체 상태' : status}
-                                    </option>
+                            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+                                className="bg-transparent text-xs font-bold text-oem-text-primary outline-none">
+                                {statusOptions.map((s) => (
+                                    <option key={s} value={s}>{s === 'all' ? '전체 상태' : s}</option>
                                 ))}
                             </select>
                         </div>
                     </div>
                 </div>
 
-                {/* Map Context Utility */}
                 <div className="oem-panel bg-white shadow-sm overflow-hidden flex-1 flex flex-col border-l-4 border-l-oem-blue">
                     <div className="oem-panel-header shrink-0">
                         <span>지도</span>
-                        <div className="flex items-center gap-3 text-[10px] uppercase font-bold text-oem-text-secondary">
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-black"></span> 본사</span>
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]"></span> 거래처</span>
+                        <div className="flex items-center gap-3 text-xs font-bold text-oem-text-secondary">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-black" /> 본사</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]" /> 거래처</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#9ca3af]" /> 휴면</span>
                         </div>
                     </div>
 
-                    {/*
-                      구글이 결제 문제로 자기 영어 대화상자를 지도 위에 덮는다.
-                      우리 프로그램이 고장 난 것으로 읽히므로 이유를 한국어로 적는다.
-                      지도는 그대로 둔다 — 흐릿하게라도 뜨면 쓸 수 있다.
-                    */}
-                    {authFailed && (
-                        <div style={{ margin: '4px 4px 0', padding: '10px 12px', borderRadius: 'var(--radius)',
-                                      background: '#fff8e6', border: '1px solid #f0d9a0', fontSize: 12.5, lineHeight: 1.8 }}>
-                            <b>구글 지도 결제가 켜져 있지 않습니다.</b> 지도 위에 뜨는 영어 안내
-                            (&ldquo;This page can&rsquo;t load Google Maps correctly&rdquo;)는 구글이 띄우는 것입니다.
-                            <br />
-                            console.cloud.google.com → 결제(Billing) → 결제 계정 연결.
-                            지도는 무료 사용량이 있지만 결제 수단 등록은 있어야 합니다.
-                            좌표는 이미 <b>{validClients.length}곳</b>에 저장돼 있어 켜는 즉시 보입니다.
-                        </div>
-                    )}
-
                     <div className="flex-1 relative m-1 rounded-oem overflow-hidden border border-oem-border shadow-inner">
-                        {/* Current Location Button */}
-                        <button
-                            onClick={handleGetCurrentLocation}
-                            disabled={locationLoading}
-                            className="absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-white p-2 md:p-3 rounded-full shadow-lg hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-gray-200"
-                            aria-label="현재 위치로 이동"
-                            title="현재 위치 표시"
-                        >
-                            {locationLoading ? (
-                                <Loader className="w-4 h-4 md:w-5 md:h-5 animate-spin text-blue-600" />
-                            ) : (
-                                <Navigation className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
-                            )}
+                        <button onClick={handleGetCurrentLocation} disabled={locationLoading}
+                            className="absolute top-3 right-3 z-10 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 border border-gray-200 disabled:opacity-50"
+                            title="현재 위치 표시" aria-label="현재 위치로 이동">
+                            {locationLoading
+                                ? <Loader className="w-5 h-5 animate-spin text-blue-600" />
+                                : <Navigation className="w-5 h-5 text-blue-600" />}
                         </button>
 
-                        <GoogleMap
-                            mapContainerStyle={containerStyle}
-                            center={defaultCenter}
-                            zoom={10}
-                            onLoad={onLoad}
-                            onUnmount={onUnmount}
-                            options={{
-                                streetViewControl: false,
-                                mapTypeControl: false,
-                                gestureHandling: 'greedy',
-                                styles: [
-                                    { featureType: 'administrative', elementType: 'labels.text.fill', stylers: [{ color: '#444444' }] },
-                                    { featureType: 'landscape', elementType: 'all', stylers: [{ color: '#f2f2f2' }] },
-                                    { featureType: 'poi', elementType: 'all', stylers: [{ visibility: 'off' }] },
-                                    { featureType: 'road', elementType: 'all', stylers: [{ saturation: -100 }, { lightness: 45 }] },
-                                    { featureType: 'water', elementType: 'all', stylers: [{ color: '#0076ce' }, { visibility: 'on' }, { opacity: 0.1 }] }
-                                ]
-                            }}
-                        >
-                            {/* HQ Marker */}
-                            {hqLocation && (
-                                <Marker
-                                    position={hqLocation}
-                                    title="CORE_OPERATIONS_CENTER"
-                                    icon={{
-                                        path: "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z",
-                                        fillColor: "#000000", // Changed to Black for contrast
-                                        fillOpacity: 1,
-                                        strokeColor: "#FFFFFF",
-                                        strokeWeight: 2,
-                                        scale: 2.2,
-                                        anchor: new window.google.maps.Point(12, 12),
-                                    }}
-                                    zIndex={999}
-                                />
-                            )}
+                        <div ref={mapBoxRef} style={{ width: '100%', height: '100%' }} />
 
-                            {/* User Location Marker */}
-                            {userLocation && (
-                                <Marker
-                                    position={userLocation}
-                                    title="내 위치"
-                                    icon={{
-                                        path: window.google.maps.SymbolPath.CIRCLE,
-                                        scale: 10,
-                                        fillColor: '#4285F4',
-                                        fillOpacity: 1,
-                                        strokeColor: '#FFFFFF',
-                                        strokeWeight: 3,
-                                    }}
-                                    zIndex={1000}
-                                />
-                            )}
+                        {!maps && (
+                            <div className="absolute inset-0 flex items-center justify-center text-oem-text-secondary text-sm">
+                                지도를 불러오는 중…
+                            </div>
+                        )}
 
-                            {/* Client Markers */}
-                            {filteredClients.map(client => {
-                                const revenue = Number(client.last_year_revenue || 0);
-                                // 크기 대폭 축소 (기존 거대 핀 -> 심플한 점)
-                                let scale = 5; // 기본 크기 (픽셀 단위 유사)
-                                if (revenue > 10000000) scale = 8;
-                                else if (revenue > 5000000) scale = 6.5;
-                                else if (revenue > 1000000) scale = 5.5;
+                        {/*
+                          카카오의 InfoWindow는 HTML 문자열을 넣어야 해서 거래처 이름에
+                          따옴표나 꺾쇠가 있으면 깨진다. React 카드로 띄운다.
+                        */}
+                        {selectedClient && (
+                            <div className="absolute left-3 bottom-3 z-10 w-[280px] bg-white rounded-oem shadow-xl border border-oem-border p-3">
+                                <div className="flex items-start justify-between gap-2 border-b border-oem-border pb-2 mb-2">
+                                    <h3 className="text-sm font-bold text-oem-blue leading-tight">{selectedClient.company}</h3>
+                                    <button className="rowbtn" onClick={() => setSelectedClient(null)} title="닫기">
+                                        <X size={13} />
+                                    </button>
+                                </div>
 
-                                return (
-                                    <Marker
-                                        key={client.id}
-                                        position={{ lat: client.latitude, lng: client.longitude }}
-                                        onClick={() => setSelectedClient(client)}
-                                        icon={{
-                                            // 단순한 원형(Dot) 마커로 변경
-                                            path: window.google.maps.SymbolPath.CIRCLE,
-                                            fillColor: client.status === '휴면' ? '#9CA3AF' : '#d90000', // Oracle Red for visibility
-                                            fillOpacity: 0.9,
-                                            strokeColor: '#FFFFFF',
-                                            strokeWeight: 1.5,
-                                            scale: scale,
-                                        }}
-                                        zIndex={Math.floor(revenue / 10000)}
-                                    />
-                                );
-                            })}
+                                <p className="text-xs text-oem-text-primary mb-2 flex items-start gap-1">
+                                    <MapPin className="w-3.5 h-3.5 text-oem-blue shrink-0 mt-0.5" />
+                                    {selectedClient.address || '주소 없음'}
+                                </p>
 
-                            {/* InfoWindow */}
-                            {selectedClient && (
-                                <InfoWindow
-                                    position={{ lat: selectedClient.latitude, lng: selectedClient.longitude }}
-                                    onCloseClick={() => setSelectedClient(null)}
-                                >
-                                    <div className="p-1 min-w-[240px] font-['Noto_Sans_KR',sans-serif]">
-                                        <div className="border-b border-oem-border pb-1.5 mb-2">
-                                            <h3 className="text-sm font-bold text-oem-blue leading-tight truncate">{selectedClient.company}</h3>
-                                            <p className="text-[10px] text-oem-text-secondary mt-0.5 tracking-tighter uppercase font-bold">Client Metadata Record</p>
+                                {selectedClient.nextSchedule ? (
+                                    <div className="bg-oem-bg-header/40 p-2.5 rounded-oem border border-oem-border border-l-4 border-l-oem-blue">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <Calendar className="w-3.5 h-3.5 text-oem-blue" />
+                                            <span className="text-xs font-bold text-oem-blue">다음에 하기로 한 것</span>
                                         </div>
-
-                                        <p className="text-[11px] text-oem-text-primary mb-3 font-medium flex items-start gap-1">
-                                            <MapPin className="w-3 h-3 text-oem-blue shrink-0 mt-0.5" />
-                                            {selectedClient.address}
+                                        <p className="text-xs font-bold text-oem-text-primary leading-snug">
+                                            {selectedClient.nextSchedule.detail || '내용 없음'}
                                         </p>
-
-                                        {selectedClient.nextSchedule ? (
-                                            <div className="bg-oem-bg-header/40 p-2.5 rounded-oem border border-oem-border border-l-4 border-l-oem-blue">
-                                                <div className="flex items-center gap-1.5 mb-1.5">
-                                                    <Calendar className="w-3 h-3 text-oem-blue" />
-                                                    <p className="text-[9px] font-bold text-oem-blue uppercase tracking-widest">
-                                                        Next Engagement Scheduled
-                                                    </p>
-                                                </div>
-                                                <p className="text-[12px] font-bold text-oem-text-primary leading-tight mb-1">
-                                                    {selectedClient.nextSchedule.detail || 'Context Pending'}
-                                                </p>
-                                                <div className="text-[10px] text-oem-text-secondary font-bold italic">
-                                                    {selectedClient.nextSchedule.date}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center justify-between pt-1">
-                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${selectedClient.status === '매출'
-                                                    ? 'bg-oem-green/10 text-oem-green border-oem-green/20'
-                                                    : 'bg-oem-bg-header text-oem-text-secondary border-oem-border'
-                                                    }`}>
-                                                    {selectedClient.status?.toUpperCase() || 'UNKNOWN'}
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="text-xs text-oem-text-secondary mt-1">
+                                            {selectedClient.nextSchedule.date}
+                                        </div>
                                     </div>
-                                </InfoWindow>
-                            )}
-                        </GoogleMap>
+                                ) : (
+                                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-bold bg-oem-bg-header text-oem-text-secondary border border-oem-border">
+                                        {selectedClient.status || '상태 없음'}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

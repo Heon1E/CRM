@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
-import { useJsApiLoader } from '@react-google-maps/api'
 import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
+import { loadKakaoMaps, geocodeAddress } from '../utils/kakaoMap'
 import { useAuth } from '../contexts/AuthContext'
 import { Plus, X } from 'lucide-react'
 import useEnterMove from '../hooks/useEnterMove'
@@ -12,10 +12,6 @@ import { CLIENT_STATUS_OPTIONS } from '../utils/clientStatus'
 
 const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-  })
   const { clients, updateClient, deleteClient, products, fetchClientContacts } = useData()
   const { user } = useAuth()
   // Use provided client prop if available, otherwise find in context
@@ -223,29 +219,15 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
         }))
 
         // Google Geocoding API 사용
-        if (isLoaded && window.google && window.google.maps) {
-          try {
-            const geocoder = new window.google.maps.Geocoder()
-            geocoder.geocode({ address: fullAddress }, (results, status) => {
-              if (status === 'OK' && results[0]) {
-                const location = results[0].geometry.location
-                console.log('[Geocoding] Success:', location.lat(), location.lng())
-
-                setFormData(prev => ({
-                  ...prev,
-                  latitude: location.lat(),
-                  longitude: location.lng(),
-                }))
-              } else {
-                console.warn('[Geocoding] Failed:', status)
-              }
-            })
-          } catch (error) {
-            console.error('[Geocoding] Error:', error)
-          }
-        } else {
-          console.warn('[Geocoding] Google Maps SDK not loaded')
-        }
+        /*
+         * 주소 → 좌표. **카카오로 옮겼다** (구글은 결제 수단이 있어야 켜진다).
+         * 실패해도 저장을 막지 않는다 — 주소만 있으면 지도에서 나중에
+         * '주소 좌표 채우기'로 한 번에 채울 수 있다.
+         */
+        loadKakaoMaps()
+          .then((maps) => geocodeAddress(maps, fullAddress))
+          .then((p) => { if (p) setFormData(prev => ({ ...prev, latitude: p.lat, longitude: p.lng })) })
+          .catch(() => { /* 키가 없거나 못 불러왔다. 주소는 이미 채워졌다. */ })
       }
     }).open()
   }

@@ -49,14 +49,6 @@
       window.global = window;
     }
 
-    /*
-     * 구글 지도가 인증·결제 문제로 못 열릴 때 부르는 콜백.
-     * **앱보다 먼저 등록해야 한다** — 구글이 스크립트를 읽자마자 부르므로
-     * React 화면에서 등록하면 이미 지나간 뒤다. 그러면 화면에는 아무 설명 없이
-     * 빈 회색 상자만 남는다(실제로 BillingNotEnabledMapError로 그랬다).
-     */
-    window.__gmAuthFailed = false;
-    window.gm_authFailure = function () { window.__gmAuthFailed = true; };
   </script>
 
 
