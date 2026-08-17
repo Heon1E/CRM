@@ -661,6 +661,21 @@ localStorage에 넣고 `kpi-manual-updated` 이벤트를 쏜다.
 - 새 달을 올릴 때 **같은 거래처명이면 제외 표시를 물려받는다.** 화면 업로드와 스크립트 양쪽에 있다.
 - `excluded` 열이 없어도(마이그레이션 전) 업로드·조회는 그대로 동작한다.
 
+## `/calendar` — 모든 일정이 'No Title'로 떠 있었다
+
+`activity.summary`를 제목으로 썼는데 **`activities`에 그런 칸이 없다**
+(실제 컬럼은 `description`). 그래서 227건이 전부 `미팅 - No Title`이었다.
+달력에서 정작 알아야 할 것은 **어느 거래처인지**다 — `거래처명 · 유형`으로 고쳤다.
+
+색 구분도 `'call'`·`'email'` 같은 **영어**로 보고 있었는데 저장된 값은
+`미팅`·`전화`·`이메일`이라 하나도 걸리지 않아 **전부 파란색**이었다.
+
+FullCalendar 기본 언어가 영어라 `today`·`month`·`Sun`으로 떴다.
+`@fullcalendar/core/locales/ko`를 넣어야 한다.
+
+메모(`description`)는 달력 칸에 안 들어가므로 `title` 속성으로 넘겨
+마우스를 올리면 보이게 했다.
+
 ## 일정 달력 (대시보드 중앙)
 
 `src/components/ScheduleCalendar.jsx` + `schedules` 테이블

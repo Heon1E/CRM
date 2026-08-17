@@ -77,17 +77,11 @@ disable_signup : true    ← 새로 가입할 수 없습니다
 
 ---
 
-## 3. 🟡 SQL 한 개 실행 — 개인 설정이 저장되지 않습니다
+## 3. ✅ settings RLS — 끝났습니다
 
-설정 화면을 열면 콘솔에
-`new row violates row-level security policy for table "settings"` 가 뜹니다.
-알림 켜고 끄기가 저장되지 않습니다(업무는 막지 않습니다).
-
-> Supabase → **SQL Editor** → 아래 파일 내용을 붙여넣고 실행
->
-> ```
-> execution/sql/settings_rls.sql
-> ```
+로그인 없이 조회하면 0행(막힘), 로그인 상태에서는 알림을 바꾸고 저장하니
+DB까지 반영됐습니다. 콘솔 오류도 사라졌습니다.
+(확인 중 켰던 '매출 목표 달성 알림'은 원래대로 꺼 두었습니다.)
 
 ---
 
@@ -229,7 +223,7 @@ VITE_DEV_AUTOLOGIN_PW=<비밀번호>
 
 ---
 
-## 6. 🟢 확인만 해 주시면 되는 것들
+## 11. 🟢 판단만 해 주시면 되는 것들
 
 ### (a) 파이프라인 기준이 실제와 맞습니까
 
