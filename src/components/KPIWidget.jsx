@@ -368,6 +368,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
 
         // 단절 / 편입 판정
         const reactivatedIds = []
+        const reactivatedPendingIds = []   // 되살아났지만 실적 기준 미달
         const dormantIds = []
 
         managedClientIds.forEach(id => {
@@ -381,10 +382,19 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             )
             if (churned) dormantIds.push({ id, lastOrderMonth })
             // 올해 처음 거래한 곳은 '단절 후 편입'이 될 수 없다 (신규와 이중 계상 방지)
-            if (reactivated
-                && !newCandidateIds.includes(id)
-                && checkQualifyingRevenue(id, rawSalesData, currentYear)) {
-                reactivatedIds.push(id)
+            if (reactivated && !newCandidateIds.includes(id)) {
+                if (checkQualifyingRevenue(id, rawSalesData, currentYear)) {
+                    reactivatedIds.push(id)
+                } else {
+                    /*
+                     * **되살아났는데 실적이 아직 문턱에 못 미친 곳.**
+                     * 예전에는 여기서 그냥 버려서 화면에 `0건`만 남았다.
+                     * 실제로는 3곳이 문턱 앞에 서 있었다(수산고분자 679만원 —
+                     * 반기 1천만까지 321만원). **지금 밀어야 할 곳**이 안 보이는
+                     * 것이 KPI 숫자보다 아깝다.
+                     */
+                    reactivatedPendingIds.push(id)
+                }
             }
         })
 
@@ -400,6 +410,19 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
 
         const qualifiedNewList = qualifiedNewIds.map(toRow).sort(byRevenueDesc)
         const reactivatedList = reactivatedIds.map(toRow).sort(byRevenueDesc)
+        // 문턱까지 얼마 남았는지 — 반기 1천만이 가장 가까운 문이다
+        const reactivatedPendingList = reactivatedPendingIds.map((id) => {
+            const row = toRow(id)
+            let h1 = 0, h2 = 0
+            ;(rawSalesData || []).forEach((s2) => {
+                if ((s2.client_id || s2.clientId) !== id) return
+                const d = new Date(s2.sale_date || s2.date)
+                if (isNaN(d.getTime()) || d.getFullYear() !== currentYear) return
+                const amt = Number(s2.total_amount ?? s2.totalAmount ?? 0) || 0
+                if (d.getMonth() < 6) h1 += amt; else h2 += amt
+            })
+            return { ...row, shortfall: Math.max(0, KPI_REVENUE_QUALIFY.HALF_YEAR - Math.max(h1, h2)) }
+        }).sort((a3, b3) => a3.shortfall - b3.shortfall)
         const dormantList = dormantIds
             .map(({ id, lastOrderMonth }) => ({
                 ...toRow(id),
@@ -492,6 +515,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                     actual: reactivatedCount, target: 0, percent: clientMgmtPercent, icon: Users,
                     detail: `${CHURN_RULE.GAP_MONTHS}\uac1c\uc6d4 \uc774\uc0c1 \uac70\ub798\uac00 \ub04a\uacbc\ub2e4\uac00 \uc62c\ud574 \ub2e4\uc2dc \uac70\ub798\ud55c \uacf3 \uc911, \ubc18\uae30 1\ucc9c\ub9cc\uc6d0(\ub610\ub294 \uc5f0 2\ucc9c\ub9cc\uc6d0)\uc744 \ub118\uae34 \uac70\ub798\ucc98`,
                     clientList: reactivatedList,
+                    pendingList: reactivatedPendingList,
                     emptyText: '\uae30\uc900\uc744 \ub118\uc740 \ud3b8\uc785 \uc2e4\uc801\uc774 \uc544\uc9c1 \uc5c6\uc2b5\ub2c8\ub2e4.',
                     dormantList,
                     excludeKind: KPI_EXCLUSION_KINDS.CHURN,
@@ -593,6 +617,36 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                         지우기
                                     </button>
                                 )}
+                            </div>
+                        )}
+
+                        {/*
+                          **문턱 앞에서 걸린 곳.** 인정 건수(0건)만 보여 주면
+                          '아무 일도 없다'로 읽히지만, 실제로는 되살아나 거래가
+                          다시 붙은 곳이 있다. 얼마가 모자란지까지 적는다 —
+                          그래야 이번 달에 무엇을 밀지 정할 수 있다.
+                        */}
+                        {item.pendingList && item.pendingList.length > 0 && (
+                            <div className="mt-3 rounded-lg p-3" style={{ background: 'var(--bg-app)', border: '1px solid var(--border-light)' }}>
+                                <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                    거래는 다시 붙었는데 실적이 모자란 곳 {item.pendingList.length}곳
+                                </p>
+                                <p style={{ color: 'var(--text-muted)' }}>
+                                    반기 1천만원 또는 연 2천만원을 넘기면 편입으로 인정됩니다.
+                                </p>
+                                <ul className="mt-2 divide-y" style={{ borderColor: 'var(--border-light)' }}>
+                                    {item.pendingList.map((c) => (
+                                        <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
+                                            <span className="truncate flex-1" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                                            <span className="shrink-0 tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                                                {formatMan(c.revenue)}
+                                            </span>
+                                            <span className="shrink-0 tabular-nums font-semibold" style={{ color: 'var(--warning)' }}>
+                                                {formatMan(c.shortfall)} 남음
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
                         )}
 
