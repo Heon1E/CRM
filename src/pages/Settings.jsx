@@ -493,7 +493,7 @@ const Settings = () => {
                         }}
                         className="oem-btn-secondary flex items-center gap-2 px-3 py-1.5"
                       >
-                        <Download className="w-4 h-4" /> EXPORT_XLSX
+                        <Download className="w-4 h-4" /> 엑셀 내리기
                       </button>
                     </div>
 
@@ -516,7 +516,7 @@ const Settings = () => {
                         }}
                         className="oem-btn-secondary flex items-center gap-2 px-3 py-1.5"
                       >
-                        <Download className="w-4 h-4" /> EXPORT_XLSX
+                        <Download className="w-4 h-4" /> 엑셀 내리기
                       </button>
                     </div>
                   </div>
@@ -550,7 +550,7 @@ const Settings = () => {
                         className="oem-btn-secondary w-full justify-center"
                         disabled={settingsLoading}
                       >
-                        RUN_SYNC_PROCESS
+                        동기화 실행
                       </button>
                     </div>
 

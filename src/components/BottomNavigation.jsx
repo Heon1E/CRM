@@ -27,7 +27,8 @@ const BottomNavigation = () => {
                 }`}
             >
               <item.icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current opacity-20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              {/* 12px 미만은 읽기 어렵다 — 화면에서 11.5px로 그려지고 있었다 */}
+              <span className="text-xs font-medium">{item.label}</span>
             </Link>
           )
         })}

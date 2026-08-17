@@ -152,8 +152,11 @@ const UserAdmin = () => {
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="checkbox" checked={!!r.active} disabled={busy === r.id || r.id === profile?.id}
-                                        onChange={(e) => patch(r, { active: e.target.checked })} />
+                                    {/* 라벨로 감싸 누르는 자리를 넓힌다 (모바일 44px) */}
+                                    <label className="tap-box" aria-label={`${String(r.email || '').split('@')[0]} 사용 여부`}>
+                                        <input type="checkbox" checked={!!r.active} disabled={busy === r.id || r.id === profile?.id}
+                                            onChange={(e) => patch(r, { active: e.target.checked })} />
+                                    </label>
                                 </td>
                             </tr>
                         ))}

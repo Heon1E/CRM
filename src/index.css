@@ -882,15 +882,35 @@ textarea:focus {
    * 고르기 칸 13×13px가 20개, 상단바 알림 36×36, 햄버거 40×40.
    * 손가락으로는 못 누른다. 그래서 단추 전체에 건다.
    */
+  /*
+   * `!important` 를 쓰는 이유 — **클래스가 요소 선택자를 이긴다.**
+   * `.oem-btn-secondary { min-height: 28px }` 같은 규칙이 있으면
+   * `button { min-height: 44px }`(0,0,0,1)는 진다. 실측: 설정 화면의
+   * '엑셀 내리기'가 31px, '동기화 실행'이 28px로 남아 있었다.
+   * 클래스를 하나하나 적어 두면 새 클래스가 생길 때마다 또 빠진다.
+   */
   button,
   [role="button"] {
-    min-height: 44px;
+    min-height: 44px !important;
   }
 
   /* 표 안의 아이콘 단추는 가로도 좁다 */
   table.dgrid td button,
   table.dgrid th button {
     min-width: 44px;
+  }
+
+  /*
+   * **12px 미만 글씨는 모바일에서 못 읽는다.**
+   * 데스크톱은 밀도가 중요해 11px 캡션을 쓰지만, 손에 들고 보는 화면은 다르다.
+   * 실측(386px): `text-[10px]`·`text-[11px]`·`.meta` 가 11~11.5px로 그려지고
+   * 있었다. 모바일에서만 12px로 올린다 — 데스크톱 밀도는 그대로 둔다.
+   */
+  .meta,
+  [class*="text-[9px]"],
+  [class*="text-[10px]"],
+  [class*="text-[11px]"] {
+    font-size: 12px !important;
   }
 
   /*
