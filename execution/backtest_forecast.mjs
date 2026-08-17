@@ -104,6 +104,27 @@ const main = async () => {
     for (const [k, f] of Object.entries(방법)) {
         console.log(`  ${k.padEnd(32)}${(mae(f).toFixed(2) + '%').padStart(8)}   ${pct(bias(f)).padStart(7)}`)
     }
+    /* ── 수렴 — 달이 지날수록 정확해지는가 ─────────────────────────────
+     * 마감된 달은 사실로 굳으므로 추정은 반드시 실제로 수렴해야 한다.
+     * 12월 말에 0.0%가 나오는지, 가는 길이 어떤 모양인지 본다.
+     * **가는 길은 단조롭지 않다** — 한 달이 세게 나오면 연간 추정도 함께
+     * 올라간다. 그건 잡음이 아니라 신호다. */
+    console.log('\n수렴 — 매월 말 시점의 연간 추정 오차')
+    for (const Y of [...new Set(rows.map((r) => r.Y))]) {
+        const act = yearSum(Y)
+        let line = ''; const errs = []
+        for (let m = 1; m <= 12; m++) {
+            const cut = new Date(Y, m, 0, 23, 59, 59)
+            const upto = all.filter((s) => new Date(s.sale_date) <= cut)
+            if (!upto.length) continue
+            const e = (calculateRevenueForecast(upto, Y, cut).total_amount - act) / act * 100
+            errs.push(Math.abs(e))
+            line += `${String(m).padStart(2)}월 ${pct(e).padStart(6)}   `
+            if (m % 6 === 0) { console.log('  ' + line); line = '' }
+        }
+        console.log(`  ${Y} 평균절대오차 ${(errs.reduce((a, b) => a + b, 0) / errs.length).toFixed(2)}%\n`)
+    }
+
 
     console.log('\n※ 표본이 적다(연도당 4개 시점). 가중치를 이 결과에 맞춰 고르면')
     console.log('   지난 자료에만 잘 맞는 값이 된다. 읽어야 할 것은 가중치가 아니라')
