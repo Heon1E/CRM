@@ -50,9 +50,9 @@ const RevenueForecastPanel = () => {
                 <div className="absolute inset-0 animate-pulse"
                     style={{ background: 'linear-gradient(90deg, transparent, rgba(16,185,129,0.04), transparent)' }} />
                 <BrainCircuit className="w-12 h-12 animate-bounce mb-4" style={{ color: 'var(--accent)' }} />
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--accent-light)' }}>AI Analyzing Data...</h3>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--accent-light)' }}>계산하는 중…</h3>
                 <p className="text-sm text-center max-w-xs" style={{ color: 'var(--text-secondary)' }}>
-                    Processing historical trends, churn risks, and seasonal patterns.
+                    최근 4년 실적을 고객 유형별로 나누고, 영업일수와 공휴일을 반영해 연말까지 내다봅니다.
                 </p>
                 <div className="w-48 h-1.5 rounded-full mt-6 overflow-hidden" style={{ backgroundColor: 'var(--border)' }}>
                     <div className="h-full rounded-full animate-[loading_2s_ease-in-out_infinite]"
@@ -71,9 +71,9 @@ const RevenueForecastPanel = () => {
                     <span className="badge-accent">시험 기능</span>
                 </div>
                 <BrainCircuit className="w-12 h-12 mb-4 opacity-30" style={{ color: 'var(--text-secondary)' }} />
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>AI Revenue Forecast</h3>
+                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>연말 매출 추정</h3>
                 <p className="text-sm text-center max-w-xs mb-6" style={{ color: 'var(--text-secondary)' }}>
-                    Predict year-end revenue using advanced cohort & trend analysis algorithms.
+                    최근 4년 실적으로 올해 연말 매출을 내다봅니다. 계산에 시간이 조금 걸립니다.
                 </p>
                 <button
                     onClick={handleAnalyze}
@@ -108,17 +108,23 @@ const RevenueForecastPanel = () => {
             <div className="p-4 flex justify-between items-start" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Annual Forecast</h3>
+                        <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>연말 매출 추정</h3>
+                        {/*
+                          예전에는 `AI` 배지를 달아 뒀다. **이 엔진은 AI가 아니다** —
+                          고객을 7가지로 나눠 영업일수로 정규화해 곱하는 규칙 계산이다
+                          (revenueForecastEngine.js). 실제보다 크게 말하면 숫자를
+                          덜 의심하게 된다. 하는 일 그대로 적는다.
+                        */}
                         <span className="badge-accent flex items-center gap-1">
-                            <BrainCircuit className="w-3 h-3" /> AI
+                            <BrainCircuit className="w-3 h-3" /> 규칙 기반
                         </span>
                     </div>
                     <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                        Calculated: {(() => {
+                        계산 시각 {(() => {
                             const d = new Date(data.created_at)
                             return !isNaN(d.getTime())
                                 ? `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`
-                                : 'Just now'
+                                : '방금'
                         })()}
                     </p>
                 </div>
@@ -190,7 +196,7 @@ const RevenueForecastPanel = () => {
                     style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }}></span>
-                        <span style={{ color: 'var(--text-secondary)' }}>Trend Line</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>추세선</span>
                     </div>
                 </div>
             </div>

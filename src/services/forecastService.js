@@ -52,6 +52,10 @@ export const ForecastService = {
                     .from('sales')
                     .select('sale_date, total_amount, client_id')
                     .gte('sale_date', `${new Date().getFullYear() - 3}-01-01`)
+                    // 휴지통에 든 매출은 빼야 한다. 지금은 지운 매출이 0건이라
+                    // 티가 안 나지만, 잘못 올린 매출을 지우는 순간 예측만 옛 값을
+                    // 계속 쓰게 된다 (다른 화면은 전부 걸러 낸다).
+                    .is('deleted_at', null)
                     // 정렬 없는 .range()는 페이지 간 행 중복/누락을 일으켜 집계 총액을 틀리게 만든다.
                     // id를 tie-breaker로 두어 sale_date가 같은 행의 순서까지 고정한다.
                     .order('sale_date', { ascending: true })
