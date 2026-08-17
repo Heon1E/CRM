@@ -574,12 +574,15 @@ const Clients = () => {
                   <thead className="sticky top-0 z-10 bg-oem-bg-header shadow-sm">
                     <tr>
                       <th className="w-8 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300"
-                          checked={isAllSelected}
-                          onChange={handleSelectAll}
-                        />
+                        {/* 라벨로 감싸 누르는 자리를 넓힌다 — 체크박스는 padding을 무시한다 */}
+                        <label className="tap-box" aria-label="전체 고르기">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300"
+                            checked={isAllSelected}
+                            onChange={handleSelectAll}
+                          />
+                        </label>
                       </th>
                       <th className="w-12 text-center py-2">번호</th>
                       <th className="w-80 py-2">회사명</th>
@@ -607,12 +610,14 @@ const Clients = () => {
                             onClick={() => setSelectedClientId(primaryContact.id)}
                           >
                             <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                className="rounded border-gray-300"
-                                checked={isChecked}
-                                onChange={(e) => handleSelectOne(primaryContact.id, e)}
-                              />
+                              <label className="tap-box" aria-label={`${company} 고르기`}>
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300"
+                                  checked={isChecked}
+                                  onChange={(e) => handleSelectOne(primaryContact.id, e)}
+                                />
+                              </label>
                             </td>
                             <td className="text-center font-bold text-oem-text-secondary py-3">{index}</td>
                             <td className="py-3">

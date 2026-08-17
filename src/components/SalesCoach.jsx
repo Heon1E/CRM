@@ -311,7 +311,8 @@ const SalesCoach = ({ sales = [], clients = [], activities = [], salesRepName = 
 
             {salesRepName && (
                 <div className="filterbar" style={{ gap: 8 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
+                    {/* tap-box: 모바일에서 누르는 자리를 44px로 넓힌다 (index.css) */}
+                    <label className="tap-box" style={{ gap: 5, fontSize: 13, padding: '0 6px' }}>
                         <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
                         내 담당만
                     </label>

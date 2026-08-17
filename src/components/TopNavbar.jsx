@@ -57,7 +57,7 @@ const TopNavbar = () => {
     >
       {/* Left: Logo & Navigation */}
       <div className="flex items-center gap-8 flex-1">
-        <Link to="/" className="flex items-center gap-2.5 group">
+        <Link to="/" className="flex items-center gap-2.5 group min-h-[44px]">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >X</div>

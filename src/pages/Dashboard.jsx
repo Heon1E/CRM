@@ -305,7 +305,7 @@ const Dashboard = () => {
             </div>
             <ActivityTimeline maxItems={5} />
             <div className="statusbar">
-              <Link to="/activities" style={{ color: 'var(--text-secondary)' }}>전체 활동 보기 &rsaquo;</Link>
+              <Link to="/activities" className="tap-box" style={{ color: 'var(--text-secondary)', padding: '0 4px' }}>전체 활동 보기 &rsaquo;</Link>
             </div>
           </div>
 

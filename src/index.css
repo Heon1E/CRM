@@ -875,6 +875,48 @@ textarea:focus {
     padding-right: 12px;
   }
 
+  /*
+   * **클래스로 열거하면 빠진다.**
+   * `.tb-btn`·`.rowbtn`만 키워 놨더니 Tailwind로 직접 꾸민 단추들이 그대로
+   * 남았다 — 실측(386px): 거래처 목록의 행 단추 28×28px가 20개,
+   * 고르기 칸 13×13px가 20개, 상단바 알림 36×36, 햄버거 40×40.
+   * 손가락으로는 못 누른다. 그래서 단추 전체에 건다.
+   */
+  button,
+  [role="button"] {
+    min-height: 44px;
+  }
+
+  /* 표 안의 아이콘 단추는 가로도 좁다 */
+  table.dgrid td button,
+  table.dgrid th button {
+    min-width: 44px;
+  }
+
+  /*
+   * 고르기 칸(체크박스)은 위 입력칸 규칙에서 일부러 빠져 있다 —
+   * `min-height`를 주면 네모가 세로로 늘어나 찌그러진다. 크기 자체를 키운다.
+   */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  /*
+   * **네이티브 체크박스는 `padding`을 무시한다** (Chrome). 안쪽 여백으로
+   * 누르는 자리를 넓히려 했지만 `padding: 0`으로 계산됐다 — 확인하고 되돌렸다.
+   * 누르는 자리는 **감싼 라벨**로 넓힌다. `.tap-box`가 그 역할이다.
+   */
+  .tap-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+
   .toolbar {
     gap: 6px;
     padding: 6px 8px;
