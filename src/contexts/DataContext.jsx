@@ -589,27 +589,43 @@ export const DataProvider = ({ children }) => {
          *
          * `id`를 마지막 정렬 기준으로 더하면 순서가 유일해져 경계가 흔들리지 않는다.
          */
-        let query = supabase
-          .from(table)
-          .select(selectStr)
-          .order(orderCol, { ascending })
-        if (orderCol !== 'id') query = query.order('id', { ascending: true })
-        query = query.range(from, from + step - 1)
-
-        if (filters && typeof filters === 'function') {
-          query = filters(query)
+        /*
+         * **조회를 만들 때마다 새로 짓는다.**
+         * 예전에는 `query`를 한 번 만들어 두고 실패하면 그것을 다시 `await`
+         * 했는데, 그렇게는 폴백이 절대 동작하지 않는다:
+         *   1. `.is('deleted_at', null)`은 새 객체를 주는 것이 아니라
+         *      **그 빌더 자신에 조건을 붙이고 자기를 돌려준다.** 그래서 재시도할
+         *      `query`에도 이미 `deleted_at` 조건이 들어 있다.
+         *   2. 빌더는 한 번 `await`하면 그 약속이 굳는다. 다시 `await`해도
+         *      요청이 새로 나가지 않고 같은 결과가 돌아온다.
+         * 결국 재시도가 같은 오류를 되풀이하고 `throw`로 떨어졌다.
+         *
+         * 실측: `issues` 표에 `deleted_at`이 없어 첫 화면마다
+         * `column issues.deleted_at does not exist`가 나고 이슈 목록이 통째로
+         * 비어 있었다(콘솔 오류 995건). 폴백이 있다고 적어 두었는데 없었던 셈이다.
+         */
+        const build = () => {
+          let q = supabase
+            .from(table)
+            .select(selectStr)
+            .order(orderCol, { ascending })
+          if (orderCol !== 'id') q = q.order('id', { ascending: true })
+          q = q.range(from, from + step - 1)
+          if (filters && typeof filters === 'function') q = filters(q)
+          return q
         }
 
         // 휴지통에 든 행은 빼고 가져온다.
-        // 마이그레이션(soft_delete_and_audit.sql) 전에는 이 칸이 없으므로,
-        // 없다고 하면 조건 없이 한 번 더 시도한다. 앱이 먼저 죽으면 안 된다.
-        let { data, error } = await query.is('deleted_at', null)
+        // 마이그레이션(soft_delete_and_audit.sql) 전이거나 그 칸이 없는 표
+        // (`issues` 등)에서는 조건 없이 한 번 더 시도한다. 앱이 먼저 죽으면 안 된다.
+        let { data, error } = await build().is('deleted_at', null)
         if (error && (error.code === '42703' || /deleted_at/.test(error.message || ''))) {
           if (!softDeleteWarned.current) {
-            console.warn('[DataContext] deleted_at 칸이 없습니다. soft_delete_and_audit.sql 을 실행하세요.')
+            console.warn(`[DataContext] '${table}'에 deleted_at 칸이 없어 조건 없이 다시 받습니다.`
+                + ' 휴지통을 쓰려면 execution/sql/soft_delete_and_audit.sql 을 실행하세요.')
             softDeleteWarned.current = true
           }
-          ;({ data, error } = await query)
+          ;({ data, error } = await build())
         }
         if (error) throw error
         if (!data || data.length === 0) {
