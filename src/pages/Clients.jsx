@@ -666,10 +666,30 @@ const Clients = () => {
                           </tr>
                         )
                       })
+                    ) : isLoading ? (
+                      /*
+                       * **불러오는 중에도 'No Data'가 떠 있었다.** 매출 1.5만 행을
+                       * 다 받아야 정렬이 되므로 이 상태가 몇 초 간다. 그동안
+                       * 화면은 "거래처가 없습니다"라고 말하고 있었던 셈이다.
+                       * 들어올 표의 모양을 그려 두면 기다림이 짧게 느껴지고,
+                       * 자료가 도착했을 때 자리가 이미 잡혀 있어 화면이 덜 튄다.
+                       */
+                      Array.from({ length: 8 }).map((_, i) => (
+                        <tr key={`sk-${i}`}>
+                          {Array.from({ length: 7 }).map((__, c) => (
+                            <td key={c} className="py-2 px-2">
+                              <div className="skeleton h-4 rounded"
+                                style={{ width: c === 2 ? '80%' : c === 0 ? '18px' : '55%' }} />
+                            </td>
+                          ))}
+                        </tr>
+                      ))
                     ) : (
                       <tr>
-                        <td colSpan="7" className="p-12 text-center text-slate-500">
-                          No Data
+                        <td colSpan="7" className="p-12 text-center text-oem-text-secondary">
+                          {searchTerm || activeFilters.length > 0
+                            ? '조건에 맞는 거래처가 없습니다.'
+                            : '거래처가 없습니다.'}
                         </td>
                       </tr>
                     )}

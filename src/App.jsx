@@ -6,6 +6,7 @@ import { useDevAutoLogin } from './hooks/useDevAutoLogin'
 import { DataProvider } from './contexts/DataContext'
 import { BackgroundTaskProvider } from './contexts/BackgroundTaskContext'
 import { I18nProvider } from './contexts/I18nContext'
+import PageLoading from './components/PageLoading'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 
@@ -71,14 +72,7 @@ const DocumentTitleUpdater = () => {
   return null
 }
 
-const PageLoading = () => (
-  <div style={{
-    minHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: 'var(--text-secondary)', fontSize: 13,
-  }}>
-    불러오는 중…
-  </div>
-)
+/* 화면 조각을 받는 동안 보이는 자리 — 스켈레톤. `components/PageLoading.jsx` */
 
 /**
  * 로그인해야 볼 수 있는 화면들.

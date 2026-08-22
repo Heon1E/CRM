@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import Modal from '../components/Modal'
+import PageLoading from '../components/PageLoading'
 
 /**
  * 모션 확인 화면 — **개발 중에만 존재한다** (`/__motion`)
@@ -87,6 +88,36 @@ const MotionLab = () => {
                             ))}
                         </div>
                     )}
+                </Swatch>
+
+                <Swatch label="화면 전환 중(PageLoading)" hint="실제 화면이 쓰는 그 컴포넌트다">
+                    <div className="border border-oem-border rounded overflow-hidden">
+                        <div className="-mt-[50px]"><PageLoading /></div>
+                    </div>
+                </Swatch>
+
+                <Swatch label="거래처 목록 스켈레톤" hint="예전에는 이 자리에 'No Data'가 떠 있었다">
+                    <div className="overflow-x-auto">
+                        <table className="dgrid min-w-full">
+                            <thead className="bg-oem-bg-header">
+                                <tr>{['', '번호', '회사명', '담당자', '상태', '최종거래', '누적매출'].map((h, i) => (
+                                    <th key={i} className="py-2 px-2 text-left text-xs">{h}</th>))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-oem-border">
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <tr key={i}>
+                                        {Array.from({ length: 7 }).map((__, c) => (
+                                            <td key={c} className="py-2 px-2">
+                                                <div className="skeleton h-4 rounded"
+                                                    style={{ width: c === 2 ? '80%' : c === 0 ? '18px' : '55%' }} />
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </Swatch>
 
                 <Swatch label="이 화면의 애니메이션 이름" hint="'동작 줄이기'를 켜면 전부 0.01ms가 되어야 한다">
