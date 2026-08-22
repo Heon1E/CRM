@@ -267,14 +267,21 @@ a:hover {
   overflow: hidden;
 }
 
+/*
+ * 패널 제목 — 왼쪽에 초록 막대를 세운다.
+ * 화면마다 패널이 여러 개인데 전부 회색이면 어디가 시작인지 눈이 못 잡는다.
+ * 면을 초록으로 덮지 않고 **3px 막대 하나**로만 표시한다 —
+ * 초록은 '정체성'이지 '강조'가 아니다.
+ */
 .win-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 5px 10px;
+  padding: 5px 10px 5px 12px;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   font-size: 13px;
   font-weight: 600;
 }
@@ -415,14 +422,21 @@ table.dgrid {
   font-size: 12px;
 }
 
+/*
+ * 표 머리 — **문서(견적서·명세서)와 같은 규칙이다.**
+ * 밝은 회색 바탕 + 먹색 글씨 + 아래 초록 실선. 머리는 구조일 뿐이므로
+ * 물러나고, 초록은 실선 하나로만 브랜드를 붙든다.
+ * 화면과 종이가 같은 모양이어야 한 회사가 만든 것처럼 보인다.
+ */
 table.dgrid th {
   background: var(--bg-header);
   border: 1px solid var(--border-light);
   border-top: 0;
+  border-bottom: 2px solid var(--accent);
   padding: 4px 7px;
   text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  color: var(--text-primary);
   white-space: nowrap;
   position: sticky;
   top: 0;

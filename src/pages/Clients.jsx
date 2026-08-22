@@ -544,7 +544,12 @@ const Clients = () => {
                         return (
                           <tr
                             key={company}
-                            className={`group cursor-pointer transition-colors ${isSelected ? 'bg-oem-grey-light border-l-4 border-l-oem-blue' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
+                            /* 고른 줄은 **노랑 면**으로 찍는다. 옅은 회색 + 초록
+                               막대로는 20줄 사이에서 눈에 안 들어왔다. 노랑은
+                               얇은 선으로 쓸 수 없고(흰 바탕 1.21:1) 면을 채워야
+                               사는 색이다 — 한 줄뿐이므로 과하지 않다.
+                               글씨는 먹색 14.58:1, 회사명 초록 4.82:1로 둘 다 읽힌다. */
+                            className={`group cursor-pointer transition-colors border-l-4 ${isSelected ? 'bg-[color:var(--sel)] border-l-[color:var(--sel-border)]' : 'hover:bg-slate-50 border-l-transparent'}`}
                             onClick={() => setSelectedClientId(primaryContact.id)}
                           >
                             <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
