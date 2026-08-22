@@ -139,12 +139,44 @@ async function fetchPhotoBase64(photoSizes) {
     return { data: buf.toString('base64'), mimeType: 'image/jpeg' }
 }
 
+/*
+ * 음성 메모 / 오디오 파일을 내려받는다.
+ *
+ * 텔레그램의 '누르고 말하기'는 OGG/Opus로 오고, 파일로 붙이면 `.m4a` 같은 것이
+ * 온다. **Gemini가 받는 형식은 정해져 있다** — `audio/ogg`는 그대로 되지만
+ * `.m4a`가 달고 오는 `audio/mp4`·`audio/x-m4a`는 목록에 없어 400이 난다.
+ * 담고 있는 것은 AAC이므로 그렇게 알려 준다.
+ *
+ * 봇 API의 `getFile`은 20MB까지만 내려준다. 그보다 앞서 우리가 막는다 —
+ * 길면 판독도 오래 걸리고 함수가 시간 안에 못 끝난다. **자르지 않는다.**
+ * 뒷부분이 조용히 사라지면 통화 끝에 합의한 것이 기록에서 빠진다.
+ */
+const AUDIO_MIME = {
+    'audio/mp4': 'audio/aac', 'audio/x-m4a': 'audio/aac', 'audio/m4a': 'audio/aac',
+    'audio/mpeg': 'audio/mp3', 'audio/mpeg3': 'audio/mp3', 'audio/x-wav': 'audio/wav',
+    'audio/3gpp': 'audio/aac', 'audio/amr': 'audio/aac', 'audio/opus': 'audio/ogg',
+}
+const AUDIO_OK = new Set(['audio/ogg', 'audio/aac', 'audio/mp3', 'audio/wav', 'audio/flac', 'audio/aiff'])
+const MAX_AUDIO_SEC = 900   // 15분
+
+async function fetchAudioBase64(a) {
+    const info = await fetch(TG(`getFile?file_id=${a.file_id}`)).then((r) => r.json())
+    if (!info.ok) throw new Error('녹음을 가져오지 못했습니다. 20MB를 넘으면 받을 수 없습니다.')
+    const url = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${info.result.file_path}`
+    const buf = Buffer.from(await fetch(url).then((r) => r.arrayBuffer()))
+    const raw = String(a.mime_type || '').split(';')[0].trim().toLowerCase()
+    const mapped = AUDIO_MIME[raw] || raw
+    return { data: buf.toString('base64'), mimeType: AUDIO_OK.has(mapped) ? mapped : 'audio/ogg' }
+}
+
 // ---------------------------------------------------------------------------
 // 판독 프롬프트 — 무엇인지 고르고, 그에 맞는 칸만 채운다
 // ---------------------------------------------------------------------------
 const PROMPT = (today, dow) => `
 너는 한국 B2B 영업사원(드럼·IBC 용기 유통)의 CRM 비서다.
-사용자가 보낸 메시지나 사진을 읽고 **아래 JSON 하나만** 출력한다. 설명 문장은 쓰지 않는다.
+사용자가 보낸 **글·사진·녹음**을 읽거나 듣고 **아래 JSON 하나만** 출력한다.
+설명 문장은 쓰지 않는다. **아래 형식을 그대로 쓴다 — 다른 칸 이름을 지어내지 마라.**
+녹음만 보내는 경우가 많다. 그때도 형식은 똑같다.
 
 오늘은 ${today} (${dow}요일) 이다. 한국 시간 기준.
 
@@ -200,6 +232,16 @@ memo:
 
 규칙:
 - 보이는 값만 쓴다. 모르면 null 또는 "". 지어내지 않는다.
+- **음성이 붙어 있으면 그것을 직접 듣고 들린 내용만 쓴다.** 파일명이나 길이를
+  보고 내용을 추측하지 마라. 알아들을 수 없으면 items를 비우고 reply에
+  "음성을 알아듣지 못했습니다"라고 적어라. 그럴듯한 요약을 만들어 채우지 마라.
+- 숫자는 **단위째로** 옮긴다. '15만원'은 금액이지 시각이 아니다.
+- **녹음이 상대방과 주고받은 대화(통화·미팅)이면 intent는 반드시 activity다.**
+  녹음이 있다는 것 자체가 그 통화가 있었다는 증거다. 그 안에서 "다음주에 다시
+  통화하시죠" 같은 약속이 나와도 schedule로 바꾸지 마라 — 그건 activity의
+  nextDate·nextDetail에 넣는다. 통화한 사실을 잃어버리면 안 된다.
+- 녹음이 **사용자가 비서에게 혼자 불러 주는 말**("내일 2시 한국화학 방문 잡아줘")
+  이면 그때만 schedule이다. 대화가 아니라 지시다.
 - 금액·수량은 콤마와 '원'을 빼고 숫자만.
 - 한 메시지에 여러 건이 있으면 items에 모두 담는다.
 `
@@ -459,12 +501,16 @@ export default async function handler(req, res) {
 
     const text = (msg.text || msg.caption || '').trim()
     const photos = msg.photo
+    // '누르고 말하기'(voice)와 파일로 붙인 오디오(audio) 둘 다 받는다.
+    const audio = msg.voice || msg.audio || null
 
     if (text === '/start' || text === '/help') {
         await tgSend(chatId,
             '<b>CRM 비서</b>\n\n그냥 보내세요. 알아서 갈라 넣습니다.\n\n' +
             '<b>일정</b> — "내일 오후 2시 한국화학 방문"\n   → 달력에 바로 등록\n' +
             '<b>업무기록</b> — "오늘 대성드럼 김부장 미팅, 단가 협의함"\n   → 활동에 바로 등록\n' +
+            '<b>녹음</b> — 통화 녹음을 보내거나 마이크를 눌러 말하세요\n' +
+            '   → 들은 내용으로 활동에 등록 (최대 15분)\n' +
             '<b>일일업무보고서 사진</b> → 활동에 등록 (영업계획은 제외)\n' +
             '<b>매출·미수금 화면 사진</b> → 받은함에 담아둠\n' +
             '   (중복 검사를 거쳐야 해서 앱에서 확인 후 반영)\n\n' +
@@ -479,8 +525,8 @@ export default async function handler(req, res) {
         catch (e) { await tgSend(chatId, `일정을 불러오지 못했습니다: ${e.message}`) }
         return ok()
     }
-    if (!text && !photos) {
-        await tgSend(chatId, '사진이나 글로 보내주세요. 사용법은 /help')
+    if (!text && !photos && !audio) {
+        await tgSend(chatId, '사진·녹음·글로 보내주세요. 사용법은 /help')
         return ok()
     }
 
@@ -494,6 +540,15 @@ export default async function handler(req, res) {
         if (photos?.length) {
             const img = await fetchPhotoBase64(photos)
             parts.push({ inlineData: { data: img.data, mimeType: img.mimeType } })
+        }
+        if (audio) {
+            if (Number(audio.duration || 0) > MAX_AUDIO_SEC) {
+                await tgSend(chatId, `녹음이 너무 깁니다 (${Math.round(audio.duration / 60)}분). 15분까지 받습니다 — 나눠서 보내주세요.`)
+                return ok()
+            }
+            await tgSend(chatId, '녹음을 듣고 있습니다…')
+            const snd = await fetchAudioBase64(audio)
+            parts.push({ inlineData: { data: snd.data, mimeType: snd.mimeType } })
         }
 
         const parsed = await callGemini(parts)
@@ -514,7 +569,7 @@ export default async function handler(req, res) {
             const clientMap = await loadClients()
             const saved = await applySchedules(items, clientMap)
             await saveToInbox({
-                chat_id: chatId, from_name: fromName, raw_text: text || null,
+                chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: 'schedule',
                 payload: { items, reply: parsed.reply || '' }, status: 'auto',
                 applied_at: new Date().toISOString(), note: `일정 ${saved.length}건 등록`
@@ -546,7 +601,7 @@ export default async function handler(req, res) {
             const clientMap = await loadClients()
             const r = await applyActivities(items, clientMap, await repOfChat(chatId))
             await saveToInbox({
-                chat_id: chatId, from_name: fromName, raw_text: text || null,
+                chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: 'activity',
                 payload: { items, reply: parsed.reply || '' }, status: 'auto',
                 applied_at: new Date().toISOString(), note: `활동 ${r.saved.length}건 등록`
@@ -564,7 +619,7 @@ export default async function handler(req, res) {
         // ---- 매출·채권: 담아두기 (대사를 거쳐야 한다) ----
         if (intent === 'sales' || intent === 'receivables') {
             await saveToInbox({
-                chat_id: chatId, from_name: fromName, raw_text: text || null,
+                chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: intent,
                 payload: { rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [] },
                 status: 'pending'
@@ -578,9 +633,23 @@ export default async function handler(req, res) {
             return ok()
         }
 
+        /*
+         * 녹음을 보냈는데 아무것도 못 뽑았으면 **그렇게 말한다.**
+         * '메모로 담아뒀습니다'라고 하면 잘 된 줄 알고 넘어가고, 정작 활동은
+         * 비어 있다. 판독이 지어내지 않도록 막아 둔 만큼 결과도 정확히 알린다.
+         */
+        if (audio && !items.length) {
+            await tgSend(chatId,
+                '🎧 <b>녹음을 알아듣지 못했습니다.</b>\n' +
+                (parsed.reply ? `${parsed.reply}\n` : '') +
+                '\n조용하거나 잡음이 많으면 놓칩니다. 글로 적어 보내주시면 그대로 넣겠습니다.'
+            )
+            return ok()
+        }
+
         // ---- 메모 ----
         await saveToInbox({
-            chat_id: chatId, from_name: fromName, raw_text: text || null,
+            chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
             has_image: !!photos?.length, doc_type: 'memo',
             payload: { items, reply: parsed.reply || '' }, status: 'pending'
         })
