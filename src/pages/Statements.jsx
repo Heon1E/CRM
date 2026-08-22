@@ -70,18 +70,29 @@ const Statements = () => {
             const d = String(s.sale_date || s.date || '').slice(0, 10)
             return d >= range.from && d <= range.to
         })
-        const lines = groups.flatMap((g) => {
+        /*
+         * **줄마다 키를 만들어 둔다.**
+         * 여기서 만드는 줄은 매출 묶음을 품목 단위로 편 것이라 `id`가 없다.
+         * 그런데 화면에서 `key={r.id}`로 그리고 있어서 모든 줄의 키가
+         * `undefined`였다 — React가 "unique key" 경고를 내고, 거래처나 기간을
+         * 바꿀 때 줄을 짝지어 재사용하지 못해 매번 전부 다시 그린다.
+         * 묶음 id가 있으면 그것을 쓰고, 없으면 날짜와 순번으로 만든다.
+         */
+        const lines = groups.flatMap((g, gi) => {
             const date = String(g.sale_date || g.date || '').slice(0, 10)
             const items = Array.isArray(g.items) ? g.items.filter(Boolean) : []
+            const base = g.id || `${date}#${gi}`
             // 품목이 아직 안 왔으면(상세 로드 전) 묶음 한 줄로라도 금액은 맞춘다
             if (items.length === 0) {
                 return [{
+                    key: `${base}:0`,
                     sale_date: date, item_name: g.displayItemName || '',
                     quantity: 0, unit_price: 0,
                     total_amount: Number(g.total_amount ?? g.totalAmount) || 0,
                 }]
             }
-            return items.map((it) => ({
+            return items.map((it, ii) => ({
+                key: `${base}:${ii}`,
                 sale_date: date,
                 item_name: it.item_name || it.itemName || '',
                 quantity: Number(it.quantity) || 0,
@@ -207,7 +218,7 @@ const Statements = () => {
                             </thead>
                             <tbody>
                                 {rows.map((r) => (
-                                    <tr key={r.id}>
+                                    <tr key={r.key}>
                                         <td className="dt">{String(r.sale_date).slice(0, 10)}</td>
                                         <td>{r.item_name || '-'}</td>
                                         <td className="num">{won(r.quantity)}</td>
