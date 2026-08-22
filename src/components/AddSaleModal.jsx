@@ -275,7 +275,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
     })
 
     if (validItems.length === 0) {
-      await showWarning('저장할 유효한 품목이 없습니다.')
+      await showWarning('품목을 목록에서 골라 주세요. 직접 입력한 이름은 저장되지 않습니다.')
       return
     }
 
@@ -319,7 +319,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
       const mergedItems = Array.from(mergedItemsMap.values())
 
       if (mergedItems.length === 0) {
-        await showWarning('저장할 유효한 품목이 없습니다.')
+        await showWarning('품목을 목록에서 골라 주세요. 직접 입력한 이름은 저장되지 않습니다.')
         return
       }
 
@@ -432,7 +432,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
                           products={products || []}
                           value={item.productId || ''}
                           onSelect={(productId) => handleProductSelect(index, productId)}
-                          placeholder={formData.clientId ? "Search product..." : "(Select Client First)"}
+                          placeholder={formData.clientId ? "품목 고르기" : "거래처를 먼저 고르세요"}
                           disabled={!formData.clientId}
                           className="border-none shadow-none"
                         />
@@ -508,7 +508,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
             type="submit"
             className="oracle-raised bg-oem-blue text-white px-8 py-1 font-bold hover:bg-oem-blue-dark"
           >
-            COMMIT_SALE
+            저장
           </button>
         </div>
       </form>
