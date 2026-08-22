@@ -564,7 +564,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                     actual: receivablesCount,
                     target: 0, percent: receivablesPercent, icon: FileWarning,
                     manualField: 'receivables',
-                    manualLabel: '\ucc44\uad8c \ubb38\uc81c \ubc1c\uc0dd \uac74\uc218',
+                    manualLabel: '채권 사고 건수 (대손 · 법적 조치)',
                     lowerIsBetter: true,
                     detail: [
                         receivablesCount != null
@@ -581,7 +581,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                     + ` · 연체금액 ${(autoReceivables.overdueAmount / 1e8).toFixed(2)}억`
                                     + ` · 3개월 이상 ${autoReceivables.m3}곳`,
                         '기준: 0건 양호 · 1건 보통 · 2건 미흡 (적을수록 좋음)',
-                        '※ 대장의 연체 거래처 수와 이 눈금은 세는 대상이 다릅니다. 기준표가 뜻하는 건수를 넣으세요.',
+                        '※ 여기 넣는 것은 대손 · 법적 조치 같은 사고 건수입니다. 위의 연체 거래처 수와는 다릅니다.',
                     ].join('\n'),
                 }
             ],

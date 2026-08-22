@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { RefreshCw, Loader2, AlertTriangle, Search, Target, Upload, EyeOff, RotateCcw } from 'lucide-react'
+import { RefreshCw, Loader2, AlertTriangle, Search, Upload, EyeOff, RotateCcw } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { parseReceivablesLedger, summarizeReceivables, ledgerAge } from '../utils/receivablesLedger'
 import { buildClientKeys } from '../hooks/useSalesImport'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
-import { setKpiManualInput } from '../utils/kpiCategories'
 import { showSuccess, showError, showWarning, showConfirm, showInput } from '../utils/alert'
 
 /**
@@ -275,11 +274,16 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
         await load(baseMonth)
     }
 
-    const sendToKpi = async () => {
-        setKpiManualInput('receivables', summary.overdueCount)
-        window.dispatchEvent(new Event('kpi-manual-updated'))
-        await showSuccess(`KPI 채권관리에 연체 ${summary.overdueCount}건을 저장했습니다.`)
-    }
+    /*
+     * **'KPI에 N건 저장' 단추를 없앴다.** 대장의 연체 거래처 수(36곳)를 KPI
+     * 채권관리에 넣고 있었는데, 그 KPI가 세는 것은 **대손·법적 조치 같은 사고
+     * 건수**다(사용자 확인). 눈금이 0건 양호 / 1건 보통 / 2건 미흡인 것도
+     * 그래서다 — 36을 넣으면 언제나 '미흡'이 된다.
+     *
+     * 두 숫자는 이름만 비슷하고 세는 대상이 다르다. 단추를 남겨 두면 언젠가
+     * 누르게 되고, 그날부터 KPI가 부당하게 깎인다. 사고 건수는 KPI 카드에서
+     * 직접 넣는다. 대장 수치는 그 카드에 '참고'로만 보인다.
+     */
 
     if (tableMissing) {
         return (
@@ -343,9 +347,7 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                     {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} 대장 올리기
                 </label>
                 <span className="tb-sep" />
-                <button className="tb-btn" onClick={sendToKpi} disabled={loading || rows.length === 0}>
-                    <Target size={14} /> KPI 채권관리에 {summary.overdueCount}건 저장
-                </button>
+
             </div>
 
             {/* 요약 */}
