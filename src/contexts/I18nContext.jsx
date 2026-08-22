@@ -170,8 +170,24 @@ const pricingData = {
     },
 }
 
+const LOCALE_KEY = 'xavian_locale'
+
 export const I18nProvider = ({ children }) => {
-    const [locale, setLocale] = useState('en') // Default: English
+    /*
+     * **기본은 한국어다.** 예전에는 `useState('en')`이 박혀 있어서, 앱 안은 전부
+     * 한국어인데 소개·요금 화면만 영어로 떴다. 아이앤디 영업팀이 쓰는 도구다.
+     *
+     * **고른 언어를 기억한다.** 예전에는 어디에도 저장하지 않아서 한국어로
+     * 바꿔도 새로고침하면 영어로 돌아갔다 — 매번 다시 눌러야 하니 사실상
+     * 언어 전환이 없는 것과 같았다.
+     */
+    const [locale, setLocale] = useState(() => {
+        try {
+            const saved = localStorage.getItem(LOCALE_KEY)
+            if (saved === 'ko' || saved === 'en') return saved
+        } catch { /* 사생활 보호 모드 등에서 막힐 수 있다 — 기본값으로 간다 */ }
+        return 'ko'
+    })
 
     const t = useCallback((key) => {
         const keys = key.split('.')
@@ -189,7 +205,11 @@ export const I18nProvider = ({ children }) => {
     }, [locale])
 
     const toggleLocale = useCallback(() => {
-        setLocale(prev => prev === 'en' ? 'ko' : 'en')
+        setLocale((prev) => {
+            const next = prev === 'en' ? 'ko' : 'en'
+            try { localStorage.setItem(LOCALE_KEY, next) } catch { /* 무시 */ }
+            return next
+        })
     }, [])
 
     const pricing = pricingData[locale]
