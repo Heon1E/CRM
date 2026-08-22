@@ -27,6 +27,7 @@
 
 import crypto from 'crypto'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../src/utils/clientAliases.js'
+import { getHolidays } from '../src/utils/koreanHolidays.js'
 
 /**
  * 웹훅 비밀 토큰을 봇 토큰에서 만들어 낸다.
@@ -414,8 +415,37 @@ async function createClient(name, repName) {
     return c ? { id: c.id, company: c.company, sales_rep: c.sales_rep } : null
 }
 
+/*
+ * **날짜 없는 '다음 할 일'은 없는 것과 같다.**
+ *
+ * 아침 브리핑(`api/daily-digest.js`)과 달력 옆 '하기로 한 것'은 전부
+ * `next_action_date`로 고른다. 그런데 통화에서는 "견적서 보내드릴게요"처럼
+ * **날짜를 말하지 않고 약속하는 경우가 대부분이다.** 실측으로 그랬다 —
+ * nextDetail은 '견적서 및 카탈로그 발송'인데 nextDate가 비어 있어
+ * 어디에도 안 뜨는 채로 묻혔다. `next_action_date` 칸이 원래 있었는데도
+ * 225건 중 7건만 채워져 아무도 안 쓰던 것과 같은 실패다.
+ *
+ * 그래서 날짜가 없으면 **다음 영업일**로 잡는다. 지어내는 것이 아니라
+ * '언제까지'를 정하는 쪽에 가깝다 — 사람이 봇 답장에서 바로 알 수 있게
+ * 무슨 날짜로 잡았는지 말해 준다. 틀리면 앱에서 고치면 된다.
+ */
+const nextBusinessDay = (ymd) => {
+    const d = new Date(`${ymd}T00:00:00Z`)
+    if (Number.isNaN(d.getTime())) return null
+    for (let i = 0; i < 14; i++) {
+        d.setUTCDate(d.getUTCDate() + 1)
+        const iso = d.toISOString().slice(0, 10)
+        const dow = d.getUTCDay()
+        if (dow === 0 || dow === 6) continue
+        // getHolidays는 {date, name} 객체 배열이다. 문자열로 비교하면 하나도 안 걸린다.
+        if (getHolidays(d.getUTCFullYear()).some((h) => h.date === iso)) continue
+        return iso
+    }
+    return null
+}
+
 async function applyActivities(items, clientMap, repName = null) {
-    const saved = [], skipped = [], unmatched = [], created = []
+    const saved = [], skipped = [], unmatched = [], created = [], assumed = []
     for (const it of items) {
         let c = findClient(clientMap, it.clientName)
         if (!c) {
@@ -435,6 +465,11 @@ async function applyActivities(items, clientMap, repName = null) {
         )
         if (dup.length) { skipped.push(`${c.company} ${fmtDate(it.date)}`); continue }
 
+        // 하기로 한 일은 있는데 날짜를 안 말한 경우 -> 다음 영업일로 잡는다
+        const said = /^\d{4}-\d{2}-\d{2}$/.test(it.nextDate || '') ? it.nextDate : null
+        const dueDate = said || (it.nextDetail ? nextBusinessDay(it.date) : null)
+        if (!said && dueDate) assumed.push(`${c.company} ${fmtDate(dueDate)}`)
+
         await sb('activities', {
             method: 'POST', prefer: 'return=minimal',
             body: [{
@@ -448,7 +483,7 @@ async function applyActivities(items, clientMap, repName = null) {
                 user_name: repName,
                 description: [it.person ? `[담당자] ${it.person}` : '', it.description || ''].filter(Boolean).join('\n'),
                 // '다음에 할 일'이 적혀 있으면 같이 담는다. 이게 아침 브리핑의 재료다.
-                next_action_date: /^\d{4}-\d{2}-\d{2}$/.test(it.nextDate || '') ? it.nextDate : null,
+                next_action_date: dueDate,
                 next_action_detail: it.nextDetail || null
             }]
         })
@@ -466,7 +501,7 @@ async function applyActivities(items, clientMap, repName = null) {
         }
         saved.push(c.company)
     }
-    return { saved, skipped, unmatched, created }
+    return { saved, skipped, unmatched, created, assumed }
 }
 
 /** 오늘/이번주 일정 답하기 */
@@ -688,6 +723,8 @@ export default async function handler(req, res) {
             if (r.saved.length) reply += `\n${r.saved.map((n) => `• ${n}`).join('\n')}`
             if (r.skipped.length) reply += `\n\n이미 있어 건너뜀: ${r.skipped.join(', ')}`
             if (r.created.length) reply += `\n\n🆕 <b>새 거래처로 등록:</b> ${[...new Set(r.created)].join(', ')}\n<i>이름이 틀렸으면 앱에서 고치거나 지워주세요.</i>`
+            // 날짜를 말하지 않은 약속은 다음 영업일로 잡았다. 그 사실을 밝힌다.
+            if (r.assumed.length) reply += `\n\n⏰ <b>하기로 한 일 기한:</b> ${r.assumed.join(', ')}\n<i>날짜를 안 말씀하셔서 다음 영업일로 잡았습니다. 아침 브리핑에 뜹니다.</i>`
             if (r.unmatched.length) reply += `\n\n거래처를 못 찾음: ${[...new Set(r.unmatched)].join(', ')}`
             if (warn.length) reply += `\n\n⚠️ ${warn.join('\n⚠️ ')}`
             await tgSend(chatId, reply)
