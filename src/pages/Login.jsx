@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Rocket, HelpCircle, Mail, Lock, Eye } from 'lucide-react'
+import { HelpCircle, Mail, Lock, Eye } from 'lucide-react'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -68,74 +68,51 @@ const Login = () => {
     navigate('/')
   }
 
+  /*
+   * **소개 화면과 같은 세계로 둔다.** 여기까지 오는 길이 `/landing` 하나뿐인데
+   * 그쪽은 어두운 화면이고 이쪽은 밝은 화면에 커다란 초록 판이라, 넘어오는 순간
+   * 다른 서비스처럼 보였다.
+   *
+   * **왼쪽 홍보 판을 걷어냈다.** "거래처 · 매출 · 채권 · 견적을 한 곳에서
+   * 봅니다"와 기능 네 줄이 화면 절반을 차지하고 있었다. 소개 화면에서 지운 것과
+   * 같은 문구다 — 여기 온 사람은 이미 무엇인지 알고 로그인하러 왔다.
+   *
+   * **입력칸이 든 판은 흰색으로 남긴다.** 어두운 판으로 바꾸면 입력칸·자동완성·
+   * 구글 단추까지 전부 다시 맞춰야 하고, 그 과정에서 대비가 깨지기 쉽다.
+   * 어두운 바탕 위의 밝은 판은 '들어가는 곳'을 분명히 가리키기도 한다.
+   */
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-['Inter',_sans-serif] relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] flex flex-col relative overflow-hidden">
 
-      {/* Header */}
-      <header className="absolute top-0 w-full flex items-center justify-between px-6 sm:px-12 py-6 z-20">
-        <Link to="/landing" className="flex items-center gap-2 group min-h-[44px]">
-          <div className="bg-[#007538] text-white p-1.5 rounded-lg shadow-sm">
-            <Rocket className="w-5 h-5" />
-          </div>
-          <h2 className="text-slate-900 text-xl font-bold leading-tight tracking-tight group-hover:text-[#007538] transition-colors">{appTitle}</h2>
+      {/* 초록 번짐 — 소개 화면과 같은 장식 하나 */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
+          w-[620px] h-[420px] max-w-[130vw] bg-oem-blue/20 rounded-full blur-3xl" />
+      </div>
+
+      <header className="relative z-20 flex items-center justify-between px-5 sm:px-8 py-4">
+        {/* 소개 화면과 같은 글자 로고. 예전에는 로켓 아이콘이었는데 우리 표시가 아니다. */}
+        <Link to="/landing" className="flex items-baseline gap-1.5 min-h-[44px] px-1">
+          <span className="text-lg font-black text-white">아이앤디</span>
+          <span className="text-lg font-black text-oem-blue-light" style={{ fontFamily: 'var(--font-brand-en)' }}>CRM</span>
         </Link>
-        {/* 예전에는 아무 일도 하지 않는 'Help' 버튼이었다. 누를 것이 있는 것처럼
-            보이면 누르게 되고, 아무 일도 안 일어나면 고장으로 읽힌다.
-            로그인 화면에서 실제로 필요한 것은 도움을 요청할 곳이다. */}
+        {/* 로그인 화면에서 실제로 필요한 것은 도움을 요청할 곳이다.
+            예전에는 아무 일도 하지 않는 'Help' 단추였다. */}
         <a href="tel:031-334-9625"
-           className="text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1.5 text-sm font-medium min-h-[44px] px-2">
+           className="text-white/55 hover:text-white transition-colors flex items-center gap-1.5 text-sm min-h-[44px] px-2">
           <HelpCircle className="w-4 h-4" />
           <span className="hidden sm:inline">문의 031-334-9625</span>
         </a>
       </header>
 
-      {/* Main Container */}
-      <div className="flex-1 flex flex-col lg:flex-row w-full max-w-[1600px] mx-auto min-h-screen pt-20 lg:pt-0">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-5 py-8">
+        <div className="w-full max-w-[400px] bg-white p-7 sm:p-9 rounded-2xl shadow-2xl
+          animate-in fade-in slide-in-from-bottom-2 duration-500">
 
-        {/* Left Panel - Branding & Testimonial (Desktop) */}
-        <div className="hidden lg:flex w-1/2 p-12 flex-col justify-center relative">
-          <div className="relative overflow-hidden rounded-2xl bg-[#007538] h-full max-h-[800px] w-full flex flex-col justify-end p-12 shadow-2xl shadow-[#007538]/20">
-            {/* Abstract Pattern Overlay */}
-            <div className="absolute inset-0 opacity-20 pointer-events-none">
-              <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-                <path d="M0 100 L100 0 L100 100 Z" fill="white"></path>
-                <circle cx="80" cy="30" r="40" fill="white" opacity="0.3"></circle>
-              </svg>
-            </div>
-
-            {/*
-              여기에는 원래 지어낸 고객 추천사("Sarah Jenkins, VP of Sales at
-              TechFlow")와 'Join 10,000+ teams'가 박혀 있었다. 둘 다 사실이
-              아니다. 사내 도구의 로그인 화면에 없는 고객의 말을 실어 둘 이유가
-              없고, 거래처가 이 화면을 볼 수도 있다. 실제로 하는 일을 적는다.
-            */}
-            <div className="relative z-10 space-y-7 max-w-lg">
-              {/* 흰색 20%를 깔면 초록이 밝아져 흰 글씨 대비가 3.94로 떨어진다
-                  (12px는 4.5 필요). 어둡게 깔아야 읽힌다 — 브라우저에서 쟀다. */}
-              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/25">
-                <span className="text-white text-xs font-bold tracking-wide">아이앤디 주식회사 영업관리</span>
-              </div>
-              <p className="text-white text-3xl font-bold leading-snug">
-                거래처 · 매출 · 채권 · 견적을<br />한 곳에서 봅니다.
-              </p>
-              <ul className="space-y-2.5 text-white/90 text-[15px] leading-relaxed">
-                <li>· 매일 아침 오늘 할 일과 지난 약속을 알려 줍니다</li>
-                <li>· 매출이 꺾인 곳과 연락이 끊긴 곳을 짚어 줍니다</li>
-                <li>· 견적서 · 발주서 · 거래명세서를 바로 만듭니다</li>
-                <li>· 결제가 밀린 순서로 채권을 세웁니다</li>
-              </ul>
-            </div>
+          <div className="mb-7">
+            <h1 className="text-slate-900 text-2xl font-bold">{appTitle}</h1>
+            <p className="text-slate-500 text-sm mt-1">아이디와 비밀번호를 넣어 주세요</p>
           </div>
-        </div>
-
-        {/* Right Panel - Auth Form */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-24 bg-[#F8FAFC]">
-          <div className="w-full max-w-[440px] bg-white p-8 sm:p-10 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 relative z-10">
-
-            <div className="text-center sm:text-left mb-8">
-              <h1 className="text-slate-900 text-3xl font-bold mb-2">{appTitle}</h1>
-              <p className="text-slate-500 text-sm">아이디와 비밀번호를 넣어 주세요</p>
-            </div>
 
             {error && (
               <div className="mb-6 p-4 bg-red-50/50 border-l-4 border-red-500 rounded-r-lg">
@@ -234,13 +211,11 @@ const Login = () => {
               거래처·매출을 전부 읽고 쓸 수 있었다. 계정은 관리자가 만든다.
               (DB에서도 막았다 — execution/sql/pending_role.sql)
             */}
-            <p className="mt-8 text-center text-sm text-slate-500">
+            <p className="mt-7 text-center text-sm text-slate-500">
               계정이 필요하면 관리자에게 요청하세요.
             </p>
-          </div>
         </div>
-      </div>
-
+      </main>
     </div>
   )
 }
