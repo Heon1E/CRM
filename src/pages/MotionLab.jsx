@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import Modal from '../components/Modal'
 import PageLoading from '../components/PageLoading'
+import PullToRefresh from '../components/PullToRefresh'
 
 /**
  * 모션 확인 화면 — **개발 중에만 존재한다** (`/__motion`)
@@ -38,6 +39,7 @@ const MotionLab = () => {
     }
 
     return (
+        <PullToRefresh onRefresh={() => new Promise((r) => setTimeout(r, 1200))}>
         <div className="min-h-screen bg-oem-bg-app p-4 sm:p-8">
             <div className="max-w-3xl mx-auto">
                 <header className="mb-6">
@@ -152,6 +154,7 @@ const MotionLab = () => {
                 </div>
             </Modal>
         </div>
+        </PullToRefresh>
     )
 }
 

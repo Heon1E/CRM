@@ -22,6 +22,7 @@ import SalesCoach from '../components/SalesCoach'
 import KPIWidget from '../components/KPIWidget'
 import { SALES_REP_OPTIONS, setStoredRep } from '../utils/salesRep'
 import ScheduleCalendar from '../components/ScheduleCalendar'
+import PullToRefresh from '../components/PullToRefresh'
 
 
 const Dashboard = () => {
@@ -173,7 +174,13 @@ const Dashboard = () => {
   const lastUpdatedTime = lastRefreshed ? lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'
 
 
+  /*
+   * 당겨서 새로고침은 **상단바의 '새로고침' 단추와 같은 일**을 한다
+   * (`handleRefresh`). 두 경로가 다른 일을 하면 어느 쪽이 맞는지 알 수 없다.
+   * 데스크톱에서는 터치 이벤트가 없어 아무것도 걸리지 않는다.
+   */
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="dashboard-light min-h-screen p-3 md:p-4 mt-[56px]" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       <div className="max-w-[1600px] mx-auto space-y-3">
 
@@ -321,6 +328,7 @@ const Dashboard = () => {
         />
       </div>
     </div>
+    </PullToRefresh>
   )
 }
 
