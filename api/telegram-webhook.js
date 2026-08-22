@@ -230,8 +230,14 @@ async function callGemini(parts) {
 // ---------------------------------------------------------------------------
 // 갈라 보내기
 // ---------------------------------------------------------------------------
+/*
+ * **요일이 하루씩 밀려 있었다.** `T00:00:00+09:00`은 한국 자정이고 그 순간은
+ * UTC로 전날 15시다. 거기서 `getUTCDay()`를 읽으면 언제나 하루 전 요일이 나온다
+ * (2026-08-22 토요일이 '금'으로 나갔다). `d`는 이미 한국 날짜 문자열이므로
+ * 시각이 아니라 **달력상의 그 날짜**로 읽어야 한다 — UTC 자정이 그 역할을 한다.
+ */
 const fmtDate = (d) => {
-    const dt = new Date(`${d}T00:00:00+09:00`)
+    const dt = new Date(`${d}T00:00:00Z`)
     return `${d.slice(5).replace('-', '/')}(${WEEKDAY[dt.getUTCDay()]})`
 }
 
@@ -443,7 +449,8 @@ export default async function handler(req, res) {
 
     try {
         const today = kstToday()
-        const dow = WEEKDAY[new Date(`${today}T00:00:00+09:00`).getUTCDay()]
+        // 한국 날짜 문자열의 요일 — UTC 자정으로 읽어야 하루 밀리지 않는다 (위 fmtDate 참고)
+        const dow = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
         const parts = [{ text: PROMPT(today, dow) }]
         if (text) parts.push({ text: `\n사용자 메시지:\n${text}` })

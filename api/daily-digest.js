@@ -98,7 +98,17 @@ const isVercelCron = (req) => {
 export async function buildDigest() {
     {
         const today = kstToday()
-        const dow = WEEKDAY[new Date(`${today}T00:00:00+09:00`).getUTCDay()]
+        /*
+         * **요일이 매일 하루씩 밀려 있었다.**
+         * `${today}T00:00:00+09:00`은 한국 자정이고, 그 순간은 UTC로 **전날
+         * 15시**다. 거기서 `getUTCDay()`를 읽으면 언제나 하루 전 요일이 나온다
+         * (2026-08-22 토요일이 '금'으로 나갔다).
+         *
+         * `today`는 이미 `kstToday()`가 만든 한국 날짜 문자열이다. 여기서
+         * 필요한 것은 시각이 아니라 **달력상의 그 날짜**이므로, UTC 자정으로
+         * 읽어야 그 날짜 자체의 요일이 나온다.
+         */
+        const dow = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
         const chats = await sb('bot_allowlist?select=chat_id')
 
