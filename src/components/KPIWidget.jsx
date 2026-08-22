@@ -28,12 +28,22 @@ const totalWeeks = 52
  * [수정] 예전에는 S≥110 / A≥100 / B≥80 / C≥60 으로 되어 있어 등급이
  * 한 칸씩 후하게 나왔다. 110%면 기준표상 '우수'인데 '탁월'로 표시됐다.
  */
+/*
+ * **등급 색을 브랜드 계열로 되돌렸다.**
+ * 예전에는 탁월=보라 · 우수=파랑이었다. 앱에서 파랑·보라를 전부 걷어냈는데
+ * 가장 눈에 띄는 KPI 배지만 남아 있었고, 무엇보다 **색이 순서를 말하지
+ * 못했다** — 보라가 파랑보다 좋은 것인지 알 길이 없다.
+ *
+ * 지금은 한 줄로 읽힌다: **잘하면 초록, 아슬하면 노랑, 못하면 빨강.**
+ * 초록 안에서 진할수록 좋다(탁월 > 우수 > 양호). 노랑은 초록의 짝이라
+ * 경고로 튀지 않으면서 '여기를 보라'를 말한다.
+ */
 function getGradeInfo(percent) {
     const p = Number(percent) || 0
-    if (p >= 120) return { grade: '탁월', color: '#6D28D9', barColor: '#8B5CF6', bgColor: '#EDE9FE' }
-    if (p >= 110) return { grade: '우수', color: '#1D4ED8', barColor: '#3B82F6', bgColor: '#DBEAFE' }
-    if (p >= 100) return { grade: '양호', color: '#1C6B3C', barColor: '#22A05B', bgColor: '#E3F5EA' }
-    if (p >= 90) return { grade: '보통', color: '#B45309', barColor: '#F59E0B', bgColor: '#FEF3C7' }
+    if (p >= 120) return { grade: '탁월', color: '#0b4a24', barColor: '#007538', bgColor: '#dcefe3' }
+    if (p >= 110) return { grade: '우수', color: '#0f5c2e', barColor: '#2a9a5e', bgColor: '#e3f5ea' }
+    if (p >= 100) return { grade: '양호', color: '#1c6b3c', barColor: '#5cbb85', bgColor: '#eef8f2' }
+    if (p >= 90) return { grade: '보통', color: '#7a5f00', barColor: '#f2c200', bgColor: '#fff6d9' }
     return { grade: '미흡', color: '#B91C1C', barColor: '#EF4444', bgColor: '#FEE2E2' }
 }
 
@@ -807,7 +817,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                 onClick={() => setExpandedKPI(isExpanded ? null : item.id)}
                                 className={`relative group cursor-pointer rounded-lg p-3 transition-all duration-200 border-t-4 ${isExpanded ? 'shadow-lg' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
                                 style={{
-                                    backgroundColor: 'var(--bg-card-hover)',
+                                    backgroundColor: 'var(--bg-card)',
                                     border: '1px solid var(--border)',
                                     borderTopColor: grade.color,
                                     boxShadow: isExpanded ? `0 0 0 1px ${grade.color}40` : undefined
@@ -904,7 +914,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                 {/* 펼친 KPI 상세 — 전체 폭 */}
                 {expandedItem && (
                     <div className="rounded-xl p-5"
-                        style={{ backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border)', borderTop: `3px solid ${getGradeInfo(expandedItem.percent).color}` }}>
+                        style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)', borderTop: `3px solid ${getGradeInfo(expandedItem.percent).color}` }}>
                         <div className="flex items-start justify-between gap-3 mb-3">
                             <div>
                                 <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{expandedItem.name}</h3>

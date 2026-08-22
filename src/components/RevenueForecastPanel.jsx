@@ -152,8 +152,8 @@ const RevenueForecastPanel = () => {
                     <AreaChart data={data.monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                             <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#DC2626" stopOpacity={0.2} />
-                                <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
+                                <stop offset="5%" stopColor="#007538" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="#007538" stopOpacity={0} />
                             </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
@@ -183,7 +183,7 @@ const RevenueForecastPanel = () => {
                         <Area
                             type="monotone"
                             dataKey="forecast"
-                            stroke="#DC2626"
+                            stroke="#007538"
                             strokeWidth={2.5}
                             fillOpacity={1}
                             fill="url(#colorForecast)"

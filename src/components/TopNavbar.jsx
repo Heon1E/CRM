@@ -57,11 +57,23 @@ const TopNavbar = () => {
     >
       {/* Left: Logo & Navigation */}
       <div className="flex items-center gap-8 flex-1">
-        <Link to="/" className="flex items-center gap-2.5 group min-h-[44px]">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >X</div>
-          <span className="font-bold text-lg tracking-tight transition-colors"
+        {/*
+          **회사 로고를 쓴다.** 예전에는 초록 네모 안에 'X' 한 글자였다 —
+          템플릿에서 온 자리이고 우리 표시가 아니다. 매일 여는 화면의 왼쪽 위는
+          그 회사가 누구인지 말하는 자리다.
+          `public/brand-logo.png`는 견적서·발주서에 쓰는 것과 같은 파일이다 —
+          화면과 문서가 같은 것을 보여야 한 회사가 만든 것처럼 보인다.
+        */}
+        <Link to="/" className="flex items-center gap-2.5 group min-h-[44px]" aria-label="아이앤디 CRM 홈">
+          {/* 로고 안의 'PACKAGING SOLUTION'은 이 크기에서 뭉개지므로 글자로
+              회사 이름을 함께 둔다. 모바일에서도 감추지 않는다 — 왼쪽 위는
+              '어느 회사 화면인가'를 말하는 자리다. */}
+          <img
+            src="/brand-logo.png"
+            alt=""
+            style={{ height: 26, width: 'auto', objectFit: 'contain' }}
+          />
+          <span className="font-bold text-base sm:text-lg tracking-tight transition-colors"
             style={{ color: 'var(--text-primary)' }}
           >아이앤디 CRM</span>
         </Link>

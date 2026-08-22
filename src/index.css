@@ -66,6 +66,19 @@
   --ind-ink: #3e3a39;          /* 본문 — 순검정이 아닌 따뜻한 먹색 */
   --ind-ink-mute: #595757;     /* 보조 설명 */
   --ind-ink-faint: #9fa0a0;    /* 캡션·러닝헤드 */
+  /* ---------------------------------------------------------------------
+     노랑 — 초록의 짝
+
+     **MANN-FILTER 방식이다.** 초록 바탕에 노란 글씨. 초록은 '누구인가'를,
+     노랑은 '여기를 보라'를 맡는다. 둘 다 강조에 쓰면 서로 죽인다.
+
+     **노랑은 면(배경)으로 쓴다.** 흰 바탕에 노란 글씨는 1.6:1이라 안 읽힌다.
+     글씨로 써야 할 때만 `--ind-yellow-ink`(어두운 겨자색)를 쓴다.
+     --------------------------------------------------------------------- */
+  --ind-yellow: #f2c200;       /* 강조 면 — 선택된 행, 배지 */
+  --ind-yellow-soft: #fff6d9;  /* 옅은 강조 — 호버, 표 선택 */
+  --ind-yellow-ink: #7a5f00;   /* 노랑 계열 '글씨' (흰 배경 5.9:1) */
+
   --ind-panel: #f2f3f3;        /* 회색 패널 (Accessories 영역, 표 줄무늬) */
   --ind-rule: #dcdddd;         /* 헤어라인 — 카탈로그는 0.28pt를 쓴다 */
   --ind-card-radius: 8px;
@@ -76,8 +89,8 @@
   /* --- Surfaces --- */
   --bg-app: #eceef1;
   --bg-card: #ffffff;
-  --bg-card-hover: #dce6f4;
-  /* 행 선택/호버 = 파란 선택색 (윈도우 관례) */
+  /* 행 선택/호버 — 노랑 계열. 위 '선택' 항목 참고 */
+  --bg-card-hover: #fffbeb;
   --bg-header: #e4e7eb;
   --bg-subtle: #f7f8fa;
 
@@ -109,9 +122,13 @@
   --danger-subtle: #fbeeeb;
   --info: #1f5c9e;
 
-  /* --- 선택 --- */
-  --sel: #dce6f4;
-  --sel-border: #7ea3d4;
+  /* --- 선택 ---
+     예전에는 윈도우 관례를 따라 파란색이었다(#dce6f4). 앱에서 파랑·보라를
+     전부 걷어냈는데 '선택된 행'만 파랗게 남으면 그 줄이 남의 옷을 입은 것처럼
+     보인다. 초록으로 하면 '성공' 표시와 헷갈리므로 **노랑**으로 둔다 —
+     초록과 가장 잘 맞고, 무엇을 골랐는지가 한눈에 보인다. */
+  --sel: var(--ind-yellow-soft);
+  --sel-border: #d9ae00;
   --focus: #2b6cb0;
 
   /* --- Shape --- */
@@ -152,7 +169,7 @@
 .dashboard-light {
   --bg-app: #eceef1;
   --bg-card: #ffffff;
-  --bg-card-hover: #dce6f4;
+  --bg-card-hover: #fffbeb;
   --bg-header: #e4e7eb;
   --border: #b9bec7;
   --border-light: #d6dae0;
@@ -1194,15 +1211,28 @@ textarea:focus {
 /* --- 표 : 초록 머리 + 줄무늬 + 헤어라인 (카탈로그 p3 비교표와 같은 언어) --- */
 .doc-sheet table { width: 100%; border-collapse: collapse; }
 .doc-grid { border-radius: var(--ind-card-radius); overflow: hidden; }
+/*
+ * **표 머리를 회색으로 내렸다.**
+ *
+ * 예전에는 진한 초록 바탕에 흰 글씨였다(카탈로그 p3 비교표를 옮긴 것).
+ * 그런데 견적서에서 눈이 가장 먼저 가는 곳이 '번호 · 사진 · 품목 · 수량 ·
+ * 단가 · 금액'이라는 **칸 이름 줄**이 됐다. 정작 봐야 할 것은 품목과 금액인데
+ * 이름표가 가장 크게 소리치고 있었던 셈이다.
+ *
+ * 머리는 구조일 뿐이므로 밝은 회색으로 물러나고, 초록은 아래쪽 **초록 실선**
+ * 하나로만 남긴다 — 브랜드는 지키되 시선은 뺏지 않는다.
+ * 진한 초록은 이 문서에서 딱 한 군데, **합계 금액**에만 남는다.
+ */
 .doc-grid thead th {
-    background: var(--ind-green);
-    color: #fff;
+    background: var(--ind-panel);
+    color: var(--ind-ink);
     font-weight: 700;
     font-size: 8.5pt;
     letter-spacing: .5px;
     text-align: center;
     padding: 2.4mm 2mm;
     border: none;
+    border-bottom: 2px solid var(--ind-green);
 }
 .doc-grid tbody td {
     padding: 1.8mm 2.5mm;
@@ -1213,6 +1243,12 @@ textarea:focus {
 .doc-grid tbody tr:nth-child(even) td { background: #fafbfb; }
 .doc-grid tbody tr:last-child td { border-bottom: 1px solid var(--ind-rule); }
 .doc-grid td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 금액(맨 오른쪽 숫자)이 이 표의 결론이다 — 여기에 무게를 준다 */
+.doc-grid tbody td.num:last-child {
+    font-weight: 700;
+    color: var(--ind-ink);
+    font-size: 9.5pt;
+}
 .doc-grid td.ctr { text-align: center; }
 .doc-grid .item-name { font-weight: 700; }
 .doc-grid .item-spec { font-size: 8pt; color: var(--ind-ink-mute); }
