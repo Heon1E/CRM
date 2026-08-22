@@ -4,8 +4,18 @@ import withReactContent from 'sweetalert2-react-content'
 const ReactSwal = withReactContent(Swal)
 
 // 공통 설정 (Light Theme)
+/*
+ * **경고·확인 창의 단추도 브랜드 색이다.**
+ * sweetalert2 기본값(인디고 #4F46E5)이 그대로 남아 있었다. 앱 안의 파랑·보라를
+ * 전부 치웠는데 이것만 라이브러리 설정이라 빠져 있었다 — '저장하시겠습니까',
+ * '삭제하시겠습니까'는 하루에 몇 번씩 보는 창이다.
+ * 값은 `index.css`의 `--accent`(#007538)와 같다.
+ */
+const BRAND = '#007538'
+const BRAND_DARK = '#005c2b'
+
 const commonConfig = {
-  confirmButtonColor: '#4F46E5', // Indigo-600
+  confirmButtonColor: BRAND,
   cancelButtonColor: '#FFFFFF', // White
   background: '#FFFFFF',
   color: '#1E293B', // Slate-800
@@ -15,7 +25,7 @@ const commonConfig = {
   customClass: {
     popup: 'rounded-xl border border-slate-100 shadow-xl', // Soft shadow & borders
     title: 'text-xl font-bold text-slate-900',
-    confirmButton: 'px-5 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:bg-indigo-700 transition-colors',
+    confirmButton: 'px-5 py-2.5 rounded-lg font-bold text-sm shadow-sm transition-colors',
     cancelButton: 'px-5 py-2.5 rounded-lg font-bold text-sm text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors', // Outlined style
     htmlContainer: 'text-sm text-slate-600 leading-relaxed text-center', // Clean text
     actions: 'gap-3 mt-4',
@@ -91,7 +101,7 @@ export const showInfo = (message, title = '알림') => {
  * @param {string} confirmText - 확인 버튼 텍스트 (기본: '삭제')
  * @param {string} cancelText - 취소 버튼 텍스트 (기본: '취소')
  * @param {string} icon - 아이콘 타입 (기본: 'warning', 'success', 'info', 'question' 가능)
- * @param {string} confirmButtonColor - 확인 버튼 색상 (기본: '#6366f1')
+ * @param {string} confirmButtonColor - 확인 버튼 색상 (기본: 브랜드 초록)
  * @returns {Promise<boolean>} - 확인 시 true, 취소 시 false
  */
 export const showConfirm = async (
@@ -100,7 +110,7 @@ export const showConfirm = async (
   confirmText = '삭제',
   cancelText = '취소',
   icon = 'warning',
-  confirmButtonColor = '#6366f1'
+  confirmButtonColor = BRAND
 ) => {
   const result = await ReactSwal.fire({
     ...commonConfig,

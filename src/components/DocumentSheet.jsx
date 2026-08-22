@@ -380,7 +380,21 @@ export const StatementSheet = ({ statement, items = [], company = {} }) => (
             </>
         )}
 
-        {company.quote_terms && <p className="doc-terms-note">{company.quote_terms}</p>}
+        {/*
+          **견적서 문구를 그대로 쓰면 안 된다.** 여기에 `quote_terms`가 붙어
+          있어서 거래명세서 아래에 "본 **견적**은 발행일로부터 유효기간 내에만
+          유효합니다"가 인쇄되고 있었다. 이미 납품한 물건의 명세서다 — 견적이
+          아니고 유효기간도 없다. 게다가 "부가세 별도"라고 적히는데 정작 이
+          문서는 부가세를 더해 합계를 낸다. 고객이 받아 보는 문서다.
+
+          `statement_terms`가 있으면 그것을 쓰고(설정 화면에서 고칠 수 있게
+          `execution/sql/statement_terms.sql`), 없으면 명세서에 맞는 기본 문장
+          하나만 둔다. 없는 칸을 읽으면 `undefined`이므로 마이그레이션 전에도
+          그대로 동작한다.
+        */}
+        <p className="doc-terms-note">
+            {company.statement_terms || '위와 같이 거래하였음을 확인합니다.'}
+        </p>
 
         <Sign company={company} />
         <Foot company={company} />
