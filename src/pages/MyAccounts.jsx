@@ -282,8 +282,16 @@ const MyAccounts = () => {
 
             {/* Table */}
             <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
+                {/*
+                  **다른 목록 화면과 같은 `dgrid`를 쓴다.** 이 표만 빠져 있어서
+                  폰에서 806px짜리 표를 옆으로 밀어야 했고, 칸 안 단추가 34~41px로
+                  남아 있었다(`table.dgrid td button { min-width: 44px }`가
+                  안 걸린다). `dgrid`를 붙이면 768px 이하에서 CSS가 카드로 접고
+                  칸 이름은 `useTableLabels`가 `<thead>`를 읽어 심어 준다 —
+                  마크업을 두 벌 만들지 않는다(DESIGN 규칙).
+                */}
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="dgrid w-full text-sm">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100">
                                 <th className="text-left px-3 py-2.5 text-[11px] font-bold text-gray-500 uppercase w-8">#</th>

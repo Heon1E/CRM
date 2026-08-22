@@ -943,6 +943,16 @@ textarea:focus {
     min-width: 44px !important;
   }
 
+  /*
+   * FullCalendar가 만드는 단추(`/calendar`의 이전·다음·오늘·월)는 아이콘을
+   * `<span class="fc-icon">`으로 그린다. 위의 svg 기준 규칙에 안 걸려
+   * 31~43px로 남아 있었다(실측). 우리가 만든 마크업이 아니므로 클래스로 잡는
+   * 수밖에 없다 — 이 클래스 이름은 라이브러리가 정한 것이라 바뀌지 않는다.
+   */
+  .fc .fc-button {
+    min-width: 44px;
+  }
+
   /* 가운데 정렬은 정말 아이콘 하나뿐일 때만 — 글씨가 있는 단추의 배치를
      건드리면 안 된다. */
   button:has(> svg:only-child),
