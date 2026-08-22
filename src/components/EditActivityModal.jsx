@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { resolveSalesRep } from '../utils/salesRep'
 import useEnterMove from '../hooks/useEnterMove'
 // GoogleGenerativeAI SDK 대신 REST API 직접 호출 방식 사용
-import { Sparkles, Loader2, X, Plus } from 'lucide-react'
+import { Sparkles, Loader2, X, Plus , Undo2} from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
 import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert'
 import { parseDateForInput } from '../utils/formatters'
@@ -35,6 +35,9 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   const [attendeeInput, setAttendeeInput] = useState('')
   const [charCount, setCharCount] = useState(0)
   const [isAILoading, setIsAILoading] = useState(false)
+  // 다듬기 전 원문. 모델이 사실을 바꿔 놓는 일이 실제로 있었으므로
+  // 한 번에 되돌릴 길을 남긴다 (조용히 덮어쓰지 않는다).
+  const [preAIText, setPreAIText] = useState(null)
 
   // activity가 변경되거나 모달이 닫힐 때 폼 초기화
   useEffect(() => {
@@ -121,80 +124,34 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
     }
   }
 
+  // 다듬기는 서버(`/api/polish-note`)가 한다. 브라우저에서 직접 Gemini를 부르면
+  // 키가 배포 번들에 박힌다 — 자세한 사정은 그 파일 머리말에 적어 두었다.
   const handleAIPolish = async () => {
     const currentText = formData.description.trim()
-
     if (!currentText) {
       await showWarning('정리할 내용을 먼저 입력해주세요.')
       return
     }
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey) {
-      await showWarning('API Key가 설정되지 않았습니다.')
-      return
-    }
-
     setIsAILoading(true)
-
     try {
-      const prompt = `당신은 현장의 거친 메모를 **품격 있고 핵심적인 '단문형 보고서'**로 탈바꿈시키는 **전문 에디터**입니다.
-입력된 내용을 내부적으로 분석하여 비즈니스 용어로 다듬은 뒤, **최종 결과물만** 출력하십시오.
-
-**[작성 가이드 (Internal Rules - Do NOT Output)]**
-1. **전문적 재구성:** '돈 때문에' -> '단가 민감도', '다시 잘해보자' -> '협력 강화' 등 격식 있는 표현으로 변환하십시오.
-2. **핵심 요약:** 서술어를 '~함', '~임', '~요청', '~협의' 등 명사형이나 단문으로 종결하십시오. (예의 차리는 '습니다' 금지)
-3. **구조:** 소제목, 불렛포인트, 번호 매기기를 절대 사용하지 마십시오. 오직 **줄바꿈(Enter)**으로만 문단을 나누십시오.
-
-**[출력 포맷 예시 (Strict Output Format)]**
-현대산업 이상호 사장 방문, 주문량 감소 원인 파악 및 물량 회복 협의.
-
-현재 BF타입(월 500개) 운용 중이나, 재생 시장의 높은 단가 민감도로 인한 물량 이탈 확인. MF타입(월 160~200개) 66,000원 공급 가능 여부 타진 및 자차 수령 조건 최저 견적 요청 접수.
-
-당사, 주문량의 점진적 정상화 강력 요청하였으며 사측 역시 협력 강화 및 발주 증대 약속.
-
-**[입력 데이터]**
-${currentText}`
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        }
-      )
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('Gemini API Error:', response.status, errorData)
-
-        if (response.status === 429) {
-          await showError('사용량이 많아 잠시 지연되고 있습니다. 1분 뒤 다시 시도해주세요. (429)')
-        } else if (response.status === 404) {
-          await showError('AI 모델을 찾을 수 없습니다. 관리자에게 문의하세요. (404)')
-        } else {
-          await showError(`AI 서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요. (Error: ${response.status})`)
-        }
+      const res = await fetch('/api/polish-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        await showError(data.message || '글 다듬기에 실패했습니다. 원문은 그대로 남아 있습니다.')
         return
       }
-
-      const data = await response.json()
-      const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text
-
-      if (aiText) {
-        const finalText = aiText.length > 3000 ? aiText.substring(0, 3000) : aiText
-        setFormData({ ...formData, description: finalText })
-        setCharCount(finalText.length)
-      } else {
-        throw new Error('AI가 응답을 생성하지 못했습니다.')
-      }
-
-    } catch (error) {
-      console.error('AI 정리 중 로직 오류:', error)
-      await showError('작업을 처리하는 중 오류가 발생했습니다.')
+      const text = String(data.text || '')
+      if (!text) { await showError('결과가 비어 있습니다. 원문은 그대로 남아 있습니다.'); return }
+      setPreAIText(currentText)
+      setFormData({ ...formData, description: text.length > 3000 ? text.slice(0, 3000) : text })
+    } catch (e) {
+      console.error('[handleAIPolish]', e)
+      await showError('글 다듬기에 실패했습니다. 원문은 그대로 남아 있습니다.')
     } finally {
       setIsAILoading(false)
     }
@@ -420,10 +377,20 @@ ${currentText}`
 
         {/* 내용 */}
         <div>
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-1 gap-2">
             <label className="block text-xs font-bold text-oem-text-secondary uppercase">
               내용 <span className="text-[color:var(--danger)]">*</span>
             </label>
+            {preAIText !== null && !isAILoading && (
+              <button
+                type="button"
+                onClick={() => { setFormData((f) => ({ ...f, description: preAIText })); setPreAIText(null) }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-[color:var(--text-secondary)] border border-oem-border rounded-sm hover:bg-oem-grey-light"
+              >
+                <Undo2 className="w-3 h-3" />
+                <span>원문으로</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleAIPolish}
@@ -433,7 +400,7 @@ ${currentText}`
               {isAILoading ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>저장 중…</span>
+                  <span>다듬는 중…</span>
                 </>
               ) : (
                 <>

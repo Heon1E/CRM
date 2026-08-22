@@ -7,7 +7,7 @@ import { resolveSalesRep } from '../utils/salesRep'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import useEnterMove from '../hooks/useEnterMove'
 // GoogleGenerativeAI SDK 대신 REST API 직접 호출 방식 사용
-import { Sparkles, Loader2, X, Plus } from 'lucide-react'
+import { Sparkles, Loader2, X, Plus , Undo2} from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
 import toast from 'react-hot-toast'
 import { showWarning, showError } from '../utils/alert'
@@ -37,6 +37,9 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   const [attendeeInput, setAttendeeInput] = useState('') // 참석자 입력 필드
   const [charCount, setCharCount] = useState(0)
   const [isAILoading, setIsAILoading] = useState(false)
+  // 다듬기 전 원문. 모델이 사실을 바꿔 놓는 일이 실제로 있었으므로
+  // 한 번에 되돌릴 길을 남긴다 (조용히 덮어쓰지 않는다).
+  const [preAIText, setPreAIText] = useState(null)
 
   // 전역 엔터 네비게이션 적용 (textarea는 Shift+Enter로 줄바꿈)
   useEnterMove({ formRef, enabled: isOpen })
@@ -117,89 +120,44 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   }
 
   // AI 글 다듬기 기능
+  /*
+   * 글 다듬기 — **서버(`/api/polish-note`)를 거친다.**
+   *
+   * 예전에는 여기서 브라우저가 직접 Gemini를 불렀다
+   * (`import.meta.env.VITE_GEMINI_API_KEY`). 그런데 배포본에는 그 값이 없어서
+   * 단추를 누르면 'API Key가 설정되지 않았습니다'만 떴다 — **아무도 못 쓰는
+   * 기능이었다.** 값을 넣었으면 더 나빴다: `VITE_` 접두어가 붙은 값은 배포된
+   * JS에서 문자열로 그대로 추출되므로 남이 우리 할당량을 쓸 수 있다.
+   * 그래서 `analyze-erp`·`client-briefing`과 같이 서버로 옮겼다.
+   */
   const handleAIPolish = async () => {
     const currentText = formData.description.trim()
-
     if (!currentText) {
       await showWarning('정리할 내용을 먼저 입력해주세요.')
       return
     }
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey) {
-      await showWarning('API Key가 설정되지 않았습니다.')
-      return
-    }
-
     setIsAILoading(true)
-
     try {
-      const prompt = `당신은 베테랑 영업 비서입니다. 사용자가 두서없이 작성한 미팅 메모를 보고받는 상사가 단 3초 만에 핵심을 파악할 수 있도록 재구성해야 합니다.
-
-**[절대 준수 규칙]**
-1. **서식 금지:** 텍스트에 볼드체(\`**\`), 헤더(\`##\`), 이탤릭 등을 **절대 사용하지 마십시오.** 오직 텍스트와 줄바꿈, 하이픈(\`-\`)만 사용하세요.
-2. **구조 재배치 (시간순 X, 중요도순 O):**
-   - 메모의 내용을 시간 순서로 나열하지 말고, **가장 중요한 성과나 결론**을 맨 윗줄에 배치하세요.
-   - 그 다음으로 거래처의 핵심 요구사항이나 이슈를 배치하세요.
-   - 마지막에 향후 계획(Next Step)을 적으세요.
-3. **문체:** 군더더기 없는 건조한 보고체(개조식)를 사용하세요. (예: "~에 대해 논의함", "~하기로 결정함")
-4. **분량:** 전체 길이는 5~7줄을 넘기지 않으면서 핵심 내용은 누락하지 마세요.
-
-**[출력 예시]**
-- [결론] A사 계약 건 단가 100원 인상하여 갱신하기로 구두 합의함.
-- [이슈] 납기 지연에 대한 우려가 있어 재고 확보 계획을 공유 요청받음.
-- [활동] 신규 제품 샘플 2종 전달 및 시연 진행.
-- [향후] 다음 주 월요일 최종 견적서 발송 예정.
-
-다음 영업 메모를 위 규칙에 따라 정리해줘:
-${currentText}`
-
-      // [수정 1] REST API 직접 호출: gemini-flash-latest 사용 (안정적인 최신 별칭)
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        }
-      )
-
-      // [수정 2] 에러 발생 시 즉시 처리하고 함수 종료
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({})) // 에러 상세 내용 파싱 시도
-        console.error('Gemini API Error:', response.status, errorData)
-
-        if (response.status === 429) {
-          await showError('사용량이 많아 잠시 지연되고 있습니다. 1분 뒤 다시 시도해주세요. (429)')
-        } else if (response.status === 404) {
-          await showError('AI 모델을 찾을 수 없습니다. 관리자에게 문의하세요. (404)')
-        } else {
-          await showError(`AI 서버 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요. (Error: ${response.status})`)
-        }
-        return // 더 이상 진행하지 않음
+      const res = await fetch('/api/polish-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentText }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        await showError(data.message || '글 다듬기에 실패했습니다. 원문은 그대로 남아 있습니다.')
+        return
       }
-
-      const data = await response.json()
-
-      // 데이터 파싱 안전장치
-      const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text
-
-      if (aiText) {
-        // 정리된 텍스트를 입력창에 반영 (3000자 제한 확인)
-        const finalText = aiText.length > 3000 ? aiText.substring(0, 3000) : aiText
-        setFormData({ ...formData, description: finalText })
-        setCharCount(finalText.length)
-      } else {
-        throw new Error('AI가 응답을 생성하지 못했습니다.')
-      }
-
-    } catch (error) {
-      console.error('AI 정리 중 로직 오류:', error)
-      await showError('작업을 처리하는 중 오류가 발생했습니다.')
+      // 원문을 덮어쓰므로 길이는 잘라 둔다 (DB 칸과 화면 모두 감당할 크기로)
+      const text = String(data.text || '')
+      if (!text) { await showError('결과가 비어 있습니다. 원문은 그대로 남아 있습니다.'); return }
+      setPreAIText(currentText)
+      setFormData({ ...formData, description: text.length > 3000 ? text.slice(0, 3000) : text })
+    } catch (e) {
+      console.error('[handleAIPolish]', e)
+      await showError('글 다듬기에 실패했습니다. 원문은 그대로 남아 있습니다.')
     } finally {
-      // [수정 3] 성공하든 실패하든 로딩 상태는 무조건 해제
       setIsAILoading(false)
     }
   }
@@ -485,10 +443,20 @@ ${currentText}`
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center justify-between mb-1 gap-2">
             <label className="oem-label">
               내용 <span className="text-[color:var(--danger)]">*</span>
             </label>
+            {preAIText !== null && !isAILoading && (
+              <button
+                type="button"
+                onClick={() => { setFormData((f) => ({ ...f, description: preAIText })); setPreAIText(null) }}
+                className="flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-[color:var(--text-secondary)] border border-oem-border rounded-sm hover:bg-oem-grey-light"
+              >
+                <Undo2 className="w-3 h-3" />
+                <span>원문으로</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleAIPolish}
@@ -498,7 +466,7 @@ ${currentText}`
               {isAILoading ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>저장 중…</span>
+                  <span>다듬는 중…</span>
                 </>
               ) : (
                 <>

@@ -242,7 +242,8 @@ const fmtDate = (d) => {
 }
 
 async function loadClients() {
-    const rows = await sb('clients?select=id,company&limit=5000')
+    // `sales_rep`도 받는다 — 담당이 비어 있는 곳만 채우려면 현재 값을 알아야 한다
+    const rows = await sb('clients?select=id,company,sales_rep&limit=5000')
     const map = new Map()
     rows.forEach((c) => keysOf(c.company).forEach((k) => { if (!map.has(k)) map.set(k, c) }))
     return map
@@ -288,8 +289,30 @@ async function applySchedules(items, clientMap) {
     return saved
 }
 
+/**
+ * 이 대화가 누구인지 — `bot_allowlist.sales_rep`.
+ *
+ * **왜 필요한가.** `activities.user_name`은 '누가 다녀왔는가'이고, 담당 판정의
+ * 근거다. 앱에서 넣은 활동은 로그인한 사람을 넣는데, 봇으로 들어온 활동은
+ * 지금까지 **비워 두고 있었다**(33건). 지금은 거래처마다 담당이 다 지정돼 있어
+ * KPI 누락이 0건이지만, 담당 없는 거래처를 봇으로 처음 방문 기록하면 그
+ * 거래처는 담당이 안 붙고 KPI 정기적방문횟수·영업 코치에서 빠진다.
+ * 영업사원이 둘 더 늘면 '누가 다녀왔는지'도 구분해야 한다.
+ *
+ * **칸이 없어도 동작한다.** `bot_allowlist`에 `sales_rep`을 나중에 더했으므로
+ * (`execution/sql/bot_allowlist_rep.sql`), 없으면 예전처럼 비워 둔다.
+ */
+async function repOfChat(chatId) {
+    try {
+        const rows = await sb(`bot_allowlist?select=sales_rep&chat_id=eq.${encodeURIComponent(chatId)}&limit=1`)
+        return rows?.[0]?.sales_rep || null
+    } catch {
+        return null   // 칸이 없는 경우 등 — 업무를 막지 않는다
+    }
+}
+
 /** 업무기록 -> activities (같은 거래처·같은 날은 건너뛴다) */
-async function applyActivities(items, clientMap) {
+async function applyActivities(items, clientMap, repName = null) {
     const saved = [], skipped = [], unmatched = []
     for (const it of items) {
         const c = findClient(clientMap, it.clientName)
@@ -310,12 +333,26 @@ async function applyActivities(items, clientMap) {
                 // 유선은 방문이 아니다. KPI 정기적방문횟수는 미팅/방문만 센다.
                 type: it.kind === '전화' ? '전화' : '미팅',
                 status: '완료',
+                // 누가 다녀왔는가 (상대측 참석자가 아니다 — 그쪽은 아래 [담당자]로 들어간다)
+                user_name: repName,
                 description: [it.person ? `[담당자] ${it.person}` : '', it.description || ''].filter(Boolean).join('\n'),
                 // '다음에 할 일'이 적혀 있으면 같이 담는다. 이게 아침 브리핑의 재료다.
                 next_action_date: /^\d{4}-\d{2}-\d{2}$/.test(it.nextDate || '') ? it.nextDate : null,
                 next_action_detail: it.nextDetail || null
             }]
         })
+        /*
+         * 다녀온 곳은 내 담당이다 — 담당이 비어 있으면 채운다.
+         * 앱(`DataContext.addActivity`)과 같은 규칙이다. 이미 담당이 있으면
+         * 건드리지 않는다(`sales_rep=is.null` 조건이 그 역할을 한다).
+         */
+        if (repName && !c.sales_rep) {
+            try {
+                await sb(`clients?id=eq.${c.id}&sales_rep=is.null`, {
+                    method: 'PATCH', prefer: 'return=minimal', body: { sales_rep: repName }
+                })
+            } catch (e) { console.warn('[telegram] 담당 자동 지정 실패', e.message) }
+        }
         saved.push(c.company)
     }
     return { saved, skipped, unmatched }
@@ -507,7 +544,7 @@ export default async function handler(req, res) {
         // ---- 업무기록: 바로 등록 (중복 방지) ----
         if (intent === 'activity' && items.length) {
             const clientMap = await loadClients()
-            const r = await applyActivities(items, clientMap)
+            const r = await applyActivities(items, clientMap, await repOfChat(chatId))
             await saveToInbox({
                 chat_id: chatId, from_name: fromName, raw_text: text || null,
                 has_image: !!photos?.length, doc_type: 'activity',
