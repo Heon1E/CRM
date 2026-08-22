@@ -28,6 +28,14 @@ const Products = lazy(() => import('./pages/Products'))
 const Issues = lazy(() => import('./pages/Issues'))
 const Settings = lazy(() => import('./pages/Settings'))
 const PipelineBoard = lazy(() => import('./pages/PipelineBoard'))
+/*
+ * 모션 확인 화면 — 개발 서버 전용.
+ * **`lazy()`를 가드 밖에 두면 안 된다.** 라우트만 감싸면 `import()`는 그대로
+ * 남아 Rollup이 조각을 만들어 배포물에 싣는다(실측 3.12KB). 절대 불러오지
+ * 않는 조각이라 해가 되진 않지만, 넣지 않기로 한 것이 들어가 있는 상태다.
+ * 삼항 안에 두면 빌드 때 `false`로 접혀 통째로 지워진다.
+ */
+const MotionLab = import.meta.env.DEV ? lazy(() => import('./pages/MotionLab')) : null
 const Login = lazy(() => import('./pages/Login'))
 const Landing = lazy(() => import('./pages/Landing'))
 const Pricing = lazy(() => import('./pages/Pricing'))
@@ -148,6 +156,12 @@ function App() {
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/login" element={<Login />} />
+                {/*
+                  모션 확인 화면 — 개발 서버에서만 존재한다.
+                  `import.meta.env.DEV`가 false면 Vite가 이 가지를 통째로 지우므로
+                  MotionLab 코드가 배포 산출물에 들어가지 않는다.
+                */}
+                {import.meta.env.DEV && <Route path="/__motion" element={<MotionLab />} />}
                 <Route path="/*" element={<ProtectedRoutes />} />
               </Routes>
               </Suspense>

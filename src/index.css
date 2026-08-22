@@ -901,6 +901,25 @@ textarea:focus {
   }
 
   /*
+   * **높이만 올리면 아이콘 단추는 여전히 못 누른다.**
+   * 위 규칙은 `min-height`만 준다. 글씨 없이 아이콘 하나만 든 단추는 가로가
+   * 아이콘 폭 그대로라, 세로 44px · 가로 28px 같은 길쭉한 띠가 된다
+   * (실측: 모달 닫기 단추 28×44). 표 안쪽만 가로를 올려 놨는데, 모달·상단바·
+   * 카드 머리처럼 표 밖에 있는 아이콘 단추가 전부 빠졌다.
+   *
+   * **클래스가 아니라 구조로 잡는다.** `.icon-btn`을 일일이 붙이게 하면
+   * 새로 만드는 단추마다 또 빠진다 — 이 저장소에서 이미 여러 번 그랬다.
+   * '자식이 svg 하나뿐인 단추'는 정의상 아이콘 전용이다.
+   */
+  button:has(> svg:only-child),
+  [role="button"]:has(> svg:only-child) {
+    min-width: 44px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /*
    * **12px 미만 글씨는 모바일에서 못 읽는다.**
    * 데스크톱은 밀도가 중요해 11px 캡션을 쓰지만, 손에 들고 보는 화면은 다르다.
    * 실측(386px): `text-[10px]`·`text-[11px]`·`.meta` 가 11~11.5px로 그려지고
@@ -1248,6 +1267,39 @@ textarea:focus {
    영영 끝나지 않는다(모달이 안 닫히는 식). 사람 눈에는 즉시로 보이면서
    이벤트는 정상적으로 오는 값이 0.01ms다.
    ========================================================================== */
+/* ==========================================================================
+   스켈레톤 — 빈 화면 대신 '곧 여기에 무엇이 온다'를 보여준다
+
+   자료를 기다리는 동안 화면이 하얗게 비어 있으면 고장으로 읽힌다. 특히 매출은
+   1.5만 행이라 첫 화면이 몇 초 걸린다. 회전하는 동그라미보다 **들어올 내용의
+   모양**을 그려 두는 편이 기다림을 짧게 느끼게 하고, 자료가 도착했을 때
+   화면이 덜 튄다(자리가 이미 잡혀 있다).
+
+   빛이 왼쪽에서 오른쪽으로 지나가는 모양이다. `transform`만 움직인다 —
+   레이아웃·페인트를 유발하면 옛 폰에서 끊긴다.
+   ========================================================================== */
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-2, #eceef1);
+}
+
+.skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 255, 255, 0.6),
+            transparent);
+    animation: skeleton-sheen 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-sheen {
+    100% { transform: translateX(100%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
 
     *,
@@ -1263,6 +1315,13 @@ textarea:focus {
        대신 회전 대신 깜빡임으로 바꿔 화면이 미끄러지지 않게 한다. */
     .animate-spin {
         animation: fade-pulse 1.2s ease-in-out infinite !important;
+    }
+
+    /* 스켈레톤도 같은 이유로 살려 둔다. 다만 빛이 지나가는 것은 '미끄러짐'이라
+       깜빡임으로 바꾼다 — 기다리는 중임은 알리되 화면은 움직이지 않는다. */
+    .skeleton::after {
+        animation: fade-pulse 1.4s ease-in-out infinite !important;
+        transform: none !important;
     }
 }
 
