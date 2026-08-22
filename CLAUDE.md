@@ -438,6 +438,7 @@ Supabase > Project Settings > API > service_role.
 | `components/MobileFAB.jsx` | 42 | |
 | `components/Toast.jsx` | 31 | `react-hot-toast`가 대신한다 |
 | `pages/AdminApprovals.jsx` | 19 | 승인은 `UserAdmin`이 맡는다 |
+| `services/aiSalesCoach.js` + `services/geminiService.js` | 131+ | 규칙 기반 `SalesCoach.jsx`가 대신한다. **이 둘만 `VITE_GEMINI_API_KEY`를 쓰는데, import하는 곳이 없어 번들에 들어가지 않아 키가 새지 않는다** — 되살리려면 서버 경유로 고쳐야 한다 |
 
 찾는 법 — 파일 이름(대문자로 시작하는 컴포넌트)이 다른 파일에서 한 번도
 언급되지 않으면 죽은 파일이다.
@@ -967,8 +968,39 @@ Vercel에 그 변수가 없으면 `undefined`가 되어 단추가 아무 일도 
 **`api/polish-note.js`**. 키는 `GEMINI_API_KEY`(VITE_ 없음).
 텔레그램 봇이 도는 것으로 이 키가 Vercel에 이미 있는 것은 확인했다.
 
-남아 있는 `VITE_GEMINI_API_KEY` 사용처: `ShareProcessing.jsx` · `geminiService.js`.
-같은 이유로 죽어 있다.
+**브라우저 번들의 `VITE_GEMINI_API_KEY` 사용처는 이제 0이다.** `geminiService.js`에
+남아 있지만 import하는 곳이 없어(위 '어디에서도 쓰이지 않는 파일') 번들에 들어가지
+않는다. 확인법:
+
+```bash
+npm run build && grep -c "AIza" dist/assets/*.js   # 0이어야 한다
+```
+
+### 통화 녹음은 오디오를 실제로 보낸다
+
+`api/analyze-call.js` + `src/pages/ShareProcessing.jsx`. 안드로이드 공유 시트로
+녹음을 넘기면(PWA `share_target`) 활동으로 남기는 경로다.
+
+예전 코드는 **오디오를 보내지 않았다.** 파일명과 제목만 넘기고 이렇게 시켰다 —
+*"실제 음성 내용을 들을 수 없으므로 파일명과 제목 정보만을 기반으로 추론해주세요"*,
+*"파일명과 제목을 바탕으로 추론한 통화 내용 요약, 3-5줄"*. 즉 **통화 내용을
+지어내게 하고 그것을 활동에 그대로 저장**했다. `녹음_001.m4a` 하나로 근거 없는
+3~5줄이 이력에 남는다. (오디오를 base64로 바꾸는 코드는 있었는데 결과를 어디에도
+쓰지 않았다.)
+
+`gemini-2.5-flash`는 오디오를 직접 받는다. 실어 보내고 **들은 것만** 적게 한다.
+실측 — 무음 파일에 파일명만 `한솔케미칼_통화.m4a`로 주었더니 요약을 만들지 않고
+`inaudible`을 돌려줬고, 실제 음성에서는 `15만원`을 금액 그대로 옮겼다.
+
+- **못 알아들으면 저장하지 않는다.** 예전에는 실패해도 `success: true`로 돌려주고
+  가짜 요약을 넣었다. 없는 기록보다 틀린 기록이 나쁘다.
+- **판독 결과를 바로 저장하지 않는다.** 화면에 띄우고 사람이 '활동으로 저장'을
+  누른다 (ERP 스크린샷 판독과 같은 규칙).
+- **자르지 않고 거절한다.** Vercel 본문 한도가 4.5MB고 base64는 4/3배로 불어난다.
+  약 6분까지다. 뒤를 조용히 버리면 통화 끝에 합의한 것이 기록에서 빠진다.
+- `.m4a`의 `audio/mp4`는 Gemini가 받는 목록에 없다. 담고 있는 것은 AAC이므로
+  `audio/aac`로 바꿔 보낸다.
+- 유형은 `전화`다 — KPI 정기적방문(미팅/방문)에는 들어가지 않는다.
 
 ### 다듬기는 사실을 바꾼다 — 원문을 덮어쓰지 않는다
 

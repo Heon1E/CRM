@@ -15,6 +15,8 @@ const ShareProcessing = () => {
   const [status, setStatus] = useState('loading') // loading, processing, success, error
   const [message, setMessage] = useState('통화 녹음 파일을 불러오는 중...')
   const [analysisResult, setAnalysisResult] = useState(null)
+  const [shared, setShared] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     processSharedAudio()
@@ -23,9 +25,7 @@ const ShareProcessing = () => {
   // 공유된 오디오 파일 처리
   const processSharedAudio = async () => {
     try {
-      // 1. IndexedDB에서 오디오 파일 가져오기
       const audioData = await getSharedAudioFromDB()
-      
       if (!audioData) {
         setStatus('error')
         setMessage('공유된 오디오 파일을 찾을 수 없습니다.')
@@ -33,62 +33,84 @@ const ShareProcessing = () => {
         return
       }
 
-      setMessage('오디오 파일을 분석하는 중...')
+      setShared(audioData)
+      setMessage('통화 내용을 듣고 있습니다…')
       setStatus('processing')
 
-      // 2. Gemini API로 오디오 분석
-      const result = await analyzeAudioWithGemini(audioData)
-      
-      if (!result || !result.success) {
-        throw new Error(result?.error || '오디오 분석에 실패했습니다.')
+      const result = await analyzeCall(audioData)
+
+      /*
+       * **못 알아들었으면 저장하지 않는다.** 예전에는 판독이 실패해도
+       * 파일명으로 만든 가짜 요약을 활동에 그대로 넣었다. 활동 기록은
+       * 영업 코치·KPI·거래처 브리핑의 근거라, 없는 기록보다 틀린 기록이 나쁘다.
+       */
+      if (result.inaudible) {
+        setStatus('error')
+        setMessage(result.message || '음성을 알아듣지 못했습니다. 활동을 직접 입력해 주세요.')
+        return
       }
 
-      setAnalysisResult(result.data)
-      setMessage('통화 기록을 저장하는 중...')
-
-      // 3. 활동 내역에 저장
-      const today = todayYmd()
-      const activityData = {
-        type: result.data.type || '전화',
-        activity_date: result.data.date || today,
-        description: result.data.summary || result.data.content || '통화 녹음 분석 결과',
-        clientName: result.data.clientName || '',
-        status: '완료',
-      }
-
-      await addActivity(activityData)
-
-      // 4. IndexedDB에서 파일 삭제 (처리 완료)
-      await clearSharedAudioFromDB()
-
-      setStatus('success')
-      setMessage('통화 기록이 저장되었습니다!')
-      
-      toast.success('통화 기록이 성공적으로 저장되었습니다.', {
-        duration: 3000,
-        icon: '✅'
-      })
-
-      // 3초 후 대시보드로 이동
-      setTimeout(() => {
-        navigate('/')
-      }, 3000)
-
+      // 판독 결과를 바로 저장하지 않는다 — 사람이 보고 정한다
+      // (ERP 스크린샷 판독과 같은 규칙).
+      setAnalysisResult(result)
+      setStatus('review')
     } catch (error) {
       console.error('[ShareProcessing] 오디오 처리 오류:', error)
       setStatus('error')
-      setMessage(`오류: ${error.message}`)
-      
-      toast.error('오디오 처리 중 오류가 발생했습니다: ' + error.message, {
-        duration: 5000,
-        icon: '❌'
-      })
-
-      // 5초 후 대시보드로 이동
-      setTimeout(() => {
-        navigate('/')
-      }, 5000)
+      setMessage(error.message || '통화 판독에 실패했습니다.')
     }
+  }
+
+  /** 서버(`/api/analyze-call`)가 음성을 듣는다. 키를 브라우저에 두지 않는다. */
+  const analyzeCall = async (audioData) => {
+    const res = await fetch('/api/analyze-call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audioBase64: arrayBufferToBase64(audioData.audioData),
+        mimeType: audioData.mimeType || 'audio/mp4',
+        fileName: audioData.fileName || '',
+        timestamp: audioData.timestamp ? ymd(new Date(audioData.timestamp)) : todayYmd(),
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.message || '통화 판독에 실패했습니다.')
+    return data
+  }
+
+  /** 사람이 확인한 뒤에만 활동으로 남긴다. */
+  const saveActivity = async () => {
+    if (!analysisResult) return
+    setSaving(true)
+    try {
+      const body = [
+        analysisResult.summary,
+        analysisResult.contactName ? `[담당자] ${analysisResult.contactName}` : '',
+        analysisResult.nextAction ? `[다음] ${analysisResult.nextAction}` : '',
+      ].filter(Boolean).join('\n')
+
+      await addActivity({
+        type: '전화',   // 통화 녹음이므로 전화다. KPI 정기적방문(미팅/방문)에는 들어가지 않는다.
+        activity_date: analysisResult.date || todayYmd(),
+        description: body,
+        clientName: analysisResult.clientName || '',
+        status: '완료',
+      })
+      await clearSharedAudioFromDB()
+      setStatus('success')
+      setMessage('통화 기록이 저장되었습니다.')
+      toast.success('통화 기록이 저장되었습니다.', { duration: 3000 })
+      setTimeout(() => navigate('/'), 2500)
+    } catch (e) {
+      console.error('[ShareProcessing] 저장 실패:', e)
+      toast.error('저장에 실패했습니다: ' + e.message)
+      setSaving(false)
+    }
+  }
+
+  const discard = async () => {
+    try { await clearSharedAudioFromDB() } catch { /* 지우기 실패는 막지 않는다 */ }
+    navigate('/')
   }
 
   // IndexedDB에서 공유된 오디오 파일 가져오기
@@ -144,138 +166,8 @@ const ShareProcessing = () => {
     })
   }
 
-  // Gemini API로 오디오 분석
-  const analyzeAudioWithGemini = async (audioData) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-    if (!apiKey) {
-      throw new Error('Gemini API 키가 설정되지 않았습니다.')
-    }
 
-    try {
-      // 오디오 파일을 Base64로 변환
-      const base64Audio = arrayBufferToBase64(audioData.audioData)
-      const mimeType = audioData.mimeType || 'audio/m4a'
-      
-      // Gemini 1.5 Flash는 오디오 파일을 직접 지원하지 않으므로,
-      // 파일명과 메타데이터를 기반으로 분석합니다.
-      // 향후 Google Cloud Speech-to-Text API 또는 다른 STT 서비스를 연동하여
-      // 실제 오디오를 텍스트로 변환한 후 Gemini에 전송할 수 있습니다.
-      
-      const fileName = audioData.fileName || '통화 녹음.m4a'
-      const title = audioData.title || '통화 녹음'
-      const timestamp = ymd(new Date(audioData.timestamp))
-      
-      // 파일명에서 거래처명, 날짜 등 추출 시도
-      const clientNameMatch = fileName.match(/([가-힣A-Za-z]+(?:사|기업|회사|코퍼레이션|Corp|Inc|Ltd))?/i)
-      const dateMatch = fileName.match(/(\d{4}[-.]?\d{2}[-.]?\d{2})/)
-      const extractedClientName = clientNameMatch ? clientNameMatch[1] : ''
-      const extractedDate = dateMatch ? dateMatch[1].replace(/[-.]/g, '-') : timestamp
-      
-      const prompt = `당신은 통화 녹음 파일 분석 전문가입니다. 다음 통화 녹음 파일의 메타데이터를 바탕으로 분석해주세요.
-
-**파일 정보:**
-- 파일명: ${fileName}
-- 제목: ${title}
-- 원본 날짜: ${timestamp}
-- 추출된 거래처명: ${extractedClientName || '없음'}
-- 추출된 날짜: ${extractedDate}
-
-**분석 요청:**
-이 통화 녹음 파일(안드로이드 갤럭시 통화 녹음)의 메타데이터를 기반으로 다음 정보를 추출해주세요:
-
-1. **거래처명** (파일명에서 추출한 회사명 또는 담당자명, 없으면 빈 문자열)
-2. **통화 날짜** (추출된 날짜가 있으면 사용, 없으면 오늘 날짜: ${todayYmd()})
-3. **핵심 내용** (주문/미팅/컴플레인/일반 문의 중 하나로 분류, 파일명/제목에서 유추)
-4. **요약** (파일명과 제목을 바탕으로 추론한 통화 내용 요약, 3-5줄)
-
-**주의사항:**
-- 통화 녹음 파일의 실제 음성 내용을 들을 수 없으므로, 파일명과 제목 정보만을 기반으로 추론해주세요.
-- 파일명에 거래처명이나 날짜가 포함되어 있을 수 있습니다. (예: "A사_20240115.m4a", "B회사_통화.m4a")
-- 확실하지 않은 정보는 빈 문자열("")로 설정하세요.
-- 파일명에서 추출한 거래처명이 있으면 그것을 우선 사용하세요.
-
-**[응답 형식 (JSON)]**
-{
-  "clientName": "거래처명 또는 빈 문자열",
-  "date": "YYYY-MM-DD 형식의 날짜",
-  "type": "주문" | "미팅" | "컴플레인" | "일반",
-  "summary": "3-5줄 요약",
-  "content": "상세 내용"
-}`
-
-      // 모델명은 geminiService와 동일하게 환경변수로 관리한다 (gemini-1.5-flash는 단종됨)
-      const model = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        }
-      )
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Gemini API 오류 (${response.status}): ${errorText}`)
-      }
-
-      const result = await response.json()
-      const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text
-
-      if (!responseText) {
-        throw new Error('Gemini API 응답이 비어있습니다.')
-      }
-
-      // JSON 추출 및 파싱
-      let jsonText = responseText.trim()
-      if (jsonText.startsWith('```')) {
-        jsonText = jsonText.replace(/^```json\n?/, '').replace(/^```\n?/, '').replace(/\n?```$/, '')
-      }
-
-      let parsed = null
-      try {
-        parsed = JSON.parse(jsonText)
-      } catch (parseError) {
-        const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
-        if (jsonMatch && jsonMatch[0]) {
-          parsed = JSON.parse(jsonMatch[0])
-        } else {
-          throw new Error('JSON 파싱 실패')
-        }
-      }
-
-      // 안전한 구조로 정규화
-      const today = todayYmd()
-      return {
-        success: true,
-        data: {
-          clientName: parsed.clientName || '',
-          date: parsed.date || today,
-          type: parsed.type || '일반',
-          summary: parsed.summary || `통화 녹음: ${audioData.title || '통화 기록'}`,
-          content: parsed.content || parsed.summary || `통화 녹음 파일: ${audioData.fileName || '통화 기록'}`
-        }
-      }
-    } catch (error) {
-      console.error('[ShareProcessing] Gemini API 오류:', error)
-      // 에러 발생 시 기본값 반환
-      const today = todayYmd()
-      return {
-        success: true, // 기본값으로 저장하도록 허용
-        data: {
-          clientName: '',
-          date: today,
-          type: '일반',
-          summary: `통화 녹음: ${audioData.title || '통화 기록'}`,
-          content: `통화 녹음 파일: ${audioData.fileName || '통화 기록'} (분석 실패, 기본값으로 저장)`
-        }
-      }
-    }
-  }
-
-  // ArrayBuffer를 Base64로 변환 (참고용, 현재는 사용하지 않음)
+  // ArrayBuffer -> Base64 (서버로 음성을 실어 보낼 때 쓴다)
   const arrayBufferToBase64 = (buffer) => {
     const bytes = new Uint8Array(buffer)
     let binary = ''
@@ -314,6 +206,51 @@ const ShareProcessing = () => {
                 </p>
               </div>
             )}
+          </>
+        )}
+
+        {status === 'review' && analysisResult && (
+          <>
+            <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-1">이렇게 들었습니다</h2>
+            <p className="text-sm text-[color:var(--text-secondary)] mb-4">
+              맞으면 저장하고, 아니면 버리고 직접 입력하세요.
+            </p>
+            <div className="p-4 rounded-lg text-left border border-[color:var(--border)] bg-[color:var(--bg-panel)]">
+              <dl className="text-sm space-y-1">
+                <div className="flex gap-2">
+                  <dt className="shrink-0 w-16 text-[color:var(--text-secondary)]">거래처</dt>
+                  <dd className="text-[color:var(--text-primary)] font-semibold">
+                    {analysisResult.clientName || <span className="font-normal text-[color:var(--text-secondary)]">못 알아들음 — 저장 후 지정하세요</span>}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="shrink-0 w-16 text-[color:var(--text-secondary)]">날짜</dt>
+                  <dd className="text-[color:var(--text-primary)]">{analysisResult.date}</dd>
+                </div>
+                {analysisResult.contactName && (
+                  <div className="flex gap-2">
+                    <dt className="shrink-0 w-16 text-[color:var(--text-secondary)]">담당자</dt>
+                    <dd className="text-[color:var(--text-primary)]">{analysisResult.contactName}</dd>
+                  </div>
+                )}
+              </dl>
+              <p className="mt-3 pt-3 border-t border-[color:var(--border)] text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">
+                {analysisResult.summary}
+              </p>
+              {analysisResult.nextAction && (
+                <p className="mt-2 text-sm text-[color:var(--text-primary)]">
+                  <strong>다음:</strong> {analysisResult.nextAction}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button type="button" onClick={discard} disabled={saving} className="oem-btn-secondary flex-1">
+                버리기
+              </button>
+              <button type="button" onClick={saveActivity} disabled={saving} className="oem-btn-primary flex-1">
+                {saving ? '저장 중…' : '활동으로 저장'}
+              </button>
+            </div>
           </>
         )}
 
