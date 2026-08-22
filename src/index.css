@@ -924,12 +924,34 @@ textarea:focus {
    * 새로 만드는 단추마다 또 빠진다 — 이 저장소에서 이미 여러 번 그랬다.
    * '자식이 svg 하나뿐인 단추'는 정의상 아이콘 전용이다.
    */
+  /*
+   * `:only-child`로는 **뱃지가 붙은 아이콘 단추를 놓친다.** 상단바 알림 단추는
+   * 자식이 `svg` + 점 하나(`absolute w-2 h-2`)라 걸리지 않아 36×44로 남아
+   * 있었다(실측). 점은 `absolute`라 폭에 기여하지 않으므로 여전히 좁다.
+   * `:only-of-type`은 'svg가 하나뿐'만 보므로 이런 장식이 붙어도 걸린다.
+   * 글씨가 함께 있는 단추도 걸리지만 그런 단추는 이미 44px보다 넓어 무해하다.
+   */
+  button:has(> svg:only-of-type),
+  [role="button"]:has(> svg:only-of-type) {
+    min-width: 44px !important;
+  }
+
+  /* 가운데 정렬은 정말 아이콘 하나뿐일 때만 — 글씨가 있는 단추의 배치를
+     건드리면 안 된다. */
   button:has(> svg:only-child),
   [role="button"]:has(> svg:only-child) {
-    min-width: 44px !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+  }
+
+  /*
+   * **키보드 힌트는 모바일에서 지운다.** `Ctrl K`·`F2`·`Enter` 같은 표시가
+   * 10px로 남아 있었는데(실측), 손가락으로 쓰는 화면에는 누를 키가 없다.
+   * 글자를 키우면 쓸모없는 것이 더 크게 자리를 차지할 뿐이라 감춘다.
+   */
+  kbd {
+    display: none;
   }
 
   /*

@@ -349,14 +349,15 @@ const Clients = () => {
     return visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id))
   }, [visibleGroupedClients, selectedIds])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-oem-bg-app">
-        <div className="text-oem-text-secondary animate-pulse font-medium">Synchronizing customers context...</div>
-      </div>
-    )
-  }
-
+  /*
+   * **불러오는 중이라고 화면 전체를 갈아치우지 않는다.**
+   * 예전에는 여기서 `Synchronizing customers context...` 한 줄만 남기고 빠져
+   * 나갔다. 매출 1.5만 행을 다 받아야 정렬이 끝나므로 그 상태가 몇 초 가는데,
+   * 그동안 도구막대도 검색창도 없어서 **할 수 있는 일이 아무것도 없었다.**
+   * 지금은 화면을 그대로 그리고 표 안쪽만 스켈레톤으로 둔다 — 기다리는 동안
+   * 검색어를 미리 칠 수 있고, 자료가 도착해도 자리가 안 튄다.
+   * (표 안쪽 분기는 `<tbody>`의 `isLoading`에 있다.)
+   */
   return (
     <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen relative">
       {/* Bulk Action Bar (Floating Bottom) */}
