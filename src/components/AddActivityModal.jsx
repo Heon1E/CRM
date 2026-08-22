@@ -443,7 +443,7 @@ ${currentText}`
           </div>
           {/* 참석자 태그 표시 */}
           {attendees.length > 0 && (
-            <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-oem-border-color min-h-[50px] rounded-sm">
+            <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border border-oem-border min-h-[50px] rounded-sm">
               {attendees.map((name, index) => (
                 <div
                   key={index}

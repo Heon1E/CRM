@@ -301,6 +301,19 @@ DESIGN.md 보라 — 네 가지가 뒤섞여 어느 것도 완성되지 않은 �
   17개 파일에서 123번 쓰이는데 설정에 없어 전부 무효였다. 다크 테마 시절엔 티가 안 났지만 배경이
   밝아지자 `bg-oem-blue text-white`가 '투명 배경 + 흰 글씨'가 되어 텍스트가 사라졌다.
 
+  **무효한 클래스는 빌드된 CSS를 뒤져 찾는다.** Tailwind는 자기가 아는 클래스만
+  CSS로 만든다. 그러니 '코드에는 있는데 CSS에는 없는 이름'이 곧 죽은 클래스다:
+
+  ```bash
+  npm run build && grep -c "bg-oem-blue-hover" dist/assets/*.css   # 0이면 무효
+  ```
+
+  이렇게 세 개를 더 찾았다 — `bg-oem-blue-hover`(설정에 `blue-hover`가 없다),
+  `border-oem-border-color`(키 이름은 `border`다), `text-oem-green`
+  (`--oem-green`은 CSS 변수일 뿐 Tailwind 색이 아니다).
+  **CSS 변수가 있다고 같은 이름의 Tailwind 클래스가 생기지는 않는다.**
+  변수는 `text-[color:var(--success)]`처럼 명시해서 쓴다.
+
 검증은 브라우저에서 수치로 한다(스크린샷 없이도 가능): 가로 오버플로, 44px 미만 터치 영역,
 12px 미만 글씨, 배경/글자 대비비. 특히 **색을 일괄 변경한 뒤에는 대비비 검사를 반드시 돌릴 것** —
 배경만 밝게 바뀌고 흰 글씨가 남으면 텍스트가 사라진다.

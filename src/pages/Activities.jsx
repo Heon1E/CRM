@@ -177,7 +177,7 @@ const Activities = () => {
             <div className="flex items-center gap-4 text-[10px] font-medium text-oem-text-secondary">
               <span>아래로 내리면 더 불러옵니다</span>
               <span className="w-px h-3 bg-oem-border"></span>
-              <span className="text-oem-green font-bold">실시간</span>
+              <span className="font-bold" style={{ color: 'var(--success)' }}>실시간</span>
             </div>
           </div>
 

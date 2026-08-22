@@ -455,7 +455,7 @@ ${currentText}`
             </button>
             <button
               type="submit"
-              className="px-6 py-2 text-xs font-bold text-white bg-oem-blue hover:bg-oem-blue-hover rounded-sm shadow-sm transition-colors"
+              className="px-6 py-2 text-xs font-bold text-white bg-oem-blue hover:bg-oem-blue-dark rounded-sm shadow-sm transition-colors"
             >
               저장
             </button>
