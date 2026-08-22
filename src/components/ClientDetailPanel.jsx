@@ -209,13 +209,23 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
     const flatSalesItems = useMemo(() => {
         if (!companySales || companySales.length === 0) return []
         const flats = []
-        companySales.forEach(sale => {
+        /*
+         * **키가 겹치고 있었다.** `${sale.id}-${item.product_id}`로 만들었는데
+         * 매출을 가볍게 받는 경로(`SALES_LIGHT`)에는 **`id`가 없다** — 무게를
+         * 줄이려고 일부러 뺀 칸이다. `product_id`도 비어 있는 품목이 있어서
+         * 같은 날 여러 줄이 같은 키를 갖게 됐다.
+         * React는 이럴 때 "줄을 빠뜨리거나 겹쳐 그릴 수 있다"고 경고한다 —
+         * 방문 직전에 보는 구매 이력이라 줄이 사라지면 안 된다.
+         * 순번을 섞어 어떤 경우에도 유일하게 만든다.
+         */
+        companySales.forEach((sale, si) => {
             const saleDate = sale.sale_date || sale.date
             const items = sale.items || []
+            const base = sale.id || `${saleDate}#${si}`
             if (items.length > 0) {
-                items.forEach(item => {
+                items.forEach((item, ii) => {
                     flats.push({
-                        id: item.id || `${sale.id}-${item.product_id}`,
+                        id: item.id || `${base}:${ii}`,
                         saleId: sale.id,
                         date: saleDate,
                         itemName: item.item_name || item.itemName || item.product_name || '-',
@@ -227,7 +237,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                 })
             } else {
                 flats.push({
-                    id: sale.id,
+                    id: base,
                     saleId: sale.id,
                     date: saleDate,
                     itemName: sale.displayItemName || sale.item_name || '-',
