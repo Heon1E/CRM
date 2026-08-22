@@ -1,5 +1,6 @@
 import { callGeminiWithRetry, isGeminiAvailable } from './geminiService'
 import { formatCurrency } from '../utils/formatters'
+import { todayYmd } from '../utils/day'
 
 /**
  * Build analysis prompt for Gemini
@@ -112,7 +113,7 @@ export async function generateDailyAdvice(rawData) {
             topClients: rawData.topRevenueClients || [],
             activeClients: rawData.currentActiveClientsCount || 0,
             currentMonthSales: rawData.currentMonthSalesTotal || 0,
-            currentDate: new Date().toISOString().split('T')[0],
+            currentDate: todayYmd(),
             dayOfMonth: new Date().getDate()
         }
 

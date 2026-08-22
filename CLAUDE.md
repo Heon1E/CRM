@@ -372,6 +372,34 @@ props 추가 ③붙여넣기(Ctrl+V) 지원. 되살리려면 성한 판본에 �
 
 **외부 연동**: Supabase(DB/Auth/RLS), Google Gemini(`src/services/geminiService.js`, `aiSalesCoach.js`), 카카오 지도(`/map`, `src/utils/kakaoMap.js`), FullCalendar, Tesseract.js(명함 OCR), xlsx(엑셀 업로드/내보내기).
 
+## 날짜 문자열은 `src/utils/day.js`로 만든다
+
+`toISOString()`을 쓰면 안 된다. **UTC라 한국(UTC+9)에서는 00:00~08:59 사이에
+하루 전 날짜가 나온다** — 하필 영업사원이 어제 방문을 기록하고 오전 주문을
+넣는 시간대다.
+
+실제로 이렇게 새고 있었다:
+
+| 자리 | 증상 |
+|---|---|
+| 매출 추가 `sale_date` 기본값 | 아침에 넣으면 **어제 매출**로 저장 |
+| 활동 추가 `activity_date` 기본값 | 아침에 넣으면 어제 방문. `(client_id, activity_date)`로 중복을 거르므로 판정까지 어긋난다 |
+| 견적서 유효기간 | `2026-08-15 + 30일`이 **2026-09-13**으로 인쇄 (하루 짧다) |
+| 지도의 '앞으로의 약속' 필터 | 아침에는 어제 것까지 딸려온다 |
+
+`ymd(date)` · `todayYmd()` · `addDays('YYYY-MM-DD', n)` 셋뿐이다.
+`addDays`는 **형식을 먼저 확인한다** — `new Date('2026T00:00:00')`은 오류가
+아니라 2026-01-01로 해석되어(V8) 근거 없는 날짜가 조용히 견적서에 찍힌다.
+
+**서버(`api/`)는 이것을 쓰지 않는다.** 그쪽은 UTC로 돌기 때문에 `kstToday()`가
+따로 있다. 브라우저는 이미 한국 시간이고 서버는 아니다.
+
+서버 쪽에도 같은 계열의 결함이 있었다 — `new Date(`${today}T00:00:00+09:00`).getUTCDay()`.
+한국 자정은 UTC로 **전날 15시**라 요일이 매일 하루씩 밀렸다(브리핑이
+2026-08-22 토요일을 '금'으로 보냈다). 날짜 문자열의 요일은 UTC 자정으로 읽는다.
+
+`tests/day.test.mjs`가 고정한다.
+
 ## 데이터 모델 주의사항
 
 스키마는 `execution/sql/supabase_schema.sql`.

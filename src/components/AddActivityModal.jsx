@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
+import { todayYmd } from '../utils/day'
 import { useData } from '../contexts/DataContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import useEnterMove from '../hooks/useEnterMove'
@@ -19,7 +20,7 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   const [formData, setFormData] = useState({
     clientId: '',
     type: '미팅',
-    activity_date: new Date().toISOString().split('T')[0],
+    activity_date: todayYmd(),
     activity_time: '',
     user: '',
     description: '',
@@ -65,7 +66,7 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
       setFormData({
         clientId: '',
         type: '미팅',
-        activity_date: new Date().toISOString().split('T')[0],
+        activity_date: todayYmd(),
         activity_time: '',
         user: '',
         description: '',

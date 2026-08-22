@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { MapPin, Filter, RefreshCw, Calendar, Navigation, Loader, X } from 'lucide-react'
 import { showSuccess, showError } from '../utils/alert'
 import { loadKakaoMaps, geocodeAddress, kakaoKey } from '../utils/kakaoMap'
+import { todayYmd } from '../utils/day'
 
 /**
  * 거래처 지도 — 카카오
@@ -47,7 +48,7 @@ const Map = () => {
             if (error) throw error
 
             // 앞으로의 약속(다음 조치일)을 거래처에 붙인다 — 지도에서 바로 보이게
-            const today = new Date().toISOString().split('T')[0]
+            const today = todayYmd()
             const { data: acts } = await supabase
                 .from('activities')
                 .select('client_id, next_action_date, next_action_detail')

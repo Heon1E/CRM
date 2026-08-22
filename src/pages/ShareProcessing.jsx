@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useData } from '../contexts/DataContext'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { todayYmd, ymd } from '../utils/day'
 
 /**
  * 공유된 통화 녹음 파일 처리 페이지
@@ -46,7 +47,7 @@ const ShareProcessing = () => {
       setMessage('통화 기록을 저장하는 중...')
 
       // 3. 활동 내역에 저장
-      const today = new Date().toISOString().split('T')[0]
+      const today = todayYmd()
       const activityData = {
         type: result.data.type || '전화',
         activity_date: result.data.date || today,
@@ -162,7 +163,7 @@ const ShareProcessing = () => {
       
       const fileName = audioData.fileName || '통화 녹음.m4a'
       const title = audioData.title || '통화 녹음'
-      const timestamp = new Date(audioData.timestamp).toISOString().split('T')[0]
+      const timestamp = ymd(new Date(audioData.timestamp))
       
       // 파일명에서 거래처명, 날짜 등 추출 시도
       const clientNameMatch = fileName.match(/([가-힣A-Za-z]+(?:사|기업|회사|코퍼레이션|Corp|Inc|Ltd))?/i)
@@ -183,7 +184,7 @@ const ShareProcessing = () => {
 이 통화 녹음 파일(안드로이드 갤럭시 통화 녹음)의 메타데이터를 기반으로 다음 정보를 추출해주세요:
 
 1. **거래처명** (파일명에서 추출한 회사명 또는 담당자명, 없으면 빈 문자열)
-2. **통화 날짜** (추출된 날짜가 있으면 사용, 없으면 오늘 날짜: ${new Date().toISOString().split('T')[0]})
+2. **통화 날짜** (추출된 날짜가 있으면 사용, 없으면 오늘 날짜: ${todayYmd()})
 3. **핵심 내용** (주문/미팅/컴플레인/일반 문의 중 하나로 분류, 파일명/제목에서 유추)
 4. **요약** (파일명과 제목을 바탕으로 추론한 통화 내용 요약, 3-5줄)
 
@@ -246,7 +247,7 @@ const ShareProcessing = () => {
       }
 
       // 안전한 구조로 정규화
-      const today = new Date().toISOString().split('T')[0]
+      const today = todayYmd()
       return {
         success: true,
         data: {
@@ -260,7 +261,7 @@ const ShareProcessing = () => {
     } catch (error) {
       console.error('[ShareProcessing] Gemini API 오류:', error)
       // 에러 발생 시 기본값 반환
-      const today = new Date().toISOString().split('T')[0]
+      const today = todayYmd()
       return {
         success: true, // 기본값으로 저장하도록 허용
         data: {

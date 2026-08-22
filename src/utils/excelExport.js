@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { formatCurrency } from './formatters'
+import { todayYmd } from './day'
 
 export const exportClientsToExcel = (clients) => {
   const data = clients.map((client) => ({
@@ -16,7 +17,7 @@ export const exportClientsToExcel = (clients) => {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '고객 목록')
 
-  const fileName = `고객목록_${new Date().toISOString().split('T')[0]}.xlsx`
+  const fileName = `고객목록_${todayYmd()}.xlsx`
   XLSX.writeFile(wb, fileName)
 }
 
@@ -34,7 +35,7 @@ export const exportActivitiesToExcel = (activities) => {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '영업 활동')
 
-  const fileName = `영업활동_${new Date().toISOString().split('T')[0]}.xlsx`
+  const fileName = `영업활동_${todayYmd()}.xlsx`
   XLSX.writeFile(wb, fileName)
 }
 
@@ -52,7 +53,7 @@ export const exportSalesToExcel = (sales) => {
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '매출 목록')
 
-  const fileName = `매출목록_${new Date().toISOString().split('T')[0]}.xlsx`
+  const fileName = `매출목록_${todayYmd()}.xlsx`
   XLSX.writeFile(wb, fileName)
 }
 
@@ -77,7 +78,7 @@ export const downloadProductTemplate = () => {
     { wch: 20 }, // 규격
   ]
 
-  const fileName = `제품등록양식_${new Date().toISOString().split('T')[0]}.xlsx`
+  const fileName = `제품등록양식_${todayYmd()}.xlsx`
   XLSX.writeFile(wb, fileName)
 }
 

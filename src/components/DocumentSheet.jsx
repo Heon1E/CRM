@@ -1,4 +1,5 @@
 import React from 'react'
+import { addDays } from '../utils/day'
 
 /**
  * 견적서 / 발주서 인쇄용 A4 문서
@@ -124,9 +125,9 @@ const Empty = ({ cols }) => (
 export const QuoteSheet = ({ quote, items = [], company = {} }) => {
     const validUntil = (() => {
         if (!quote.quote_date) return ''
-        const d = new Date(`${String(quote.quote_date).slice(0, 10)}T00:00:00`)
-        d.setDate(d.getDate() + (Number(quote.valid_days) || 30))
-        return dateK(d.toISOString().slice(0, 10))
+        // `toISOString()`은 UTC라 로컬 자정에서 읽으면 하루 짧아진다.
+        // 실제로 '2026-08-22 + 30일'이 2026-09-20으로 인쇄되고 있었다.
+        return dateK(addDays(quote.quote_date, Number(quote.valid_days) || 30))
     })()
 
     return (

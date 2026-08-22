@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
+import { todayYmd } from '../utils/day'
 import { useData } from '../contexts/DataContext'
 import { Plus, X } from 'lucide-react'
 import ClientCombobox from './ClientCombobox'
@@ -15,7 +16,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
   // 상태 단순화: DB 컬럼명과 일치하는 키만 사용
   const [formData, setFormData] = useState({
     clientId: '',
-    sale_date: new Date().toISOString().split('T')[0],
+    sale_date: todayYmd(),
     items: [{
       productId: '',
       item_name: '',  // DB 컬럼명과 일치
@@ -250,7 +251,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
     if (!isOpen) {
       setFormData({
         clientId: '',
-        sale_date: new Date().toISOString().split('T')[0],
+        sale_date: todayYmd(),
         items: [{ productId: '', item_name: '', quantity: 1, unitPrice: 0 }],
         notes: '',
       })
@@ -352,7 +353,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
       // 폼 초기화
       setFormData({
         clientId: '',
-        sale_date: new Date().toISOString().split('T')[0],
+        sale_date: todayYmd(),
         items: [{ productId: '', item_name: '', quantity: 1, unitPrice: 0 }],
         notes: '',
       })

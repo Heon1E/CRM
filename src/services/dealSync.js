@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { addDays } from '../utils/day'
 
 /**
  * 견적서 ↔ 영업 기회 잇기
@@ -71,9 +72,10 @@ export const syncQuoteToDeal = async (quote) => {
             title: `견적 ${quote.quote_no}`,
             stage: target,
             amount,
+            // 날짜 더하기는 `addDays` 하나로 한다. 여기 방식(UTC끼리)도 결과는
+            // 맞지만, 자리마다 다르게 쓰면 '이건 괜찮은가'를 매번 따져야 한다.
             expected_close: quote.quote_date
-                ? new Date(new Date(quote.quote_date).getTime() + (Number(quote.valid_days) || 30) * 86400000)
-                    .toISOString().slice(0, 10)
+                ? addDays(quote.quote_date, Number(quote.valid_days) || 30) || null
                 : null,
             owner: quote.sales_rep || null,
             quote_id: quote.id,
