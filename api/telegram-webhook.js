@@ -444,6 +444,51 @@ const nextBusinessDay = (ymd) => {
     return null
 }
 
+/*
+ * 통화에서 알아낸 상대방을 **거래처 담당자로 남긴다.**
+ *
+ * 예전에는 활동 내용 안에 "[담당자] 박경록"으로만 적혔다. 그러면 거래처 카드와
+ * 브리핑에는 연락처가 여전히 비어 있어, 만나러 가면서 '누구를 찾아야 하지'를
+ * 활동 메모에서 다시 뒤져야 한다 — `extract_contacts.mjs`가 과거분을 훑어
+ * 채워야 했던 것도 같은 이유다. 이제 들어올 때 바로 넣는다.
+ *
+ * **전화번호는 못 얻는다.** 통화 내용에 자기 번호를 부르는 사람은 없다.
+ * 이름·직급만 채우고 번호는 명함이나 연락처 가져오기로 채운다.
+ *
+ * 조심할 것:
+ *  - 이미 같은 이름이 있으면 만들지 않는다 (손으로 넣은 쪽이 더 정확하다).
+ *  - 거래처당 대표는 하나라는 유니크 제약이 있다. **그 거래처에 아무도 없을
+ *    때만** 대표로 세운다 — 이미 있는 대표와 부딪히면 통째로 실패한다.
+ *  - 실패해도 활동 등록을 막지 않는다. 부수적인 일이 본업을 막으면 안 된다.
+ */
+const TITLE_TAIL = /\s*(사장|대표이사|대표|부사장|전무|상무|이사|본부장|실장|공장장|소장|팀장|부장|차장|과장|대리|주임|사원|기사|책임|수석|님)$/
+
+async function saveContact(clientId, rawPerson) {
+    const raw = String(rawPerson || '').trim().replace(/님$/, '')
+    if (!raw || raw.length < 2 || raw.length > 20) return
+    const m = raw.match(TITLE_TAIL)
+    const role = m ? m[1] : null
+    const stripped = (m ? raw.slice(0, m.index) : raw).trim()
+    /*
+     * 직급을 떼고 두 글자가 안 남으면 **떼지 않는다.** '김부장'이 그렇다 —
+     * 성만 들린 흔한 경우인데, '김'만 남기면 아무 쓸모가 없다. 부르던 대로
+     * 두는 편이 나중에 알아보기 쉽다. (`김진만 주임 이천공장`처럼 끝말이
+     * 직급이 아닌 것을 떼지 않는 것과 같은 판단이다.)
+     */
+    const name = stripped.length >= 2 ? stripped : raw
+    if (name.length < 2) return
+
+    const dup = await sb(`client_contacts?select=id&client_id=eq.${clientId}` +
+        `&name=eq.${encodeURIComponent(name)}&limit=1`)
+    if (dup.length) return
+
+    const any = await sb(`client_contacts?select=id&client_id=eq.${clientId}&limit=1`)
+    await sb('client_contacts', {
+        method: 'POST', prefer: 'return=minimal',
+        body: [{ client_id: clientId, name, department_role: role, is_primary: any.length === 0 }]
+    })
+}
+
 async function applyActivities(items, clientMap, repName = null) {
     const saved = [], skipped = [], unmatched = [], created = [], assumed = []
     for (const it of items) {
@@ -498,6 +543,11 @@ async function applyActivities(items, clientMap, repName = null) {
                     method: 'PATCH', prefer: 'return=minimal', body: { sales_rep: repName }
                 })
             } catch (e) { console.warn('[telegram] 담당 자동 지정 실패', e.message) }
+        }
+        // 통화에서 알아낸 상대방을 담당자로 남긴다 (실패해도 활동은 이미 들어갔다)
+        if (it.person) {
+            try { await saveContact(c.id, it.person) }
+            catch (e) { console.warn('[telegram] 담당자 저장 실패', e.message) }
         }
         saved.push(c.company)
     }
