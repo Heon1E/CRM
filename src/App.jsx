@@ -7,6 +7,7 @@ import { DataProvider } from './contexts/DataContext'
 import { BackgroundTaskProvider } from './contexts/BackgroundTaskContext'
 import { I18nProvider } from './contexts/I18nContext'
 import PageLoading from './components/PageLoading'
+import RouteTransition from './components/RouteTransition'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 
@@ -111,6 +112,8 @@ const ProtectedRoutes = () => {
       <Layout>
         {/* 화면 묶음이 도착할 때까지 자리를 지킨다 */}
         <Suspense fallback={<PageLoading />}>
+        {/* 앞으로 가면 오른쪽에서, 뒤로 가면 왼쪽에서 들어온다 */}
+        <RouteTransition>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/clients" element={<Clients />} />
@@ -130,6 +133,7 @@ const ProtectedRoutes = () => {
           <Route path="/share-processing" element={<ShareProcessing />} />
           <Route path="/my-accounts" element={<MyAccounts />} />
         </Routes>
+        </RouteTransition>
         </Suspense>
       </Layout>
     </ErrorBoundary>

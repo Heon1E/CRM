@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import Modal from '../components/Modal'
 import PageLoading from '../components/PageLoading'
 import PullToRefresh from '../components/PullToRefresh'
+import RouteTransition from '../components/RouteTransition'
 
 /**
  * 모션 확인 화면 — **개발 중에만 존재한다** (`/__motion`)
@@ -31,6 +32,7 @@ const MotionLab = () => {
     const [modal, setModal] = useState(null)   // null | 'sm' | 'md' | 'lg'
     const [saving, setSaving] = useState('idle')
     const [skeleton, setSkeleton] = useState(true)
+    const [nav, setNav] = useState({ back: false, seq: 0 })
 
     const fakeSave = () => {
         setSaving('saving')
@@ -90,6 +92,22 @@ const MotionLab = () => {
                             ))}
                         </div>
                     )}
+                </Swatch>
+
+                <Swatch label="화면 전환 방향" hint="앞으로=오른쪽에서 / 뒤로=왼쪽에서">
+                    <div className="flex gap-2 mb-3">
+                        <button onClick={() => setNav((n) => ({ back: false, seq: n.seq + 1 }))}
+                            className="px-4 py-2 rounded bg-oem-blue text-white text-sm font-semibold">앞으로</button>
+                        <button onClick={() => setNav((n) => ({ back: true, seq: n.seq + 1 }))}
+                            className="px-4 py-2 rounded border border-oem-border text-sm">뒤로</button>
+                    </div>
+                    <div className="border border-oem-border rounded overflow-hidden">
+                        <RouteTransition key={nav.seq} forceBack={nav.back}>
+                            <div className="p-6 bg-white text-sm">
+                                {nav.back ? '왼쪽에서 들어왔다 (뒤로)' : '오른쪽에서 들어왔다 (앞으로)'}
+                            </div>
+                        </RouteTransition>
+                    </div>
                 </Swatch>
 
                 <Swatch label="화면 전환 중(PageLoading)" hint="실제 화면이 쓰는 그 컴포넌트다">
