@@ -103,7 +103,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-            TITLE <span className="text-[color:var(--danger)]">*</span>
+            제목 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="text"
@@ -112,20 +112,20 @@ const AddIssueModal = ({ isOpen, onClose }) => {
             className="oem-input w-full"
             required
             maxLength={200}
-            placeholder="Issue Title"
+            placeholder="무엇이 문제인지 한 줄로"
           />
         </div>
 
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-            CONTENT
+            내용
           </label>
           <textarea
             value={formData.content}
             onChange={handleContentChange}
             rows={6}
             className="oem-input w-full resize-none"
-            placeholder="Describe the issue..."
+            placeholder="자세한 내용"
             maxLength={1000}
           />
           <div className="mt-1 text-right text-[10px] text-gray-500 font-mono">
@@ -136,7 +136,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-              TARGET DATE
+              목표일
             </label>
             <input
               type="date"
@@ -148,7 +148,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
 
           <div>
             <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-              STATUS <span className="text-[color:var(--danger)]">*</span>
+              상태 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}

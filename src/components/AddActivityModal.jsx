@@ -313,7 +313,7 @@ ${currentText}`
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="oem-label">
-            CLIENT <span className="text-[color:var(--danger)]">*</span>
+            거래처 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -331,7 +331,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="oem-label">
-              ACTIVITY TYPE <span className="text-[color:var(--danger)]">*</span>
+              활동 유형 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.type}
@@ -350,7 +350,7 @@ ${currentText}`
 
           <div>
             <label className="oem-label">
-              STATUS <span className="text-[color:var(--danger)]">*</span>
+              상태 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
@@ -367,7 +367,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="oem-label">
-              DATE <span className="text-[color:var(--danger)]">*</span>
+              날짜 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
               type="date"
@@ -379,14 +379,14 @@ ${currentText}`
           </div>
           <div>
             <label className="oem-label">
-              TIME
+              시각
             </label>
             <input
               type="time"
               value={formData.activity_time}
               onChange={(e) => setFormData({ ...formData, activity_time: e.target.value })}
               className="oem-input"
-              placeholder="e.g. 14:00"
+              placeholder="예: 14:00"
             />
           </div>
         </div>
@@ -395,7 +395,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="oem-label">
-              Target Date
+              다음 조치일
             </label>
             <input
               type="date"
@@ -406,14 +406,14 @@ ${currentText}`
           </div>
           <div>
             <label className="oem-label">
-              Action Detail
+              다음에 할 일
             </label>
             <input
               type="text"
               value={formData.next_action_detail}
               onChange={(e) => setFormData({ ...formData, next_action_detail: e.target.value })}
               className="oem-input"
-              placeholder="e.g. Send Quotation"
+              placeholder="예: 견적서 보내기"
             />
           </div>
         </div>
@@ -421,7 +421,7 @@ ${currentText}`
         {/* 참석자 입력 섹션 */}
         <div>
           <label className="oem-label">
-            ATTENDEES
+            참석자
           </label>
           <div className="flex gap-2 mb-2">
             <input
@@ -431,7 +431,7 @@ ${currentText}`
               onChange={(e) => setAttendeeInput(e.target.value)}
               onKeyDown={handleAttendeeKeyDown}
               className="flex-1 oem-input"
-              placeholder="Type name and press Enter..."
+              placeholder="이름을 넣고 Enter"
             />
             <button
               type="button"
@@ -467,7 +467,7 @@ ${currentText}`
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="oem-label">
-              DESCRIPTION <span className="text-[color:var(--danger)]">*</span>
+              내용 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <button
               type="button"
@@ -493,7 +493,7 @@ ${currentText}`
             onChange={handleDescriptionChange}
             rows={6}
             className="oem-input"
-            placeholder="Enter activity details..."
+            placeholder="무엇을 하고 왔는지 적습니다"
             required
             disabled={isAILoading}
           />
@@ -501,14 +501,19 @@ ${currentText}`
         </div>
 
         {/* 이슈 등록 체크박스 */}
-        <div className="flex items-center space-x-2 p-3 bg-gray-50 border border-oem-border rounded-sm">
-          <input
-            type="checkbox"
-            id="registerAsIssue"
-            checked={registerAsIssue}
-            onChange={(e) => setRegisterAsIssue(e.target.checked)}
-            className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-oem-blue cursor-pointer"
-          />
+        <div className="flex items-center gap-1 p-3 bg-gray-50 border border-oem-border rounded-sm">
+          {/* 네이티브 체크박스는 `padding`을 무시한다(Chrome). 누르는 자리는
+              감싼 라벨(`.tap-box`, 44x44)로 넓힌다 — 폰에서 22px짜리 네모를
+              손가락으로 맞추기 어렵다. */}
+          <label htmlFor="registerAsIssue" className="tap-box" aria-label="이슈로 등록">
+            <input
+              type="checkbox"
+              id="registerAsIssue"
+              checked={registerAsIssue}
+              onChange={(e) => setRegisterAsIssue(e.target.checked)}
+              className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-oem-blue cursor-pointer"
+            />
+          </label>
           <label htmlFor="registerAsIssue" className="text-sm font-bold text-oem-text-primary cursor-pointer">
             이슈로도 등록
           </label>
@@ -530,9 +535,7 @@ ${currentText}`
             type="button"
             onClick={onClose}
             className="oem-btn-secondary"
-          >
-            Cancel
-          </button>
+          >취소</button>
           <button
             type="submit"
             className="oem-btn-primary"

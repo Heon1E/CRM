@@ -492,7 +492,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={2}
             className="oracle-sunken px-2 py-1 bg-white resize-none"
-            placeholder="System notes..."
+            placeholder="메모 (선택)"
           />
         </div>
 

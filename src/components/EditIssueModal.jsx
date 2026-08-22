@@ -198,7 +198,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
 
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-            CONTENT
+            내용
           </label>
           <textarea
             value={formData.content}
@@ -216,7 +216,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-              TARGET DATE
+              목표일
             </label>
             <input
               type="date"

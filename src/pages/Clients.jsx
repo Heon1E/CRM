@@ -373,9 +373,7 @@ const Clients = () => {
           <button
             onClick={() => setSelectedIds(new Set())}
             className="text-slate-500 hover:text-white text-xs ml-2"
-          >
-            Cancel
-          </button>
+          >취소</button>
         </div>
       )}
 

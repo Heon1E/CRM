@@ -255,7 +255,7 @@ ${currentText}`
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-oem-text-primary">
         <div>
           <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-            CLIENT <span className="text-[color:var(--danger)]">*</span>
+            거래처 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -265,7 +265,7 @@ ${currentText}`
                 setFormData({ ...formData, clientId })
               }
             }}
-            placeholder="Search Client..."
+            placeholder="거래처를 검색하세요..."
             disabled={false}
           />
         </div>
@@ -273,7 +273,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-              ACTIVITY TYPE <span className="text-[color:var(--danger)]">*</span>
+              활동 유형 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.type}
@@ -292,7 +292,7 @@ ${currentText}`
 
           <div>
             <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-              STATUS <span className="text-[color:var(--danger)]">*</span>
+              상태 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
@@ -308,7 +308,7 @@ ${currentText}`
 
         <div>
           <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-            DATE <span className="text-[color:var(--danger)]">*</span>
+            날짜 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="date"
@@ -346,7 +346,7 @@ ${currentText}`
                 value={formData.next_action_detail}
                 onChange={(e) => setFormData({ ...formData, next_action_detail: e.target.value })}
                 className="w-full px-2 py-1.5 border border-oem-border rounded-sm text-sm focus:border-oem-blue outline-none"
-                placeholder="e.g. Send Quotation"
+                placeholder="예: 견적서 보내기"
               />
             </div>
           </div>
@@ -365,7 +365,7 @@ ${currentText}`
               onChange={(e) => setAttendeeInput(e.target.value)}
               onKeyDown={handleAttendeeKeyDown}
               className="flex-1 px-3 py-2 border border-oem-border rounded-sm focus:border-oem-blue focus:ring-1 focus:ring-oem-blue outline-none text-sm placeholder-gray-300"
-              placeholder="Type name and press Enter..."
+              placeholder="이름을 넣고 Enter"
             />
             <button
               type="button"
@@ -401,7 +401,7 @@ ${currentText}`
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="block text-xs font-bold text-oem-text-secondary uppercase">
-              DESCRIPTION <span className="text-[color:var(--danger)]">*</span>
+              내용 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <button
               type="button"
@@ -427,7 +427,7 @@ ${currentText}`
             onChange={handleDescriptionChange}
             rows={6}
             className="w-full px-3 py-2.5 border border-oem-border rounded-sm focus:border-oem-blue focus:ring-1 focus:ring-oem-blue outline-none text-sm leading-relaxed resize-none placeholder-gray-300"
-            placeholder="Enter activity details..."
+            placeholder="무엇을 하고 왔는지 적습니다"
             required
             disabled={isAILoading}
           />
