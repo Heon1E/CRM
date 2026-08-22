@@ -956,6 +956,36 @@ localStorage에 `{ clientId: { new?: true, churn?: true } }` 형태로 저장한
 즉시 실패한다. 상태는 `isGeminiAvailable()` / `getGeminiDisabledReason()`으로 확인한다.
 이 래치가 없으면 대시보드를 열 때마다 같은 에러가 콘솔을 수십 줄씩 채운다.
 
+### 브라우저에서 Gemini를 직접 부르지 않는다
+
+`VITE_GEMINI_API_KEY`를 쓰는 자리는 **배포본에서 죽어 있거나 키가 새거나 둘 중 하나**다.
+Vercel에 그 변수가 없으면 `undefined`가 되어 단추가 아무 일도 안 하고(활동 모달의
+'AI 다듬기'가 그랬다 — 배포된 JS에 `AIza` 문자열이 0건이었다), 넣으면 번들에서
+문자열로 그대로 추출된다.
+
+서버 경유가 기준이다 — `api/analyze-erp.js` · `api/client-briefing.js` ·
+**`api/polish-note.js`**. 키는 `GEMINI_API_KEY`(VITE_ 없음).
+텔레그램 봇이 도는 것으로 이 키가 Vercel에 이미 있는 것은 확인했다.
+
+남아 있는 `VITE_GEMINI_API_KEY` 사용처: `ShareProcessing.jsx` · `geminiService.js`.
+같은 이유로 죽어 있다.
+
+### 다듬기는 사실을 바꾼다 — 원문을 덮어쓰지 않는다
+
+`api/polish-note.js`. 실제 응답이다:
+
+```
+입력  오늘 한솔케미칼 김부장 만남. IBC 단가 15만원대 원함. 우리는 16만원.
+출력  IBC 미팅을 15시에 진행. 익일 16시에 추가 미팅이 예정되어 있습니다.
+```
+
+**금액이 시각이 됐고** 거래처명·사람·단가 협상은 통째로 사라졌다. 활동 기록은
+영업 코치·KPI·거래처 브리핑의 근거라, 지어낸 문장은 안 다듬은 원문보다 나쁘다.
+
+단위·이름을 그대로 옮기라는 규칙을 **예시와 함께** 넣어 고쳤다(규칙만으로는 안
+걸렸다). 그래도 완전하지 않으므로 다듬은 결과는 '원문으로' 단추로 한 번에
+되돌린다. **모델이 고친 글을 조용히 덮어쓰지 말 것.**
+
 ## 환경 변수
 
 `.env` / `.env.local` (커밋 금지). Supabase URL/anon key, 카카오 지도 키
