@@ -252,7 +252,7 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-[#0f172a]/90 backdrop-blur-md border-b border-blue-900/50 z-50">
+    <nav className="fixed top-0 left-0 right-0 bg-[#0f172a]/90 backdrop-blur-md border-b border-oem-border/50 z-50">
       <div className="flex items-center justify-between h-14 md:h-16 px-2 md:px-6 relative">
         {/* PC: Logo (왼쪽), 모바일: 숨김 */}
         <div className="hidden md:flex items-center space-x-4 flex-shrink-0">

@@ -148,7 +148,7 @@ const ClientCombobox = ({
                       handleSelect(client)
                     }
                   }}
-                  className={`px-4 py-2 cursor-pointer hover:bg-gray-50 focus:bg-gray-100 focus:outline-none ${selectedClient?.id === client.id ? 'bg-blue-50 text-oem-blue' : 'text-oem-text-primary'
+                  className={`px-4 py-2 cursor-pointer hover:bg-gray-50 focus:bg-gray-100 focus:outline-none ${selectedClient?.id === client.id ? 'bg-oem-grey-light text-oem-blue' : 'text-oem-text-primary'
                     }`}
                 >
                   <div className="flex items-center justify-between">

@@ -105,7 +105,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
           </button>
           <button
             type="submit"
-            className="px-5 py-2.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 font-medium shadow-sm hover:shadow"
+            className="px-5 py-2.5 bg-oem-blue text-white rounded-md hover:bg-oem-blue-dark transition-colors duration-200 font-medium shadow-sm hover:shadow"
           >
             저장
           </button>

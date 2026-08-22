@@ -298,23 +298,23 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
             </div>
 
             {/* Sales Briefing (Top Section) */}
-            <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-indigo-100 relative overflow-hidden">
+            <div className="mb-6 bg-white p-4 rounded-lg shadow-sm border border-oem-border relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-5">
-                    <TrendingUp className="w-24 h-24 text-indigo-600" />
+                    <TrendingUp className="w-24 h-24 text-oem-blue" />
                 </div>
-                <h3 className="text-xs font-bold text-indigo-900 flex items-center gap-1 mb-3">
-                    <span className="bg-indigo-600 text-white px-1 rounded">⚡</span> Sales Briefing
+                <h3 className="text-xs font-bold text-oem-blue flex items-center gap-1 mb-3">
+                    <span className="bg-oem-blue text-white px-1 rounded">⚡</span> Sales Briefing
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                     {/* Top Products */}
                     <div>
-                        <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2">선호 제품 (Top 3)</p>
+                        <p className="text-[10px] font-bold text-oem-blue uppercase mb-2">선호 제품 (Top 3)</p>
                         <div className="space-y-2">
                             {topProducts.map((prod, idx) => (
                                 <div key={idx} className="flex justify-between items-center text-xs">
                                     <span className="font-bold text-slate-700">{prod.name}</span>
-                                    <span className="text-indigo-600 font-bold">{formatCurrency(prod.lastPrice)}</span>
+                                    <span className="text-oem-blue font-bold">{formatCurrency(prod.lastPrice)}</span>
                                 </div>
                             ))}
                             {topProducts.length === 0 && <p className="text-xs text-slate-500">데이터 없음</p>}
@@ -322,14 +322,14 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                     </div>
                     {/* Last Activity */}
                     <div>
-                        <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2">최근 활동</p>
+                        <p className="text-[10px] font-bold text-oem-blue uppercase mb-2">최근 활동</p>
                         {lastActivity ? (
-                            <div className="bg-indigo-50/50 p-2 rounded border border-indigo-50">
+                            <div className="bg-oem-grey-light/50 p-2 rounded border border-oem-border">
                                 <div className="flex justify-between items-center mb-1">
-                                    <span className="font-bold text-xs text-indigo-900">{lastActivity.type}</span>
-                                    <span className="text-[10px] text-indigo-400">{new Date(lastActivity.date).toLocaleDateString()}</span>
+                                    <span className="font-bold text-xs text-oem-blue">{lastActivity.type}</span>
+                                    <span className="text-[10px] text-oem-blue">{new Date(lastActivity.date).toLocaleDateString()}</span>
                                 </div>
-                                <p className="text-xs text-indigo-800 line-clamp-2">{lastActivity.description}</p>
+                                <p className="text-xs text-oem-blue line-clamp-2">{lastActivity.description}</p>
                             </div>
                         ) : <p className="text-xs text-slate-500">활동 없음</p>}
                     </div>
@@ -346,7 +346,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                     </div>
                 </div>
                 <div className="bg-white p-3 rounded border border-slate-200 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-blue-50 flex items-center justify-center text-blue-600"><Mail className="w-4 h-4" /></div>
+                    <div className="w-8 h-8 rounded bg-oem-grey-light flex items-center justify-center text-oem-blue"><Mail className="w-4 h-4" /></div>
                     <div className="overflow-hidden">
                         <p className="text-[10px] text-slate-500 uppercase font-bold">Email</p>
                         <p className="text-sm font-bold text-slate-700 truncate">{primaryContact.email || '-'}</p>

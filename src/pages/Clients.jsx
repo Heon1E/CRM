@@ -607,7 +607,7 @@ const Clients = () => {
                         return (
                           <tr
                             key={company}
-                            className={`group cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-l-4 border-l-oem-blue' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
+                            className={`group cursor-pointer transition-colors ${isSelected ? 'bg-oem-grey-light border-l-4 border-l-oem-blue' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}
                             onClick={() => setSelectedClientId(primaryContact.id)}
                           >
                             <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
@@ -658,10 +658,10 @@ const Clients = () => {
                             <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => setEditingClient(primaryContact)}
-                                className="p-1.5 hover:bg-blue-50 rounded-md transition-colors group/btn"
+                                className="p-1.5 hover:bg-oem-grey-light rounded-md transition-colors group/btn"
                                 title="Edit Client"
                               >
-                                <Edit className="w-4 h-4 text-slate-500 group-hover/btn:text-blue-600" />
+                                <Edit className="w-4 h-4 text-slate-500 group-hover/btn:text-oem-blue" />
                               </button>
                             </td>
                           </tr>

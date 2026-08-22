@@ -120,7 +120,7 @@ const ClientMonthSalesModal = ({ isOpen, onClose, client, salesData, currentMont
                                     </tr>
                                 ) : (
                                     thisMonthItems.map((item, idx) => (
-                                        <tr key={item.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                                        <tr key={item.id || idx} className="hover:bg-oem-grey-light/30 transition-colors">
                                             <td className="px-4 py-3 font-medium text-gray-900">{item.itemName}</td>
                                             <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
                                             <td className="px-4 py-3 text-right font-medium text-gray-800">{formatNumber(item.quantity)}</td>

@@ -96,7 +96,7 @@ const NotificationPermissionPrompt = () => {
     >
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center space-x-3 flex-1">
-          <Bell className="w-5 h-5 md:w-6 md:h-6 text-blue-600 flex-shrink-0" />
+          <Bell className="w-5 h-5 md:w-6 md:h-6 text-oem-blue flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm md:text-base font-medium text-slate-800">
               푸시 알림을 활성화하여 백업 완료 등의 중요 알림을 받아보세요.
@@ -109,7 +109,7 @@ const NotificationPermissionPrompt = () => {
         <div className="flex items-center space-x-2 ml-4">
           <button
             onClick={handleRequestPermission}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors font-medium text-sm md:text-base touch-manipulation min-h-[44px]"
+            className="px-4 py-2 bg-oem-blue text-white rounded-lg hover:bg-oem-blue-dark transition-colors font-medium text-sm md:text-base touch-manipulation min-h-[44px]"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             허용하기

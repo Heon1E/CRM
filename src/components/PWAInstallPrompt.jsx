@@ -175,7 +175,7 @@ const PWAInstallPrompt = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3 flex-1 min-w-0">
-            <Download className="w-5 h-5 flex-shrink-0 text-blue-600" />
+            <Download className="w-5 h-5 flex-shrink-0 text-oem-blue" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
                 더 편리한 사용을 위해 앱을 설치하세요
@@ -188,7 +188,7 @@ const PWAInstallPrompt = () => {
           <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
             <button
               onClick={handleInstallClick}
-              className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-all duration-200 font-semibold text-xs sm:text-sm flex items-center space-x-1"
+              className="px-3 sm:px-4 py-2 bg-oem-blue text-white rounded-lg hover:bg-oem-blue-dark transition-all duration-200 font-semibold text-xs sm:text-sm flex items-center space-x-1"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">설치하기</span>

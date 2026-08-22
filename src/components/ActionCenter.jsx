@@ -92,10 +92,10 @@ const ActionCenter = () => {
                 {hotDeals.length > 0 ? (
                     <div className="bg-white border border-oem-border rounded-oem p-5 shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-3 opacity-5">
-                            <UserPlus className="w-16 h-16 text-blue-500" />
+                            <UserPlus className="w-16 h-16 text-oem-blue" />
                         </div>
                         <div className="flex items-center gap-2 mb-4">
-                            <div className="p-1.5 bg-blue-100 text-blue-600 rounded-full">
+                            <div className="p-1.5 bg-oem-grey-light text-oem-blue rounded-full">
                                 <ArrowRight className="w-4 h-4" />
                             </div>
                             <div>
@@ -105,12 +105,12 @@ const ActionCenter = () => {
                         </div>
                         <div className="space-y-3 relative z-10">
                             {hotDeals.map(client => (
-                                <div key={client.id} className="flex items-center justify-between bg-blue-50/50 p-2 rounded border border-blue-100/50">
+                                <div key={client.id} className="flex items-center justify-between bg-oem-grey-light/50 p-2 rounded border border-oem-border/50">
                                     <div>
                                         <p className="text-xs font-bold text-slate-700">{client.company}</p>
-                                        <p className="text-[10px] text-slate-500">{client.contact_person} · <span className="text-blue-600 font-bold">{client.status}</span></p>
+                                        <p className="text-[10px] text-slate-500">{client.contact_person} · <span className="text-oem-blue font-bold">{client.status}</span></p>
                                     </div>
-                                    <Link to={`/clients/${client.id}`} className="text-[11px] font-bold text-blue-600 hover:underline">
+                                    <Link to={`/clients/${client.id}`} className="text-[11px] font-bold text-oem-blue hover:underline">
                                         View Deal →
                                     </Link>
                                 </div>

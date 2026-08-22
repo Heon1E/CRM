@@ -90,7 +90,7 @@ const TopClientsView = ({ data, stats, advice }) => {
                                     <div>
                                         <Link
                                             to={`/clients/${client.id}`}
-                                            className="font-semibold text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                                            className="font-semibold text-sm text-oem-blue hover:text-oem-blue-dark hover:underline"
                                         >
                                             {client.company}
                                         </Link>

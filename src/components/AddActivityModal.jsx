@@ -435,10 +435,10 @@ ${currentText}`
             <button
               type="button"
               onClick={handleAddAttendee}
-              className="px-3 py-1.5 bg-oem-blue text-white border border-oem-blue rounded-sm hover:bg-blue-700 hover:border-blue-700 transition-all duration-200 flex items-center justify-center space-x-1 h-[34px]"
+              className="px-3 py-1.5 bg-oem-blue text-white border border-oem-blue rounded-sm hover:bg-oem-blue-dark hover:border-oem-blue transition-all duration-200 flex items-center justify-center space-x-1 h-[34px]"
             >
               <Plus className="w-3 h-3" />
-              <span>Add</span>
+              <span>추가</span>
             </button>
           </div>
           {/* 참석자 태그 표시 */}
@@ -447,13 +447,13 @@ ${currentText}`
               {attendees.map((name, index) => (
                 <div
                   key={index}
-                  className="inline-flex items-center space-x-1 px-2 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-sm text-xs font-bold"
+                  className="inline-flex items-center space-x-1 px-2 py-1 bg-oem-grey-light text-oem-blue border border-oem-border rounded-sm text-xs font-bold"
                 >
                   <span>{name}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveAttendee(index)}
-                    className="ml-1 hover:bg-purple-200 rounded-full p-0.5 transition-colors"
+                    className="ml-1 hover:bg-oem-grey-light rounded-full p-0.5 transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -517,7 +517,7 @@ ${currentText}`
         </div>
 
         {registerAsIssue && (
-          <div className="p-3 bg-blue-50 border border-blue-100 rounded-sm">
+          <div className="p-3 bg-oem-grey-light border border-oem-border rounded-sm">
             <p className="text-xs text-oem-blue font-medium">
               💡 This activity will be copied to the Issue Tracker with the same title and description.
             </p>

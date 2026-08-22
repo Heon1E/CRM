@@ -263,7 +263,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
               <button
                 type="button"
                 onClick={handleAddressSearch}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-oem-blue text-white rounded-lg hover:bg-oem-blue-dark transition-colors text-sm font-medium"
               >
                 주소 검색
               </button>
@@ -292,7 +292,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
             <button
               type="button"
               onClick={handleAddContact}
-              className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+              className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-oem-grey-light text-oem-blue hover:bg-oem-grey-light rounded-md transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>담당자 추가</span>
@@ -320,9 +320,9 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
                       type="checkbox"
                       checked={contact.is_primary || false}
                       onChange={(e) => handleContactChange(index, 'is_primary', e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-indigo-500"
                     />
-                    <span className="text-xs font-medium text-indigo-600">Key-man (주요 연락처)</span>
+                    <span className="text-xs font-medium text-oem-blue">Key-man (주요 연락처)</span>
                   </label>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -396,13 +396,13 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
             onClick={onClose}
             className="btn-secondary px-4 py-2.5 font-medium"
           >
-            Cancel
+            취소
           </button>
           <button
             type="submit"
-            className="btn px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 font-medium"
+            className="btn px-4 py-2.5 bg-oem-blue text-white hover:bg-oem-blue-dark font-medium"
           >
-            Save
+            저장
           </button>
         </div>
       </form>

@@ -52,7 +52,7 @@ const MetricCard = ({
           <p className="text-[11px] md:text-xs font-semibold text-slate-500 uppercase tracking-[0.15em]">
             {title}
           </p>
-          <p className="text-3xl md:text-4xl font-bold tracking-tight break-words text-blue-600">
+          <p className="text-3xl md:text-4xl font-bold tracking-tight break-words text-oem-blue">
             {value}
           </p>
           {trend && trendValue && (

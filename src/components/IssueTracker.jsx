@@ -64,7 +64,7 @@ const IssueTracker = ({ maxItems = null }) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-1.5 py-0.5 rounded-[2px] text-[9px] font-bold border uppercase tracking-tight ${issue.status === '완료' ? 'bg-gray-100 text-gray-500 border-gray-200' :
-                        issue.status === '진행' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                        issue.status === '진행' ? 'bg-oem-grey-light text-oem-blue border-oem-border' :
                           'bg-amber-50 text-amber-700 border-amber-100'
                         }`}>
                         {issue.status}
@@ -87,7 +87,7 @@ const IssueTracker = ({ maxItems = null }) => {
                       e.stopPropagation()
                       setEditingIssueId(issue.id)
                     }}
-                    className="p-1.5 text-gray-500 hover:text-oem-blue hover:bg-blue-50 rounded-sm transition-all"
+                    className="p-1.5 text-gray-500 hover:text-oem-blue hover:bg-oem-grey-light rounded-sm transition-all"
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>

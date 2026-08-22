@@ -92,7 +92,7 @@ const DormantClientsView = ({ data, advice }) => {
                                 <td className="px-4 py-3">
                                     <Link
                                         to={`/clients/${client.id}`}
-                                        className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                                        className="text-sm font-semibold text-oem-blue hover:text-oem-blue-dark hover:underline"
                                     >
                                         {client.company}
                                     </Link>
@@ -105,7 +105,7 @@ const DormantClientsView = ({ data, advice }) => {
                                         {client.phone && (
                                             <a
                                                 href={`tel:${client.phone}`}
-                                                className="text-xs text-gray-600 hover:text-blue-600 flex items-center gap-1"
+                                                className="text-xs text-gray-600 hover:text-oem-blue-dark flex items-center gap-1"
                                             >
                                                 <Phone className="w-3 h-3" />
                                                 {client.phone}
@@ -114,7 +114,7 @@ const DormantClientsView = ({ data, advice }) => {
                                         {client.email && (
                                             <a
                                                 href={`mailto:${client.email}`}
-                                                className="text-xs text-gray-600 hover:text-blue-600 flex items-center gap-1"
+                                                className="text-xs text-gray-600 hover:text-oem-blue-dark flex items-center gap-1"
                                             >
                                                 <Mail className="w-3 h-3" />
                                                 {client.email}
@@ -134,7 +134,7 @@ const DormantClientsView = ({ data, advice }) => {
                                 <td className="px-4 py-3 text-center">
                                     <Link
                                         to={`/clients/${client.id}`}
-                                        className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                                        className="inline-flex items-center gap-1 text-xs text-oem-blue hover:text-oem-blue-dark font-medium"
                                     >
                                         상세보기
                                         <ExternalLink className="w-3 h-3" />

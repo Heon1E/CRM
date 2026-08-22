@@ -25,7 +25,7 @@ const BackgroundTaskIndicator = () => {
       }}
     >
       <div className="flex items-center justify-center space-x-2 max-w-7xl mx-auto">
-        <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-blue-600 animate-spin flex-shrink-0" />
+        <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-oem-blue animate-spin flex-shrink-0" />
         <span className="text-xs md:text-sm font-medium text-slate-800 text-center">
           AI 분석 중... ({activeTasks.length}개 작업)
         </span>

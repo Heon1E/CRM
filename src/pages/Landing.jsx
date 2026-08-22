@@ -23,9 +23,9 @@ const LangToggle = () => {
 
 // ─── Feature Card ─────────────────────────────────────────────────────────────
 const FeatureCard = ({ icon: Icon, title, desc }) => (
-    <div className="group bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-100 transition-all duration-200">
-        <div className="w-11 h-11 bg-blue-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors">
-            <Icon className="w-5 h-5 text-blue-600" />
+    <div className="group bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md hover:border-oem-border transition-all duration-200">
+        <div className="w-11 h-11 bg-oem-grey-light rounded-lg flex items-center justify-center mb-4 group-hover:bg-oem-grey-light transition-colors">
+            <Icon className="w-5 h-5 text-oem-blue-light" />
         </div>
         <h3 className="text-sm font-bold text-gray-900 mb-2">{title}</h3>
         <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
@@ -57,8 +57,8 @@ const Landing = () => {
                     {/* Logo */}
                     <Link to="/landing" className="flex items-center gap-2 min-h-[44px]">
                         <span className="text-xl font-black text-white">아이앤디</span>
-                        <span className="text-xl font-black text-blue-400">CRM</span>
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400 ml-0.5 mt-1"></div>
+                        <span className="text-xl font-black text-oem-blue-light">CRM</span>
+                        <div className="w-1.5 h-1.5 rounded-full bg-oem-blue ml-0.5 mt-1"></div>
                     </Link>
                     {/* Menu */}
                     <div className="hidden md:flex items-center gap-8">
@@ -71,7 +71,7 @@ const Landing = () => {
                         <LangToggle />
                         <Link
                             to="/login"
-                            className="hidden md:inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors min-h-[44px]"
+                            className="hidden md:inline-flex items-center gap-2 bg-oem-blue hover:bg-oem-blue-dark text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors min-h-[44px]"
                         >
                             {t('nav.getStarted')}
                         </Link>
@@ -83,23 +83,25 @@ const Landing = () => {
             <section className="bg-[#0f172a] pt-32 pb-24 px-6 relative overflow-hidden">
                 {/* Glow effect */}
                 <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-blue-600/20 rounded-full blur-3xl"></div>
-                    <div className="absolute top-1/2 left-1/4 w-[300px] h-[200px] bg-indigo-600/10 rounded-full blur-3xl"></div>
+                    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-oem-blue/20 rounded-full blur-3xl"></div>
+                    <div className="absolute top-1/2 left-1/4 w-[300px] h-[200px] bg-oem-blue/10 rounded-full blur-3xl"></div>
                 </div>
                 <div className="max-w-4xl mx-auto text-center relative z-10">
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 bg-blue-600/20 border border-blue-500/30 rounded-full px-4 py-1.5 mb-8">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+                    <div className="inline-flex items-center gap-2 bg-oem-blue/20 border border-oem-blue/30 rounded-full px-4 py-1.5 mb-8">
+                        <span className="w-1.5 h-1.5 rounded-full bg-oem-blue animate-pulse"></span>
                         {/* 'New: AI-Powered Forecasting' 이라고 붙어 있었다.
                             매출 추정은 실제로 있지만 AI가 아니라 규칙 기반 계산이다
                             (revenueForecastEngine). 하는 일 그대로 적는다. */}
-                        <span className="text-blue-300 text-xs font-bold tracking-widest">
+                        <span className="text-oem-blue-light text-xs font-bold tracking-widest">
                             {locale === 'ko' ? '최근 4년 실적으로 연말까지 내다봅니다' : 'Year-end projection from four years of history'}
                         </span>
                     </div>
                     <h1 className="text-5xl md:text-6xl font-black text-white leading-tight mb-6">
                         {t('landing.heroTitle')}<br />
-                        <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                        {/* 앱 전체에서 유일하게 남아 있던 파랑 그러데이션이었다.
+                            브랜드 초록 단색으로 둔다 — 대비가 확실하고 더 단정하다. */}
+                        <span className="text-oem-blue-light">
                             {t('landing.heroTitleHighlight')}
                         </span>
                     </h1>
@@ -109,7 +111,7 @@ const Landing = () => {
                     <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
                         <Link
                             to="/login"
-                            className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5"
+                            className="inline-flex items-center justify-center gap-2 bg-oem-blue hover:bg-oem-blue-dark text-white font-bold px-8 py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5"
                         >
                             {t('landing.ctaPrimary')}
                             <ArrowRight className="w-4 h-4" />
@@ -118,7 +120,7 @@ const Landing = () => {
                             없기 때문이다. 아래 기능 설명으로 내려가게 한다. */}
                         <a href="#features"
                            className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/40 text-white font-bold px-8 py-4 rounded-xl text-base transition-all hover:bg-white/5">
-                            <Play className="w-4 h-4 text-blue-400" />
+                            <Play className="w-4 h-4 text-oem-blue-light" />
                             {t('landing.ctaSecondary')}
                         </a>
                     </div>
@@ -145,8 +147,8 @@ const Landing = () => {
                         <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
                             {[
                                 { label: locale === 'ko' ? '거래처' : 'Clients', color: 'text-emerald-400' },
-                                { label: locale === 'ko' ? '이번 달 매출' : 'Revenue', color: 'text-blue-400' },
-                                { label: locale === 'ko' ? '진행 중 기회' : 'Open deals', color: 'text-purple-400' },
+                                { label: locale === 'ko' ? '이번 달 매출' : 'Revenue', color: 'text-oem-blue-light' },
+                                { label: locale === 'ko' ? '진행 중 기회' : 'Open deals', color: 'text-oem-blue-light' },
                                 { label: locale === 'ko' ? '연체 채권' : 'Overdue', color: 'text-amber-400' },
                             ].map((stat, i) => (
                                 <div key={i} className="bg-white/5 rounded-xl p-4">
@@ -161,7 +163,7 @@ const Landing = () => {
                                     {[40, 65, 50, 80, 60, 90, 75, 95, 70, 85, 92, 88].map((h, i) => (
                                         <div
                                             key={i}
-                                            className="flex-1 bg-blue-500/40 hover:bg-blue-400/60 rounded-t transition-all"
+                                            className="flex-1 bg-oem-blue/40 hover:bg-oem-blue/60 rounded-t transition-all"
                                             style={{ height: `${h}%` }}
                                         ></div>
                                     ))}
@@ -186,7 +188,7 @@ const Landing = () => {
                 <div className="max-w-6xl mx-auto">
                     <div className="text-center mb-16">
                         <h2 className="text-4xl font-black text-gray-900 mb-4">{t('landing.featuresTitle')}</h2>
-                        <div className="w-16 h-1 bg-blue-600 rounded-full mx-auto"></div>
+                        <div className="w-16 h-1 bg-oem-blue rounded-full mx-auto"></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {features.map(({ icon, key }) => (
@@ -210,7 +212,7 @@ const Landing = () => {
             <section id="pricing" className="py-24 px-6 bg-gray-50">
                 <div className="max-w-3xl mx-auto text-center">
                     <h2 className="text-3xl font-black text-gray-900 mb-4">지금은 사내에서 쓰고 있습니다</h2>
-                    <div className="w-16 h-1 bg-blue-600 rounded-full mx-auto mb-8"></div>
+                    <div className="w-16 h-1 bg-oem-blue rounded-full mx-auto mb-8"></div>
                     <p className="text-gray-600 leading-relaxed mb-10">
                         아이앤디 주식회사의 영업 업무에 맞춰 만들었고, 저희가 매일 쓰고 있습니다.<br />
                         밖에 파는 상품이 아니라 요금제가 없습니다. 관심이 있으시면 연락 주세요.
@@ -238,14 +240,14 @@ const Landing = () => {
             {/* ── CTA BANNER ── */}
             <section className="bg-[#0f172a] py-24 px-6 relative overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-blue-600/20 rounded-full blur-3xl"></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-oem-blue/20 rounded-full blur-3xl"></div>
                 </div>
                 <div className="max-w-3xl mx-auto text-center relative z-10">
                     <h2 className="text-4xl font-black text-white mb-4">{t('landing.ctaBannerTitle')}</h2>
                     <p className="text-gray-400 mb-8">{t('landing.ctaBannerSub')}</p>
                     <Link
                         to="/login"
-                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-10 py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5"
+                        className="inline-flex items-center gap-2 bg-oem-blue hover:bg-oem-blue-dark text-white font-bold px-10 py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5"
                     >
                         {t('landing.ctaPrimary')}
                         <ArrowRight className="w-4 h-4" />
@@ -266,7 +268,7 @@ const Landing = () => {
                         <div className="col-span-2">
                             <div className="flex items-center gap-1 mb-4">
                                 <span className="text-lg font-black text-white">아이앤디</span>
-                                <span className="text-lg font-black text-blue-400">CRM</span>
+                                <span className="text-lg font-black text-oem-blue-light">CRM</span>
                             </div>
                             <p className="text-xs text-gray-400 leading-relaxed max-w-xs">
                                 아이앤디 주식회사의 영업관리 도구입니다.<br />

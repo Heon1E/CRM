@@ -107,7 +107,7 @@ const ForgotPassword = () => {
           비밀번호 찾기
         </h2>
         <p className="mt-2 text-center text-sm text-slate-500">
-          <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+          <Link to="/login" className="font-medium text-oem-blue hover:text-oem-blue-dark">
             로그인으로 돌아가기
           </Link>
         </p>

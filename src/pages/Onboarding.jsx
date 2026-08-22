@@ -41,12 +41,12 @@ const StepIndicator = ({ steps, current }) => (
                 <React.Fragment key={step.id}>
                     <div className="flex flex-col items-center">
                         <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${done ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' :
-                                active ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100' :
+                                active ? 'bg-oem-blue text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100' :
                                     'bg-gray-100 text-gray-500'
                             }`}>
                             {done ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                         </div>
-                        <span className={`text-[10px] font-bold mt-1.5 ${active ? 'text-blue-600' : done ? 'text-emerald-600' : 'text-gray-500'}`}>
+                        <span className={`text-[10px] font-bold mt-1.5 ${active ? 'text-oem-blue' : done ? 'text-emerald-600' : 'text-gray-500'}`}>
                             {step.title}
                         </span>
                     </div>
@@ -87,7 +87,7 @@ const Step1 = ({ data, setData, locale }) => {
                             key={ind}
                             onClick={() => setData(d => ({ ...d, industry: ind }))}
                             className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left ${data.industry === ind
-                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                    ? 'border-oem-blue bg-oem-grey-light text-oem-blue'
                                     : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
                                 }`}
                         >
@@ -128,23 +128,23 @@ const Step2 = ({ data, setData, locale }) => {
                         key={size.value}
                         onClick={() => setData(d => ({ ...d, teamSize: size.value }))}
                         className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all ${data.teamSize === size.value
-                                ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                ? 'border-oem-blue bg-oem-grey-light text-oem-blue'
                                 : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                             }`}
                     >
                         <span className="text-sm font-bold">{isEn ? size.label : size.labelKo}</span>
                         {data.teamSize === size.value && (
-                            <CheckCircle className="w-5 h-5 text-blue-500" />
+                            <CheckCircle className="w-5 h-5 text-oem-blue" />
                         )}
                     </button>
                 ))}
             </div>
-            <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
+            <div className="mt-4 p-4 bg-oem-grey-light rounded-xl border border-oem-border">
                 <div className="flex items-center gap-2 mb-1">
-                    <Sparkles className="w-4 h-4 text-blue-600" />
-                    <span className="text-xs font-black text-blue-700">{isEn ? 'AI-Powered Setup' : 'AI 맞춤 설정'}</span>
+                    <Sparkles className="w-4 h-4 text-oem-blue" />
+                    <span className="text-xs font-black text-oem-blue">{isEn ? 'AI-Powered Setup' : 'AI 맞춤 설정'}</span>
                 </div>
-                <p className="text-xs text-blue-600">
+                <p className="text-xs text-oem-blue">
                     {isEn
                         ? 'Based on your team size, we\'ll pre-configure your pipeline stages and KPI targets.'
                         : '팀 규모에 따라 파이프라인 단계와 KPI 목표를 사전 구성해 드립니다.'}
@@ -271,7 +271,7 @@ const Onboarding = () => {
 
             {/* Background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-blue-600/15 rounded-full blur-3xl"></div>
+                <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-oem-blue/15 rounded-full blur-3xl"></div>
             </div>
 
             <div className="w-full max-w-lg relative z-10">
@@ -280,9 +280,12 @@ const Onboarding = () => {
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-1 mb-2">
                         <span className="text-2xl font-black text-white">아이앤디</span>
-                        <span className="text-2xl font-black text-blue-400">CRM</span>
+                        {/* 이 머리 부분은 어두운 그러데이션 위다 — 밝은 쪽 초록과
+                            밝은 회색을 쓴다. 진한 초록은 2.5:1, gray-500은 3.6:1로
+                            둘 다 읽히지 않았다(실측). */}
+                        <span className="text-2xl font-black text-oem-blue-light">CRM</span>
                     </div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-300">
                         {isEn ? `Welcome! Let's set up your workspace in 2 minutes.` : `환영합니다! 2분 안에 워크스페이스를 설정해 드릴게요.`}
                     </p>
                 </div>
@@ -328,7 +331,7 @@ const Onboarding = () => {
                             <button
                                 onClick={() => setStep(s => s + 1)}
                                 disabled={!canNext()}
-                                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-200 disabled:text-gray-500 text-white font-bold px-7 py-3 rounded-xl text-sm transition-all"
+                                className="flex items-center gap-2 bg-oem-blue hover:bg-oem-blue-dark disabled:bg-gray-200 disabled:text-gray-500 text-white font-bold px-7 py-3 rounded-xl text-sm transition-all"
                             >
                                 {isEn ? 'Continue' : '계속'}
                                 <ArrowRight className="w-4 h-4" />
@@ -351,7 +354,7 @@ const Onboarding = () => {
                 {/* Progress dots */}
                 <div className="flex justify-center gap-2 mt-6">
                     {steps.map((s) => (
-                        <div key={s.id} className={`h-1.5 rounded-full transition-all ${s.id === step ? 'w-8 bg-blue-400' : s.id < step ? 'w-3 bg-emerald-400' : 'w-3 bg-white/20'}`} />
+                        <div key={s.id} className={`h-1.5 rounded-full transition-all ${s.id === step ? 'w-8 bg-oem-blue' : s.id < step ? 'w-3 bg-emerald-400' : 'w-3 bg-white/20'}`} />
                     ))}
                 </div>
 

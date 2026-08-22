@@ -187,6 +187,34 @@ const MotionLab = import.meta.env.DEV ? lazy(() => import('./pages/MotionLab')) 
 -> 끝나면 `none`). 페이지 전체가 함께 미끄러지므로 어긋나 보이지는 않지만,
 이 안에서 화면에 붙박아야 하는 것을 만들 때는 기억할 것.
 
+### 강조색은 브랜드 초록 하나다 — 파랑·보라 잔재를 없앴다
+
+`--accent`를 초록으로 바꾼 뒤에도 **Tailwind 기본 팔레트 파랑·보라가 28개 파일에
+139곳** 남아 있었다. `bg-indigo-600`(주소 검색)·`bg-blue-600`(저장)처럼 **가장 자주
+누르는 단추**가 그랬다. 토큰이 아니라 클래스로 박혀 있어 `index.css`를 고쳐도
+안 바뀌는 자리다.
+
+옮긴 규칙:
+
+| 예전 | 지금 |
+|---|---|
+| `bg-{blue,indigo}-{500..800}` | `bg-oem-blue` (hover는 `bg-oem-blue-dark`) |
+| `text-{blue,indigo,purple}-{400..900}` | `text-oem-blue` |
+| `bg-{blue,indigo,purple}-{50,100,200}` | `bg-oem-grey-light` (중립으로 내린다) |
+| `border-*` | `border-oem-blue` / `border-oem-border` |
+
+**어두운 면에는 `oem-blue-light`(#45b97a)를 쓴다.** 브랜드 초록 #007538은 진해서
+랜딩의 `#0f172a` 위에서 2.5:1까지 떨어진다(실측 4곳 실패). 같은 계열로 밝기만
+올린 값이다 — `#0f172a` 위 6.95:1 / `#1e293b` 위 5.90:1.
+
+**그러데이션 배경 위는 자동 검사가 못 잡는다.** `backgroundColor`가 투명이라
+검사기가 흰 배경으로 오인한다. 온보딩의 `text-gray-500`(3.6:1)과 `CRM` 초록
+(2.5:1)이 그렇게 통과한 것처럼 보였다. 어두운 그러데이션을 쓰는 화면
+(`/landing`·`/onboarding`)은 눈으로 한 번 더 볼 것.
+
+일괄 변경 뒤 대비비 실측 — `/` `/clients` `/activities` `/pipeline` `/quotes`
+`/settings` `/receivables` `/pricing` `/landing` **전부 실패 0건**.
+
 ## 디자인 시스템
 
 **`src/index.css`가 단일 기준이다.** `DESIGN.md` 스펙(Indigo Purple `#833CF6`, 8px radius, Inter)을 구현한다.

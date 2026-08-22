@@ -289,7 +289,7 @@ const MyAccounts = () => {
                                 <th className="text-left px-3 py-2.5 text-[11px] font-bold text-gray-500 uppercase w-8">#</th>
                                 <th className="text-left px-3 py-2.5 text-[11px] font-bold text-gray-500 uppercase min-w-[140px]">거래처</th>
                                 <th
-                                    className="text-right px-3 py-2.5 text-[11px] font-bold text-oem-blue uppercase cursor-pointer hover:text-blue-700 select-none"
+                                    className="text-right px-3 py-2.5 text-[11px] font-bold text-oem-blue uppercase cursor-pointer hover:text-oem-blue-dark select-none"
                                     onClick={() => toggleSort('thisMonthSales')}
                                 >
                                     <span className="inline-flex items-center gap-1">금월 매출 <SortIcon field="thisMonthSales" /></span>
@@ -333,7 +333,7 @@ const MyAccounts = () => {
                                 filteredClients.map((client, idx) => (
                                     <tr
                                         key={client.id}
-                                        className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors group"
+                                        className="border-b border-gray-50 hover:bg-oem-grey-light/30 transition-colors group"
                                     >
                                         <td className="px-3 py-2 text-[11px] text-gray-500">{idx + 1}</td>
                                         <td className="px-3 py-2">

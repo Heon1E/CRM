@@ -609,7 +609,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
             </button>
             <button
               type="submit"
-              className="oracle-raised bg-blue-800 text-white px-6 py-1 font-bold hover:bg-blue-700"
+              className="oracle-raised bg-oem-blue text-white px-6 py-1 font-bold hover:bg-oem-blue-dark"
             >
               저장
             </button>

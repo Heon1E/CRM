@@ -33,7 +33,7 @@ const AIInsightModal = ({ advice, stats, onClose }) => {
                                 <ul className="text-left space-y-2">
                                     {advice.actionItems.map((item, idx) => (
                                         <li key={idx} className="flex items-start gap-2">
-                                            <span className="text-blue-600 font-bold">•</span>
+                                            <span className="text-oem-blue font-bold">•</span>
                                             <span className="text-sm text-gray-600">{item}</span>
                                         </li>
                                     ))}
@@ -54,7 +54,7 @@ const AIInsightModal = ({ advice, stats, onClose }) => {
                         <div className="flex items-center gap-2 mb-2">
                             <h2 className="text-xl font-bold text-gray-900">AI Sales Coach</h2>
                             {advice.isAIGenerated && (
-                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-bold border border-purple-200">
+                                <span className="text-xs bg-oem-grey-light text-oem-blue px-2 py-1 rounded-full font-bold border border-oem-border">
                                     AI 분석
                                 </span>
                             )}
@@ -85,7 +85,7 @@ const AIInsightModal = ({ advice, stats, onClose }) => {
                             {advice.actionItems.map((item, idx) => (
                                 <span
                                     key={idx}
-                                    className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium"
+                                    className="text-xs bg-oem-grey-light text-oem-blue px-3 py-1 rounded-full font-medium"
                                 >
                                     {item}
                                 </span>

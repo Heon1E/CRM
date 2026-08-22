@@ -284,8 +284,8 @@ const Map = () => {
                             className="absolute top-3 right-3 z-10 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 border border-gray-200 disabled:opacity-50"
                             title="현재 위치 표시" aria-label="현재 위치로 이동">
                             {locationLoading
-                                ? <Loader className="w-5 h-5 animate-spin text-blue-600" />
-                                : <Navigation className="w-5 h-5 text-blue-600" />}
+                                ? <Loader className="w-5 h-5 animate-spin text-oem-blue" />
+                                : <Navigation className="w-5 h-5 text-oem-blue" />}
                         </button>
 
                         <div ref={mapBoxRef} style={{ width: '100%', height: '100%' }} />

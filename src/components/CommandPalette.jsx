@@ -125,12 +125,12 @@ const CommandPalette = () => {
                             return (
                                 <button
                                     key={item.id}
-                                    className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-colors ${idx === selectedIndex ? 'bg-indigo-50 text-indigo-900' : 'text-slate-700 hover:bg-slate-50'
+                                    className={`w-full flex items-center px-3 py-2.5 rounded-lg text-left transition-colors ${idx === selectedIndex ? 'bg-oem-grey-light text-oem-blue' : 'text-slate-700 hover:bg-slate-50'
                                         }`}
                                     onClick={() => handleSelect(item)}
                                     onMouseEnter={() => setSelectedIndex(idx)}
                                 >
-                                    <div className={`w-8 h-8 rounded-md flex items-center justify-center mr-3 ${idx === selectedIndex ? 'bg-white text-indigo-600 shadow-sm' : 'bg-slate-100 text-slate-500'
+                                    <div className={`w-8 h-8 rounded-md flex items-center justify-center mr-3 ${idx === selectedIndex ? 'bg-white text-oem-blue shadow-sm' : 'bg-slate-100 text-slate-500'
                                         }`}>
                                         <Icon className="w-4 h-4" />
                                     </div>
@@ -139,7 +139,7 @@ const CommandPalette = () => {
                                         {item.sub && <p className="text-xs text-slate-500 truncate">Contact: {item.sub}</p>}
                                     </div>
                                     {idx === selectedIndex && (
-                                        <ArrowRight className="w-4 h-4 text-indigo-400" />
+                                        <ArrowRight className="w-4 h-4 text-oem-blue" />
                                     )}
                                 </button>
                             )
