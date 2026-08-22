@@ -6,6 +6,7 @@ import {
 import { Target, TrendingUp, Users, UserPlus, MapPin, FileWarning } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useI18n } from '../contexts/I18nContext'
+import { useReceivablesKpi } from '../hooks/useReceivablesKpi'
 import { getKpiExclusions, toggleKpiExclusion, isExcludedFrom, KPI_EXCLUSION_KINDS, getKpiManualInputs, setKpiManualInput } from '../utils/kpiCategories'
 
 // ---------------------------------------------------------------------------
@@ -212,6 +213,9 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     const [exclusions, setExclusions] = useState(() => getKpiExclusions())
 
     // 목표 매출·채권관리는 CRM에서 알 수 없어 직접 입력받는다 (목표는 미입력 시 전년 매출)
+    /* 채권 연체 건수는 대장에서 직접 읽는다. 손으로 넣은 값이 있으면 그쪽이 이긴다. */
+    const autoReceivables = useReceivablesKpi()
+
     const [manual, setManual] = useState(() => getKpiManualInputs())
     const updateManual = (field, value) => setManual(setKpiManualInput(field, value))
 
@@ -473,7 +477,19 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             ? Math.round((projectedRevenue / 100_000_000) / revenueTargetEok * 100)
             : null
         const revenueKpiPercent = bandScore(revenueAchievement, KPI_BANDS.revenue)
-        const receivablesPercent = bandScore(manual.receivables, KPI_BANDS.receivables, true)
+        /*
+         * **대장의 연체 건수를 그대로 점수에 넣지 않는다.**
+         * 대장에서 읽으면 36건이 나오는데(2026-05 기준), 기준표 눈금은
+         * 0건 양호 / 1건 보통 / 2건 미흡이다. **둘은 다른 것을 세고 있다** —
+         * 36은 '잔액이 밀린 거래처 수'이고, 눈금이 가리키는 것은 '채권 사고
+         * 건수'로 보인다. 그대로 넣으면 어느 회사든 늘 '미흡'이 된다.
+         *
+         * 그래서 점수는 사람이 넣은 값으로만 매기고, 대장에서 읽은 숫자는
+         * 아래 상세에 **참고로** 보여준다. 어느 쪽을 쓸지는 기준표를 만든
+         * 사람이 정할 일이다.
+         */
+        const receivablesCount = manual.receivables ?? null
+        const receivablesPercent = bandScore(receivablesCount, KPI_BANDS.receivables, true)
 
         return {
             items: [
@@ -545,24 +561,28 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                     // [\ucd94\uac00] \uae30\uc900\ud45c\uc5d0 \uc788\uc73c\ub098 \ud654\uba74\uc5d0 \uc544\uc608 \uc5c6\ub358 \ud56d\ubaa9. \uc774\uac83\uc774 \ube60\uc838 \uac00\uc911\uce58 \ud569\uc774
                     // 95\uc810\uc774\uc5c8\uace0 \ucd1d\uc810\uc774 \uc2e4\uc81c\uc640 \ub2ec\ub790\ub2e4.
                     id: 'receivables', category: '\uc815\uc131\ud3c9\uac00', name: '\ucc44\uad8c\uad00\ub9ac', kpi: '\uc5f0\uac04 \uae30\uc900', weight: 5, unit: '\uac74',
-                    actual: manual.receivables ?? null,
+                    actual: receivablesCount,
                     target: 0, percent: receivablesPercent, icon: FileWarning,
                     manualField: 'receivables',
                     manualLabel: '\ucc44\uad8c \ubb38\uc81c \ubc1c\uc0dd \uac74\uc218',
                     lowerIsBetter: true,
-                    detail: manual.receivables == null
-                        ? [
-                            '\ucc44\uad8c\uad00\ub9ac\ub294 CRM\uc5d0 \uc790\ub8cc\uac00 \uc5c6\uc5b4 \uc790\ub3d9 \uacc4\uc0b0\ub418\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4. \uac74\uc218\ub97c \uc785\ub825\ud558\uba74 \ubc18\uc601\ub429\ub2c8\ub2e4.',
-                            '\uae30\uc900: 0\uac74 \uc591\ud638 \u00b7 1\uac74 \ubcf4\ud1b5 \u00b7 2\uac74 \ubbf8\ud761 (\uc801\uc744\uc218\ub85d \uc88b\uc74c)'
-                        ].join('\n')
-                        : [
-                            `\uc785\ub825\ud55c \ucc44\uad8c \ubb38\uc81c ${manual.receivables}\uac74`,
-                            '\uae30\uc900: 0\uac74 \uc591\ud638 \u00b7 1\uac74 \ubcf4\ud1b5 \u00b7 2\uac74 \ubbf8\ud761 (\uc801\uc744\uc218\ub85d \uc88b\uc74c)'
-                        ].join('\n'),
+                    detail: [
+                        receivablesCount != null
+                            ? `직접 넣은 값 ${receivablesCount}건`
+                            : '아직 입력하지 않았습니다. 이 항목은 총점에서 빠집니다.',
+                        autoReceivables
+                            ? `참고 — ${autoReceivables.month} 대장 기준:`
+                                + ` 잔액이 밀린 곳 ${autoReceivables.overdueCount}곳`
+                                + ` · 연체금액 ${(autoReceivables.overdueAmount / 1e8).toFixed(2)}억`
+                                + ` · 3개월 이상 ${autoReceivables.m3}곳`
+                            : '채권 대장이 아직 없습니다. 채권관리 화면에서 올릴 수 있습니다.',
+                        '기준: 0건 양호 · 1건 보통 · 2건 미흡 (적을수록 좋음)',
+                        '※ 대장의 연체 거래처 수와 이 눈금은 세는 대상이 다릅니다. 기준표가 뜻하는 건수를 넣으세요.',
+                    ].join('\n'),
                 }
             ],
         }
-    }, [rawSalesData, clients, activities, managedClientIds, exclusions, manual])
+    }, [rawSalesData, clients, activities, managedClientIds, exclusions, manual, autoReceivables])
 
     /**
      * 총점 = 가중평균.

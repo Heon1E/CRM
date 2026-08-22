@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Loader2, AlertTriangle, Search, Target, Upload, EyeOff, RotateCcw } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { parseReceivablesLedger } from '../utils/receivablesLedger'
+import { parseReceivablesLedger, summarizeReceivables } from '../utils/receivablesLedger'
 import { buildClientKeys } from '../hooks/useSalesImport'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
@@ -105,18 +105,9 @@ const Receivables = () => {
     const active = useMemo(() => rows.filter((r) => !r.excluded), [rows])
     const excludedRows = useMemo(() => rows.filter((r) => r.excluded), [rows])
 
-    const summary = useMemo(() => {
-        const withBal = active.filter((r) => Number(r.balance) > 0)
-        const od = active.filter((r) => Number(r.overdue_amount) > 0)
-        return {
-            // 음수(선수금)까지 합산해야 대장의 합계행과 맞는다
-            total: active.reduce((a, r) => a + Number(r.balance || 0), 0),
-            clients: withBal.length,
-            overdueCount: od.length,
-            overdueAmount: od.reduce((a, r) => a + Number(r.overdue_amount || 0), 0),
-            m3: active.filter((r) => r.aging_months >= 3).length,
-        }
-    }, [active])
+    // 계산은 `receivablesLedger.summarizeReceivables` 하나뿐이다 —
+    // KPI 카드도 같은 함수를 쓴다. 두 벌로 세면 어긋났을 때 알 수 없다.
+    const summary = useMemo(() => summarizeReceivables(rows), [rows])
 
     const view = useMemo(() => {
         const b = BUCKETS.find((x) => x.key === bucket) || BUCKETS[0]

@@ -161,3 +161,28 @@ export const parseReceivablesLedger = (sheet) => {
 /** 화면 표시용 구간 */
 export const agingBucket = (aging) =>
     aging <= 0 ? '정상(당월분)' : aging === 1 ? '1개월' : aging === 2 ? '2개월' : '3개월 이상'
+
+/**
+ * 대장 한 달치를 요약한다 — 총 미수금 · 연체 건수 · 연체 금액 · 3개월 이상.
+ *
+ * **화면과 KPI가 같은 함수를 쓴다.** 예전에는 채권관리 화면 안에만 이 계산이
+ * 있어서, KPI로 보내려면 사람이 '저장' 단추를 눌러야 했다. 같은 숫자를 두
+ * 군데서 따로 세면 어긋났을 때 어느 쪽이 맞는지 알 수 없다.
+ *
+ * - **제외 표시된 건은 전부 뺀다.** 회계팀이 잘못 잡은 미수(선입금 건 등)라
+ *   실제 채권이 아니다.
+ * - **총 미수금은 음수(선수금)까지 더한다.** 그래야 대장의 합계행과 맞는다.
+ * - **연체는 `overdue_amount > 0`으로 본다.** 대장의 '지연' 메모는 108곳 중
+ *   10곳에만 적혀 있어 기준이 되지 못한다.
+ */
+export const summarizeReceivables = (rows = []) => {
+    const active = rows.filter((r) => !r.excluded)
+    const overdue = active.filter((r) => Number(r.overdue_amount) > 0)
+    return {
+        total: active.reduce((a, r) => a + Number(r.balance || 0), 0),
+        clients: active.filter((r) => Number(r.balance) > 0).length,
+        overdueCount: overdue.length,
+        overdueAmount: overdue.reduce((a, r) => a + Number(r.overdue_amount || 0), 0),
+        m3: active.filter((r) => Number(r.aging_months) >= 3).length,
+    }
+}
