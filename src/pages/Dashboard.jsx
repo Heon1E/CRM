@@ -1,8 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell
-} from 'recharts'
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   BarChart2, Phone, Mail, FileText, CheckCircle, TrendingUp, RefreshCw, ChevronRight,
@@ -11,7 +7,19 @@ import {
 import { useData } from '../contexts/DataContext'
 import { useDashboardData } from '../hooks/useDashboardData'
 import EditActivityModal from '../components/EditActivityModal'
-import RevenueForecastPanel from '../components/RevenueForecastPanel'
+/*
+ * 매출 추정 패널만 **열 때 받는다.**
+ *
+ * 이 패널은 대시보드에서 유일하게 recharts를 쓴다(5MB 짜리 묶음이다).
+ * 대시보드는 로그인 직후 바로 뜨는 화면이라 미리 넣어 두는데, 그 바람에
+ * 차트 라이브러리까지 첫 화면에 딸려 왔다. 패널은 화면 아래쪽이고 계산도
+ * 단추를 눌러야 도는 것이라, 조금 늦게 와도 아무도 기다리지 않는다.
+ *
+ * `Dashboard`와 `KPIWidget`은 recharts를 **import만 하고 차트를 하나도
+ * 그리지 않고 있었다** — 'Weekly Revenue Trend'를 없앨 때 import가 남은 것이다.
+ * 그것도 함께 걷어냈다.
+ */
+const RevenueForecastPanel = lazy(() => import('../components/RevenueForecastPanel'))
 import AppInstallGuide from '../components/AppInstallGuide'
 import IssueTracker from '../components/IssueTracker'
 import ActivityTimeline from '../components/ActivityTimeline'
@@ -265,7 +273,10 @@ const Dashboard = () => {
         </div>
 
         <div>
-          <RevenueForecastPanel />
+          {/* 오는 동안 자리를 지킨다 — 갑자기 아래 내용이 밀려 올라가지 않게 */}
+          <Suspense fallback={<div className="skeleton" style={{ height: 260, borderRadius: 6 }} />}>
+            <RevenueForecastPanel />
+          </Suspense>
         </div>
 
         {/* Lower Section */}

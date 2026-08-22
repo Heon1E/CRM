@@ -1,8 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react'
-import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-    Cell, ReferenceLine, ResponsiveContainer
-} from 'recharts'
 import { Target, TrendingUp, Users, UserPlus, MapPin, FileWarning } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useI18n } from '../contexts/I18nContext'
