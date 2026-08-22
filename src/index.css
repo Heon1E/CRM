@@ -1234,3 +1234,39 @@ textarea:focus {
     .doc-grid thead { display: table-header-group; }
     @page { size: A4; margin: 0; }
 }
+
+/* ==========================================================================
+   모션을 원하지 않는 사람에게는 꺼 준다
+
+   **이건 취향 설정이 아니라 접근성이다.** 전정기관 질환이 있으면 화면이
+   미끄러지는 것만으로 어지럼·메스꺼움이 온다. 운영체제에 '동작 줄이기'를
+   켜 둔 사람에게 애니메이션을 강제하면 앱을 못 쓴다.
+   (윈도우: 설정 > 접근성 > 시각 효과 / iOS·안드로이드: 손쉬운 사용 > 동작 줄이기)
+
+   **완전히 0으로 만들지 않고 0.01ms로 둔다.** 0으로 두면 `animationend`·
+   `transitionend` 이벤트가 아예 안 와서, 그 이벤트로 뒷정리를 하는 코드가
+   영영 끝나지 않는다(모달이 안 닫히는 식). 사람 눈에는 즉시로 보이면서
+   이벤트는 정상적으로 오는 값이 0.01ms다.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    /* '불러오는 중' 표시는 남긴다 — 돌지 않으면 멈춘 것으로 보인다.
+       대신 회전 대신 깜빡임으로 바꿔 화면이 미끄러지지 않게 한다. */
+    .animate-spin {
+        animation: fade-pulse 1.2s ease-in-out infinite !important;
+    }
+}
+
+@keyframes fade-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}

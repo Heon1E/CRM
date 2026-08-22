@@ -56,6 +56,28 @@ export default {
       borderRadius: {
         'oem': '2px', // 데스크톱 프로그램 느낌
       },
+      keyframes: {
+        // Toast(`animate-slide-in`) 와 설정 탭(`animate-fade-in`)이 쓰는데
+        // 정의가 없어 아무 일도 일어나지 않았다. 여기서 만든다.
+        'slide-in': {
+          '0%': { opacity: '0', transform: 'translate(-50%, calc(-50% + 8px))' },
+          '100%': { opacity: '1', transform: 'translate(-50%, -50%)' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        // RevenueForecastPanel 의 진행 막대 (animate-[loading_2s...])
+        loading: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(250%)' },
+        },
+      },
+      animation: {
+        // 모바일에서는 짧아야 빠릿하게 느껴진다. 200ms 안쪽으로 둔다.
+        'slide-in': 'slide-in 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'fade-in': 'fade-in 160ms ease-out',
+      },
       minHeight: {
         'tap': '44px', // 터치 최소 영역
       },
@@ -70,5 +92,14 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    /*
+     * **이 플러그인이 없으면 `animate-in`·`fade-in`·`slide-in-from-*`이
+     * 전부 무효 클래스가 된다.** 코드 8곳 이상이 그 클래스를 쓰고 있었는데
+     * 플러그인이 빠져 있어 모달이 툭 나타났다 툭 사라졌다.
+     * `oem-blue`가 123번 쓰였는데 설정에 없어 투명했던 것과 같은 종류다.
+     * 빌드타임에 CSS만 만들어 낸다 — 런타임 비용 0.
+     */
+    require('tailwindcss-animate'),
+  ],
 }
