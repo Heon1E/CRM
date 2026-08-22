@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 /**
@@ -11,6 +11,23 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
   const totalPages = Math.ceil(totalCount / pageSize)
 
+  /*
+   * **좁은 화면에서는 가운데 번호를 하나만 보여준다.**
+   * 5개를 그대로 두면 `‹ 1 … 10 11 12 13 14 … 58 ›`가 500px을 넘어서
+   * 화면(386px) 밖으로 밀려 나가고, 감싼 상자가 `overflow-x: hidden`이라
+   * **잘린 채 손이 닿지 않는다** — 거래처가 58쪽인데 뒤로 못 간다(실측).
+   * 처음·끝 단추는 남긴다. 맨 뒤로 한 번에 가는 길이 사라지면 안 된다.
+   */
+  const [narrow, setNarrow] = useState(
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)')
+    const on = (e) => setNarrow(e.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+
   // 페이지가 없으면 숨김
   if (totalPages === 0) {
     return null
@@ -19,7 +36,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
   // 페이지 번호 배열 생성 (최대 5개 표시)
   const getPageNumbers = () => {
     const pages = []
-    const maxVisible = 5
+    const maxVisible = narrow ? 1 : 5
 
     if (totalPages <= maxVisible) {
       // 전체 페이지가 5개 이하면 모두 표시
@@ -65,7 +82,11 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
   }
 
   return (
-    <div className="flex items-center justify-center space-x-2 py-4 px-4 border-t" style={{ borderColor: "var(--border)" }}>
+    <div
+      /* `flex-wrap`은 마지막 안전장치다 — 어떤 조합이 와도 잘리지 않고 줄이 바뀐다 */
+      className="flex flex-wrap items-center justify-center gap-1 sm:gap-2 py-4 px-2 sm:px-4 border-t"
+      style={{ borderColor: "var(--border)" }}
+    >
       {/* 이전 버튼 */}
       <button
         onClick={handlePrev}
@@ -81,7 +102,7 @@ const Pagination = ({ totalCount, pageSize, currentPage, onPageChange }) => {
       </button>
 
       {/* 페이지 번호 */}
-      <div className="flex items-center space-x-1">
+      <div className="flex flex-wrap items-center justify-center gap-1">
         {pageNumbers[0] > 1 && (
           <>
             <button

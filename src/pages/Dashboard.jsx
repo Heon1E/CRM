@@ -223,14 +223,16 @@ const Dashboard = () => {
           }}>
             {summaryCards.map((c) => (
               <div key={c.label} style={{ background: 'var(--bg-card)', padding: '10px 14px' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.label}</div>
+                {/* 인라인 `fontSize`는 전역 모바일 규칙(12px)을 이긴다. 매일 보는
+                    카드의 라벨이 폰에서 11px로 남아 있었다 — 클래스로 넘긴다. */}
+                <div className="card-label" style={{ color: 'var(--text-secondary)' }}>{c.label}</div>
                 {/* 불러오는 중에는 '—' 대신 자리를 그린다. '—'는 '값이 없다'는
                     뜻으로 읽혀서(매출 0원인 상태와 구별되지 않는다), 기다리는
                     중임을 알리지 못한다. 틀린 숫자를 안 보여주는 원칙은 그대로다. */}
                 <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
                   {dataReady ? c.value : <span className="skeleton" style={{ display: 'block', height: 22, width: '70%', borderRadius: 4 }} />}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                <div className="card-label" style={{ color: 'var(--text-secondary)' }}>
                   {dataReady ? c.sub : <span className="skeleton" style={{ display: 'block', height: 10, width: '45%', borderRadius: 3, marginTop: 4 }} />}
                 </div>
               </div>

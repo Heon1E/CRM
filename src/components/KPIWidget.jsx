@@ -743,14 +743,20 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     return (
         <div className="rounded-xl overflow-hidden mb-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
             {/* Header */}
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+            {/*
+              **좁은 화면에서는 줄을 바꾼다.** 예전에는 한 줄에 밀어 넣어서
+              오른쪽 등급 뱃지('양호')가 화면 밖으로 잘려 나갔다
+              (실측 386px: 오른쪽 끝 403px — 17px가 밖에 있었다).
+              등급은 이 카드에서 가장 먼저 봐야 할 값이라 잘리면 안 된다.
+            */}
+            <div className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-y-2" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-3">
                     <h2 className="text-base font-black" style={{ color: 'var(--text-primary)' }}>KPI Performance</h2>
                     <span className="text-[10px] font-bold px-2 py-0.5" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontFamily: 'var(--font-data)' }}>
                         {currentWeek}주차 / {totalWeeks}
                     </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>{locale === 'en' ? 'Overall:' : '\uc885\ud569:'}</span>
                     <span className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>{overallScore}%</span>
                     <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>

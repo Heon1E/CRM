@@ -250,6 +250,13 @@ a:hover {
   font-weight: 600;
 }
 
+/* 상단 요약 카드의 라벨·부연. 데스크톱은 밀도가 중요해 11px을 쓰지만
+   모바일에서는 아래 미디어쿼리가 12px로 올린다. 인라인 `style`로 주면
+   그 규칙을 이겨 버리므로 반드시 클래스로 둔다. */
+.card-label {
+    font-size: 11px;
+}
+
 .win-title .meta {
   font-family: var(--font-data);
   font-size: 11px;
@@ -961,9 +968,26 @@ textarea:focus {
    * 있었다. 모바일에서만 12px로 올린다 — 데스크톱 밀도는 그대로 둔다.
    */
   .meta,
+  .card-label,
+  .statusbar,
   [class*="text-[9px]"],
   [class*="text-[10px]"],
   [class*="text-[11px]"] {
+    font-size: 12px !important;
+  }
+
+  /*
+   * **인라인 `style={{ fontSize: 11 }}`도 잡는다.** 코드에 60곳이 흩어져 있어
+   * 하나씩 고치면 반드시 빠지고, 새로 쓰는 사람이 또 만든다.
+   * 보통은 인라인 스타일이 이기지만, **스타일시트의 `!important`는 인라인을
+   * 이긴다** — 인라인 쪽에 `!important`가 없는 한.
+   * React는 숫자를 `font-size: 11px`로 직렬화하므로 속성 선택자로 걸린다.
+   */
+  [style*="font-size: 9px"],
+  [style*="font-size: 10px"],
+  [style*="font-size: 10.5px"],
+  [style*="font-size: 11px"],
+  [style*="font-size: 11.5px"] {
     font-size: 12px !important;
   }
 
@@ -1026,8 +1050,16 @@ textarea:focus {
 }
 
 .sched-grid {
-    padding: 10px;
+    /* 좁은 화면에서는 안쪽 여백을 줄인다. 10px이면 칸이 43px로 눌려
+       터치 기준 44px을 1px 차이로 못 채운다(실측 386px). */
+    padding: 6px;
     border-bottom: 1px solid var(--border);
+}
+
+@media (min-width: 720px) {
+    .sched-grid {
+        padding: 10px;
+    }
 }
 
 @media (min-width: 720px) {

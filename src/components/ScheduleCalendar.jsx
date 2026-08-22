@@ -245,15 +245,18 @@ const ScheduleCalendar = () => {
             <div className="sched-body">
                 {/* 달력 */}
                 <div className="sched-grid">
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2, marginBottom: 4 }}>
+                        {/* 요일 글자 크기는 클래스로 준다 — 인라인 `fontSize`는
+                            모바일 12px 규칙을 이겨 버린다. 토요일 파랑은 브랜드
+                            팔레트 밖이라 먹색 계열로 눌렀다(일요일 빨강만 남긴다). */}
                         {WEEK.map((w, i) => (
-                            <div key={w} style={{
-                                textAlign: 'center', fontSize: 11, fontWeight: 700, padding: '3px 0',
-                                color: i === 0 ? '#B91C1C' : i === 6 ? '#1D4ED8' : 'var(--text-secondary)'
+                            <div key={w} className="card-label" style={{
+                                textAlign: 'center', fontWeight: 700, padding: '3px 0',
+                                color: i === 0 ? '#B91C1C' : 'var(--text-secondary)'
                             }}>{w}</div>
                         ))}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2 }}>
                         {cells.map((d) => {
                             const key = ymd(d)
                             const inMonth = d.getMonth() === cursor.getMonth()
@@ -283,7 +286,10 @@ const ScheduleCalendar = () => {
                                         {d.getDate()}
                                     </span>
                                     {holiday && (
-                                        <span style={{
+                                        /* 칸이 좁아 '대체공휴일'은 잘린다(말줄임).
+                                           누르면 아래 상세에 전체 이름이 뜨고,
+                                           마우스로는 여기서 바로 보인다. */
+                                        <span title={holiday} style={{
                                             display: 'block', fontSize: 10, lineHeight: 1.2, color: '#B91C1C',
                                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
                                         }}>
