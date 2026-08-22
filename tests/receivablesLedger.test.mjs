@@ -12,8 +12,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-    parseReceivablesLedger, findColumns, findBaseMonth, dataRows, toNumber, agingBucket
-} from '../src/utils/receivablesLedger.js'
+    parseReceivablesLedger, findColumns, findBaseMonth, dataRows, toNumber, agingBucket, summarizeReceivables, ledgerAge } from '../src/utils/receivablesLedger.js'
 
 /**
  * 대장 모양의 2차원 배열을 만든다.
@@ -191,4 +190,72 @@ test('빈 대장은 기준월 없이 조용히 끝난다', () => {
     const r = parseReceivablesLedger(sheet)
     assert.equal(r.baseMonth, null)
     assert.deepEqual(r.rows, [])
+})
+
+
+/* ---------------------------------------------------------------------------
+   대장이 낡았는지 — 갱신을 요청할 시점
+
+   대장은 **월 스냅샷**이다. 한 달이 끝나야 그 달 자료가 나오므로 8월에 최신이
+   7월인 것은 정상이다. 그보다 벌어지면 이미 갚은 곳이 아직 밀린 것처럼 보이고
+   새로 밀린 곳은 아예 안 보인다 — 그런 숫자를 '참고'라며 보여주면 그걸 근거로
+   전화를 걸게 된다.
+--------------------------------------------------------------------------- */
+const AT = (iso) => new Date(iso)
+
+test('이번 달·지난달 대장은 정상이다 (갱신 요청 안 함)', () => {
+    assert.equal(ledgerAge('2026-08', AT('2026-08-22')).stale, false)
+    assert.equal(ledgerAge('2026-07', AT('2026-08-22')).stale, false)
+    assert.equal(ledgerAge('2026-07', AT('2026-08-01')).stale, false)
+})
+
+test('두 달 이상 벌어지면 갱신을 요청한다', () => {
+    assert.equal(ledgerAge('2026-06', AT('2026-08-22')).stale, true)
+    assert.equal(ledgerAge('2026-05', AT('2026-08-22')).monthsBehind, 3)
+    assert.equal(ledgerAge('2026-05', AT('2026-08-22')).stale, true)
+})
+
+test('연말을 넘어가도 개월 수를 맞게 센다', () => {
+    // 2025-12 대장을 2026-01에 보는 것은 지난달 자료다 (13개월이 아니다)
+    assert.equal(ledgerAge('2025-12', AT('2026-01-05')).monthsBehind, 1)
+    assert.equal(ledgerAge('2025-12', AT('2026-01-05')).stale, false)
+    assert.equal(ledgerAge('2025-11', AT('2026-01-05')).stale, true)
+})
+
+test('기준월이 없거나 형식이 이상하면 낡은 것으로 본다', () => {
+    for (const bad of [null, undefined, '', '2026', '26-05', 'x']) {
+        assert.equal(ledgerAge(bad, AT('2026-08-22')).stale, true)
+    }
+})
+
+test('최신 대장을 올리면 다시 정상으로 돌아온다', () => {
+    // 사용자가 8월 대장을 올린 직후
+    const before = ledgerAge('2026-05', AT('2026-08-22'))
+    const after = ledgerAge('2026-08', AT('2026-08-22'))
+    assert.equal(before.stale, true)
+    assert.equal(after.stale, false)
+    assert.equal(after.monthsBehind, 0)
+})
+
+/* 요약 계산 — 화면과 KPI가 같은 함수를 쓴다 */
+test('제외된 건은 합계·연체 건수에서 모두 빠진다', () => {
+    const rows = [
+        { balance: 1000, overdue_amount: 500, aging_months: 2, excluded: false },
+        { balance: 9999, overdue_amount: 9999, aging_months: 5, excluded: true },
+        { balance: 300, overdue_amount: 0, aging_months: 0 },
+    ]
+    const s = summarizeReceivables(rows)
+    assert.equal(s.total, 1300)          // 제외분 9999는 빠진다
+    assert.equal(s.overdueCount, 1)
+    assert.equal(s.overdueAmount, 500)
+    assert.equal(s.m3, 0)                // 제외분의 5개월도 세지 않는다
+})
+
+test('총 미수금은 음수(선수금)까지 더한다 — 대장 합계행과 맞아야 한다', () => {
+    const s = summarizeReceivables([
+        { balance: 1000, overdue_amount: 0, aging_months: 0 },
+        { balance: -400, overdue_amount: 0, aging_months: 0 },
+    ])
+    assert.equal(s.total, 600)
+    assert.equal(s.clients, 1)           // 잔액이 있는 곳은 1곳
 })

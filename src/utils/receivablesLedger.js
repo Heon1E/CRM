@@ -186,3 +186,24 @@ export const summarizeReceivables = (rows = []) => {
         m3: active.filter((r) => Number(r.aging_months) >= 3).length,
     }
 }
+
+/**
+ * 대장이 얼마나 낡았는지 — `'YYYY-MM'` 기준월과 오늘을 비교한다.
+ *
+ * 대장은 **월 스냅샷**이다. 한 달이 끝나야 그 달 자료가 나오므로, 8월에
+ * 가장 최신이 7월인 것은 정상이다. 그보다 더 벌어지면 그때부터는 숫자가
+ * 현재를 말하지 못한다 — 이미 갚은 곳이 아직 밀린 것처럼 보이고, 새로
+ * 밀린 곳은 아예 안 보인다. **그런 숫자는 보여주지 않는 편이 낫다.**
+ *
+ * @returns {{ monthsBehind: number, stale: boolean }}
+ *   `monthsBehind` 0이면 이번 달 자료, 1이면 지난달 자료(정상).
+ *   `stale` 2개월 이상 벌어졌는가 — 갱신을 요청해야 하는 상태.
+ */
+export const ledgerAge = (baseMonth, now = new Date()) => {
+    const m = /^(\d{4})-(\d{2})$/.exec(String(baseMonth || ''))
+    if (!m) return { monthsBehind: Infinity, stale: true }
+    const base = Number(m[1]) * 12 + (Number(m[2]) - 1)
+    const cur = now.getFullYear() * 12 + now.getMonth()
+    const monthsBehind = cur - base
+    return { monthsBehind, stale: monthsBehind >= 2 }
+}

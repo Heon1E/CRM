@@ -570,12 +570,16 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                         receivablesCount != null
                             ? `직접 넣은 값 ${receivablesCount}건`
                             : '아직 입력하지 않았습니다. 이 항목은 총점에서 빠집니다.',
-                        autoReceivables
-                            ? `참고 — ${autoReceivables.month} 대장 기준:`
-                                + ` 잔액이 밀린 곳 ${autoReceivables.overdueCount}곳`
-                                + ` · 연체금액 ${(autoReceivables.overdueAmount / 1e8).toFixed(2)}억`
-                                + ` · 3개월 이상 ${autoReceivables.m3}곳`
-                            : '채권 대장이 아직 없습니다. 채권관리 화면에서 올릴 수 있습니다.',
+                        // 낡은 대장의 숫자는 보여주지 않는다 — 그걸 근거로 전화를 걸게 된다
+                        !autoReceivables
+                            ? '채권 대장이 아직 없습니다. 채권관리 화면에서 올릴 수 있습니다.'
+                            : autoReceivables.stale
+                                ? `⚠ 채권 대장이 ${autoReceivables.month} 기준으로 ${autoReceivables.monthsBehind}개월 전 것입니다.`
+                                    + ' 채권관리 화면에서 최신 대장을 올려 주세요 — 지금 숫자는 현재를 말하지 못합니다.'
+                                : `참고 — ${autoReceivables.month} 대장 기준:`
+                                    + ` 잔액이 밀린 곳 ${autoReceivables.overdueCount}곳`
+                                    + ` · 연체금액 ${(autoReceivables.overdueAmount / 1e8).toFixed(2)}억`
+                                    + ` · 3개월 이상 ${autoReceivables.m3}곳`,
                         '기준: 0건 양호 · 1건 보통 · 2건 미흡 (적을수록 좋음)',
                         '※ 대장의 연체 거래처 수와 이 눈금은 세는 대상이 다릅니다. 기준표가 뜻하는 건수를 넣으세요.',
                     ].join('\n'),

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Loader2, AlertTriangle, Search, Target, Upload, EyeOff, RotateCcw } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { parseReceivablesLedger, summarizeReceivables } from '../utils/receivablesLedger'
+import { parseReceivablesLedger, summarizeReceivables, ledgerAge } from '../utils/receivablesLedger'
 import { buildClientKeys } from '../hooks/useSalesImport'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
@@ -108,6 +108,14 @@ const Receivables = () => {
     // 계산은 `receivablesLedger.summarizeReceivables` 하나뿐이다 —
     // KPI 카드도 같은 함수를 쓴다. 두 벌로 세면 어긋났을 때 알 수 없다.
     const summary = useMemo(() => summarizeReceivables(rows), [rows])
+
+    /*
+     * **대장이 낡았으면 맨 위에서 말해 준다.** 월 스냅샷이라 두 달 이상
+     * 벌어지면 이미 갚은 곳이 아직 밀린 것처럼 보이고 새로 밀린 곳은 안 보인다.
+     * 여기가 대장을 올리는 자리이므로, 알려 줄 곳도 여기다.
+     * 가장 최신 기준월로 잰다 — 사용자가 옛 달을 골라 보는 중일 수 있다.
+     */
+    const age = useMemo(() => ledgerAge(months[0]), [months])
 
     const view = useMemo(() => {
         const b = BUCKETS.find((x) => x.key === bucket) || BUCKETS[0]
@@ -360,6 +368,20 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                     </div>
                 ))}
             </div>
+
+            {age.stale && months.length > 0 && (
+                <div style={{
+                    margin: '10px 0', padding: '10px 14px', display: 'flex', alignItems: 'center',
+                    gap: 10, flexWrap: 'wrap',
+                    background: 'var(--warning-subtle)', border: '1px solid var(--warning)',
+                    borderRadius: 'var(--radius)', color: 'var(--warning)', fontWeight: 700,
+                }}>
+                    <span>
+                        가장 최신 대장이 {months[0]} 기준입니다 ({age.monthsBehind}개월 전).
+                        지금 보이는 숫자는 현재를 말하지 못합니다 — 최신 대장을 올려 주세요.
+                    </span>
+                </div>
+            )}
 
             <div className="filterbar" style={{ gap: 8, flexWrap: 'wrap' }}>
                 {BUCKETS.map((b) => (

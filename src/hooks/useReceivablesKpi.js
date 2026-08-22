@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { summarizeReceivables } from '../utils/receivablesLedger'
+import { summarizeReceivables, ledgerAge } from '../utils/receivablesLedger'
 
 /**
  * KPI 채권관리에 쓸 연체 건수를 **가장 최근 대장에서 직접 읽는다.**
@@ -63,7 +63,14 @@ export const useReceivablesKpi = () => {
                 if (e2) return warnOnce('대장을 읽지 못했습니다', e2)
                 if (!rows) return
 
-                if (alive) setState({ month, ...summarizeReceivables(rows) })
+                /*
+                 * **낡은 대장의 숫자는 내보내지 않는다.** 대장은 월 스냅샷이라
+                 * 두 달 이상 벌어지면 이미 갚은 곳이 아직 밀린 것처럼 보이고,
+                 * 새로 밀린 곳은 아예 안 보인다. 그런 숫자를 '참고'라며 보여주면
+                 * 그걸 근거로 전화를 걸게 된다. 대신 갱신을 요청한다.
+                 */
+                const age = ledgerAge(month)
+                if (alive) setState({ month, ...age, ...summarizeReceivables(rows) })
             } catch (e) {
                 /* 채권 자료를 못 읽어도 KPI 나머지는 그대로 보여야 한다.
                    다만 **조용히 삼키지는 않는다** — 왜 '대장 없음'으로 보이는지
