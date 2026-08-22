@@ -65,13 +65,19 @@ const TopNavbar = () => {
           화면과 문서가 같은 것을 보여야 한 회사가 만든 것처럼 보인다.
         */}
         <Link to="/" className="flex items-center gap-2.5 group min-h-[44px]" aria-label="아이앤디 CRM 홈">
-          {/* 로고 안의 'PACKAGING SOLUTION'은 이 크기에서 뭉개지므로 글자로
-              회사 이름을 함께 둔다. 모바일에서도 감추지 않는다 — 왼쪽 위는
-              '어느 회사 화면인가'를 말하는 자리다. */}
+          {/*
+            **IND 마크만 쓴다** (`brand-mark.png`). 원본 로고에는 아래에
+            'PACKAGING SOLUTION'이 붙어 있는데, 상단바 높이(22px)로 줄이면
+            그 줄이 회색 얼룩이 된다. 옆에 회사 이름이 글자로 있으니 마크만으로
+            충분하다. 문서(견적서·발주서)에는 원본을 그대로 쓴다 — 거기서는
+            크게 들어가 다 읽힌다.
+            배경은 투명하게 따 두었다. 흰 네모가 붙어 있으면 상단바 회색과
+            부딪힌다.
+          */}
           <img
-            src="/brand-logo.png"
+            src="/brand-mark.png"
             alt=""
-            style={{ height: 26, width: 'auto', objectFit: 'contain' }}
+            style={{ height: 22, width: 'auto', objectFit: 'contain' }}
           />
           <span className="font-bold text-base sm:text-lg tracking-tight transition-colors"
             style={{ color: 'var(--text-primary)' }}

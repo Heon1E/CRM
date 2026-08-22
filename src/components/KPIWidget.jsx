@@ -43,7 +43,7 @@ function getGradeInfo(percent) {
     if (p >= 120) return { grade: '탁월', color: '#0b4a24', barColor: '#007538', bgColor: '#dcefe3' }
     if (p >= 110) return { grade: '우수', color: '#0f5c2e', barColor: '#2a9a5e', bgColor: '#e3f5ea' }
     if (p >= 100) return { grade: '양호', color: '#1c6b3c', barColor: '#5cbb85', bgColor: '#eef8f2' }
-    if (p >= 90) return { grade: '보통', color: '#7a5f00', barColor: '#f2c200', bgColor: '#fff6d9' }
+    if (p >= 90) return { grade: '보통', color: '#3e3a39', barColor: '#ffed00', bgColor: '#ffed00' }
     return { grade: '미흡', color: '#B91C1C', barColor: '#EF4444', bgColor: '#FEE2E2' }
 }
 

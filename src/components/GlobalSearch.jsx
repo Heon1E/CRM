@@ -137,7 +137,9 @@ const GlobalSearch = ({ open, onClose }) => {
                                     style={{
                                         width: '100%', display: 'flex', alignItems: 'center', gap: 9,
                                         padding: '8px 12px', border: 'none', textAlign: 'left', cursor: 'pointer',
-                                        background: i === cursor ? 'var(--bg-card-hover)' : 'transparent',
+                                        // 고른 줄에만 진짜 노랑. 먹색 글씨와 9.29:1이라 또렷하다
+                                        background: i === cursor ? 'var(--sel)' : 'transparent',
+                                        color: i === cursor ? 'var(--text-primary)' : undefined,
                                         borderBottom: '1px solid var(--border)',
                                     }}
                                 >

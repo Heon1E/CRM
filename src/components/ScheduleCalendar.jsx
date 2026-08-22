@@ -272,7 +272,8 @@ const ScheduleCalendar = () => {
                                         minHeight: 52, padding: '3px 4px', textAlign: 'left',
                                         border: isSel ? '2px solid var(--accent)' : '1px solid var(--border)',
                                         borderRadius: 'var(--radius)',
-                                        background: isToday ? 'var(--bg-card-hover)' : 'transparent',
+                                        /* 오늘 — 달력에서 한 칸뿐이므로 진짜 노랑으로 찍는다 */
+                                        background: isToday ? 'var(--sel)' : 'transparent',
                                         opacity: inMonth ? 1 : 0.38,
                                         cursor: 'pointer', display: 'block',
                                     }}
