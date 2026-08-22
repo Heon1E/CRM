@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
 import { useData } from '../contexts/DataContext'
+import { useAuth } from '../contexts/AuthContext'
+import { resolveSalesRep } from '../utils/salesRep'
 import useEnterMove from '../hooks/useEnterMove'
 // GoogleGenerativeAI SDK 대신 REST API 직접 호출 방식 사용
 import { Sparkles, Loader2, X, Plus } from 'lucide-react'
@@ -11,6 +13,8 @@ import { parseDateForInput } from '../utils/formatters'
 const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치
   const { activities, clients, updateActivity, deleteActivity, registerModal } = useData()
+  // '누가 다녀왔는지'를 넣으려면 로그인한 사람을 알아야 한다
+  const { user, salesRep: authSalesRep } = useAuth()
   const activity = activities?.find((a) => a.id === activityId)
   const formRef = useRef(null)
   const attendeeInputRef = useRef(null)
@@ -213,10 +217,27 @@ ${currentText}`
     }
 
     try {
-      const userString = attendees.length > 0 ? attendees.join(', ') : ''
+      /*
+       * **`user_name`은 '누가 다녀왔는가'다 — 상대측 참석자가 아니다.**
+       *
+       * 예전에는 참석자 목록을 그대로 `user`로 넘겼고, `addActivity`가 그 값을
+       * `user_name`에 넣은 뒤 **거래처의 담당자가 비어 있으면 그 이름으로
+       * 채웠다.** 즉 참석자를 적는 순간 `clients.sales_rep`에 **고객사 직원
+       * 이름**이 우리 담당자로 박힌다. 담당자는 KPI·영업 코치·거래처 정렬의
+       * 기준이라 한 번 틀어지면 여러 화면이 함께 어긋난다.
+       * (다행히 아직 그런 값은 없다 — 담당 지정된 86곳 전부 우리 영업사원이다.)
+       *
+       * 지금은 로그인한 사람을 넣는다. 참석자는 지울 수 없는 정보이므로
+       * 내용 끝에 `[참석] …`으로 남긴다 — `activities`에 참석자 칸이 없다.
+       */
+      const myRep = authSalesRep || resolveSalesRep(user) || null
+      const attendeeLine = attendees.length > 0 ? `[참석] ${attendees.join(', ')}` : ''
+      const mergedDescription = [formData.description, attendeeLine].filter(Boolean).join('\n')
       await updateActivity(activityId, {
         ...formData,
-        user: userString,
+        description: mergedDescription,
+        user_name: myRep,
+        user: attendees.join(', '),
       })
       await showSuccess('활동 내역이 수정되었습니다.')
       onClose()

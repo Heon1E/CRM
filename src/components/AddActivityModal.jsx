@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import Modal from './Modal'
 import { todayYmd } from '../utils/day'
 import { useData } from '../contexts/DataContext'
+import { useAuth } from '../contexts/AuthContext'
+import { resolveSalesRep } from '../utils/salesRep'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import useEnterMove from '../hooks/useEnterMove'
 // GoogleGenerativeAI SDK 대신 REST API 직접 호출 방식 사용
@@ -13,6 +15,8 @@ import { showWarning, showError } from '../utils/alert'
 const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { clients, addActivity, addIssue, registerModal } = useData()
+  // '누가 다녀왔는지'를 넣으려면 로그인한 사람을 알아야 한다
+  const { user, salesRep: authSalesRep } = useAuth()
   const { isOnline } = useOnlineStatus()
   const formRef = useRef(null)
   const attendeeInputRef = useRef(null)
@@ -216,8 +220,22 @@ ${currentText}`
     }
 
     try {
-      // 참석자 배열을 콤마로 구분된 문자열로 변환하여 user 필드에 저장
-      const userString = attendees.length > 0 ? attendees.join(', ') : ''
+      /*
+       * **`user_name`은 '누가 다녀왔는가'다 — 상대측 참석자가 아니다.**
+       *
+       * 예전에는 참석자 목록을 그대로 `user`로 넘겼고, `addActivity`가 그 값을
+       * `user_name`에 넣은 뒤 **거래처의 담당자가 비어 있으면 그 이름으로
+       * 채웠다.** 즉 참석자를 적는 순간 `clients.sales_rep`에 **고객사 직원
+       * 이름**이 우리 담당자로 박힌다. 담당자는 KPI·영업 코치·거래처 정렬의
+       * 기준이라 한 번 틀어지면 여러 화면이 함께 어긋난다.
+       * (다행히 아직 그런 값은 없다 — 담당 지정된 86곳 전부 우리 영업사원이다.)
+       *
+       * 지금은 로그인한 사람을 넣는다. 참석자는 지울 수 없는 정보이므로
+       * 내용 끝에 `[참석] …`으로 남긴다 — `activities`에 참석자 칸이 없다.
+       */
+      const myRep = authSalesRep || resolveSalesRep(user) || null
+      const attendeeLine = attendees.length > 0 ? `[참석] ${attendees.join(', ')}` : ''
+      const mergedDescription = [formData.description, attendeeLine].filter(Boolean).join('\n')
 
       // 오프라인 상태 확인 및 처리
       if (!isOnline) {
@@ -230,7 +248,9 @@ ${currentText}`
       // 영업 활동 등록 (오프라인 지원 - addActivity 내부에서 처리됨)
       const activity = await addActivity({
         ...formData,
-        user: userString,
+        description: mergedDescription,
+        user_name: myRep,
+        user: attendees.join(', '),   // 화면 표시용 (DB의 user_name과 다르다)
       })
 
       // [SMART LOGIC] Issue 등록 여부 판단
@@ -540,7 +560,7 @@ ${currentText}`
             type="submit"
             className="oem-btn-primary"
           >
-            Save
+            저장
           </button>
         </div>
       </form>
