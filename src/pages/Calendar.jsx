@@ -23,7 +23,9 @@ const Calendar = () => {
          * 색 구분도 `'call'`·`'email'` 같은 영어로 보고 있었는데 저장된 값은
          * `미팅`·`전화`·`이메일`이라 **하나도 걸리지 않아 전부 파란색**이었다.
          */
-        const COLOR = { 미팅: '#2563eb', 방문: '#2563eb', 전화: '#146b46', 이메일: '#b45309' }
+        // 대시보드 달력(`ScheduleCalendar`)과 같은 계열로 맞춘다.
+        // 예전에는 미팅·방문이 파랑이었다 — 브랜드와 상관없는 색이다.
+        const COLOR = { 미팅: '#3e3a39', 방문: '#007538', 전화: '#8a6b00', 이메일: '#6b7280' }
         const activityEvents = activities?.map((activity) => {
             const color = COLOR[activity.type] || '#6b7280'
             const who = activity.clientName || activity.client_name || '거래처 없음'

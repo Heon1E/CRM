@@ -33,8 +33,8 @@ const agoText = (ms) => {
 }
 
 const STAGE_COLOR = {
-    '중단': '#6B7280', '보류': '#B45309', '초기 접촉': '#6B7280', '정보 파악': '#1D4ED8',
-    '견적 제출': '#1D4ED8', '샘플 진행': '#7C3AED', '단가 협의': '#7C3AED',
+    '중단': '#9fa0a0', '보류': '#B45309', '초기 접촉': '#6B7280', '정보 파악': '#8a6b00',
+    '견적 제출': '#8a6b00', '샘플 진행': '#2a9a5e', '단가 협의': '#2a9a5e',
     '발주 임박': '#1C6B3C', '거래 중': '#1C6B3C',
 }
 const RISK_COLOR = { '낮음': '#1C6B3C', '보통': '#B45309', '높음': '#B91C1C' }
@@ -217,7 +217,7 @@ const ClientBriefing = ({ client, sales = [], activities = [], onClose }) => {
                         {client.phone ? (
                             // 휴대폰에서 누르면 바로 걸린다
                             <a href={`tel:${String(client.phone).replace(/[^0-9+]/g, '')}`}
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#1D4ED8', fontWeight: 600 }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)', fontWeight: 600 }}>
                                 <Phone size={12} /> {client.phone}
                             </a>
                         ) : (
@@ -277,7 +277,7 @@ const ClientBriefing = ({ client, sales = [], activities = [], onClose }) => {
 
                             <Section icon={ListChecks} title="다음에 할 일" items={briefing.nextActions} color="#1C6B3C" />
                             <Section icon={AlertTriangle} title="걸림돌" items={briefing.blockers} color="#B91C1C" />
-                            <Section icon={Package} title="따낼 물량" items={briefing.opportunity} color="#1D4ED8" />
+                            <Section icon={Package} title="따낼 물량" items={briefing.opportunity} color="#8a6b00" />
                             <Section icon={Swords} title="경쟁" items={briefing.competitors} color="#B45309" />
                             <Section icon={Info} title="기억할 것" items={briefing.keyFacts} color="#6B7280" />
 

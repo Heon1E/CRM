@@ -33,10 +33,24 @@ const BUCKETS = [
     { key: 'm3', label: '3개월 이상', test: (r) => r.aging_months >= 3 },
 ]
 
+/*
+ * 경과월 표시 — **색이 단계를 말해야 한다.**
+ *
+ * 예전에는 1개월이 **파란색**이었다. 파랑은 이 앱에서 걷어낸 색이고, 무엇보다
+ * '주의'를 말하지 못한다. 3개월(빨강)·2개월(옅은 주황)과 나란히 놓으면
+ * 순서도 읽히지 않았다.
+ *
+ * 지금은 밝기가 그대로 무게가 된다 — 채도 높은 노랑에서 시작해 점점 어두워진다:
+ *   정상 회색(무게 없음) -> 1개월 노랑 0.82 -> 2개월 주황 0.45 -> 3개월+ 빨강 0.14
+ *
+ * 전부 **면을 채우고 어두운 글씨를 얹는다.** 노랑은 흰 바탕에서 1.2:1이라
+ * 글씨나 얇은 선으로는 보이지 않는다 — 면으로 써야 산다.
+ * 대비: 노랑 9.29 · 주황 5.39 · 빨강 5.44 (전부 본문 기준 통과)
+ */
 const agingStyle = (m) => {
-    if (m >= 3) return { color: '#B91C1C', background: '#FEE2E2' }
-    if (m === 2) return { color: '#B45309', background: '#FEF3C7' }
-    if (m === 1) return { color: '#1D4ED8', background: '#DBEAFE' }
+    if (m >= 3) return { color: '#ffffff', background: '#c0392b' }
+    if (m === 2) return { color: '#3e3a39', background: '#ff9d00' }
+    if (m === 1) return { color: '#3e3a39', background: 'var(--ind-yellow)' }
     return { color: 'var(--text-secondary)', background: 'transparent' }
 }
 
@@ -375,8 +389,10 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                 <div style={{
                     margin: '10px 0', padding: '10px 14px', display: 'flex', alignItems: 'center',
                     gap: 10, flexWrap: 'wrap',
-                    background: 'var(--warning-subtle)', border: '1px solid var(--warning)',
-                    borderRadius: 'var(--radius)', color: 'var(--warning)', fontWeight: 700,
+                    /* 진짜 노랑 면 + 먹색 글씨(9.29:1). 옅은 amber로 깔면
+                       표 안의 경과월 칩보다 약해져서 경고가 경고로 안 보인다. */
+                    background: 'var(--ind-yellow)', border: 'none',
+                    borderRadius: 'var(--radius)', color: 'var(--ind-ink)', fontWeight: 700,
                 }}>
                     <span>
                         가장 최신 대장이 {months[0]} 기준입니다 ({age.monthsBehind}개월 전).

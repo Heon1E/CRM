@@ -48,7 +48,7 @@ const DormantClientsView = ({ data, advice }) => {
                 <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="text-sm border border-gray-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="text-sm border border-gray-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-oem-blue"
                 >
                     <option value="historicalRevenue">과거 매출액 순</option>
                     <option value="lastSaleDate">최근 거래일 순</option>

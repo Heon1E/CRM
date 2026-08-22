@@ -17,11 +17,19 @@ import { openFollowUps } from '../utils/followUps'
  */
 
 const WEEK = ['일', '월', '화', '수', '목', '금', '토']
+/*
+ * 일정 종류별 점 색. 예전에는 파랑·보라·청록이었다 — 이 앱에서 걷어낸
+ * 색이고, 우리 브랜드와 아무 상관이 없다.
+ *
+ * **노랑은 여기에 못 쓴다.** 5px짜리 점을 흰 바탕에 찍으면 1.2:1이라 보이지
+ * 않는다. 노랑은 면을 채우고 어두운 글씨를 얹을 때만 산다.
+ * 대신 브랜드 초록에서 시작해 어두운 쪽으로 벌린다 (흰 바탕 대비 4.8~11.2:1).
+ */
 const KIND_COLOR = {
-    방문: '#2563EB',
-    미팅: '#7C3AED',
-    전화: '#0891B2',
-    기타: '#6B7280',
+    방문: '#007538',   /* 직접 간 것 — 브랜드 초록 */
+    미팅: '#3e3a39',   /* 먹색 */
+    전화: '#8a6b00',   /* 겨자 (노랑 계열의 '글씨용' 값) */
+    기타: '#6b7280',
 }
 
 /** Date -> 'YYYY-MM-DD' (로컬 기준. toISOString은 UTC라 하루 밀린다) */
@@ -247,12 +255,15 @@ const ScheduleCalendar = () => {
                 <div className="sched-grid">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2, marginBottom: 4 }}>
                         {/* 요일 글자 크기는 클래스로 준다 — 인라인 `fontSize`는
-                            모바일 12px 규칙을 이겨 버린다. 토요일 파랑은 브랜드
-                            팔레트 밖이라 먹색 계열로 눌렀다(일요일 빨강만 남긴다). */}
+                            모바일 12px 규칙을 이겨 버린다.
+                            **일요일 빨강 · 토요일 파랑은 한국 달력 관례다.**
+                            브랜드 색이 아니라 사람들이 그렇게 읽는 규칙이므로
+                            파랑을 걷어내는 정리에서 예외로 둔다. 아래 날짜 칸도
+                            같은 색을 쓴다 — 머리글만 바꾸면 어긋나 보인다. */}
                         {WEEK.map((w, i) => (
                             <div key={w} className="card-label" style={{
                                 textAlign: 'center', fontWeight: 700, padding: '3px 0',
-                                color: i === 0 ? '#B91C1C' : 'var(--text-secondary)'
+                                color: i === 0 ? '#B91C1C' : i === 6 ? '#1D4ED8' : 'var(--text-secondary)'
                             }}>{w}</div>
                         ))}
                     </div>

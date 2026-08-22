@@ -100,7 +100,7 @@ const EditProductModal = ({ isOpen, onClose, productId }) => {
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all duration-200"
             placeholder="품목명을 입력하세요"
             required
           />
@@ -113,7 +113,7 @@ const EditProductModal = ({ isOpen, onClose, productId }) => {
           <select
             value={formData.type}
             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all duration-200 bg-white"
             required
           >
             <option value="IBC">IBC</option>
@@ -129,7 +129,7 @@ const EditProductModal = ({ isOpen, onClose, productId }) => {
             type="text"
             value={formData.standard}
             onChange={(e) => setFormData({ ...formData, standard: e.target.value })}
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all duration-200"
             placeholder="규격을 입력하세요 (선택사항)"
           />
         </div>

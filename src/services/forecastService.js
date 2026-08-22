@@ -79,10 +79,10 @@ export const ForecastService = {
             // 그 자체로 눈에 띄게 느리다. 개발 중에만 남긴다.
             if (import.meta.env.DEV && result.debug) {
                 console.group('AI Forecast Debug Report (v7.0)')
-                console.log('%c Revenue Audit', 'font-weight: bold; color: #4F46E5')
+                console.log('%c Revenue Audit', 'font-weight: bold; color: #007538')
                 console.table(result.debug.audit)
 
-                console.log('%c Segment Contribution', 'font-weight: bold; color: #4F46E5')
+                console.log('%c Segment Contribution', 'font-weight: bold; color: #007538')
                 console.table(result.debug.contribution)
 
                 if (result.debug.stoppedClients?.length > 0) {

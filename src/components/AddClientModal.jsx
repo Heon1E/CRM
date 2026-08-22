@@ -320,7 +320,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
                       type="checkbox"
                       checked={contact.is_primary || false}
                       onChange={(e) => handleContactChange(index, 'is_primary', e.target.checked)}
-                      className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-oem-blue"
                     />
                     <span className="text-xs font-medium text-oem-blue">Key-man (주요 연락처)</span>
                   </label>

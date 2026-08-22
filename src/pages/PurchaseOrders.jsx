@@ -21,7 +21,8 @@ const won = (v) => Math.round(Number(v) || 0).toLocaleString('ko-KR')
 const num = (v) => { const n = Number(String(v).replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? n : 0 }
 
 const STATUS = ['작성중', '발송', '입고', '취소']
-const STATUS_COLOR = { 작성중: '#6B7280', 발송: '#1D4ED8', 입고: '#1C6B3C', 취소: '#6B7280' }
+/* 견적서와 같은 단계 색: 회색(아직) -> 겨자(공을 넘겼다) -> 초록(들어왔다) */
+const STATUS_COLOR = { 작성중: '#6B7280', 발송: '#8a6b00', 입고: '#007538', 취소: '#9fa0a0' }
 
 const emptyLine = () => ({
     key: Math.random().toString(36).slice(2),

@@ -127,7 +127,7 @@ const Map = () => {
             add(hqLocation, el, 9999)
         }
         if (userLocation) {
-            const el = dot('#2563eb', 14, 3)
+            const el = dot('#007538', 14, 3)
             el.title = '내 위치'
             add(userLocation, el, 10000)
         }

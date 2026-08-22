@@ -35,7 +35,7 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
 
                     switch (act.type) {
                         case '전화':
-                            badgeColor = { bg: 'rgba(59,130,246,0.1)', text: '#1d4ed8', border: 'rgba(59,130,246,0.25)' }
+                            badgeColor = { bg: 'rgba(0,117,56,0.08)', text: '#007538', border: 'rgba(0,117,56,0.25)' }
                             Icon = Phone
                             break
                         case '이메일':

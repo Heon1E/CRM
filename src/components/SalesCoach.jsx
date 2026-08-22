@@ -75,7 +75,7 @@ const AREAS = [
         key: 'new', label: '신규 영업',
         groups: [
             {
-                key: 'newHot', title: '진행 중', icon: Target, color: '#1D4ED8', bg: '#DBEAFE',
+                key: 'newHot', title: '진행 중', icon: Target, color: '#8a6b00', bg: '#fff4cc',
                 hint: '방문했지만 아직 첫 거래가 없습니다. 무엇이 막고 있는지 확인하세요.',
             },
             {

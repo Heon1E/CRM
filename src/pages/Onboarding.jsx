@@ -41,7 +41,7 @@ const StepIndicator = ({ steps, current }) => (
                 <React.Fragment key={step.id}>
                     <div className="flex flex-col items-center">
                         <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${done ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' :
-                                active ? 'bg-oem-blue text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100' :
+                                active ? 'bg-oem-blue text-white shadow-md shadow-blue-500/30 ring-4 ring-oem-blue' :
                                     'bg-gray-100 text-gray-500'
                             }`}>
                             {done ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
@@ -74,7 +74,7 @@ const Step1 = ({ data, setData, locale }) => {
                     value={data.companyName}
                     onChange={e => setData(d => ({ ...d, companyName: e.target.value }))}
                     placeholder={isEn ? 'e.g. Acme Corporation' : '예: 주식회사 아크미'}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all"
                 />
             </div>
             <div>
@@ -105,7 +105,7 @@ const Step1 = ({ data, setData, locale }) => {
                     value={data.website}
                     onChange={e => setData(d => ({ ...d, website: e.target.value }))}
                     placeholder="https://yourcompany.com"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all"
                 />
             </div>
         </div>
@@ -173,7 +173,7 @@ const Step3 = ({ data, setData, locale }) => {
                     value={data.firstClientName}
                     onChange={e => setData(d => ({ ...d, firstClientName: e.target.value }))}
                     placeholder={isEn ? 'e.g. Global Tech Inc.' : '예: 글로벌테크 주식회사'}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all"
                 />
             </div>
             <div>
@@ -185,7 +185,7 @@ const Step3 = ({ data, setData, locale }) => {
                     value={data.firstClientContact}
                     onChange={e => setData(d => ({ ...d, firstClientContact: e.target.value }))}
                     placeholder={isEn ? 'e.g. John Smith' : '예: 홍길동'}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all"
                 />
             </div>
             <div>
@@ -197,7 +197,7 @@ const Step3 = ({ data, setData, locale }) => {
                     value={data.firstClientEmail}
                     onChange={e => setData(d => ({ ...d, firstClientEmail: e.target.value }))}
                     placeholder="contact@company.com"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-oem-blue focus:border-transparent transition-all"
                 />
             </div>
             <p className="text-[11px] text-gray-500 text-center">

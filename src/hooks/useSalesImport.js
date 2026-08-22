@@ -252,7 +252,7 @@ export function useSalesImport() {
           <p style="margin:0 0 10px"><b>대상 기간:</b> ${plan.targetDates[0]} ~ ${plan.targetDates[plan.targetDates.length - 1]} (${plan.targetDates.length}개 날짜)</p>
           <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px">
             <tr><td style="padding:5px 0">그대로 유지</td><td style="text-align:right"><b>${stats.unchanged}건</b></td></tr>
-            <tr><td style="padding:5px 0;color:#2563eb">신규 등록</td><td style="text-align:right;color:#2563eb"><b>${stats.insert}건</b></td></tr>
+            <tr><td style="padding:5px 0;color:#007538">신규 등록</td><td style="text-align:right;color:#007538"><b>${stats.insert}건</b></td></tr>
             <tr><td style="padding:5px 0;color:#ca8a04">금액·수량 수정</td><td style="text-align:right;color:#ca8a04"><b>${stats.update}건</b></td></tr>
             <tr><td style="padding:5px 0;color:#dc2626">삭제</td><td style="text-align:right;color:#dc2626"><b>${stats.delete}건</b></td></tr>
           </table>

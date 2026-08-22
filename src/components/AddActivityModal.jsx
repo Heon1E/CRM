@@ -507,7 +507,7 @@ ${currentText}`
             id="registerAsIssue"
             checked={registerAsIssue}
             onChange={(e) => setRegisterAsIssue(e.target.checked)}
-            className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+            className="w-4 h-4 text-oem-blue border-gray-300 rounded focus:ring-oem-blue cursor-pointer"
           />
           <label htmlFor="registerAsIssue" className="text-sm font-bold text-oem-text-primary cursor-pointer">
             이슈로도 등록
