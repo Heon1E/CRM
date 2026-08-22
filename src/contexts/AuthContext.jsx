@@ -113,20 +113,20 @@ export function AuthProvider({ children }) {
     }
   }
 
-  /** 계정 만들기 — 맨 처음 만들어지는 계정이 관리자가 된다 (SQL 트리거) */
-  const signUp = async (idOrEmail, password, fullName) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: toLoginEmail(idOrEmail),
-        password,
-        options: { data: { full_name: fullName || String(idOrEmail).split('@')[0] } },
-      })
-      if (error) return { success: false, error: error.message }
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: err.message }
-    }
-  }
+  /*
+   * **`signUp`을 없앴다.**
+   *
+   * 스스로 가입하는 길은 보안 때문에 닫았다 — 배포 주소가 공개돼 있어서
+   * 가입 한 번으로 거래처 1,150곳과 매출 1.5만 건을 읽을 수 있었다.
+   * 화면에서 가입 탭을 지운 뒤에도 이 함수만 남아 있었는데, 남겨 둘 이유가
+   * 없다: 부르는 곳이 없고, 브라우저에서 부르면 **만든 계정으로 세션이 바뀌어
+   * 관리자가 로그아웃된다**(남을 대신 만들 수 없다).
+   *
+   * 새 계정은 Supabase 대시보드에서 만든다 (Authentication > Users > Add user).
+   * 만들어진 계정은 `pending`으로 들어와 아무것도 못 보고, 설정 > 계정 · 권한
+   * 에서 관리자가 역할을 올려 준다.
+   */
+
 
   const signOut = async () => {
     try {
@@ -148,7 +148,6 @@ export function AuthProvider({ children }) {
     isAdmin: profile?.role === 'admin',
     canWrite: profile?.role === 'admin' || profile?.role === 'sales',
     signIn,
-    signUp,
     signInWithGoogle,
     signOut,
     loading,

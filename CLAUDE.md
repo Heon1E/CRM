@@ -399,6 +399,49 @@ Supabase > Project Settings > API > service_role.
 
 새 스크립트를 만들 때도 `createClient`를 직접 부르지 말고 `connect()`를 쓸 것.
 
+## 새 계정은 앱에서 못 만든다 — Supabase 대시보드에서 만든다
+
+스스로 가입하는 길을 보안 때문에 닫은 뒤(2026-08-15), **계정을 만드는 길이
+앱 안에 하나도 없다.** `UserAdmin`(설정 > 계정 · 권한)은 이미 있는 계정의
+역할만 바꾼다.
+
+그런데 그 화면 안내문이 *"그 다음부터는 영업으로 들어오고 여기서 올려 줍니다"*
+라고 **없앤 기능을 설명하고 있었다.** 관리자가 새 직원 계정을 어떻게 만드는지
+알 길이 없었다. 지금은 실제 절차를 적는다:
+
+> Supabase > Authentication > Users > Add user.
+> 아이디에 `@idibc.local`을 붙인다 (예: `park@idibc.local`).
+> 만든 계정은 `pending`으로 들어와 아무것도 못 보고, 관리자가 역할을 올려 준다.
+
+**화면에 '계정 만들기'를 붙일 수 없다.** `supabase.auth.signUp`을 브라우저에서
+부르면 **만든 계정으로 세션이 바뀌어 관리자가 로그아웃된다.** 남을 대신
+만들려면 서비스 롤 키가 필요한데 그건 브라우저에 두면 안 되는 값이다.
+그래서 `AuthContext`의 `signUp`도 없앴다 — 부를 수 있는 곳이 없고, 남겨 두면
+누군가 다시 이어 붙이려 한다.
+
+## 어디에서도 쓰이지 않는 파일
+
+`import`하는 곳이 없어 빌드 산출물에도 들어가지 않는다. 지우지 않고 적어 두는
+것은, 되살릴지가 사람이 정할 일이기 때문이다. **새 코드를 여기에 이어 붙이기
+전에 이 목록을 볼 것** — 화면에 안 나오는 파일을 고치고 있을 수 있다.
+
+| 파일 | 줄 | 메모 |
+|---|---|---|
+| `components/SalesCalendar.jsx` | 762 | 한글 깨짐(U+FFFD 277). 아래 '알려진 손상 파일' 참고 |
+| `pages/ForgotPassword.jsx` | 278 | 아이디가 `@idibc.local`이라 메일을 못 보낸다 |
+| `components/SwipeableListItem.jsx` | 221 | 폰에서도 표를 쓰기로 하면서 쓰지 않게 됐다 |
+| `components/StatusBar.jsx` | 103 | |
+| `components/AIInsightModal.jsx` + `insights/*` | 102+ | 대시보드 개편 때 뺀 화면 |
+| `components/MetricCard.jsx` | 81 | |
+| `components/ProtectedRoute.jsx` | 56 | **App.jsx의 `ProtectedRoutes`(복수)와 다른 파일이다.** 이름이 비슷해 헷갈린다 |
+| `components/common/OracleInput.jsx` | 55 | |
+| `components/MobileFAB.jsx` | 42 | |
+| `components/Toast.jsx` | 31 | `react-hot-toast`가 대신한다 |
+| `pages/AdminApprovals.jsx` | 19 | 승인은 `UserAdmin`이 맡는다 |
+
+찾는 법 — 파일 이름(대문자로 시작하는 컴포넌트)이 다른 파일에서 한 번도
+언급되지 않으면 죽은 파일이다.
+
 ## 알려진 손상 파일
 
 `src/components/SalesCalendar.jsx`는 한글이 깨져 있다 — **U+FFFD 277개**(예전에
