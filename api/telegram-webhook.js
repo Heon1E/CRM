@@ -180,6 +180,12 @@ const PROMPT = (today, dow) => `
 
 오늘은 ${today} (${dow}요일) 이다. 한국 시간 기준.
 
+**우리 회사는 '아이앤디'(IND · 아이앤디비씨 · IDIBC · 아이앤디 주식회사)다.**
+드럼·IBC 용기를 만들어 파는 쪽이 우리다. 절대 거래처가 아니다 —
+clientName에 넣지 마라. 우리 영업사원(이헌일·박민철·송원기)도 person이 아니다.
+녹음에서 우리 쪽 사람이 먼저 자기소개를 하는 경우가 많으니 헷갈리지 마라.
+**clientName·person은 언제나 상대편(고객사와 그 직원)이다.**
+
 {
   "intent": "schedule" | "activity" | "sales" | "receivables" | "question" | "memo",
   "items": [ ... ],
@@ -232,6 +238,9 @@ memo:
 
 규칙:
 - 보이는 값만 쓴다. 모르면 null 또는 "". 지어내지 않는다.
+- 파일명이 함께 주어지면 **거래처명·상대방 이름을 못 들었을 때만** 참고한다
+  ("TalkFile_아존아시아박부장_...m4a" 같은 이름에 상대 회사가 들어 있다).
+  파일명으로 통화 **내용**을 추측하지는 마라.
 - **음성이 붙어 있으면 그것을 직접 듣고 들린 내용만 쓴다.** 파일명이나 길이를
   보고 내용을 추측하지 마라. 알아들을 수 없으면 items를 비우고 reply에
   "음성을 알아듣지 못했습니다"라고 적어라. 그럴듯한 요약을 만들어 채우지 마라.
@@ -354,10 +363,70 @@ async function repOfChat(chatId) {
 }
 
 /** 업무기록 -> activities (같은 거래처·같은 날은 건너뛴다) */
+/*
+ * **우리 회사는 거래처가 아니다.** 녹음에서 우리 쪽 사람이 먼저 자기소개를 하면
+ * 모델이 그것을 거래처로 적는다 — 실제로 그랬다(clientName "IND", person
+ * "이헌일 차장"). 프롬프트로 막았지만 그것만 믿을 수는 없다. 신규 등록은
+ * 되돌리기 번거로우므로 **코드에서 한 번 더 막는다.**
+ */
+const OURS = /^(아이앤디|아이엔디|ind|idibc|아이앤디비씨)(주식회사)?$/i
+const isOurCompany = (name) => OURS.test(normalizeKey(name, { removeCorp: true, removePunct: true }))
+
+/*
+ * 못 찾은 거래처를 새로 만든다.
+ *
+ * 예전에는 "거래처를 못 찾음: OO"이라고만 하고 활동을 버렸다. 처음 통화한
+ * 곳일수록 CRM에 없는데, **바로 그 통화가 가장 남길 값어치가 있다.**
+ * 판독 내용(단가·수량·다음 할 일)이 통째로 사라졌다.
+ *
+ * 다만 아무 이름이나 만들면 거래처 목록이 쓰레기가 된다. 셋을 막는다:
+ *   - 우리 회사 (위 isOurCompany)
+ *   - 두 글자 미만 — 잘못 들은 조각일 가능성이 크다
+ *   - 사람 이름·'사무실' 같은 것 (NON_CLIENT_PATTERN, findClient와 같은 기준)
+ * 만든 곳은 '잠재고객'으로 들어가고 답장에 그렇게 알린다 — 틀렸으면
+ * 앱에서 이름을 고치거나 지우면 된다.
+ */
+const TITLE = '사장|대표|부장|차장|과장|대리|주임|팀장|실장|이사|상무|전무|소장|공장장|반장|기사|님|씨'
+/*
+ * '박부장'·'김대표'처럼 **사람을 거래처 칸에 적은 것**을 거른다.
+ * 녹음에서 상대 회사를 못 듣고 이름만 들리면 모델이 그리 적는다 —
+ * 그대로 만들면 거래처 목록에 사람이 쌓인다. 회사를 가리키는 말
+ * (산업·화학·상사…)이 함께 있으면 회사로 본다.
+ */
+const looksLikePerson = (name) => {
+    const t = String(name).replace(/\s+/g, '')
+    if (t.length > 5) return false
+    if (/(산업|화학|상사|공업|물산|테크|전자|기업|코리아|케미|드럼|아이비씨)/.test(t)) return false
+    return new RegExp(`^[가-힣]{1,3}(${TITLE})$`).test(t)
+}
+
+async function createClient(name, repName) {
+    const clean = String(name || '').trim()
+    if (clean.length < 2) return null
+    if (isOurCompany(clean)) return null
+    if (looksLikePerson(clean)) return null
+    if (NON_CLIENT_PATTERN.test(clean) || looksLikeMultiCompany(clean)) return null
+    const rows = await sb('clients', {
+        method: 'POST', prefer: 'return=representation',
+        body: [{ company: clean, status: '잠재고객', sales_rep: repName || null }]
+    })
+    const c = Array.isArray(rows) ? rows[0] : rows
+    return c ? { id: c.id, company: c.company, sales_rep: c.sales_rep } : null
+}
+
 async function applyActivities(items, clientMap, repName = null) {
-    const saved = [], skipped = [], unmatched = []
+    const saved = [], skipped = [], unmatched = [], created = []
     for (const it of items) {
-        const c = findClient(clientMap, it.clientName)
+        let c = findClient(clientMap, it.clientName)
+        if (!c) {
+            // 처음 통화한 곳이면 CRM에 없는 게 당연하다. 만들어서 기록을 살린다.
+            try { c = await createClient(it.clientName, repName) }
+            catch (e) { console.warn('[telegram] 거래처 생성 실패', e.message) }
+            if (c) {
+                created.push(c.company)
+                keysOf(c.company).forEach((k) => { if (!clientMap.has(k)) clientMap.set(k, c) })
+            }
+        }
         if (!c) { unmatched.push(it.clientName || '(거래처 없음)'); continue }
         if (!it.date) { skipped.push(`${c.company} (날짜 없음)`); continue }
 
@@ -397,7 +466,7 @@ async function applyActivities(items, clientMap, repName = null) {
         }
         saved.push(c.company)
     }
-    return { saved, skipped, unmatched }
+    return { saved, skipped, unmatched, created }
 }
 
 /** 오늘/이번주 일정 답하기 */
@@ -547,6 +616,14 @@ export default async function handler(req, res) {
                 return ok()
             }
             await tgSend(chatId, '녹음을 듣고 있습니다…')
+            /*
+             * **파일명을 같이 준다.** 통화 녹음 파일명에는 상대 회사·사람이
+             * 들어 있는 경우가 많다(`TalkFile_아존아시아박부장_...m4a`).
+             * 실제로 이것을 안 줬더니 모델이 우리 쪽 사람의 자기소개를 듣고
+             * 거래처를 '아이앤디'(우리 회사)로 적었다.
+             */
+            if (audio.file_name) parts.push({ text: `
+녹음 파일명: ${audio.file_name}` })
             const snd = await fetchAudioBase64(audio)
             parts.push({ inlineData: { data: snd.data, mimeType: snd.mimeType } })
         }
@@ -610,6 +687,7 @@ export default async function handler(req, res) {
             let reply = `📝 <b>업무기록 ${r.saved.length}건을 넣었습니다.</b>`
             if (r.saved.length) reply += `\n${r.saved.map((n) => `• ${n}`).join('\n')}`
             if (r.skipped.length) reply += `\n\n이미 있어 건너뜀: ${r.skipped.join(', ')}`
+            if (r.created.length) reply += `\n\n🆕 <b>새 거래처로 등록:</b> ${[...new Set(r.created)].join(', ')}\n<i>이름이 틀렸으면 앱에서 고치거나 지워주세요.</i>`
             if (r.unmatched.length) reply += `\n\n거래처를 못 찾음: ${[...new Set(r.unmatched)].join(', ')}`
             if (warn.length) reply += `\n\n⚠️ ${warn.join('\n⚠️ ')}`
             await tgSend(chatId, reply)
