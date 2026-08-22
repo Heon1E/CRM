@@ -555,7 +555,7 @@ const Settings = () => {
                     </div>
 
                     <div className="bg-red-50 p-4 border border-red-200 rounded-sm">
-                      <h4 className="text-sm font-bold text-red-700 mb-2 flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-[color:var(--danger)] mb-2 flex items-center gap-2">
                         <TriangleAlert className="w-4 h-4" /> 되돌릴 수 없는 작업
                       </h4>
                       <p className="text-[10px] text-red-800 mb-3">
@@ -648,7 +648,7 @@ const Settings = () => {
                                 </button>
                                 <button
                                   onClick={() => handleDelete(product.id)}
-                                  className="p-1 hover:bg-gray-100 rounded text-red-500 transition-colors"
+                                  className="p-1 hover:bg-gray-100 rounded text-[color:var(--danger)] transition-colors"
                                   title="Delete"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />

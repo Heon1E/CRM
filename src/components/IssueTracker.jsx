@@ -70,7 +70,7 @@ const IssueTracker = ({ maxItems = null }) => {
                         {issue.status}
                       </span>
                       {issue.target_date && (
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm border ${Math.ceil((new Date(issue.target_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 3 ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-500 border-gray-100'
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm border ${Math.ceil((new Date(issue.target_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 3 ? 'bg-red-50 text-[color:var(--danger)] border-red-100' : 'bg-gray-50 text-gray-500 border-gray-100'
                           }`}>
                           D-{Math.ceil((new Date(issue.target_date) - new Date()) / (1000 * 60 * 60 * 24))}
                         </span>

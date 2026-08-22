@@ -31,12 +31,12 @@ const TopClientsView = ({ data, stats, advice }) => {
             {isHighRisk && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                     <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                        <AlertTriangle className="w-5 h-5 text-[color:var(--danger)] mt-0.5" />
                         <div>
                             <h3 className="font-bold text-red-900 mb-1">
                                 매출 집중도 리스크 경고
                             </h3>
-                            <p className="text-sm text-red-700">
+                            <p className="text-sm text-[color:var(--danger)]">
                                 상위 3개 고객사가 전체 매출의 {topThreePercentage.toFixed(1)}%를 차지하고 있습니다.
                                 고객 다변화를 통해 리스크를 분산하세요.
                             </p>
@@ -113,7 +113,7 @@ const TopClientsView = ({ data, stats, advice }) => {
                 <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
                         <p className="text-xs text-gray-500 mb-1">상위 3개 집중도</p>
-                        <p className={`text-lg font-bold ${isHighRisk ? 'text-red-600' : 'text-green-600'}`}>
+                        <p className={`text-lg font-bold ${isHighRisk ? 'text-[color:var(--danger)]' : 'text-[color:var(--success)]'}`}>
                             {topThreePercentage.toFixed(1)}%
                         </p>
                     </div>

@@ -255,7 +255,7 @@ ${currentText}`
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-oem-text-primary">
         <div>
           <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-            CLIENT <span className="text-red-500">*</span>
+            CLIENT <span className="text-[color:var(--danger)]">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -273,7 +273,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-              ACTIVITY TYPE <span className="text-red-500">*</span>
+              ACTIVITY TYPE <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.type}
@@ -292,7 +292,7 @@ ${currentText}`
 
           <div>
             <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-              STATUS <span className="text-red-500">*</span>
+              STATUS <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
@@ -308,7 +308,7 @@ ${currentText}`
 
         <div>
           <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-            DATE <span className="text-red-500">*</span>
+            DATE <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="date"
@@ -387,7 +387,7 @@ ${currentText}`
                   <button
                     type="button"
                     onClick={() => handleRemoveAttendee(index)}
-                    className="hover:text-red-500 transition-colors"
+                    className="hover:text-[color:var(--danger)] transition-colors"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -401,7 +401,7 @@ ${currentText}`
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="block text-xs font-bold text-oem-text-secondary uppercase">
-              DESCRIPTION <span className="text-red-500">*</span>
+              DESCRIPTION <span className="text-[color:var(--danger)]">*</span>
             </label>
             <button
               type="button"
@@ -441,7 +441,7 @@ ${currentText}`
           <button
             type="button"
             onClick={handleDeleteWrap}
-            className="px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 rounded-sm transition-colors"
+            className="px-4 py-2 text-xs font-bold text-[color:var(--danger)] hover:bg-red-50 border border-transparent hover:border-red-200 rounded-sm transition-colors"
           >
             DELETE
           </button>

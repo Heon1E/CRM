@@ -369,7 +369,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <label className="font-bold text-black uppercase tracking-tight">
-              CLIENT_ID: <span className="text-red-600">*</span>
+              CLIENT_ID: <span className="text-[color:var(--danger)]">*</span>
             </label>
             <ClientCombobox
               clients={clients || []}
@@ -382,7 +382,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
 
           <div className="flex flex-col gap-1">
             <label className="font-bold text-black uppercase tracking-tight">
-              TRANS_DATE: <span className="text-red-600">*</span>
+              TRANS_DATE: <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
               type="date"
@@ -465,7 +465,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
                       </td>
                       <td className="p-1 text-center">
                         {formData.items.length > 1 && (
-                          <button type="button" onClick={() => removeItem(index)} className="text-red-700 font-bold">×</button>
+                          <button type="button" onClick={() => removeItem(index)} className="text-[color:var(--danger)] font-bold">×</button>
                         )}
                       </td>
                     </tr>

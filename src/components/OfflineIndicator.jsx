@@ -84,7 +84,7 @@ const OfflineIndicator = () => {
             ? 'text-emerald-600'
             : isOnline
             ? 'text-amber-600'
-            : 'text-red-600'
+            : 'text-[color:var(--danger)]'
         }
         shadow-sm
       `}
@@ -117,7 +117,7 @@ const OfflineIndicator = () => {
           <span className="text-xs md:text-sm font-medium text-center">
             현재 오프라인 상태입니다. 작성한 데이터는 연결 시 자동 저장됩니다.
             {pendingSyncCount > 0 && (
-              <span className="ml-1 font-semibold text-red-600">
+              <span className="ml-1 font-semibold text-[color:var(--danger)]">
                 (대기 중: {pendingSyncCount}개)
               </span>
             )}

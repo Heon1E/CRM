@@ -173,7 +173,7 @@ const ClientCombobox = ({
             {onNewClient && searchTerm.trim() && filteredClients.length === 0 && (
               <div
                 onClick={handleCreateNew}
-                className="px-4 py-2.5 cursor-pointer hover:bg-green-50 text-green-700 font-bold text-sm border-t border-gray-100 flex items-center gap-1"
+                className="px-4 py-2.5 cursor-pointer hover:bg-green-50 text-[color:var(--success)] font-bold text-sm border-t border-gray-100 flex items-center gap-1"
               >
                 <span className="text-lg leading-none">+</span> "{searchTerm.trim()}" 신규 거래처로 등록
               </div>

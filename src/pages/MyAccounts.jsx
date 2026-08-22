@@ -273,7 +273,7 @@ const MyAccounts = () => {
                 </div>
                 <div className={`border rounded-lg p-3 ${totalYoY >= 0 ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
                     <p className="text-[10px] text-gray-500 uppercase font-bold">전년 동기 대비</p>
-                    <p className={`text-lg font-bold mt-1 flex items-center gap-1 ${totalYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className={`text-lg font-bold mt-1 flex items-center gap-1 ${totalYoY >= 0 ? 'text-[color:var(--success)]' : 'text-[color:var(--danger)]'}`}>
                         {totalYoY >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                         {totalYoY >= 0 ? '+' : ''}{totalYoY}%
                     </p>
@@ -381,8 +381,8 @@ const MyAccounts = () => {
                                         </td>
                                         <td className="px-3 py-2 text-right">
                                             {client.lastYearSamePeriodSales > 0 || client.thisYearSales > 0 ? (
-                                                <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${client.yoyChange > 0 ? 'text-green-600' :
-                                                    client.yoyChange < 0 ? 'text-red-500' : 'text-gray-500'
+                                                <span className={`inline-flex items-center gap-0.5 text-xs font-bold ${client.yoyChange > 0 ? 'text-[color:var(--success)]' :
+                                                    client.yoyChange < 0 ? 'text-[color:var(--danger)]' : 'text-gray-500'
                                                     }`}>
                                                     {client.yoyChange > 0 ? <TrendingUp className="w-3 h-3" /> :
                                                         client.yoyChange < 0 ? <TrendingDown className="w-3 h-3" /> :
@@ -465,7 +465,7 @@ const MyAccounts = () => {
                                         {formatMoney(filteredClients.reduce((s, c) => s + c.lastYearSamePeriodSales, 0))}
                                     </td>
                                     <td className="px-3 py-2.5 text-right">
-                                        <span className={`text-xs font-bold ${totalYoY >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        <span className={`text-xs font-bold ${totalYoY >= 0 ? 'text-[color:var(--success)]' : 'text-[color:var(--danger)]'}`}>
                                             {totalYoY >= 0 ? '+' : ''}{totalYoY}%
                                         </span>
                                     </td>

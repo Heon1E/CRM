@@ -291,7 +291,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                             <ArrowRight className="w-5 h-5" />
                         </Link>
                     )}
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${primaryContact.status === '매출' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${primaryContact.status === '매출' ? 'bg-green-100 text-[color:var(--success)]' : 'bg-slate-200 text-slate-600'}`}>
                         {coerceClientStatus(primaryContact.status)}
                     </span>
                 </div>
@@ -339,7 +339,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
             {/* Quick Contact */}
             <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-white p-3 rounded border border-slate-200 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-green-50 flex items-center justify-center text-green-600"><Phone className="w-4 h-4" /></div>
+                    <div className="w-8 h-8 rounded bg-green-50 flex items-center justify-center text-[color:var(--success)]"><Phone className="w-4 h-4" /></div>
                     <div className="overflow-hidden">
                         <p className="text-[10px] text-slate-500 uppercase font-bold">Phone</p>
                         <p className="text-sm font-bold text-slate-700 truncate">{primaryContact.phone || '-'}</p>

@@ -30,7 +30,7 @@ class ErrorBoundary extends React.Component {
                     <div className="max-w-md w-full bg-white border border-red-200 shadow-lg rounded-sm p-8 text-center">
                         <div className="flex justify-center mb-6">
                             <div className="bg-red-50 p-4 rounded-full">
-                                <TriangleAlert className="w-12 h-12 text-red-500" />
+                                <TriangleAlert className="w-12 h-12 text-[color:var(--danger)]" />
                             </div>
                         </div>
 

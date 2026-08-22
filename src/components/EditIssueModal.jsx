@@ -183,7 +183,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-            TITLE <span className="text-red-500">*</span>
+            TITLE <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="text"
@@ -228,7 +228,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
 
           <div>
             <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-              STATUS <span className="text-red-500">*</span>
+              STATUS <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
@@ -247,7 +247,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 transition-colors text-[11px] font-bold uppercase"
+            className="px-4 py-2 bg-red-50 text-[color:var(--danger)] border border-red-200 rounded hover:bg-red-100 transition-colors text-[11px] font-bold uppercase"
           >
             DELETE_ISSUE
           </button>

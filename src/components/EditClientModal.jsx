@@ -504,7 +504,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
                     </td>
                     <td className="p-1 text-center">
                       {contacts.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveContact(index)} className="text-red-600 font-bold">×</button>
+                        <button type="button" onClick={() => handleRemoveContact(index)} className="text-[color:var(--danger)] font-bold">×</button>
                       )}
                     </td>
                   </tr>
@@ -581,7 +581,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
                           onChange={(e) => handleUpdateContractPrice(cp?.productId, e.target.value || '0')}
                           className="w-16 border border-gray-300 outline-none px-1 text-right"
                         />
-                        <button type="button" onClick={() => handleRemoveContractPrice(cp?.productId)} className="text-red-600 font-bold px-1">×</button>
+                        <button type="button" onClick={() => handleRemoveContractPrice(cp?.productId)} className="text-[color:var(--danger)] font-bold px-1">×</button>
                       </div>
                     </div>
                   )

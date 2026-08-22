@@ -77,7 +77,7 @@ const ActionCenter = () => {
                 ) : (
                     <div className="bg-white border border-oem-border rounded-oem p-4 shadow-sm flex items-center justify-between opacity-80 hover:opacity-100 transition-opacity">
                         <div className="flex items-center gap-3">
-                            <div className="p-1.5 bg-green-100 text-green-600 rounded-full">
+                            <div className="p-1.5 bg-green-100 text-[color:var(--success)] rounded-full">
                                 <CheckCircle2 className="w-5 h-5" />
                             </div>
                             <div>

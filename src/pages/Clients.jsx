@@ -576,7 +576,7 @@ const Clients = () => {
                             )}
                             <td className="text-center py-3">
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${coerceClientStatus(primaryContact?.status) === '매출'
-                                ? 'bg-green-100 text-green-700'
+                                ? 'bg-green-100 text-[color:var(--success)]'
                                 : 'bg-slate-100 text-slate-600'
                                 }`}>
                                 {primaryContact?.status?.toUpperCase() || 'UNKNOWN'}

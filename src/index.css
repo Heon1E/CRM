@@ -317,7 +317,9 @@ a:hover {
 .tb-btn kbd {
   font-family: var(--font-data);
   font-size: 10px;
-  color: var(--text-muted);
+  /* `--text-muted`(#5f6773)는 `--bg-app` 위에서 4.47:1로 4.5에 미치지 못한다
+     (실측). 한 단계 진한 값으로 둔다. */
+  color: var(--text-secondary);
   border: 1px solid var(--border-light);
   border-radius: 2px;
   padding: 0 3px;
@@ -325,7 +327,8 @@ a:hover {
 }
 
 .tb-btn.primary kbd {
-  color: #ffd9d1;
+  /* 예전 Oracle 레드 테마의 분홍 잔재였다. 초록 단추 위에서는 흰색 계열이 맞다. */
+  color: rgba(255, 255, 255, .85);
   border-color: rgba(255, 255, 255, .35);
   background: rgba(0, 0, 0, .15);
 }

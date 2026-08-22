@@ -142,7 +142,7 @@ const SalesExcelUpload = ({ onRefresh }) => {
         disabled={isDeleting || busy}
         className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${isDeleting || busy
           ? 'opacity-50 cursor-not-allowed bg-[color:var(--bg-card)] text-[color:var(--text-secondary)] border border-[color:var(--border)]'
-          : 'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200'
+          : 'bg-red-50 hover:bg-red-100 text-[color:var(--danger)] border border-red-200'
           }`}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >

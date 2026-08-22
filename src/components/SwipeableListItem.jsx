@@ -186,7 +186,7 @@ const SwipeableListItem = ({
               e.stopPropagation()
               handleActionClick('delete')
             }}
-            className="flex-1 bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-500 font-medium transition-colors touch-manipulation border border-red-100"
+            className="flex-1 bg-red-50 hover:bg-red-100 flex items-center justify-center text-[color:var(--danger)] font-medium transition-colors touch-manipulation border border-red-100"
             style={{ minWidth: '80px', minHeight: '44px', WebkitTapHighlightColor: 'transparent' }}
             aria-label={deleteLabel}
           >

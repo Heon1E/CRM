@@ -312,7 +312,7 @@ ${currentText}`
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="oem-label">
-            CLIENT <span className="text-red-500">*</span>
+            CLIENT <span className="text-[color:var(--danger)]">*</span>
           </label>
           <ClientCombobox
             clients={clients || []}
@@ -330,7 +330,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="oem-label">
-              ACTIVITY TYPE <span className="text-red-500">*</span>
+              ACTIVITY TYPE <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.type}
@@ -349,7 +349,7 @@ ${currentText}`
 
           <div>
             <label className="oem-label">
-              STATUS <span className="text-red-500">*</span>
+              STATUS <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
@@ -366,7 +366,7 @@ ${currentText}`
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="oem-label">
-              DATE <span className="text-red-500">*</span>
+              DATE <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
               type="date"
@@ -466,7 +466,7 @@ ${currentText}`
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="oem-label">
-              DESCRIPTION <span className="text-red-500">*</span>
+              DESCRIPTION <span className="text-[color:var(--danger)]">*</span>
             </label>
             <button
               type="button"

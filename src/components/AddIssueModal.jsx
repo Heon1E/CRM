@@ -103,7 +103,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
           <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-            TITLE <span className="text-red-500">*</span>
+            TITLE <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="text"
@@ -148,7 +148,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
 
           <div>
             <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
-              STATUS <span className="text-red-500">*</span>
+              STATUS <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
