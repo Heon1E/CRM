@@ -171,6 +171,47 @@ async function fetchAudioBase64(a) {
     return { data: buf.toString('base64'), mimeType: AUDIO_OK.has(mapped) ? mapped : 'audio/ogg' }
 }
 
+/*
+ * 같은 것을 두 번 보냈는지 알아본다 — **내용으로 판정한다.**
+ *
+ * 손이 미끄러져 같은 녹음·같은 스크린샷을 두 번 보내는 일이 있다. 예전에는
+ * 활동에 `(거래처, 날짜)`가 겹치면 건너뛰어 우연히 막혔는데, 이제 그런 건
+ * **합치므로** 같은 내용이 '2회째'로 두 번 적힌다. 일정·매출은 아예 막는 것도
+ * 없었다.
+ *
+ * 그래서 판독하기 **전에** 내용 지문을 보고 이미 처리한 것이면 그대로 끝낸다.
+ * Gemini 호출도 건너뛰니 비용도 아낀다.
+ *
+ * 지문은 **파일 바이트의 해시**다. 텔레그램의 `file_unique_id`를 쓸 수도 있지만,
+ * 같은 화면을 다시 캡처하면 그 id는 달라지므로 내용 자체를 본다.
+ * 글은 공백을 정리한 뒤 해시한다.
+ *
+ * 마이그레이션은 필요 없다 — `telegram_inbox.payload.fp`에 담고
+ * PostgREST의 `payload->>fp` 로 찾는다.
+ */
+const sha = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 32)
+
+export const fingerprint = ({ text, blobs = [] } = {}) => {
+    const parts = blobs.filter(Boolean).map(sha)
+    const t = String(text || '').replace(/\s+/g, ' ').trim()
+    if (t) parts.push(sha(t))
+    return parts.length ? sha(parts.join('|')) : null
+}
+
+/** 이미 처리한 지문이면 그 기록을 돌려준다. */
+async function findProcessed(fp) {
+    if (!fp) return null
+    try {
+        const rows = await sb(`telegram_inbox?select=doc_type,note,created_at,status`
+            + `&payload->>fp=eq.${fp}&order=created_at.desc&limit=1`)
+        return rows[0] || null
+    } catch (e) {
+        // 지문 조회가 실패했다고 판독을 막지는 않는다 — 중복 하나가 오류보다 낫다
+        console.warn('[telegram] 지문 조회 실패', e.message)
+        return null
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 판독 프롬프트 — 무엇인지 고르고, 그에 맞는 칸만 채운다
 // ---------------------------------------------------------------------------
@@ -797,9 +838,11 @@ export default async function handler(req, res) {
         const dow = WEEKDAY[new Date(`${today}T00:00:00Z`).getUTCDay()]
 
         const parts = [{ text: PROMPT(today, dow) }]
+        const blobs = []   // 내용 지문용 (같은 것을 두 번 보냈는지 본다)
         if (text) parts.push({ text: `\n사용자 메시지:\n${text}` })
         if (photos?.length) {
             const img = await fetchPhotoBase64(photos)
+            blobs.push(img.data)
             parts.push({ inlineData: { data: img.data, mimeType: img.mimeType } })
         }
         if (audio) {
@@ -817,7 +860,26 @@ export default async function handler(req, res) {
             if (audio.file_name) parts.push({ text: `
 녹음 파일명: ${audio.file_name}` })
             const snd = await fetchAudioBase64(audio)
+            blobs.push(snd.data)
             parts.push({ inlineData: { data: snd.data, mimeType: snd.mimeType } })
+        }
+
+        /*
+         * **판독하기 전에** 같은 것을 이미 처리했는지 본다. 여기서 끊으면
+         * Gemini 호출도 하지 않는다. 손이 미끄러져 두 번 보낸 것을 두 번
+         * 기록하는 것보다, 두 번째는 알려 주고 마는 편이 낫다.
+         */
+        const fp = fingerprint({ text, blobs })
+        const already = await findProcessed(fp)
+        if (already) {
+            const what = { schedule: '일정', activity: '업무기록', sales: '매출', receivables: '채권', memo: '메모' }
+            await tgSend(chatId,
+                '↩️ <b>이미 처리한 내용입니다.</b> 그대로 두었습니다.\n'
+                + `${fmtDate(String(already.created_at).slice(0, 10))}에 `
+                + `${what[already.doc_type] || already.doc_type}으로 넣었습니다`
+                + `${already.note ? ` — ${already.note}` : ''}.`
+            )
+            return ok()
         }
 
         const parsed = await callGemini(parts)
@@ -840,7 +902,7 @@ export default async function handler(req, res) {
             await saveToInbox({
                 chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: 'schedule',
-                payload: { items, reply: parsed.reply || '' }, status: 'auto',
+                payload: { fp, items, reply: parsed.reply || '' }, status: 'auto',
                 applied_at: new Date().toISOString(), note: `일정 ${saved.length}건 등록`
             })
 
@@ -872,7 +934,7 @@ export default async function handler(req, res) {
             await saveToInbox({
                 chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: 'activity',
-                payload: { items, reply: parsed.reply || '' }, status: 'auto',
+                payload: { fp, items, reply: parsed.reply || '' }, status: 'auto',
                 applied_at: new Date().toISOString(), note: `활동 ${r.saved.length}건 등록`
             })
 
@@ -895,7 +957,7 @@ export default async function handler(req, res) {
             await saveToInbox({
                 chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: intent,
-                payload: { rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [] },
+                payload: { fp, rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [] },
                 status: 'pending'
             })
             const label = intent === 'sales' ? '매출' : '채권(미수금)'
@@ -925,7 +987,7 @@ export default async function handler(req, res) {
         await saveToInbox({
             chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
             has_image: !!photos?.length, doc_type: 'memo',
-            payload: { items, reply: parsed.reply || '' }, status: 'pending'
+            payload: { fp, items, reply: parsed.reply || '' }, status: 'pending'
         })
         await tgSend(chatId, `🗒 메모로 담아뒀습니다.\n${parsed.reply || ''}\n\nCRM 설정 &gt; 받은 항목에서 볼 수 있습니다.`)
         return ok()
