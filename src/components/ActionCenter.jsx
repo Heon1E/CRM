@@ -57,7 +57,7 @@ const ActionCenter = () => {
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800">Requires Attention</h3>
-                                <p className="text-[10px] text-slate-500">No contact for 7+ days</p>
+                                <p className="text-[10px] text-slate-500">7일 넘게 연락이 없는 곳</p>
                             </div>
                         </div>
                         <div className="space-y-3 relative z-10">
@@ -82,7 +82,7 @@ const ActionCenter = () => {
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-slate-700">All Leads Active</h3>
-                                <p className="text-[10px] text-slate-500">No dormant leads found.</p>
+                                <p className="text-[10px] text-slate-500">연락이 끊긴 곳이 없습니다.</p>
                             </div>
                         </div>
                     </div>
@@ -100,7 +100,7 @@ const ActionCenter = () => {
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800">Closing Priorities</h3>
-                                <p className="text-[10px] text-slate-500">Deals in final stages</p>
+                                <p className="text-[10px] text-slate-500">마무리 단계인 기회</p>
                             </div>
                         </div>
                         <div className="space-y-3 relative z-10">
@@ -125,7 +125,7 @@ const ActionCenter = () => {
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-slate-700">No Closing Deals</h3>
-                                <p className="text-[10px] text-slate-500">No active deals in final stage.</p>
+                                <p className="text-[10px] text-slate-500">마무리 단계인 기회가 없습니다.</p>
                             </div>
                         </div>
                     </div>

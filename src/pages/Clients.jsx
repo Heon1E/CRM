@@ -599,7 +599,7 @@ const Clients = () => {
                               <button
                                 onClick={() => setEditingClient(primaryContact)}
                                 className="p-1.5 hover:bg-oem-grey-light rounded-md transition-colors group/btn"
-                                title="Edit Client"
+                                title="거래처 고치기"
                               >
                                 <Edit className="w-4 h-4 text-slate-500 group-hover/btn:text-oem-blue" />
                               </button>

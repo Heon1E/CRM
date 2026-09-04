@@ -763,6 +763,38 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   .flash-in { animation: none; }
 }
 
+/* 코드에 쓰이는데 정의가 없던 것들 — 빌드 CSS에 0건이었다.
+   `npm run build && grep -c "oem-input" dist/assets/*.css` 로 찾는다. */
+
+/* 입력칸은 요소 선택자(input/select/textarea)가 이미 꾸민다. 이 클래스는
+   '이 칸은 폼 입력이다'라는 표시로 남기고 폭만 채운다 — 지우면 4개 파일을
+   손봐야 하고, 두면 다음 사람이 또 없는 규칙을 기대한다. */
+.oem-input { width: 100%; }
+
+.oem-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.oem-panel-content { padding: 16px; }
+
+/* 설정 화면의 표 하나가 이 이름을 쓴다. 목록 표(.dgrid)와 같은 규칙으로 둔다 */
+.oem-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.oem-table th {
+  background: var(--ind-panel); color: var(--ind-ink);
+  font-weight: 700; text-align: left; padding: 6px 10px;
+  border-bottom: 2px solid var(--ind-green); white-space: nowrap;
+}
+.oem-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.oem-table tbody tr:hover { background: var(--bg-panel); }
+
+/* 문서 미리보기 바깥 상자. 인쇄할 때는 .doc-sheet 밖을 전부 감추므로
+   여기서는 화면용 여백만 맡는다 (실제 값은 각 화면의 인라인 style). */
+.doc-preview { overflow: auto; }
+
 .oem-panel-header {
   display: flex;
   align-items: center;

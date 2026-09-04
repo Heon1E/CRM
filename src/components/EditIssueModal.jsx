@@ -192,7 +192,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
             className="oem-input w-full"
             required
             maxLength={200}
-            placeholder="Issue Title"
+            placeholder="무슨 일인가요"
           />
         </div>
 
@@ -205,7 +205,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
             onChange={handleContentChange}
             rows={6}
             className="oem-input w-full resize-none"
-            placeholder="Describe the issue..."
+            placeholder="자세한 내용을 적습니다"
             maxLength={1000}
           />
           <div className="mt-1 text-right text-[10px] text-gray-500 font-mono">

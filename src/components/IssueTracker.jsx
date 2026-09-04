@@ -98,7 +98,7 @@ const IssueTracker = ({ maxItems = null }) => {
         </div>
       ) : (
         <div className="text-center py-6 border border-dashed border-gray-200 rounded-sm bg-gray-50">
-          <p className="text-[11px] text-gray-500 font-medium">No active issues found.</p>
+          <p className="text-[11px] text-gray-500 font-medium">진행 중인 이슈가 없습니다.</p>
         </div>
       )}
 

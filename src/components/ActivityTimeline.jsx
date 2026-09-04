@@ -2,6 +2,14 @@ import React, { useState } from 'react'
 import { Phone, Mail, FileText, CheckCircle, ChevronRight } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import EditActivityModal from './EditActivityModal'
+import { parseActivityDescription } from '../utils/activityMerge'
+
+/** 봇이 심은 머리글([통화 N회]·[담당자])을 걷어내고 첫 줄만 보여준다 */
+const summaryOf = (act) => {
+    const body = parseActivityDescription(act.description || '').body
+    const first = body.split('\n').map((l) => l.trim()).find(Boolean) || ''
+    return first.replace(/^\d+\.\s*/, '') || '(내용 없음)'
+}
 
 const ActivityTimeline = ({ maxItems = 5 }) => {
     const { activities } = useData()
@@ -13,8 +21,8 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
 
     if (!sortedActivities.length) {
         return (
-            <div className="p-5 text-center text-gray-500 text-xs font-medium">
-                No recent activities recorded.
+            <div className="p-5 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                아직 기록이 없습니다.
             </div>
         )
     }
@@ -66,23 +74,29 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
                                 <div className="flex items-center justify-between mb-0.5">
                                     <p className="text-[12px] font-bold truncate transition-colors"
                                         style={{ color: 'var(--text-primary)' }}>
-                                        {act.title || act.clientName}
+                                        {act.clientName || '거래처 없음'}
                                     </p>
                                     <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                                        {new Date(act.date).toLocaleDateString()}
+                                        {String(act.activity_date || act.date || '').slice(5).replace('-', '/')}
                                     </span>
                                 </div>
+                                {/*
+                                  * 예전에는 여기에 거래처명을 한 번 더 찍고 있었다 —
+                                  * 위에 이미 있는 것을 되풀이하느라 **무슨 일이 있었는지는
+                                  * 한 글자도 안 보였다.** (`act.title`은 activities에 없는
+                                  * 칸이라 늘 clientName으로 떨어졌다. /calendar가 없는 칸
+                                  * `summary`를 보다 227건이 전부 'No Title'이던 것과 같다.)
+                                  */}
                                 <p className="text-[11px] font-medium truncate flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                                    <span className={`text-xs px-1.5 rounded-sm font-bold`}
+                                    <span className={`text-xs px-1.5 rounded-sm font-bold shrink-0`}
                                         style={{ backgroundColor: badgeColor.bg, color: badgeColor.text, border: `1px solid ${badgeColor.border}` }}>
                                         {act.type}
                                     </span>
-                                    <span>·</span>
-                                    <span>{act.clientName}</span>
+                                    <span className="truncate">{summaryOf(act)}</span>
                                 </p>
                             </div>
                             <div className="transition-colors" style={{ color: 'var(--text-muted)' }}>
-                                <ChevronRight className="w-4 h-4 group-hover:text-emerald-400" />
+                                <ChevronRight className="w-4 h-4 group-hover:text-[color:var(--accent)]" />
                             </div>
                         </div>
                     )

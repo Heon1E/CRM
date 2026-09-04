@@ -104,7 +104,7 @@ const CommandPalette = () => {
                         ref={inputRef}
                         type="text"
                         className="flex-1 bg-transparent outline-none text-slate-700 placeholder:text-slate-500 text-lg"
-                        placeholder="Type a command or search..."
+                        placeholder="무엇을 찾으세요? (거래처·화면 이름)"
                         value={query}
                         onChange={e => {
                             setQuery(e.target.value)
@@ -147,7 +147,7 @@ const CommandPalette = () => {
                     ) : (
                         <div className="py-8 text-center text-slate-500">
                             <Command className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                            <p className="text-sm">No results found.</p>
+                            <p className="text-sm">찾는 것이 없습니다.</p>
                         </div>
                     )}
                 </div>

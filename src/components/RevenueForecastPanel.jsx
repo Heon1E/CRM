@@ -210,7 +210,7 @@ const RevenueForecastPanel = () => {
                     onClick={handleAnalyze}
                     className="transition-colors p-1"
                     style={{ color: 'var(--text-muted)' }}
-                    title="Re-run analysis"
+                    title="다시 계산"
                     onMouseEnter={e => e.currentTarget.style.color = 'var(--accent)'}
                     onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                 >

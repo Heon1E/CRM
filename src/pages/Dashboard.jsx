@@ -21,11 +21,9 @@ import EditActivityModal from '../components/EditActivityModal'
  */
 const RevenueForecastPanel = lazy(() => import('../components/RevenueForecastPanel'))
 import AppInstallGuide from '../components/AppInstallGuide'
-import IssueTracker from '../components/IssueTracker'
 import ActivityTimeline from '../components/ActivityTimeline'
 import { formatCurrency, formatKoreanCurrency } from '../utils/formatters'
 
-import ActionCenter from '../components/ActionCenter'
 import SalesCoach from '../components/SalesCoach'
 import KPIWidget from '../components/KPIWidget'
 import { SALES_REP_OPTIONS, setStoredRep } from '../utils/salesRep'

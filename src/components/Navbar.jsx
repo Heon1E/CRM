@@ -299,7 +299,7 @@ const Navbar = () => {
           {/* Language Toggle */}
           <button
             onClick={toggleLocale}
-            title="Toggle language"
+            title="언어 바꾸기"
             className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-white/20 text-[11px] font-bold text-[color:var(--text-primary)]/70 hover:text-[color:var(--text-primary)] hover:border-white/40 hover:bg-[color:var(--bg-subtle)] transition-all"
           >
             <Globe className="w-3.5 h-3.5" />

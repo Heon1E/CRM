@@ -411,7 +411,7 @@ const Settings = () => {
                 </div>
               </Panel>
 
-              <Panel title="Bulk Data Operations">
+              <Panel title="자료 일괄 등록">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-oem-bg-app p-4 rounded-sm border border-oem-border">
                     <h3 className="text-sm font-bold text-oem-text-primary mb-2 flex items-center gap-2">
@@ -470,14 +470,14 @@ const Settings = () => {
                 </div>
               </Panel>
 
-              <Panel title="Data Export & Maintenance">
+              <Panel title="내보내기 · 정리">
                 <div className="space-y-6">
                   {/* Export Section */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="bg-white p-4 border border-oem-border rounded-sm flex items-center justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-oem-text-primary">거래처 내려받기</h4>
-                        <p className="text-[10px] text-oem-text-secondary mt-1">Download all registered client profiles as Excel.</p>
+                        <p className="text-[10px] text-oem-text-secondary mt-1">등록된 거래처를 엑셀로 내려받습니다.</p>
                       </div>
                       <button
                         onClick={async () => {
@@ -500,7 +500,7 @@ const Settings = () => {
                     <div className="bg-white p-4 border border-oem-border rounded-sm flex items-center justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-oem-text-primary">매출 내려받기</h4>
-                        <p className="text-[10px] text-oem-text-secondary mt-1">Download complete transaction history.</p>
+                        <p className="text-[10px] text-oem-text-secondary mt-1">전체 매출 이력을 내려받습니다.</p>
                       </div>
                       <button
                         onClick={async () => {
