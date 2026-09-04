@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Search, Edit, Trash2, Plus } from 'lucide-react'
+import { Search, Edit, Trash2, Plus, X } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { useAuth } from '../contexts/AuthContext'
 import { resolveSalesRep } from '../utils/salesRep'
@@ -19,6 +19,19 @@ import { showConfirm, showError, showSuccess, showWarning } from '../utils/alert
 import { formatKoreanCurrency } from '../utils/formatters'
 
 const PAGE_SIZE = 20
+
+/**
+ * 상태를 색의 무게로 나눈다 (DESIGN.md 1장).
+ * 실제 분포 - 활성 736 · 매출 335 · 잠재고객 46 · 신규 44 · 거래 종료 4 · 단절 1 · 영업 대기 1
+ */
+const statusTone = (status) => {
+  const s = String(status || '').trim()
+  if (s === '매출') return 'live'      // 거래 중 - 초록(결론)
+  if (s === '신규') return 'new'       // 지금 여기 - 노랑
+  if (s === '잠재고객' || s === '영업 대기') return 'lead'
+  if (s === '거래 종료' || s === '단절') return 'off'
+  return 'idle'                        // 활성 등 - 물러난다
+}
 
 const Clients = () => {
   // Common Data & Actions
@@ -571,23 +584,43 @@ const Clients = () => {
                             </td>
                             {!selectedClientId && (
                               <td className="py-3 ">
+                                {/*
+                                  * **전화번호를 보여준다.** 예전에는 이메일이었는데 거의 비어 있고,
+                                  * 이 화면에서 실제로 하는 일은 '전화 거는 것'이다. 폰에서 누르면
+                                  * 바로 걸린다. 번호가 없을 때만 이메일로 떨어진다.
+                                  */}
                                 <div className="flex flex-col gap-0.5">
                                   <span className="font-medium">{primaryContact?.contact_person || '담당자 없음'}</span>
-                                  <span className="text-[10px] text-oem-text-secondary italic">{primaryContact?.email || '-'}</span>
+                                  {primaryContact?.phone ? (
+                                    <a href={`tel:${String(primaryContact.phone).replace(/[^0-9+]/g, '')}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-[11px] font-medium text-[color:var(--accent)] hover:underline w-fit">
+                                      {primaryContact.phone}
+                                    </a>
+                                  ) : (
+                                    <span className="text-[10px] text-oem-text-secondary">
+                                      {primaryContact?.email || '연락처 없음'}
+                                    </span>
+                                  )}
                                 </div>
                               </td>
                             )}
                             <td className="text-center py-3">
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${coerceClientStatus(primaryContact?.status) === '매출'
-                                ? 'bg-green-100 text-[color:var(--success)]'
-                                : 'bg-slate-100 text-slate-600'
-                                }`}>
-                                {primaryContact?.status?.toUpperCase() || 'UNKNOWN'}
+                              {/*
+                                * 예전에는 '매출'만 초록이고 **나머지 866곳이 전부 같은 회색**이었다.
+                                * 상태가 일곱 가지인데 눈으로는 두 가지뿐이라 정보가 없는 셈이었다.
+                                * 게다가 한글에 .toUpperCase()를 걸고, 없으면 'UNKNOWN'을 찍었다.
+                                * DESIGN.md 규칙대로 **색의 무게**로 말한다 - 초록은 '거래 중'(결론),
+                                * 노랑은 '지금 여기'(신규, 1,150곳 중 44곳이라 한 화면에 한둘이다),
+                                * 나머지는 물러난다.
+                                */}
+                              <span className="badge-status" data-tone={statusTone(primaryContact?.status)}>
+                                {primaryContact?.status || '미분류'}
                               </span>
                             </td>
                             {!selectedClientId && (
                               <td className="text-oem-text-secondary font-medium py-3 ">
-                                {stats.lastOrder ? stats.lastOrder.split('T')[0] : 'NO_RECORDS'}
+                                {stats.lastOrder ? stats.lastOrder.split('T')[0] : '거래 없음'}
                               </td>
                             )}
                             {!selectedClientId && (
@@ -652,8 +685,11 @@ const Clients = () => {
             {selectedClientId && (
               <div className="w-1/2 flex flex-col bg-white border border-oem-border rounded-lg shadow-lg overflow-hidden relative animate-in slide-in-from-right-10 duration-300">
                 <div className="absolute top-2 right-2 z-10">
-                  <button onClick={() => setSelectedClientId(null)} className="p-1 hover:bg-slate-100 rounded-full text-slate-500">
-                    X
+                  {/* 글자 'X'였다. 아이콘 전용 단추라 index.css가 44px로 키워 준다 */}
+                  <button onClick={() => setSelectedClientId(null)}
+                    className="icon-btn rounded-full text-[color:var(--text-secondary)] hover:bg-[color:var(--bg-panel)]"
+                    title="닫기" aria-label="닫기">
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
                 <ClientDetailPanel

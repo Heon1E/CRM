@@ -795,6 +795,22 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
    여기서는 화면용 여백만 맡는다 (실제 값은 각 화면의 인라인 style). */
 .doc-preview { overflow: auto; }
 
+/* 거래처 상태 — **단계는 색의 무게로 말한다** (DESIGN.md 1장).
+   예전에는 '매출'만 초록이고 나머지 866곳이 전부 같은 회색이라, 상태가
+   일곱 가지인데 눈으로는 두 가지뿐이었다. 노랑은 '신규'에만 쓴다 —
+   1,150곳 중 44곳이라 한 화면에 한둘이고, 그래야 노랑이 산다. */
+.badge-status {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 3px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.badge-status[data-tone="live"] { background: rgba(0,117,56,.10); color: var(--ind-green); border-color: rgba(0,117,56,.28); }
+.badge-status[data-tone="new"]  { background: var(--ind-yellow); color: var(--ind-ink); border-color: var(--sel-border); }
+.badge-status[data-tone="lead"] { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+.badge-status[data-tone="idle"] { background: var(--ind-panel); color: var(--text-secondary); }
+.badge-status[data-tone="off"]  { background: transparent; color: var(--text-muted); border-color: var(--border); text-decoration: line-through; }
+
 .oem-panel-header {
   display: flex;
   align-items: center;
