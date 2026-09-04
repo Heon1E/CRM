@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Plus, Printer, Trash2, Loader2, Save, X, FileText, ArrowLeft, Search } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
@@ -114,7 +114,7 @@ const Quotes = () => {
     const shownTotal = useMemo(() => shown.reduce((a, r) => a + num(r.total), 0), [shown])
 
     const newQuote = () => {
-        setEditing({
+        const fresh = {
             head: {
                 quote_no: '',
                 quote_date: todayLocal(), valid_days: 30,
@@ -122,16 +122,34 @@ const Quotes = () => {
                 status: '작성중', notes: '', sales_rep: myRep || '',
             },
             lines: [emptyLine()],
-        })
+        }
+        openedSnapshot.current = JSON.stringify(fresh)
+        setEditing(fresh)
     }
 
     const openQuote = async (q) => {
         const { data, error } = await supabase.from('quote_items').select('*').eq('quote_id', q.id).order('line_no')
         if (error) { await showError(error.message); return }
-        setEditing({
+        const opened = {
             head: { ...q },
             lines: (data || []).map((r) => ({ ...r, key: r.id, accessories: r.accessories || [] })),
-        })
+        }
+        openedSnapshot.current = JSON.stringify(opened)
+        setEditing(opened)
+    }
+
+    /*
+     * 편집을 열 때의 모습을 그대로 담아 둔다. '취소'가 손댄 것을 그냥 버리면
+     * 안 되기 때문이다 — 품목 열 줄을 적은 뒤 눌러도 되돌릴 방법이 없었다.
+     */
+    const openedSnapshot = useRef(null)
+    const isDirty = () => {
+        if (!editing || !openedSnapshot.current) return false
+        return JSON.stringify(editing) !== openedSnapshot.current
+    }
+    const cancelEdit = async () => {
+        if (isDirty() && !(await showConfirm('고친 내용이 사라집니다. 그래도 닫을까요?', '편집 취소'))) return
+        setEditing(null)
     }
 
     const setHead = (patch) => setEditing((e) => ({ ...e, head: { ...e.head, ...patch } }))
@@ -291,7 +309,11 @@ const Quotes = () => {
                     <button className="tb-btn primary" onClick={save} disabled={saving}>
                         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 저장
                     </button>
-                    <button className="tb-btn" onClick={() => setEditing(null)}><X size={14} /> 취소</button>
+                    {/*
+                      * **아무 확인 없이 다 날아갔다.** 품목을 열 줄 넣고 단가를 다
+                      * 적은 뒤 '취소'를 누르면 그대로 사라진다. 되돌릴 방법이 없다.
+                      */}
+                    <button className="tb-btn" onClick={cancelEdit}><X size={14} /> 취소</button>
                 </div>
 
                 {/* 머리 정보 */}
@@ -476,13 +498,21 @@ const Quotes = () => {
                     </thead>
                     <tbody>
                         {shown.map((r) => (
-                            <tr key={r.id}>
-                                <td><button className="rowbtn doc-no-btn" onClick={() => openQuote(r)}>{r.quote_no}</button></td>
+                            /* 줄 전체를 눌러 연다. 예전에는 견적번호 글자만 눌렸는데,
+                               그 칸이 목록에서 가장 작은 자리다. */
+                            <tr key={r.id} onClick={() => openQuote(r)} style={{ cursor: 'pointer' }}>
+                                <td><button className="rowbtn doc-no-btn" onClick={(e) => { e.stopPropagation(); openQuote(r) }}>{r.quote_no}</button></td>
                                 <td className="dt">{String(r.quote_date).slice(0, 10)}</td>
                                 <td>{r.client_name}</td>
-                                <td className="num">{won(r.total)}</td>
+                                {/* **견적서에서 눈이 가야 할 곳은 금액이다.** 다른 칸과 같은
+                                    크기로 두면 목록에서 비교가 안 된다. */}
+                                <td className="num" style={{ fontWeight: 700, fontSize: 13 }}>{won(r.total)}</td>
                                 <td>
-                                    <span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[r.status] || '#6B7280' }}>
+                                    <span className="badge-status" style={{
+                                        color: STATUS_COLOR[r.status] || '#6B7280',
+                                        borderColor: 'var(--border)',
+                                        background: r.status === '수주' ? 'rgba(0,117,56,.10)' : 'transparent',
+                                    }}>
                                         {r.status}
                                     </span>
                                 </td>
@@ -492,6 +522,17 @@ const Quotes = () => {
                                 </td>
                             </tr>
                         ))}
+                        {loading && shown.length === 0 && (
+                            /* 예전에는 불러오는 동안 표 안이 **통째로 비어 있었다** —
+                               빈 목록과 구별되지 않는다. 들어올 모양을 그려 둔다. */
+                            [...Array(6)].map((_, i) => (
+                                <tr key={`sk-${i}`}>
+                                    {[110, 84, 150, 96, 56, 70].map((w, c) => (
+                                        <td key={c}><div className="skeleton h-3.5 rounded" style={{ width: w }} /></td>
+                                    ))}
+                                </tr>
+                            ))
+                        )}
                         {shown.length === 0 && !loading && (
                             <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: 'var(--text-secondary)' }}>
                                 {/*
