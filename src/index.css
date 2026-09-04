@@ -691,6 +691,27 @@ textarea:focus {
 /* =========================================
    6. 버튼 유틸 (기존 클래스명 유지)
    ========================================= */
+/*
+ * 패널 머리 — **정의가 없어 3개 화면에서 아무 일도 하지 않고 있었다.**
+ * (`oem-blue`가 123번 쓰이는데 설정에 없던 것과 같은 종류의 결함이다.
+ *  찾는 법: `npm run build && grep -c "oem-panel-header" dist/assets/*.css` -> 0)
+ *
+ * 표 머리와 같은 규칙을 쓴다 — 밝은 회색 바탕 + 먹색 글씨 + 초록 실선.
+ * 화면과 종이가 같은 모양이어야 한 회사가 만든 것으로 보인다.
+ */
+.oem-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--ind-panel);
+  color: var(--ind-ink);
+  font-size: 12px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--ind-green);
+}
+
 .oem-panel,
 .card {
   background-color: var(--bg-card);
