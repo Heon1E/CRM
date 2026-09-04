@@ -28,6 +28,7 @@
 import crypto from 'crypto'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../src/utils/clientAliases.js'
 import { getHolidays } from '../src/utils/koreanHolidays.js'
+import { mergeActivityDescription } from '../src/utils/activityMerge.js'
 
 /**
  * 웹훅 비밀 토큰을 봇 토큰에서 만들어 낸다.
@@ -217,6 +218,18 @@ activity:
     "kind": "미팅"|"전화", "person": "만난 사람", "description": "내용",
     "nextDate": "YYYY-MM-DD" 또는 null, "nextDetail": "다음에 할 일" }
   - 유선/통화면 kind는 "전화", 직접 갔으면 "미팅".
+  - **description은 요약이 아니다. 통화에서 오간 것을 빠짐없이 옮긴 기록이다.**
+    한두 문장으로 줄이지 마라. 5분짜리 통화를 한 줄로 적으면 나중에 그 기록만
+    보고는 아무것도 할 수 없다. 오간 내용이 많으면 **1. 2. 3. 으로 번호를 매겨**
+    항목별로 적는다. 통화가 길면 길게 쓴다.
+    반드시 남길 것 — 들렸다면 하나도 빼지 마라:
+      · 숫자는 **단위째 그대로**. 수량·단가·금액·규격(mm/리터/인치)·비중·기간·개수.
+        '15만원'은 금액이지 시각이 아니다. '150 캡', '20피트', '월 10개'처럼 그대로.
+      · 회사명·사람 이름·직급·부서·공장 위치.
+      · 상대가 요구한 것과 우리가 답한 것을 **구분해서**. 누가 무엇을 하기로 했는지.
+      · 걸림돌·불만·경쟁사 이야기·가격 저항. 잘 안 된 이야기일수록 중요하다.
+      · 서로 합의한 것, 아직 확인이 필요한 것.
+    들리지 않은 것은 쓰지 않는다. 지어내는 것과 빠짐없이 적는 것은 다르다.
   - "다음주에 견적 보내기로 함", "2주 뒤 재방문" 처럼 **다음에 할 일이 적혀 있으면**
     nextDate와 nextDetail을 채운다. 오늘 날짜를 기준으로 실제 날짜로 바꾼다.
     적혀 있지 않으면 null. 지어내지 마라.
@@ -490,7 +503,7 @@ async function saveContact(clientId, rawPerson) {
 }
 
 async function applyActivities(items, clientMap, repName = null) {
-    const saved = [], skipped = [], unmatched = [], created = [], assumed = []
+    const saved = [], skipped = [], unmatched = [], created = [], assumed = [], merged = []
     for (const it of items) {
         let c = findClient(clientMap, it.clientName)
         if (!c) {
@@ -505,10 +518,34 @@ async function applyActivities(items, clientMap, repName = null) {
         if (!c) { unmatched.push(it.clientName || '(거래처 없음)'); continue }
         if (!it.date) { skipped.push(`${c.company} (날짜 없음)`); continue }
 
+        /*
+         * 같은 거래처·같은 날 기록이 이미 있으면 **버리지 않고 합친다.**
+         * 예전에는 '이미 있어 건너뜀'으로 끝냈는데, 하루에 두세 번 통화하는
+         * 일은 흔하고 **뒤의 통화일수록 결론에 가깝다**(오전 문의 -> 오후 수량 확정).
+         * 그게 통째로 사라지고 있었다.
+         *
+         * 활동을 여러 건으로 만들지는 않는다 — KPI 정기적방문횟수가 건수를
+         * 세므로 하루 세 번 통화가 방문 세 번이 되면 안 된다.
+         * 기록은 합치고 횟수는 '[통화 N회]'로 따로 적는다.
+         */
         const dup = await sb(
-            `activities?select=id&client_id=eq.${c.id}&activity_date=eq.${it.date}&limit=1`
+            `activities?select=id,type,description,next_action_date,next_action_detail` +
+            `&client_id=eq.${c.id}&activity_date=eq.${it.date}&limit=1`
         )
-        if (dup.length) { skipped.push(`${c.company} ${fmtDate(it.date)}`); continue }
+        if (dup.length) {
+            const m = mergeActivityDescription(dup[0].description, it, { existingType: dup[0].type })
+            const patch = { description: m.description, type: m.type }
+            // 다음에 할 일은 나중 것이 이긴다 (앞의 것은 이미 지나갔을 수 있다)
+            if (it.nextDetail) {
+                patch.next_action_detail = it.nextDetail
+                patch.next_action_date = /^\d{4}-\d{2}-\d{2}$/.test(it.nextDate || '')
+                    ? it.nextDate : (nextBusinessDay(it.date) || dup[0].next_action_date)
+            }
+            await sb(`activities?id=eq.${dup[0].id}`, { method: 'PATCH', prefer: 'return=minimal', body: patch })
+            if (it.person) { try { await saveContact(c.id, it.person) } catch { /* 부수적인 일이 본업을 막지 않는다 */ } }
+            merged.push(`${c.company} ${fmtDate(it.date)} ${m.count}회째`)
+            continue
+        }
 
         // 하기로 한 일은 있는데 날짜를 안 말한 경우 -> 다음 영업일로 잡는다
         const said = /^\d{4}-\d{2}-\d{2}$/.test(it.nextDate || '') ? it.nextDate : null
@@ -551,7 +588,7 @@ async function applyActivities(items, clientMap, repName = null) {
         }
         saved.push(c.company)
     }
-    return { saved, skipped, unmatched, created, assumed }
+    return { saved, skipped, unmatched, created, assumed, merged }
 }
 
 /** 오늘/이번주 일정 답하기 */
@@ -771,7 +808,9 @@ export default async function handler(req, res) {
 
             let reply = `📝 <b>업무기록 ${r.saved.length}건을 넣었습니다.</b>`
             if (r.saved.length) reply += `\n${r.saved.map((n) => `• ${n}`).join('\n')}`
-            if (r.skipped.length) reply += `\n\n이미 있어 건너뜀: ${r.skipped.join(', ')}`
+            if (r.merged.length) reply += `\n\n🔗 <b>같은 날 기록에 합쳤습니다:</b> ${r.merged.join(', ')}`
+            // 이제 중복은 합치므로, 여기 남는 것은 날짜를 못 읽은 건뿐이다
+            if (r.skipped.length) reply += `\n\n건너뜀: ${r.skipped.join(', ')}`
             if (r.created.length) reply += `\n\n🆕 <b>새 거래처로 등록:</b> ${[...new Set(r.created)].join(', ')}\n<i>이름이 틀렸으면 앱에서 고치거나 지워주세요.</i>`
             // 날짜를 말하지 않은 약속은 다음 영업일로 잡았다. 그 사실을 밝힌다.
             if (r.assumed.length) reply += `\n\n⏰ <b>하기로 한 일 기한:</b> ${r.assumed.join(', ')}\n<i>날짜를 안 말씀하셔서 다음 영업일로 잡았습니다. 아침 브리핑에 뜹니다.</i>`
