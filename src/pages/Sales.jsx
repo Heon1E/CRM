@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Edit, Download, Plus, Trash2, Search, RefreshCw, FileText } from 'lucide-react'
 import { useData } from '../contexts/DataContext'
 import { supabase, supabaseConfigError } from '../lib/supabase'
@@ -44,8 +44,15 @@ const Sales = () => {
 
   // 하루 단위로 본다. 하루 평균 15건이라 한 화면에 들어간다.
   const [viewDate, setViewDate] = useState(toISO(new Date()))
+  /*
+   * 고른 줄. **툴바의 '수정(F4)'이 언제나 localSales[0] — 그 날의 첫 줄을
+   * 열고 있었다.** 세 번째 줄을 고치려고 눌러도 첫 줄이 열리고, 그대로
+   * 저장하면 엉뚱한 매출이 바뀐다. 키 처리기보다 위에 둬야 F4가 이 값을 본다.
+   */
+  const [pickedId, setPickedId] = useState(null)
   const [localSales, setLocalSales] = useState([])
   const [localLoading, setLocalLoading] = useState(true)
+  const picked = useMemo(() => localSales.find((r) => r.id === pickedId) || null, [localSales, pickedId])
   const [totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -174,7 +181,9 @@ const Sales = () => {
       else if (e.key === 'Escape' && !typing) { setEditingSale(null); setIsAddModalOpen(false) }
       else if (e.key === 'F4') {
         e.preventDefault()
-        setLocalSales(prev => { if (prev.length) setEditingSale(prev[0]); return prev })
+        // 고른 줄이 없으면 아무 일도 하지 않는다. 첫 줄을 여는 것보다 낫다 —
+        // 엉뚱한 줄이 열린 줄 모르고 저장하면 다른 매출이 바뀐다.
+        if (picked) setEditingSale(picked)
       }
       // 날짜 이동은 입력 중이 아닐 때만 (날짜칸에서 방향키를 쓰기 때문)
       else if (e.key === 'ArrowLeft' && !typing && !isSearchMode) { e.preventDefault(); jumpDay(-1) }
@@ -182,8 +191,12 @@ const Sales = () => {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [fetchData, jumpDay, isSearchMode])
+  }, [fetchData, jumpDay, isSearchMode, picked])
 
+
+  /* 날짜나 검색이 바뀌면 고른 줄을 푼다 — 다른 날의 줄이 골라진 채로 남으면
+     '수정'이 화면에 없는 줄을 연다. */
+  useEffect(() => { setPickedId(null) }, [viewDate, searchTerm])
 
   const handleSearchChange = (e) => {
     setSearchInput(e.target.value)
@@ -227,7 +240,7 @@ const Sales = () => {
   }
 
   // 선택된 행 (키보드 이동용)
-  const selectedId = editingSale?.id || null
+  const selectedId = editingSale?.id || pickedId || null
   const pageSum = localSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
   // 한 행은 '같은 거래처·같은 날짜'의 매출을 묶은 것이라, 행 수와 원본 건수가 다르다.
   const rawCount = localSales.reduce((n, s) => n + (s.items?.length || 1), 0)
@@ -242,7 +255,7 @@ const Sales = () => {
             <span className="flex items-baseline gap-3">
               매출 관리
               <span className="meta">
-                SALES · 전체 {totalCount.toLocaleString()}건 ·{' '}
+                전체 {totalCount.toLocaleString()}건 ·{' '}
                 {isSearchMode ? `검색: ${searchTerm}` : `${viewDate} (${weekdayOf(viewDate)})`}
               </span>
             </span>
@@ -253,8 +266,9 @@ const Sales = () => {
             <button className="tb-btn primary" onClick={() => setIsAddModalOpen(true)}>
               <Plus className="w-3.5 h-3.5" /> 신규 <kbd>F2</kbd>
             </button>
-            <button className="tb-btn" disabled={!localSales.length}
-              onClick={() => handleEdit(localSales[0])}>
+            <button className="tb-btn" disabled={!picked}
+              title={picked ? `${picked.clientName} 수정` : '고칠 줄을 먼저 누르세요'}
+              onClick={() => picked && handleEdit(picked)}>
               <Edit className="w-3.5 h-3.5" /> 수정 <kbd>F4</kbd>
             </button>
             <span className="tb-sep" />
@@ -342,6 +356,7 @@ const Sales = () => {
                       <tr
                         key={sale.id}
                         className={selectedId === sale.id ? 'is-selected' : ''}
+                        onClick={() => setPickedId(sale.id)}
                         onDoubleClick={() => handleEdit(sale)}
                       >
                         <td className="seq">{index + 1}</td>
