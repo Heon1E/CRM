@@ -1834,16 +1834,37 @@ export const DataProvider = ({ children }) => {
   }, [user, clients])
 
   // 활동 내역 수정
+  /*
+   * **일부만 넘겨도 안전해야 한다.**
+   *
+   * 예전에는 넘겨받은 것으로 행을 통째로 다시 지었다. 그래서 예컨대
+   * `{ next_action_date: null }` 하나만 넘기면 거래처·날짜·유형·내용이
+   * 전부 빈 값으로 덮여 **활동 기록이 통째로 지워졌다.** 지금까지는 수정
+   * 모달만 이 함수를 불렀고 그쪽은 폼 전체를 넘겨서 드러나지 않았을 뿐이다.
+   *
+   * 이제 이미 들고 있는 값 위에 덮는다. 전부 넘기던 호출부는 결과가 같고,
+   * 일부만 넘기는 호출부(달력의 '하기로 한 것' 처리)는 나머지가 보존된다.
+   */
   const updateActivity = useCallback(async (id, activityData) => {
+    const prevRow = activities.find((a) => a.id === id) || {}
+    const pick = (key, ...alts) => {
+      for (const k of [key, ...alts]) {
+        if (Object.prototype.hasOwnProperty.call(activityData, k)) return activityData[k]
+      }
+      for (const k of [key, ...alts]) {
+        if (prevRow[k] !== undefined && prevRow[k] !== null) return prevRow[k]
+      }
+      return undefined
+    }
     // DB 컬럼명(snake_case)으로 변환 (user 필드는 DB에 없으므로 제외)
     const data = {
-      client_id: activityData.clientId || activityData.client_id,
-      activity_date: activityData.activity_date || activityData.date || null,
-      type: activityData.type || '',
-      description: activityData.description || '',
-      status: activityData.status || '완료',
-      next_action_date: activityData.next_action_date || null,
-      next_action_detail: activityData.next_action_detail || ''
+      client_id: pick('client_id', 'clientId') ?? null,
+      activity_date: pick('activity_date', 'date') ?? null,
+      type: pick('type') ?? '',
+      description: pick('description') ?? '',
+      status: pick('status') ?? '완료',
+      next_action_date: pick('next_action_date') ?? null,
+      next_action_detail: pick('next_action_detail') ?? ''
     }
 
     // 빈 문자열 날짜 필드를 null로 변환
@@ -1873,7 +1894,7 @@ export const DataProvider = ({ children }) => {
     }
     setActivities(prev => prev.map(item => item.id === id ? updatedActivity : item))
     return updatedActivity
-  }, [clients])
+  }, [clients, activities])
 
   // 활동 내역 삭제
   const deleteActivity = useCallback(async (id) => {

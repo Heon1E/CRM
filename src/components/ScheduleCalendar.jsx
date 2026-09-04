@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Loader2, Check, Trash2, MapPin, Send }
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { showError, showConfirm } from '../utils/alert'
+import { addDays } from '../utils/day'
 import { getHolidays, hasHolidayData } from '../utils/koreanHolidays'
 import { openFollowUps } from '../utils/followUps'
 
@@ -75,7 +76,7 @@ const holidayName = (year, key) => {
 }
 
 const ScheduleCalendar = () => {
-    const { clients, activities } = useData()
+    const { clients, activities, updateActivity } = useData()
     const today = useMemo(() => new Date(), [])
 
     const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
@@ -84,6 +85,7 @@ const ScheduleCalendar = () => {
     const [loading, setLoading] = useState(true)
     const [tableMissing, setTableMissing] = useState(false)
     const [adding, setAdding] = useState(false)
+    const [busyFollowUp, setBusyFollowUp] = useState(null)
     const [form, setForm] = useState({ title: '', clientName: '', time: '', kind: '방문', location: '' })
 
     const monthStart = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth(), 1), [cursor])
@@ -195,6 +197,37 @@ const ScheduleCalendar = () => {
         }
     }
 
+    /*
+     * '하기로 한 것'을 **여기서 바로 끝낸다.**
+     *
+     * 예전에는 글자만 나열돼 있어 아무것도 할 수 없었다. 봇이 날짜를 자동으로
+     * 잡아 주기 시작하면서 목록이 쌓이는데, 이미 처리했거나 쓸데없이 잡힌 것을
+     * 지울 방법이 화면에 없었다 - 볼 때마다 거슬리는데 손쓸 수 없으면 결국
+     * 그 영역 전체를 안 보게 된다.
+     *
+     * 활동의 next_action_date를 비우면 목록에서 빠진다. **활동 기록 자체는
+     * 그대로 남는다** - 지우는 것은 '언제까지 할 일'이라는 표시뿐이다.
+     */
+    const clearFollowUp = async (row) => {
+        setBusyFollowUp(row.id)
+        try {
+            await updateActivity(row.id, { next_action_date: null, next_action_detail: '' })
+        } catch (e) {
+            await showError(e.message || '처리하지 못했습니다.')
+        } finally { setBusyFollowUp(null) }
+    }
+
+    /** 미룬다 - 오늘 못 한 것을 지우지 않고 넘긴다 */
+    const postponeFollowUp = async (row, days = 1) => {
+        setBusyFollowUp(row.id)
+        try {
+            const base = row.due < ymd(today) ? ymd(today) : row.due
+            await updateActivity(row.id, { next_action_date: addDays(base, days) })
+        } catch (e) {
+            await showError(e.message || '미루지 못했습니다.')
+        } finally { setBusyFollowUp(null) }
+    }
+
     const setStatus = async (row, status) => {
         const { error } = await supabase.from('schedules').update({ status }).eq('id', row.id)
         if (error) { await showError(error.message); return }
@@ -279,6 +312,12 @@ const ScheduleCalendar = () => {
                                 <button
                                     key={key}
                                     onClick={() => setSelected(key)}
+                                    /* **고르고 나서 또 찾아 눌러야 했다.** 날짜를 고르면 오른쪽
+                                       패널로 눈을 옮겨 '추가'를 다시 눌러야 넣을 수 있었다.
+                                       두 번 누르면 그 날짜로 바로 입력칸이 열린다. */
+                                    onDoubleClick={() => { setSelected(key); setAdding(true) }}
+                                    title="두 번 누르면 이 날짜에 일정을 넣습니다"
+                                    className="cal-day"
                                     style={{
                                         minHeight: 52, padding: '3px 4px', textAlign: 'left',
                                         border: isSel ? '2px solid var(--accent)' : '1px solid var(--border)',
@@ -404,29 +443,40 @@ const ScheduleCalendar = () => {
                         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
                             <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)' }}>
                                 하기로 한 것
+                                <span style={{ marginLeft: 6, fontWeight: 500, color: 'var(--text-muted)' }}>
+                                    ✓ 처리 · 다음날로 미루기
+                                </span>
                             </p>
-                            {followUps.today.map((r) => (
-                                <div key={r.id} style={{ fontSize: 11.5, padding: '2px 0', display: 'flex', gap: 5 }}>
-                                    <span style={{ color: '#1C6B3C', fontWeight: 700, flexShrink: 0 }}>오늘</span>
-                                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {[...followUps.today.map((r) => ({ ...r, kind: 'today' })),
+                              ...followUps.overdue.slice(0, 6).map((r) => ({ ...r, kind: 'late' }))].map((r) => (
+                                <div key={r.id} className="fu-row" data-busy={busyFollowUp === r.id ? '1' : undefined}>
+                                    <span className="fu-when" style={{ color: r.kind === 'today' ? '#1C6B3C' : '#B91C1C' }}>
+                                        {r.kind === 'today' ? '오늘' : `${r.daysLate}일 지남`}
+                                    </span>
+                                    <span className="fu-text" title={`${r.clientName}${r.detail ? ` · ${r.detail}` : ''}`}>
                                         {r.clientName}{r.detail ? ` · ${r.detail}` : ''}
+                                    </span>
+                                    <span className="fu-acts">
+                                        <button className="rowbtn" title="하루 미루기"
+                                            disabled={busyFollowUp === r.id}
+                                            onClick={() => postponeFollowUp(r, 1)}>
+                                            <ChevronRight size={12} />
+                                        </button>
+                                        <button className="rowbtn" title="처리함 (목록에서 뺍니다)"
+                                            disabled={busyFollowUp === r.id}
+                                            onClick={() => clearFollowUp(r)}>
+                                            <Check size={12} />
+                                        </button>
                                     </span>
                                 </div>
                             ))}
-                            {followUps.overdue.slice(0, 4).map((r) => (
-                                <div key={r.id} style={{ fontSize: 11.5, padding: '2px 0', display: 'flex', gap: 5 }}>
-                                    <span style={{ color: '#B91C1C', fontWeight: 700, flexShrink: 0 }}>{r.daysLate}일 지남</span>
-                                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {r.clientName}{r.detail ? ` · ${r.detail}` : ''}
-                                    </span>
-                                </div>
-                            ))}
-                            {followUps.overdue.length > 4 && (
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>… 외 {followUps.overdue.length - 4}건</div>
+                            {followUps.overdue.length > 6 && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>… 외 {followUps.overdue.length - 6}건</div>
                             )}
                         </div>
                     )}
 
+                    
                     {upcoming.length > 0 && (
                         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 'auto' }}>
                             <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)' }}>다가오는 일정</p>

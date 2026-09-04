@@ -699,6 +699,70 @@ textarea:focus {
  * 표 머리와 같은 규칙을 쓴다 — 밝은 회색 바탕 + 먹색 글씨 + 초록 실선.
  * 화면과 종이가 같은 모양이어야 한 회사가 만든 것으로 보인다.
  */
+/* ==========================================================================
+   손맛 — 누르면 반응한다
+   ==========================================================================
+   업무 도구라도 **누른 것이 눌렸는지 몰라 두 번 누르는 일**은 없어야 한다.
+   클래스를 하나씩 적어 두면 새 단추가 생길 때마다 빠지므로 요소로 건다
+   (`button { min-height: 44px }`을 그렇게 건 것과 같은 이유다).
+
+   `transform`과 `opacity`만 건드린다 — 레이아웃·페인트를 유발하면 옛 폰에서
+   끊긴다. 시간은 120ms 안쪽: 업무 도구에서 이보다 길면 굼떠 보인다.
+   '동작 줄이기'를 켠 사람에게는 아래 미디어쿼리가 통째로 끈다.          */
+
+button, [role="button"], a.tb-btn, .rowbtn, summary {
+  transition: transform 90ms ease, background-color 120ms ease,
+              border-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+button:active:not(:disabled),
+[role="button"]:active,
+.rowbtn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+/* 키보드로 옮겨 다닐 때만 테두리를 보여준다 (마우스 클릭에는 안 뜬다) */
+:where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 표의 줄 — 지금 어느 줄에 있는지 */
+table.dgrid tbody tr { transition: background-color 110ms ease; }
+table.dgrid tbody tr:active { background: var(--bg-panel); }
+
+/* 달력 칸 — 고를 수 있다는 것이 보여야 한다 */
+.cal-day { transition: transform 90ms ease, background-color 120ms ease, border-color 120ms ease; }
+.cal-day:hover { background: var(--bg-panel) !important; }
+.cal-day:active { transform: scale(0.94); }
+
+/* 하기로 한 것 — 한 줄에 글·처리·미루기 */
+.fu-row {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11.5px; padding: 2px 0;
+  border-radius: 4px; transition: background-color 120ms ease, opacity 150ms ease;
+}
+.fu-row:hover { background: var(--bg-panel); }
+.fu-row[data-busy] { opacity: 0.45; pointer-events: none; }
+.fu-when { font-weight: 700; flex-shrink: 0; }
+.fu-text { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 단추는 마우스를 올렸을 때만 진하게 — 평소에는 글을 읽는 데 방해되지 않는다.
+   **숨기지는 않는다**: 터치 기기에는 hover가 없어 아예 안 보이게 된다. */
+.fu-acts { display: flex; gap: 2px; flex-shrink: 0; opacity: 0.45; }
+.fu-row:hover .fu-acts, .fu-acts:focus-within { opacity: 1; }
+
+/* 새로 들어온 줄이 어디에 꽂혔는지 한 번 반짝인다 */
+@keyframes flash-in {
+  0%   { background: var(--ind-yellow); }
+  100% { background: transparent; }
+}
+.flash-in { animation: flash-in 900ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  button, [role="button"], .rowbtn, .cal-day, .fu-row, table.dgrid tbody tr { transition: none; }
+  button:active:not(:disabled), [role="button"]:active,
+  .rowbtn:active:not(:disabled), .cal-day:active { transform: none; }
+  .flash-in { animation: none; }
+}
+
 .oem-panel-header {
   display: flex;
   align-items: center;
