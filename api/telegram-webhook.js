@@ -685,7 +685,21 @@ export default async function handler(req, res) {
     }
 
     if (!allowed.includes(chatId)) {
-        await tgSend(chatId, '이 봇은 등록된 사용자만 쓸 수 있습니다.')
+        /*
+         * **거부만 하고 끝내면 기기를 늘릴 길이 없다.**
+         * 영업용 폰처럼 텔레그램 계정이 다른 기기는 chat_id가 달라 여기로 떨어지는데,
+         * 예전에는 '등록된 사용자만 쓸 수 있습니다' 한 줄이라 자기 id조차 알 수 없었다.
+         * 관리자도 그 번호를 모르니 목록에 넣어 줄 수가 없다 — 막다른 길이었다.
+         *
+         * chat_id를 알려 주는 것은 위험하지 않다. 그 대화를 이미 쥔 사람만 보고,
+         * **넣어 주는 것은 여전히 등록된 기기에서만** 할 수 있다.
+         */
+        await tgSend(chatId,
+            '이 봇은 등록된 기기만 쓸 수 있습니다.\n\n'
+            + `이 대화의 id: <code>${chatId}</code>\n\n`
+            + '이미 쓰고 있는 기기에서 아래를 보내면 여기도 열립니다:\n'
+            + `<code>/기기추가 ${chatId}</code>`
+        )
         console.warn('[telegram] 허용되지 않은 chat_id:', chatId)
         return ok()
     }
@@ -707,6 +721,7 @@ export default async function handler(req, res) {
             '   (중복 검사를 거쳐야 해서 앱에서 확인 후 반영)\n\n' +
             '<b>/today</b> 오늘 일정   <b>/week</b> 이번주 일정\n' +
             '<b>/브리핑</b> 아침 브리핑 지금 받기\n\n' +
+            '<b>/기기목록</b> 등록된 기기   <b>/기기추가 &lt;id&gt;</b> 다른 폰 열기\n\n' +
             `chat id: <code>${chatId}</code>`
         )
         return ok()
@@ -715,6 +730,61 @@ export default async function handler(req, res) {
         try { await tgSend(chatId, await answerQuestion(text === '/week' ? 'week' : 'today')) }
         catch (e) { await tgSend(chatId, `일정을 불러오지 못했습니다: ${e.message}`) }
         return ok()
+    }
+    /*
+     * 기기(대화) 관리 — **여기까지 온 대화는 이미 허용된 것이다.**
+     * 그래서 등록된 기기에서만 다른 기기를 열어 줄 수 있다. 영업용 폰처럼
+     * 텔레그램 계정이 다른 기기는 chat_id가 달라 따로 넣어야 한다.
+     */
+    if (text.startsWith('/기기')) {
+        const [cmd, arg] = text.split(/\s+/)
+        try {
+            if (cmd === '/기기목록') {
+                const rows = await sb('bot_allowlist?select=chat_id,label,sales_rep&order=created_at')
+                await tgSend(chatId,
+                    `📱 <b>등록된 기기 ${rows.length}대</b>\n`
+                    + rows.map((r) => `• <code>${r.chat_id}</code> ${r.label || ''}`
+                        + `${r.sales_rep ? ` (${r.sales_rep})` : ''}`
+                        + `${String(r.chat_id) === chatId ? ' ← 지금 이 기기' : ''}`).join('\n')
+                    + '\n\n추가: <code>/기기추가 &lt;id&gt;</code>   삭제: <code>/기기삭제 &lt;id&gt;</code>'
+                )
+                return ok()
+            }
+            if (cmd === '/기기추가') {
+                if (!/^-?\d+$/.test(arg || '')) {
+                    await tgSend(chatId, '기기 id를 같이 보내주세요. 예: <code>/기기추가 123456789</code>\n'
+                        + '(새 기기에서 봇에게 아무 말이나 보내면 그 id를 알려줍니다.)')
+                    return ok()
+                }
+                const dup = await sb(`bot_allowlist?select=chat_id&chat_id=eq.${encodeURIComponent(arg)}&limit=1`)
+                if (dup.length) { await tgSend(chatId, '이미 등록된 기기입니다.'); return ok() }
+                // 담당자는 지금 이 기기 것을 물려준다 — 같은 사람의 다른 폰이기 때문이다
+                const rep = await repOfChat(chatId)
+                await sb('bot_allowlist', {
+                    method: 'POST', prefer: 'return=minimal',
+                    body: [{ chat_id: String(arg), label: '추가 기기', sales_rep: rep }]
+                })
+                await tgSend(chatId, `✅ 기기를 추가했습니다: <code>${arg}</code>${rep ? ` (담당 ${rep})` : ''}`)
+                await tgSend(String(arg), '✅ <b>연결됐습니다.</b> 이제 이 기기에서도 쓸 수 있습니다.\n사용법은 /help')
+                return ok()
+            }
+            if (cmd === '/기기삭제') {
+                // 마지막 기기를 지우면 아무도 못 들어온다. 그때는 SQL로만 되살릴 수 있다.
+                const rows = await sb('bot_allowlist?select=chat_id')
+                if (rows.length <= 1) { await tgSend(chatId, '마지막 기기는 지울 수 없습니다.'); return ok() }
+                if (!rows.some((r) => String(r.chat_id) === String(arg))) {
+                    await tgSend(chatId, '그런 기기가 없습니다. <code>/기기목록</code>으로 확인하세요.')
+                    return ok()
+                }
+                await sb(`bot_allowlist?chat_id=eq.${encodeURIComponent(arg)}`, { method: 'DELETE', prefer: 'return=minimal' })
+                await tgSend(chatId, `🗑 기기를 지웠습니다: <code>${arg}</code>`)
+                return ok()
+            }
+        } catch (e) {
+            console.error('[telegram] 기기 관리 실패', e.message)
+            await tgSend(chatId, e.denied || !HAS_SERVICE_KEY ? SETUP_HINT : `처리하지 못했습니다: ${e.message}`)
+            return ok()
+        }
     }
     if (!text && !photos && !audio) {
         await tgSend(chatId, '사진·녹음·글로 보내주세요. 사용법은 /help')
