@@ -799,6 +799,17 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
    예전에는 '매출'만 초록이고 나머지 866곳이 전부 같은 회색이라, 상태가
    일곱 가지인데 눈으로는 두 가지뿐이었다. 노랑은 '신규'에만 쓴다 —
    1,150곳 중 44곳이라 한 화면에 한둘이고, 그래야 노랑이 산다. */
+/* 목록의 전화번호 — **폰에서 실제로 누르는 것이다.**
+   재 보니 84x16이라 손가락으로는 못 누른다. 인라인 링크라 요소 규칙
+   (button min-height)이 걸리지 않으므로 여기서 따로 준다. */
+.tel-link {
+  display: inline-flex; align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 768px) {
+  .tel-link { min-height: 44px; padding-right: 8px; }
+}
+
 .badge-status {
   display: inline-block;
   font-size: 10px; font-weight: 700;
@@ -810,6 +821,8 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
 .badge-status[data-tone="lead"] { background: transparent; color: var(--text-secondary); border-color: var(--border); }
 .badge-status[data-tone="idle"] { background: var(--ind-panel); color: var(--text-secondary); }
 .badge-status[data-tone="off"]  { background: transparent; color: var(--text-muted); border-color: var(--border); text-decoration: line-through; }
+/* 10px은 손에 들고 보기엔 작다. 데스크톱 밀도는 그대로 두고 폰에서만 올린다. */
+@media (max-width: 768px) { .badge-status { font-size: 12px; padding: 3px 7px; } }
 
 .oem-panel-header {
   display: flex;
@@ -944,6 +957,18 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
    레이아웃을 바꾸지 않고, 좁으면 가로 스크롤로 처리한다.
    ========================================= */
 @media (max-width: 768px) {
+  /*
+   * **단축키 안내는 폰에서 감춘다.** 키우는 것이 아니라 없애는 것이 맞다 —
+   * 손에 든 화면에는 F2도 Enter도 없다. 12px 미만 글씨를 뒤지다 마지막까지
+   * 남은 셋이 전부 이것이었다(`kbd` 10px, `.hint` 11px).
+   * 자리를 차지하면서 아무 말도 하지 않는 것이 가장 나쁘다.
+   */
+  kbd, .hint { display: none !important; }
+
+  /* '하기로 한 것' 줄 — 내가 새로 만들면서 11.5px로 두었다.
+     데스크톱 밀도는 그대로, 폰에서만 올린다 (규칙은 12px). */
+  .fu-row { font-size: 12px; }
+
 
   /* 입력칸 글자만 16px로 둔다.
      이보다 작으면 iOS 사파리가 포커스 시 화면을 제멋대로 확대해서

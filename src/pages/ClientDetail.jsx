@@ -24,7 +24,7 @@ const ClientDetail = () => {
   const { id } = useParams()
   // PC/Mobile page wrapper
   return (
-    <div className="md:p-6 bg-oem-bg-app min-h-screen md:mt-[50px]">
+    <div className="md:p-6 bg-oem-bg-app min-h-screen">
       <div className="max-w-[1200px] mx-auto bg-white md:rounded-lg md:shadow-sm overflow-hidden min-h-[800px]">
         <ClientDetailPanel clientId={id} isEmbedded={false} />
       </div>

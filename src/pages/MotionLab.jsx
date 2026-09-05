@@ -112,7 +112,7 @@ const MotionLab = () => {
 
                 <Swatch label="화면 전환 중(PageLoading)" hint="실제 화면이 쓰는 그 컴포넌트다">
                     <div className="border border-oem-border rounded overflow-hidden">
-                        <div className="-mt-[50px]"><PageLoading /></div>
+                        <PageLoading />
                     </div>
                 </Swatch>
 

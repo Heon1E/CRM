@@ -308,7 +308,7 @@ const Settings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px]">
+    <div className="min-h-screen bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary">
       <div className="max-w-[1200px] mx-auto space-y-6">
 
         {/* Page Header */}

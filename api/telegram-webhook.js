@@ -27,7 +27,7 @@
 
 import crypto from 'crypto'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../src/utils/clientAliases.js'
-import { getHolidays } from '../src/utils/koreanHolidays.js'
+import { nextBusinessDay } from '../src/utils/businessDay.js'
 import { mergeActivityDescription } from '../src/utils/activityMerge.js'
 
 /**
@@ -483,20 +483,6 @@ async function createClient(name, repName) {
  * '언제까지'를 정하는 쪽에 가깝다 — 사람이 봇 답장에서 바로 알 수 있게
  * 무슨 날짜로 잡았는지 말해 준다. 틀리면 앱에서 고치면 된다.
  */
-const nextBusinessDay = (ymd) => {
-    const d = new Date(`${ymd}T00:00:00Z`)
-    if (Number.isNaN(d.getTime())) return null
-    for (let i = 0; i < 14; i++) {
-        d.setUTCDate(d.getUTCDate() + 1)
-        const iso = d.toISOString().slice(0, 10)
-        const dow = d.getUTCDay()
-        if (dow === 0 || dow === 6) continue
-        // getHolidays는 {date, name} 객체 배열이다. 문자열로 비교하면 하나도 안 걸린다.
-        if (getHolidays(d.getUTCFullYear()).some((h) => h.date === iso)) continue
-        return iso
-    }
-    return null
-}
 
 /*
  * 통화에서 알아낸 상대방을 **거래처 담당자로 남긴다.**

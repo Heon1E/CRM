@@ -371,7 +371,7 @@ const Clients = () => {
    * (표 안쪽 분기는 `<tbody>`의 `isLoading`에 있다.)
    */
   return (
-    <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary mt-[50px] min-h-screen relative">
+    <div className="p-3 md:p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary min-h-screen relative">
       {/* Bulk Action Bar (Floating Bottom) */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 animate-in slide-in-from-bottom-10 fade-in duration-300">
@@ -594,7 +594,7 @@ const Clients = () => {
                                   {primaryContact?.phone ? (
                                     <a href={`tel:${String(primaryContact.phone).replace(/[^0-9+]/g, '')}`}
                                       onClick={(e) => e.stopPropagation()}
-                                      className="text-[11px] font-medium text-[color:var(--accent)] hover:underline w-fit">
+                                      className="tel-link text-[12px] font-medium text-[color:var(--accent)] hover:underline w-fit">
                                       {primaryContact.phone}
                                     </a>
                                   ) : (

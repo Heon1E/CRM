@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Loader2, Check, Trash2, MapPin, Send }
 import { supabase } from '../lib/supabase'
 import { useData } from '../contexts/DataContext'
 import { showError, showConfirm } from '../utils/alert'
-import { addDays } from '../utils/day'
+import { nextBusinessDay } from '../utils/businessDay'
 import { getHolidays, hasHolidayData } from '../utils/koreanHolidays'
 import { openFollowUps } from '../utils/followUps'
 
@@ -217,12 +217,18 @@ const ScheduleCalendar = () => {
         } finally { setBusyFollowUp(null) }
     }
 
-    /** 미룬다 - 오늘 못 한 것을 지우지 않고 넘긴다 */
+    /*
+     * 미룬다 - 오늘 못 한 것을 지우지 않고 넘긴다.
+     * **다음 영업일로 간다.** 그냥 하루를 더하면 토요일에 누른 것이 일요일이
+     * 되어 아무 일도 할 수 없는 날이 기한이 된다(실제로 그랬다).
+     */
     const postponeFollowUp = async (row, days = 1) => {
         setBusyFollowUp(row.id)
         try {
             const base = row.due < ymd(today) ? ymd(today) : row.due
-            await updateActivity(row.id, { next_action_date: addDays(base, days) })
+            const next = nextBusinessDay(base, days)
+            if (!next) { await showError('날짜를 계산하지 못했습니다.'); return }
+            await updateActivity(row.id, { next_action_date: next })
         } catch (e) {
             await showError(e.message || '미루지 못했습니다.')
         } finally { setBusyFollowUp(null) }
@@ -457,7 +463,7 @@ const ScheduleCalendar = () => {
                                         {r.clientName}{r.detail ? ` · ${r.detail}` : ''}
                                     </span>
                                     <span className="fu-acts">
-                                        <button className="rowbtn" title="하루 미루기"
+                                        <button className="rowbtn" title="다음 영업일로 미루기"
                                             disabled={busyFollowUp === r.id}
                                             onClick={() => postponeFollowUp(r, 1)}>
                                             <ChevronRight size={12} />

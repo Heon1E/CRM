@@ -194,14 +194,14 @@ const Activities = () => {
 
     if (loading) {
         return (
-            <div className="p-3 md:p-6 mt-[50px] max-w-[1100px] mx-auto space-y-3">
+            <div className="p-3 md:p-6 max-w-[1100px] mx-auto space-y-3">
                 {[...Array(6)].map((_, i) => <div key={i} className="skeleton h-20 rounded" />)}
             </div>
         )
     }
 
     return (
-        <div className="p-3 md:p-6 mt-[50px] min-h-screen">
+        <div className="p-3 md:p-6 min-h-screen">
             {/* 읽는 화면이므로 폭을 줄인다 — 한 줄이 너무 길면 눈이 되돌아올 자리를 잃는다 */}
             <div className="max-w-[1100px] mx-auto space-y-4">
 

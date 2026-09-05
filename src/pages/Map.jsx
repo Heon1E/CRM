@@ -238,7 +238,7 @@ const Map = () => {
     const statusOptions = ['all', '신규', '거래중', '휴면']
 
     return (
-        <div className="p-3 md:p-6 bg-oem-bg-app text-oem-text-primary mt-[50px] min-h-screen">
+        <div className="p-3 md:p-6 bg-oem-bg-app text-oem-text-primary min-h-screen">
             <div className="max-w-[1600px] mx-auto flex flex-col h-[calc(100vh-120px)] space-y-4">
 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">

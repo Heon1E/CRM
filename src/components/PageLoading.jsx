@@ -15,7 +15,7 @@ import React from 'react'
  * `App.jsx`에 두면 확인 화면이 App을 다시 import하게 되어 순환이 생긴다.
  */
 const PageLoading = () => (
-    <div className="p-4 sm:p-6 mt-[50px]" aria-busy="true" aria-label="불러오는 중">
+    <div className="p-4 sm:p-6" aria-busy="true" aria-label="불러오는 중">
         <div className="skeleton" style={{ height: 24, width: 180, borderRadius: 4, marginBottom: 16 }} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 16 }}>
             {[0, 1, 2, 3].map((i) => (
