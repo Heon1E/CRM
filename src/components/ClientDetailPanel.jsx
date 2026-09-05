@@ -10,11 +10,15 @@ import {
     Activity,
     TrendingUp,
     TrendingDown,
-    ArrowRight
+    ArrowRight,
+    Star,
+    X
 } from 'lucide-react'
 import { formatCurrency } from '../utils/formatters'
 import { coerceClientStatus, getClientStatusTone } from '../utils/clientStatus'
 import { showError } from '../utils/alert'
+import Modal from './Modal'
+import { parseActivityDescription } from '../utils/activityMerge'
 
 const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
     const { clients, sales, activities, loading, ensureSalesDetail } = useData()
@@ -89,6 +93,42 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
      * 걸 수 있는 사람이 아래로 밀린다.
      */
     const [contactList, setContactList] = useState([])
+    const [primaryBusy, setPrimaryBusy] = useState(null)
+    const [openActivity, setOpenActivity] = useState(null)
+
+    /*
+     * 대표 담당자 바꾸기 — **순서가 중요하다.**
+     *
+     * 거래처당 대표는 하나라는 유니크 제약(`idx_single_primary_contact`)이 있다.
+     * 새 사람을 먼저 세우면 아직 대표인 옛 사람과 부딪혀 **통째로 실패한다.**
+     * 지운 표시만으로도 안 풀린다 — 인덱스는 그 행을 본다.
+     * 그래서 **먼저 전부 내리고, 그다음에 세운다.**
+     */
+    const makePrimary = async (contact) => {
+        if (contact.is_primary) return
+        setPrimaryBusy(contact.id)
+        try {
+            const { error: down } = await supabase.from('client_contacts')
+                .update({ is_primary: false }).eq('client_id', clientId).eq('is_primary', true)
+            if (down) throw down
+            const { error: up } = await supabase.from('client_contacts')
+                .update({ is_primary: true }).eq('id', contact.id)
+            if (up) throw up
+            setContactList((prev) => {
+                const next = prev.map((c) => ({ ...c, is_primary: c.id === contact.id }))
+                // 대표가 맨 위로 — 목록 순서도 함께 맞춘다
+                next.sort((a, b) =>
+                    (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0)
+                    || (b.phone ? 1 : 0) - (a.phone ? 1 : 0)
+                    || String(a.name || '').localeCompare(String(b.name || ''), 'ko'))
+                return next
+            })
+        } catch (e) {
+            await showError(e.message || '대표를 바꾸지 못했습니다.')
+        } finally {
+            setPrimaryBusy(null)
+        }
+    }
     useEffect(() => {
         if (!clientId) { setContactList([]); return undefined }
         let alive = true
@@ -369,15 +409,28 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                     {/* Last Activity */}
                     <div>
                         <p className="text-[10px] font-bold text-oem-blue uppercase mb-2">최근 활동</p>
+                        {/*
+                          * **눌러서 전체를 본다.** 통화 녹음이 들어오면서 기록이
+                          * 400~800자가 됐는데 여기서는 두 줄만 보인다. 만나기 직전에
+                          * 보는 화면이라 뒷부분(단가·수량·다음 할 일)이 정작 중요하다.
+                          */}
                         {lastActivity ? (
-                            <div className="bg-oem-grey-light/50 p-2 rounded border border-oem-border">
+                            <button type="button"
+                                onClick={() => setOpenActivity(lastActivity)}
+                                title="눌러서 전체 보기"
+                                className="w-full text-left bg-oem-grey-light/50 p-2 rounded border border-oem-border hover:border-[color:var(--accent)] transition-colors">
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-xs text-oem-blue">{lastActivity.type}</span>
-                                    <span className="text-[10px] text-oem-blue">{new Date(lastActivity.date).toLocaleDateString()}</span>
+                                    <span className="text-[11px] text-[color:var(--text-secondary)]">
+                                        {String(lastActivity.activity_date || lastActivity.date || '').slice(0, 10)}
+                                    </span>
                                 </div>
-                                <p className="text-xs text-oem-blue line-clamp-2">{lastActivity.description}</p>
-                            </div>
-                        ) : <p className="text-xs text-slate-500">활동 없음</p>}
+                                <p className="text-xs line-clamp-2" style={{ color: 'var(--text-primary)' }}>
+                                    {parseActivityDescription(lastActivity.description || '').body || '(내용 없음)'}
+                                </p>
+                                <span className="text-[11px] font-bold text-[color:var(--accent)]">전체 보기 →</span>
+                            </button>
+                        ) : <p className="text-xs text-[color:var(--text-secondary)]">활동 없음</p>}
                     </div>
                 </div>
             </div>
@@ -410,8 +463,21 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                                 {c.department_role && (
                                     <span className="text-[12px] text-[color:var(--text-secondary)]">{c.department_role}</span>
                                 )}
-                                {c.is_primary && (
+                                {/*
+                                  * 대표는 배지, 나머지는 **누르면 대표가 되는 단추**다.
+                                  * 대표가 곧 목록·브리핑에 뜨는 사람이라 바꿀 일이 자주 있는데
+                                  * 예전에는 이 화면에서 할 수 없어 수정 창을 열어야 했다.
+                                  */}
+                                {c.is_primary ? (
                                     <span className="badge-status" data-tone="new">대표</span>
+                                ) : (
+                                    <button type="button"
+                                        onClick={() => makePrimary(c)}
+                                        disabled={primaryBusy === c.id}
+                                        title={`${c.name}을(를) 대표 담당자로`}
+                                        className="text-[11px] px-1.5 py-0.5 rounded border border-[color:var(--border)] text-[color:var(--text-secondary)] hover:border-[color:var(--accent)] hover:text-[color:var(--accent)] disabled:opacity-40">
+                                        {primaryBusy === c.id ? '바꾸는 중…' : '대표로'}
+                                    </button>
                                 )}
                                 <span className="flex-1" />
                                 {c.phone && (
@@ -468,6 +534,58 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                 </div>
             </div>
 
+            {/*
+              * 활동 전체 보기.
+              *
+              * `Modal`이 모바일 시트·Esc·뒤 화면 스크롤 잠금을 다 맡는다 —
+              * 여기서 다시 만들지 않는다.
+              *
+              * 봇이 심은 머리글(`[통화 3회]`·`[담당자] …`)은 배지로 뽑아 올리고
+              * 본문은 `pre-wrap`으로 줄과 번호를 그대로 살린다. 영업활동 화면과
+              * 같은 규칙이다 — 같은 기록이 화면마다 다르게 보이면 안 된다.
+              */}
+            <Modal
+                isOpen={openActivity !== null}
+                onClose={() => setOpenActivity(null)}
+                title={`${primaryContact?.company || ''} · ${openActivity?.type || '활동'}`}
+                meta={String(openActivity?.activity_date || openActivity?.date || '').slice(0, 10)}
+                size="lg"
+            >
+                {openActivity && (() => {
+                    const parsed = parseActivityDescription(openActivity.description || '')
+                    return (
+                        <div className="p-4 space-y-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {parsed.persons.length > 0 && (
+                                    <span className="text-[13px] font-bold">{parsed.persons.join(', ')}</span>
+                                )}
+                                {parsed.count > 1 && (
+                                    <span className="badge-status" data-tone="new">
+                                        {parsed.label || '접촉'} {parsed.count}회
+                                    </span>
+                                )}
+                                {openActivity.user_name && (
+                                    <span className="text-[12px] text-[color:var(--text-secondary)]">· {openActivity.user_name}</span>
+                                )}
+                            </div>
+
+                            <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words"
+                                style={{ color: 'var(--text-primary)' }}>
+                                {parsed.body || '(내용 없음)'}
+                            </p>
+
+                            {(openActivity.next_action_date || openActivity.next_action_detail) && (
+                                <div className="pt-3 border-t border-oem-border text-[13px]">
+                                    <b style={{ color: 'var(--accent)' }}>
+                                        {String(openActivity.next_action_date || '').slice(0, 10) || '기한 없음'}
+                                    </b>
+                                    {openActivity.next_action_detail ? ` — ${openActivity.next_action_detail}` : ''}
+                                </div>
+                            )}
+                        </div>
+                    )
+                })()}
+            </Modal>
         </div>
     )
 }
