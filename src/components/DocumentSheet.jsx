@@ -327,36 +327,19 @@ export const StatementSheet = ({ statement, items = [], company = {} }) => (
                 </tr>
             </thead>
             <tbody>
-                {/*
-                  * **0원 줄에 이유를 적는다.** 고객이 받아 자기 장부와 맞춰 보는
-                  * 문서다. 수량은 있는데 금액이 0이면 우리 실수로 여기고 전화한다.
-                  *
-                  * 실측(매출 15,530행) — 0원 + 수량있음이 1,285행이고 두 무리로
-                  * 갈린다. 월말(마지막 3일) 331행은 71%가 다음 달에 값이 붙어 다시
-                  * 나오고(결제 이월), 월중 954행은 3%만 재등장하며 품목이 전부
-                  * 부속품이다(제리캔상부캡 211·가로대 186·보안캡 126…) — 샘플
-                  * 무상공급·불량 교환이다.
-                  *
-                  * **어느 쪽인지 줄마다 단정하지 않는다.** 문서에 틀린 이유를 적느니
-                  * '실수가 아니다'만 알린다.
-                  */}
-                {items.map((it, i) => {
-                    const free = Number(it.total_amount) === 0 && Number(it.quantity) > 0
-                    return (
-                        <tr key={it.id || i}>
-                            <td className="ctr num">{i + 1}</td>
-                            <td className="ctr num">{dateK(it.sale_date)}</td>
-                            <td>
-                                <div className="item-name">{it.item_name || '-'}</div>
-                                {free && <div className="item-spec">무상 공급 또는 익월 청구</div>}
-                                {it.notes && <div className="item-spec">{it.notes}</div>}
-                            </td>
-                            <td className="num">{won(it.quantity)}</td>
-                            <td className="num">{won(it.unit_price)}</td>
-                            <td className="num">{won(it.total_amount)}</td>
-                        </tr>
-                    )
-                })}
+                {items.map((it, i) => (
+                    <tr key={it.id || i}>
+                        <td className="ctr num">{i + 1}</td>
+                        <td className="ctr num">{dateK(it.sale_date)}</td>
+                        <td>
+                            <div className="item-name">{it.item_name || '-'}</div>
+                            {it.notes && <div className="item-spec">{it.notes}</div>}
+                        </td>
+                        <td className="num">{won(it.quantity)}</td>
+                        <td className="num">{won(it.unit_price)}</td>
+                        <td className="num">{won(it.total_amount)}</td>
+                    </tr>
+                ))}
                 {items.length === 0 && <Empty cols={6} />}
             </tbody>
         </table>
