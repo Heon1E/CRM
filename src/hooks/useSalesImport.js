@@ -204,17 +204,38 @@ export function useSalesImport() {
             }
 
             setProgress({ current: 0, total: targetDates.length, stage: '기존 매출 조회 중' })
+            /*
+             * **지운 매출은 대사에 참여시키지 않는다.**
+             *
+             * 거래처를 지우면 `deleteClient`가 딸린 매출에도 `deleted_at`을 찍는다
+             * (휴지통에서 되살릴 수 있게). 그런데 여기서 그것을 거르지 않아
+             * **대사가 '이미 있는 매출'로 보고 유지 판정을 내렸다.** 그러면
+             * 엑셀에 있는 행이 새로 등록되지 않고, 화면에는 여전히 안 보인다 —
+             * 같은 기간을 다시 올려도 자료가 돌아오지 않는다.
+             *
+             * 칸이 없을 수 있으므로(마이그레이션 전) 실패하면 조건 없이 한 번 더
+             * 시도한다. **그때는 조회를 새로 지어야 한다** — 빌더는 한 번
+             * `await`하면 약속이 굳어 다시 기다려도 요청이 나가지 않는다.
+             */
+            const salesQuery = (withDeletedFilter) => {
+                // 정렬이 없으면 .range() 페이지 사이에서 행이 중복/누락된다.
+                // 대사 결과가 통째로 틀어지므로 반드시 지정할 것.
+                let q = supabase.from('sales').select('*')
+                    .order('id', { ascending: true })
+                    .in('sale_date', targetDates)
+                if (withDeletedFilter) q = q.is('deleted_at', null)
+                return q
+            }
+
             let existingSales = []
             try {
-                existingSales = await fetchAllRows(() =>
-                    supabase
-                        .from('sales')
-                        .select('*')
-                        // 정렬이 없으면 .range() 페이지 사이에서 행이 중복/누락된다.
-                        // 대사 결과가 통째로 틀어지므로 반드시 지정할 것.
-                        .order('id', { ascending: true })
-                        .in('sale_date', targetDates)
-                )
+                try {
+                    existingSales = await fetchAllRows(() => salesQuery(true))
+                } catch (e) {
+                    if (!/deleted_at/i.test(e?.message || '')) throw e
+                    console.warn('[대사] sales.deleted_at 칸이 없어 조건 없이 조회합니다.')
+                    existingSales = await fetchAllRows(() => salesQuery(false))
+                }
             } catch (error) {
                 console.error('기존 매출 데이터 조회 오류:', error)
                 await showError('기존 매출 데이터를 불러오는 중 오류가 발생했습니다.')

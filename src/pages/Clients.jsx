@@ -312,33 +312,40 @@ const Clients = () => {
     setSelectedIds(newSelected)
   }
 
+  /*
+   * 일괄 삭제 — **`deleteClient`를 거친다.**
+   *
+   * 예전에는 여기서 `clients`를 `.delete()`로 **진짜 지웠다.** 두 가지가 나쁘다:
+   *
+   * 1. **되돌릴 수 없다.** 저장소의 규칙은 '지우기는 표시다'(`deleted_at`)이고
+   *    설정 > 휴지통에서 되살릴 수 있다. 이 경로만 그것을 우회했다.
+   * 2. **딸린 자료가 고아가 된다.** `deleteClient`는 담당자·활동·매출에도 같은
+   *    표시를 찍는데, 여기서는 거래처 행만 지워 매출의 `client_id`가 없는 곳을
+   *    가리키게 된다 — `repair_orphan_sales.mjs`가 고치려고 만들어진 바로 그 상태다.
+   *
+   * 체크박스 스무 개를 고르고 한 번 누르면 그만큼이 한꺼번에 그렇게 됐다.
+   */
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return
     const confirmed = await showConfirm(
-      `${selectedIds.size}개 항목을 삭제하시겠습니까?`,
-      '삭제된 데이터는 복구할 수 없습니다.'
+      `거래처 ${selectedIds.size}곳을 지웁니다. 딸린 매출·활동·연락처도 함께 감춰집니다.`,
+      '설정 > 휴지통에서 되살릴 수 있습니다.'
     )
-    if (confirmed) {
-      try {
-        setLocalLoading(true)
-        // Simulate bulk delete (Supabase doesn't support array delete directly easily without function, so loops for now or 'in' filter)
-        // Using 'in' filter is better
-        const { error } = await supabase
-          .from('clients')
-          .delete()
-          .in('id', Array.from(selectedIds))
+    if (!confirmed) return
 
-        if (error) throw error
-
-        showSuccess(`${selectedIds.size}개 항목이 삭제되었습니다.`)
-        setSelectedIds(new Set())
-        fetchData(page, searchTerm)
-      } catch (e) {
-        console.error(e)
-        showError('일괄 삭제 중 오류가 발생했습니다.')
-      } finally {
-        setLocalLoading(false)
+    setLocalLoading(true)
+    const failed = []
+    try {
+      for (const id of Array.from(selectedIds)) {
+        try { await deleteClient(id) } catch (e) { failed.push(id); console.error('거래처 삭제 실패', id, e) }
       }
+      const done = selectedIds.size - failed.length
+      if (failed.length === 0) showSuccess(`${done}곳을 휴지통으로 보냈습니다.`)
+      else showError(`${done}곳을 지웠고 ${failed.length}곳은 실패했습니다.`)
+      setSelectedIds(new Set())
+      fetchData(page, searchTerm)
+    } finally {
+      setLocalLoading(false)
     }
   }
 
