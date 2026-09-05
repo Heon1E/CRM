@@ -46,11 +46,37 @@ const Statements = () => {
             .then(({ data }) => setCompany(data || {}))
     }, [])
 
+    /*
+     * 고를 거래처 목록 — **최근 거래순으로 세운다.**
+     *
+     * 1,167곳을 `<select>`에 다 넣으면 느려서 100개로 자르는데, 예전에는
+     * **가나다순 앞 100곳**을 잘랐다. 그래서 정작 명세서를 보낼 큰 거래처
+     * (바커케미칼·현대드럼산업)가 목록에 아예 없었다 — 검색을 해야만 나온다.
+     *
+     * 거래명세서는 **거래한 곳에 보내는 문서**다. 최근에 산 곳이 위에 와야 한다.
+     * 매출이 없는 곳은 뒤로 밀되 빼지는 않는다 (첫 거래 명세서도 있을 수 있다).
+     */
+    const lastSaleByClient = useMemo(() => {
+        const m = new Map()
+        ;(sales || []).forEach((x) => {
+            const id = x.client_id || x.clientId
+            if (!id) return
+            const d = String(x.sale_date || x.date || '').slice(0, 10)
+            if (d && d > (m.get(id) || '')) m.set(id, d)
+        })
+        return m
+    }, [sales])
+
     const shownClients = useMemo(() => {
         const term = q.trim().toLowerCase()
         const list = (clients || []).filter((c) => !term || String(c.company || '').toLowerCase().includes(term))
-        return list.slice(0, 100)
-    }, [clients, q])
+        list.sort((a, b) => {
+            const x = lastSaleByClient.get(a.id) || '', y = lastSaleByClient.get(b.id) || ''
+            if (x !== y) return y.localeCompare(x)          // 최근 거래순
+            return String(a.company || '').localeCompare(String(b.company || ''), 'ko')
+        })
+        return { rows: list.slice(0, 100), total: list.length }
+    }, [clients, q, lastSaleByClient])
 
     const client = useMemo(() => (clients || []).find((c) => c.id === clientId), [clients, clientId])
 
@@ -177,7 +203,14 @@ const Statements = () => {
                 </span>
                 <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ minWidth: 220 }}>
                     <option value="">거래처를 고르세요</option>
-                    {shownClients.map((c) => <option key={c.id} value={c.id}>{c.company}</option>)}
+                    {shownClients.rows.map((c) => (
+                        <option key={c.id} value={c.id}>
+                            {c.company}{lastSaleByClient.get(c.id) ? ` · ${lastSaleByClient.get(c.id)}` : ''}
+                        </option>
+                    ))}
+                    {shownClients.total > shownClients.rows.length && (
+                        <option disabled>― 최근 거래순 100곳만 보입니다. 나머지는 왼쪽 '거래처 찾기'로 ―</option>
+                    )}
                 </select>
 
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
