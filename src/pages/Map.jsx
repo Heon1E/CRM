@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useData } from '../contexts/DataContext'
 import { MapPin, Filter, RefreshCw, Calendar, Navigation, Loader, X } from 'lucide-react'
 import { showSuccess, showError } from '../utils/alert'
 import { loadKakaoMaps, geocodeAddress, kakaoKey } from '../utils/kakaoMap'
@@ -41,35 +42,41 @@ const Map = () => {
     }, [])
 
     /* ── 데이터 ───────────────────────────────────────────────────────── */
-    const fetchClients = useCallback(async () => {
-        try {
-            const { data: clientsData, error } = await supabase
-                .from('clients').select('*').is('deleted_at', null)
-            if (error) throw error
+    /*
+     * **거래처를 따로 조회하지 않는다.**
+     *
+     * 예전에는 여기서 `from('clients').select('*')`를 직접 불렀는데
+     * **페이지네이션이 없어 1,000곳에서 잘렸다.** 거래처는 1,167곳이라
+     * 167곳이 통째로 지도에서 빠지고, 화면의 안내 문구까지 '1,000곳 중'이라고
+     * 틀린 수를 말했다. 저장소가 경고한 그 함정이다 —
+     * *"1000행 초과 조회는 `.range()` 페이지네이션 필수"*.
+     *
+     * 그런데 `DataContext`가 이미 전량을 들고 있다. 다시 받을 이유가 없다
+     * (`useDashboardData`에서 같은 중복 조회를 걷어낸 것과 같다).
+     * 활동도 마찬가지라 '앞으로의 약속'도 거기서 만든다.
+     */
+    const { clients: allClients, activities, refreshData } = useData()
 
-            // 앞으로의 약속(다음 조치일)을 거래처에 붙인다 — 지도에서 바로 보이게
-            const today = todayYmd()
-            const { data: acts } = await supabase
-                .from('activities')
-                .select('client_id, next_action_date, next_action_detail')
-                .gte('next_action_date', today)
-                .order('next_action_date', { ascending: true })
-
-            setClients((clientsData || []).map((c) => {
-                const next = (acts || []).find((a) => a.client_id === c.id)
-                return {
-                    ...c,
-                    nextSchedule: next
-                        ? { date: next.next_action_date, detail: next.next_action_detail }
-                        : null,
-                }
-            }))
-        } catch (e) {
-            console.error('거래처 데이터 로드 오류:', e)
-        }
-    }, [])
-
-    useEffect(() => { fetchClients() }, [fetchClients])
+    useEffect(() => {
+        const today = todayYmd()
+        /*
+         * 거래처마다 가장 가까운 '다음 조치일' 하나.
+         *
+         * **`new Map()`을 쓰면 안 된다** — 이 파일의 컴포넌트 이름이 `Map`이라
+         * 전역 생성자를 가린다(`TypeError: Map is not a constructor`).
+         * 실제로 그렇게 짰다가 지도 화면이 통째로 죽었다.
+         */
+        const nextByClient = {}
+        ;(activities || []).forEach((a) => {
+            const d = String(a.next_action_date || '').slice(0, 10)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d < today) return
+            const id = a.client_id || a.clientId
+            if (!id) return
+            const cur = nextByClient[id]
+            if (!cur || d < cur.date) nextByClient[id] = { date: d, detail: a.next_action_detail || '' }
+        })
+        setClients((allClients || []).map((c) => ({ ...c, nextSchedule: nextByClient[c.id] || null })))
+    }, [allClients, activities])
 
     const validClients = useMemo(
         () => clients.filter((c) => c.latitude && c.longitude), [clients])
@@ -176,7 +183,8 @@ const Map = () => {
             // 하루 10만 건이라 여유가 크지만, 몰아치면 순간 제한에 걸린다
             await new Promise((r) => setTimeout(r, 120))
         }
-        await fetchClients()
+        // 좌표를 DB에 넣었으니 앱이 들고 있는 거래처도 새로 받는다
+        await refreshData()
         setIsSyncing(false)
         await showSuccess(`좌표 ${done}곳을 채웠습니다.${failed ? ` (${failed}곳은 주소로 찾지 못했습니다)` : ''}`)
     }
