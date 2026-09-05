@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Plus, Printer, Trash2, Loader2, Save, X, FileText, ArrowLeft, Search } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { saveWithFreshNo, todayLocal } from '../utils/docNumber'
@@ -96,21 +96,40 @@ const PurchaseOrders = () => {
 
     const shownTotal = useMemo(() => shown.reduce((a, r) => a + num(r.total), 0), [shown])
 
+    /*
+     * 편집을 열 때의 모습을 담아 둔다. **'취소'가 손댄 것을 그냥 버리면 안 된다** —
+     * 품목 열 줄을 적은 뒤 눌러도 되돌릴 방법이 없었다. 견적서와 같은 문제이고
+     * 같은 방식으로 막는다.
+     */
+    const openedSnapshot = useRef(null)
+    const isDirty = () => {
+        if (!editing || !openedSnapshot.current) return false
+        return JSON.stringify(editing) !== openedSnapshot.current
+    }
+    const cancelEdit = async () => {
+        if (isDirty() && !(await showConfirm('고친 내용이 사라집니다. 그래도 닫을까요?', '편집 취소'))) return
+        setEditing(null)
+    }
+
     const newOrder = () => {
-        setEditing({
+        const fresh = {
             head: {
                 po_no: '',
                 po_date: todayLocal(), vendor_name: '', vendor_contact: '', vendor_phone: '', vendor_email: '',
                 delivery_date: '', delivery_to: '', status: '작성중', notes: '',
             },
             lines: [emptyLine()],
-        })
+        }
+        openedSnapshot.current = JSON.stringify(fresh)
+        setEditing(fresh)
     }
 
     const openOrder = async (o) => {
         const { data, error } = await supabase.from('po_items').select('*').eq('po_id', o.id).order('line_no')
         if (error) { await showError(error.message); return }
-        setEditing({ head: { ...o }, lines: (data || []).map((r) => ({ ...r, key: r.id })) })
+        const opened = { head: { ...o }, lines: (data || []).map((r) => ({ ...r, key: r.id })) }
+        openedSnapshot.current = JSON.stringify(opened)
+        setEditing(opened)
     }
 
     const setHead = (patch) => setEditing((e) => ({ ...e, head: { ...e.head, ...patch } }))
@@ -234,7 +253,7 @@ const PurchaseOrders = () => {
                     <button className="tb-btn primary" onClick={save} disabled={saving}>
                         {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 저장
                     </button>
-                    <button className="tb-btn" onClick={() => setEditing(null)}><X size={14} /> 취소</button>
+                    <button className="tb-btn" onClick={cancelEdit}><X size={14} /> 취소</button>
                 </div>
 
                 <div style={{ padding: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
@@ -371,19 +390,38 @@ const PurchaseOrders = () => {
                     </thead>
                     <tbody>
                         {shown.map((o) => (
-                            <tr key={o.id}>
-                                <td><button className="rowbtn doc-no-btn" onClick={() => openOrder(o)}>{o.po_no}</button></td>
+                            /* 줄 전체를 눌러 연다 — 문서번호 글자는 목록에서 가장 작은 자리다
+                               (견적서와 같은 규칙). */
+                            <tr key={o.id} onClick={() => openOrder(o)} style={{ cursor: 'pointer' }}>
+                                <td><button className="rowbtn doc-no-btn" onClick={(e) => { e.stopPropagation(); openOrder(o) }}>{o.po_no}</button></td>
                                 <td className="dt">{String(o.po_date).slice(0, 10)}</td>
                                 <td>{o.vendor_name}</td>
                                 <td className="dt">{o.delivery_date ? String(o.delivery_date).slice(0, 10) : '-'}</td>
-                                <td className="num">{won(o.total)}</td>
-                                <td><span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLOR[o.status] || '#6B7280' }}>{o.status}</span></td>
+                                {/* 금액이 이 목록에서 눈이 가야 할 곳이다 */}
+                                <td className="num" style={{ fontWeight: 700, fontSize: 13 }}>{won(o.total)}</td>
                                 <td>
+                                    <span className="badge-status" style={{
+                                        color: STATUS_COLOR[o.status] || '#6B7280',
+                                        borderColor: 'var(--border)',
+                                        background: o.status === '수주' || o.status === '완료' ? 'rgba(0,117,56,.10)' : 'transparent',
+                                    }}>{o.status}</span>
+                                </td>
+                                <td onClick={(e) => e.stopPropagation()}>
                                     <button className="rowbtn" onClick={() => print(o)} title="인쇄 / PDF"><Printer size={13} /></button>
                                     <button className="rowbtn" onClick={() => removeOrder(o)} title="삭제"><Trash2 size={13} /></button>
                                 </td>
                             </tr>
                         ))}
+                        {loading && shown.length === 0 && (
+                            /* 불러오는 동안 표 안이 통째로 비어 있으면 빈 목록과 구별되지 않는다 */
+                            [...Array(6)].map((_, i) => (
+                                <tr key={`sk-${i}`}>
+                                    {[110, 84, 150, 84, 96, 56, 70].map((w, c) => (
+                                        <td key={c}><div className="skeleton h-3.5 rounded" style={{ width: w }} /></td>
+                                    ))}
+                                </tr>
+                            ))
+                        )}
                         {shown.length === 0 && !loading && (
                             <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: 'var(--text-secondary)' }}>
                                 <FileText size={20} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.5 }} />

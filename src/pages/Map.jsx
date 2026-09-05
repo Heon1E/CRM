@@ -74,6 +74,12 @@ const Map = () => {
     const validClients = useMemo(
         () => clients.filter((c) => c.latitude && c.longitude), [clients])
 
+    // 왜 안 뜨는지 나누어 센다 — '좌표만 없는 것'과 '주소가 아예 없는 것'은 할 일이 다르다
+    const needGeocode = useMemo(
+        () => clients.filter((c) => c.address && !(c.latitude && c.longitude)).length, [clients])
+    const noAddress = useMemo(
+        () => clients.filter((c) => !c.address && !(c.latitude && c.longitude)).length, [clients])
+
     const filteredClients = useMemo(
         () => (statusFilter === 'all' ? validClients : validClients.filter((c) => c.status === statusFilter)),
         [validClients, statusFilter])
@@ -244,10 +250,29 @@ const Map = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-oem-border pb-4">
                     <div>
                         <h1 className="text-xl font-bold text-oem-blue tracking-tight">거래처 지도</h1>
-                        <p className="text-xs text-oem-text-secondary mt-1">
-                            {validClients.length > 0
-                                ? <>주소 좌표가 등록된 거래처 <b className="text-oem-blue">{validClients.length}곳</b>을 지도에 표시합니다.</>
-                                : <>아직 좌표가 등록된 거래처가 없습니다. 아래 <b>주소 좌표 채우기</b>를 누르면 주소로 찾아 넣습니다.</>}
+                        {/*
+                          * **왜 비어 보이는지 말해 준다.**
+                          *
+                          * 실측(2026-09) — 거래처 1,167곳 중 좌표가 있는 곳은 31곳뿐이고
+                          * **1,133곳은 주소 자체가 없다.** 지도를 열면 점 서른 개만
+                          * 떠 있는데 화면은 이유를 말하지 않아 고장으로 보인다.
+                          *
+                          * '주소 좌표 채우기'로 해결되는 것은 **주소는 있는데 좌표만 없는**
+                          * 곳뿐이다(3곳). 나머지는 주소를 넣어야 한다 — 그 사실을 적는다.
+                          */}
+                        <p className="text-xs text-oem-text-secondary mt-1 leading-relaxed">
+                            {validClients.length > 0 ? (
+                                <>
+                                    거래처 <b>{clients.length.toLocaleString()}곳</b> 중{' '}
+                                    <b className="text-oem-blue">{validClients.length}곳</b>을 지도에 표시합니다.
+                                    {needGeocode > 0 && <> · 주소는 있는데 좌표가 없는 곳 <b>{needGeocode}곳</b>은 아래 단추로 채웁니다.</>}
+                                    {noAddress > 0 && (
+                                        <><br />주소가 없는 <b>{noAddress.toLocaleString()}곳</b>은 지도에 뜨지 않습니다 — 거래처 수정에서 주소를 넣어야 합니다.</>
+                                    )}
+                                </>
+                            ) : (
+                                <>아직 좌표가 등록된 거래처가 없습니다. 아래 <b>주소 좌표 채우기</b>를 누르면 주소로 찾아 넣습니다.</>
+                            )}
                         </p>
                     </div>
 
