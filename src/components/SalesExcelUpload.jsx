@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Upload, Download, Loader2, Trash2 } from 'lucide-react'
+import { Upload, Download, Loader2 } from 'lucide-react'
 import { downloadSaleTemplate, parseSaleExcel } from '../utils/excelExport'
 import { supabase } from '../lib/supabase'
 import { showSuccess, showError, showWarning } from '../utils/alert'
@@ -14,7 +14,6 @@ import { useSalesImport } from '../hooks/useSalesImport'
 const SalesExcelUpload = ({ onRefresh }) => {
   const { importSalesRows, isImporting, progress } = useSalesImport()
   const [isParsing, setIsParsing] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const fileInputRef = useRef(null)
 
   const busy = isParsing || isImporting
@@ -61,23 +60,22 @@ const SalesExcelUpload = ({ onRefresh }) => {
     }
   }
 
-  const handleDeleteAll = async () => {
-    const confirmed = window.confirm('Are you sure you want to delete ALL sales data? This cannot be undone.')
-    if (!confirmed) return
-
-    try {
-      setIsDeleting(true)
-      const { error } = await supabase.from('sales').delete().gte('created_at', '1970-01-01')
-      if (error) throw error
-      await showSuccess('모든 매출 데이터가 삭제되었습니다.')
-      if (onRefresh) await onRefresh()
-    } catch (error) {
-      console.error('전체 삭제 오류:', error)
-      await showError('전체 삭제 중 오류가 발생했습니다.')
-    } finally {
-      setIsDeleting(false)
-    }
-  }
+  /*
+   * **'Delete All' 단추를 없앴다.**
+   *
+   * 여기 `supabase.from('sales').delete()`로 **매출 15,221행을 진짜 지우는**
+   * 단추가 있었다. 하필 자리가 '엑셀 업로드' **바로 옆**이었고, 확인 창은
+   * 브라우저 기본 `window.confirm`에 영어였다
+   * ("Are you sure you want to delete ALL sales data?").
+   * 엑셀을 올리려다 한 칸 옆을 누르고 확인을 눌러 버리면 3년치가 사라진다.
+   *
+   * 저장소의 규칙과 어긋난다 — **"지우기는 '표시'다"**(deleted_at).
+   * 게다가 같은 기간을 다시 올려도 **대사(reconcileSales)가 중복을 막으므로**
+   * 올리기 전에 전부 지울 이유 자체가 없다. 초기 개발 때 만든 것이 남아 있던
+   * 것으로 보인다.
+   *
+   * 잘못 올린 매출은 대사의 '삭제 후보'로 미리보기에서 승인해 지운다.
+   */
 
   return (
     <div className="flex items-center space-x-3">
@@ -136,28 +134,6 @@ const SalesExcelUpload = ({ onRefresh }) => {
           </span>
         </div>
       )}
-      {/* Delete All 버튼 (위험 구역) */}
-      <button
-        onClick={handleDeleteAll}
-        disabled={isDeleting || busy}
-        className={`flex-1 sm:flex-none flex items-center justify-center space-x-2 touch-manipulation min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all duration-200 ${isDeleting || busy
-          ? 'opacity-50 cursor-not-allowed bg-[color:var(--bg-card)] text-[color:var(--text-secondary)] border border-[color:var(--border)]'
-          : 'bg-red-50 hover:bg-red-100 text-[color:var(--danger)] border border-red-200'
-          }`}
-        style={{ WebkitTapHighlightColor: 'transparent' }}
-      >
-        {isDeleting ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>삭제 중...</span>
-          </>
-        ) : (
-          <>
-            <Trash2 className="w-4 h-4" />
-            <span>Delete All</span>
-          </>
-        )}
-      </button>
     </div>
   )
 }

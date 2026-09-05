@@ -373,7 +373,7 @@ const Settings = () => {
                       value={settings.email}
                       onChange={(e) => setSettings({ ...settings, email: e.target.value })}
                       className="w-full px-3 py-2 text-sm border border-oem-border rounded-sm focus:border-oem-blue outline-none transition-colors placeholder:text-gray-500"
-                      placeholder="admin@example.com"
+                      placeholder="alert@idibc.kr"
                     />
                   </div>
                 </div>
@@ -418,7 +418,7 @@ const Settings = () => {
                       거래처 일괄 등록
                     </h3>
                     <p className="text-[11px] text-oem-text-secondary mb-4">
-                      Upload Excel/CSV to bulk register client profiles. Key personnel will be auto-assigned.
+                      엑셀·CSV를 올리면 거래처가 한꺼번에 등록됩니다. 담당자 칸이 있으면 함께 들어갑니다.
                     </p>
                     <ClientExcelUpload />
                   </div>
@@ -427,7 +427,7 @@ const Settings = () => {
                       매출 일괄 등록
                     </h3>
                     <p className="text-[11px] text-oem-text-secondary mb-4">
-                      Import transaction history via Excel. Ensures exact match on Client Name.
+                      엑셀로 매출을 올립니다. 같은 기간을 다시 올려도 대사를 거쳐 중복이 생기지 않습니다.
                     </p>
                     <SalesExcelUpload />
                   </div>
@@ -528,7 +528,7 @@ const Settings = () => {
                         <RefreshCw className="w-4 h-4" /> 품목 동기화
                       </h4>
                       <p className="text-[10px] text-oem-text-secondary mb-3">
-                        Scans sales records for unregistered products and adds them to the Product Master. Backfills product IDs.
+                        매출에 있는데 품목 목록에 없는 것을 찾아 등록하고, 매출에 품목 번호를 채웁니다.
                       </p>
                       <button
                         onClick={async () => {
@@ -554,34 +554,35 @@ const Settings = () => {
                       </button>
                     </div>
 
-                    <div className="bg-red-50 p-4 border border-red-200 rounded-sm">
-                      <h4 className="text-sm font-bold text-[color:var(--danger)] mb-2 flex items-center gap-2">
-                        <TriangleAlert className="w-4 h-4" /> 되돌릴 수 없는 작업
+                    {/*
+                      * **'전체 삭제' 단추를 없앴다.**
+                      *
+                      * 이 자리에 `clients` · `sales` · `activities` · `client_contacts`를
+                      * `.delete()`로 **진짜 지우는** 단추가 있었다. 확인 창 한 번이면
+                      * 매출 15,221행 · 거래처 1,150곳 · 활동 265건 · 연락처 585명이
+                      * 되돌릴 방법 없이 사라진다. 설명은 영어였고
+                      * ("Permanently delete ALL client data…") 엑셀을 올리러 오는
+                      * 화면 안, '동기화 실행' 바로 아래에 있었다.
+                      *
+                      * 저장소의 규칙과 정면으로 어긋난다 — **"지우기는 '표시'다.
+                      * 거래처 하나를 잘못 누르면 그 회사의 매출이 통째로 사라지고
+                      * 되돌릴 방법이 없었다. 지금은 deleted_at만 채운다."**
+                      * 초기 개발 때 만든 것이 그대로 남아 있던 것으로 보인다.
+                      *
+                      * 3년치 실제 자료가 든 CRM에서 이것을 누를 이유가 없다.
+                      * 한 건씩 지우는 길은 이미 있고 되돌릴 수도 있다.
+                      */}
+                    <div className="bg-oem-grey-light p-4 border border-oem-border rounded-sm">
+                      <h4 className="text-sm font-bold mb-2 flex items-center gap-2">
+                        <TriangleAlert className="w-4 h-4" style={{ color: 'var(--warning)' }} /> 자료 지우기
                       </h4>
-                      <p className="text-[10px] text-red-800 mb-3">
-                        Permanently delete ALL client data, including related sales and activities. This action cannot be undone.
+                      <p className="text-xs text-[color:var(--text-secondary)] leading-relaxed">
+                        거래처·매출을 <b>한꺼번에 지우는 단추는 없앴습니다.</b> 실수로 한 번 누르면
+                        3년치 자료가 되돌릴 수 없이 사라지기 때문입니다.
+                        <br />
+                        지울 것은 각 화면에서 한 건씩 지웁니다. 지운 것은 아래
+                        <b> 휴지통 · 변경 이력</b>에 남아 되살릴 수 있습니다.
                       </p>
-                      <button
-                        onClick={async () => {
-                          const confirmed = await showConfirm('거래처 자료를 전부 지웁니다. 되돌릴 수 없습니다.', '경고', '전부 지우기', '취소')
-                          if (!confirmed) return
-                          try {
-                            setSettingsLoading(true)
-                            await supabase.from('client_contacts').delete().neq('id', 0)
-                            await supabase.from('activities').delete().neq('id', 0)
-                            await supabase.from('sales').delete().neq('id', 0)
-                            const { error } = await supabase.from('clients').delete().neq('id', 0)
-                            if (error) throw error
-                            showSuccess('All client data has been wiped.')
-                          } catch (error) {
-                            showError('Deletion failed.')
-                          } finally { setSettingsLoading(false) }
-                        }}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-sm transition-colors flex items-center justify-center gap-2"
-                        disabled={settingsLoading}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> 전체 삭제
-                      </button>
                     </div>
                   </div>
                 </div>
