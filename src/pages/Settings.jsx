@@ -39,7 +39,7 @@ const Panel = ({ title, children, className = "" }) => (
 )
 
 const Settings = () => {
-  const { products, deleteProduct, loading, registerMissingProductsFromSales } = useData()
+  const { products, clients, sales, deleteProduct, loading, registerMissingProductsFromSales } = useData()
   const { user, role } = useAuth()
   const [activeTab, setActiveTab] = useState('general') // 'general' or 'products'
   const [editingProductId, setEditingProductId] = useState(null)
@@ -483,12 +483,19 @@ const Settings = () => {
                         onClick={async () => {
                           try {
                             setSettingsLoading(true)
-                            const { data, error } = await supabase.from('clients').select('*').order('company', { ascending: true })
-                            if (error) throw error
-                            exportClientsToExcel(data)
-                            showSuccess('Client database exported successfully.')
+                            /* **다시 조회하지 않는다.** 예전에는 여기서
+                               `select('*')`를 새로 던졌는데 `.range()`가 없어
+                               **1,000곳에서 잘렸고**(거래처는 1,167곳이다)
+                               휴지통에 든 것도 함께 나갔다. 앱이 이미 들고 있는
+                               것을 쓴다 — 매출을 함께 넘겨 최근거래일·누적매출을
+                               실제 값으로 적는다. */
+                            const rows = [...(clients || [])].sort((a, b) =>
+                              String(a.company || '').localeCompare(String(b.company || ''), 'ko'))
+                            if (!rows.length) { await showWarning('내보낼 거래처가 없습니다.'); return }
+                            exportClientsToExcel(rows, sales || [])
+                            showSuccess(`거래처 ${rows.length.toLocaleString()}곳을 엑셀로 내려받았습니다.`)
                           } catch (e) {
-                            showError('Export failed.')
+                            showError('엑셀 내려받기에 실패했습니다.')
                           } finally { setSettingsLoading(false) }
                         }}
                         className="oem-btn-secondary flex items-center gap-2 px-3 py-1.5"

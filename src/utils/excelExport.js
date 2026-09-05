@@ -2,16 +2,49 @@ import * as XLSX from 'xlsx'
 import { formatCurrency } from './formatters'
 import { todayYmd } from './day'
 
-export const exportClientsToExcel = (clients) => {
-  const data = clients.map((client) => ({
-    회사명: client.company,
-    담당자: client.contact_person || '',
-    전화번호: client.phone,
-    이메일: client.email,
-    상태: client.status,
-    최근주문일: client.lastOrder,
-    주문금액: `${(client.orderAmount / 10000).toLocaleString()}만원`,
-  }))
+/**
+ * 거래처 목록 내려받기.
+ *
+ * **두 열이 아무 말도 하지 않고 있었다.** `clients.last_order`·`order_amount`는
+ * 1,167곳 **전부 비어 있는** 칸이다(실측). 게다가 설정 화면은 DB 원본 행을
+ * 그대로 넘기는데 여기서는 camelCase(`client.orderAmount`)를 읽어서,
+ * `undefined / 10000`이 **`NaN만원`** 으로 1,167줄 찍혔다.
+ * 빈 칸보다 나쁘다 — 받아 본 사람은 고장이 아니라 자료라고 읽는다.
+ *
+ * 거래 실적은 `sales`에 있다. 그것으로 센다. 매출을 넘기지 않으면 두 열을
+ * 아예 빼고 낸다 — **없는 값을 0으로 적지 않는다.**
+ */
+export const exportClientsToExcel = (clients, sales = null) => {
+  const byClient = {}
+  if (Array.isArray(sales)) {
+    for (const s of sales) {
+      const id = s.client_id || s.clientId
+      if (!id) continue
+      const amount = Number(s.total_amount ?? s.totalAmount) || 0
+      const date = s.sale_date || s.date || s.created_at
+      const cur = (byClient[id] ||= { total: 0, last: null })
+      cur.total += amount
+      if (date && (!cur.last || date > cur.last)) cur.last = date
+    }
+  }
+
+  const data = clients.map((client) => {
+    const row = {
+      회사명: client.company,
+      담당자: client.contact_person || client.contactPerson || '',
+      전화번호: client.phone || '',
+      이메일: client.email || '',
+      상태: client.status || '',
+      주소: client.address || '',
+      담당영업: client.sales_rep || client.salesRep || '',
+    }
+    if (Array.isArray(sales)) {
+      const st = byClient[client.id]
+      row['최근거래일'] = st?.last ? String(st.last).slice(0, 10) : ''
+      row['누적매출'] = st ? Math.round(st.total) : 0
+    }
+    return row
+  })
 
   const ws = XLSX.utils.json_to_sheet(data)
   const wb = XLSX.utils.book_new()
@@ -24,7 +57,10 @@ export const exportClientsToExcel = (clients) => {
 export const exportActivitiesToExcel = (activities) => {
   const data = activities.map((activity) => ({
     날짜: activity.activity_date || activity.date,
-    담당자: activity.user,
+    /* **`activity.user`는 없는 칸이었다.** `activities`의 실제 칸은 `user_name`이고,
+       `user`는 방금 추가·수정한 활동에만 잠깐 붙는 값이다. 그래서 내려받은
+       엑셀의 '담당자' 열이 **늘 비어 있었다** (다녀온 사람을 적으라고 만든 열인데). */
+    담당자: activity.user_name || activity.user || '',
     활동유형: activity.type,
     고객사: activity.clientName,
     내용: activity.description,

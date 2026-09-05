@@ -692,24 +692,68 @@ export const DataProvider = ({ children }) => {
     return sanitized
   }, [])
 
-  // 2. 담당자 관련 함수 (is_primary 반영)
+  /**
+   * 거래처 담당자를 통째로 갈아 끼운다.
+   *
+   * **지우고 넣는 사이에서 실패하면 담당자가 통째로 사라진다.** 예전 코드는
+   * `delete()`와 `insert()` 둘 다 결과를 보지 않고 무조건 `{ success: true }`를
+   * 돌려줬다. 지우기는 이미 커밋됐는데 넣기가 실패하면 그 거래처의 담당자가
+   * 전부 없어지고, 화면은 '저장했습니다'라고 말한다. **하드 삭제라 되돌릴
+   * 방법도 없다** (아모레퍼시픽이면 전화번호 가진 4명이 그대로 날아간다).
+   *
+   * 실제로 그 실패를 만드는 경로가 있었다 — 명함 스캔(`BusinessCardScannerModal`)이
+   * 기존 담당자 뒤에 새 사람을 `is_primary: true`로 붙여 넘긴다. 그 거래처에
+   * 이미 대표가 있으면 **대표가 둘**이 되어 유니크 제약
+   * (`idx_single_primary_contact`)이 배치 전체를 거절한다.
+   *
+   * 셋을 지킨다:
+   *   1. **대표는 하나만** 남긴다 — 넣기 전에 다듬는다. 막을 수 있는 실패는 막는다.
+   *   2. 지우기·넣기의 **오류를 본다.** 실패를 성공이라고 말하지 않는다.
+   *   3. 그래도 넣기가 실패하면 **지운 것을 그대로 되돌린다** (id까지 원래대로).
+   */
   const replaceClientContacts = useCallback(async (clientId, contacts) => {
     try {
       const userId = await getValidUserId(user)
-      await supabase.from('client_contacts').delete().eq('client_id', clientId)
-      if (contacts && contacts.length > 0) {
-        const toInsert = contacts.map(c => ({
-          client_id: clientId,
-          name: c.name || '',
-          department_role: c.department_role || '',
-          phone: c.phone || '',
-          email: c.email || '',
-          is_primary: !!c.is_primary,
-          created_by: userId
-        }))
-        // 디버깅: DB에 전송될 담당자 데이터 확인
-        console.log('[replaceClientContacts] client_contacts 테이블에 저장될 데이터:', toInsert)
-        await supabase.from('client_contacts').insert(toInsert)
+
+      // 1) 넣을 것을 먼저 다듬는다. 대표는 앞선 하나만 남기고 나머지는 내린다.
+      let primaryTaken = false
+      const toInsert = (contacts || [])
+        .filter(c => (c?.name || '').trim())
+        .map(c => {
+          const isPrimary = !!c.is_primary && !primaryTaken
+          if (isPrimary) primaryTaken = true
+          return {
+            client_id: clientId,
+            name: c.name || '',
+            department_role: c.department_role || '',
+            phone: c.phone || '',
+            email: c.email || '',
+            is_primary: isPrimary,
+            created_by: userId,
+          }
+        })
+
+      // 2) 되돌릴 수 있도록 지금 것을 손에 쥐고 시작한다
+      const { data: before, error: readError } = await supabase
+        .from('client_contacts').select('*').eq('client_id', clientId)
+      if (readError) throw readError
+
+      const { error: deleteError } = await supabase
+        .from('client_contacts').delete().eq('client_id', clientId)
+      if (deleteError) throw deleteError
+
+      if (toInsert.length === 0) return { success: true }
+
+      const { error: insertError } = await supabase.from('client_contacts').insert(toInsert)
+      if (insertError) {
+        // 3) 지우기는 이미 커밋됐다. 원래대로 돌려놓고 실패를 알린다.
+        if (before?.length) {
+          const { error: restoreError } = await supabase.from('client_contacts').insert(before)
+          if (restoreError) {
+            console.error('담당자 복구 실패 — 수동 확인 필요:', clientId, restoreError.message)
+          }
+        }
+        throw insertError
       }
       return { success: true }
     } catch (error) { return { success: false, error } }
@@ -1088,7 +1132,10 @@ export const DataProvider = ({ children }) => {
     const uid = await getValidUserId(user)
     const { data, error } = await supabase.from('clients').insert([{ ...sanitizeData(c, 'client'), created_by: uid }]).select().single()
     if (error) throw error
-    if (c.contacts) await replaceClientContacts(data.id, c.contacts)
+    if (c.contacts) {
+      const r = await replaceClientContacts(data.id, c.contacts)
+      if (!r?.success) throw (r?.error || new Error('담당자를 저장하지 못했습니다.'))
+    }
 
     // 담당자 저장 후 최신 담당자 데이터 조회
     const { data: contactsData } = await supabase
@@ -1117,7 +1164,12 @@ export const DataProvider = ({ children }) => {
   const updateClient = useCallback(async (id, c) => {
     const { data, error } = await supabase.from('clients').update(sanitizeData(c, 'client')).eq('id', id).select().single()
     if (error) throw error
-    if (c.contacts) await replaceClientContacts(id, c.contacts)
+    if (c.contacts) {
+      // **실패를 삼키지 않는다.** 담당자가 저장되지 않았는데 '저장했습니다'가
+      // 뜨면, 사라진 것을 아무도 모른 채 넘어간다.
+      const r = await replaceClientContacts(id, c.contacts)
+      if (!r?.success) throw (r?.error || new Error('담당자를 저장하지 못했습니다.'))
+    }
 
     // 담당자 저장 후 최신 담당자 데이터 조회
     const { data: contactsData } = await supabase

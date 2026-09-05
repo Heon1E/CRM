@@ -2082,6 +2082,38 @@ VITE_DEV_AUTOLOGIN_PW=<비밀번호>
 실측(386px, 팝업 연 상태) — 시트가 `0~386`으로 화면에 정확히 맞고 가로 넘침 0 ·
 터치 44px 미달 0 · 12px 미만 0.
 
+### 담당자 저장은 '전부 지우고 다시 넣기'다 — 사이에서 실패하면 전멸한다
+
+`replaceClientContacts`(DataContext). 거래처 담당자를 통째로 갈아 끼운다.
+`delete()` 다음에 `insert()`인데, **둘 다 결과를 보지 않고 무조건
+`{ success: true }`를 돌려주고 있었다.** 지우기는 이미 커밋됐으므로 넣기가
+실패하면 **그 거래처의 담당자가 전부 사라지고 화면은 '저장했습니다'라고 말한다.**
+하드 삭제라 되돌릴 방법도 없다.
+
+**그 실패를 실제로 만드는 경로가 있었다.** 명함 스캔(`BusinessCardScannerModal`)이
+기존 담당자 뒤에 새 사람을 `is_primary: true`로 붙여 넘긴다. 그 거래처에 이미
+대표가 있으면 **대표가 둘**이 되고, 유니크 제약이 배치를 통째로 거절한다.
+실측으로 확인했다 (담당자 0명인 거래처에 대표 둘을 한 번에 넣어 봤다):
+
+```
+duplicate key value violates unique constraint "idx_single_primary_contact"
+들어간 행: 0        ← 한 줄도 안 들어간다. 앞의 delete 는 이미 끝났다.
+```
+
+아모레퍼시픽이면 전화번호를 가진 4명이 명함 한 장 찍다가 사라진다.
+
+셋을 지킨다:
+
+1. **대표는 하나만 남긴다** — 넣기 전에 다듬는다. 막을 수 있는 실패는 막는다.
+   (같은 자료로 다시 재 보니 대표 하나로 다듬은 뒤에는 정상 저장됐다.)
+2. **오류를 본다.** 실패를 성공이라고 말하지 않는다. 부르는 쪽
+   (`addClient`·`updateClient`·명함 스캔)도 `success`를 확인해 던진다.
+3. 그래도 넣기가 실패하면 **지운 것을 id까지 그대로 되돌린다.**
+
+명함 스캔은 추가로 두 가지를 고쳤다 — 기존 담당자를 읽을 때 `deleted_at`을
+거르지 않아 **지운 사람을 되살리고 있었고**, 새 사람을 무조건 대표로 세우고
+있었다(이제 대표가 없을 때만 세운다).
+
 ### 이름이 겹치는 담당자 — 한쪽이 비어 있을 때만 합친다
 
 `execution/merge_contacts_by_name.mjs`.
@@ -2147,7 +2179,7 @@ VITE_DEV_AUTOLOGIN_PW=<비밀번호>
 
 ### 없는 칸을 읽어 조용히 빈 값이 나오는 결함
 
-**같은 종류가 네 번 나왔다.** 오류가 안 나고 `undefined`가 될 뿐이라 화면이
+**같은 종류가 일곱 번 나왔다.** 오류가 안 나고 `undefined`가 될 뿐이라 화면이
 그럴듯하게 비어 보인다:
 
 | 자리 | 읽던 칸 | 증상 |
@@ -2156,16 +2188,30 @@ VITE_DEV_AUTOLOGIN_PW=<비밀번호>
 | 대시보드 최근 활동 | `act.title` | 거래처명이 두 줄로 되풀이, 내용은 안 보임 |
 | 거래처 상태 | `CLIENT_STATUS_SET`에 '활성' 없음 | 736곳이 '신규'로 표시 |
 | **거래처 목록 '누적매출'** | `client.last_year_revenue` | **1,150곳 전부 `-`** |
+| 활동 엑셀 '담당자' | `activity.user` | **265건 전부 빈칸** (실제 칸은 `user_name`, 195건에 값이 있다) |
+| 거래처 엑셀 '주문금액' | `client.orderAmount` (원본 행은 snake_case) | **`NaN만원`이 1,167줄** |
+| 거래처 엑셀 '최근주문일' | `clients.last_order` | 그 칸은 **1,167곳 전부 비어 있다** |
 
-마지막 것은 `client_sales_summary` 뷰의 칸 이름이 `last_year`인데
+'누적매출'은 `client_sales_summary` 뷰의 칸 이름이 `last_year`인데
 `last_year_revenue`로 읽고 있었다. `clients` 표에도 그런 칸이 없다.
 지금은 `DataContext`가 이미 들고 있는 매출에서 센다 — **다시 조회하지 않는다.**
 뷰 값과 상위 6곳이 원 단위까지 일치하는 것을 확인했고, 매출이 있는
 **687곳**이 `-`에서 실제 금액으로 바뀌었다.
 
+**`NaN만원`은 빈칸보다 나쁘다.** 받아 본 사람은 고장이 아니라 자료라고 읽는다.
+`clients.last_order`·`order_amount`는 아무도 채우지 않는 칸이므로(실측 0곳)
+거래 실적은 `sales`에서 센다. **매출을 안 넘기면 그 두 열을 아예 빼고 낸다** —
+없는 값을 0으로 적지 않는다.
+
 **찾는 법** — DB에서 실제 칸 목록을 받아 코드의 속성 접근과 맞춰 본다.
-`clients`/`sales`/`activities`/`deals`/`quotes` 다섯 표로 훑으면 몇 분이면 된다.
-파생 필드(`clientName`·`totalAmount` 등 `DataContext`가 붙이는 것)는 빼고 볼 것.
+표 하나에서 한 줄만 받아 `Object.keys()`를 보면 실제 칸이 나온다
+(`clients`/`sales`/`activities`/`deals`/`quotes`/`products`/`client_contacts`…).
+코드 쪽은 `client.` `sale.` `activity.` 같은 접근을 훑어 그 목록에 없는 이름만
+남기면 된다. 몇 분이면 전 코드를 훑는다.
+**파생 필드는 빼고 볼 것** — `DataContext`가 `clientId`·`totalAmount`·
+`displayItemName`·`lastOrder`를 붙이고, 화면이 자기 자리에서 계산해 붙이는 것도
+많다(`MyAccounts`의 `thisYearSales`, 대시보드의 `amount`·`growthRate`).
+후보 34종 중 실제 결함은 셋이었다 — **거의 다 파생 필드다.**
 
 ### 거래처 거르기 · 저장된 보기
 

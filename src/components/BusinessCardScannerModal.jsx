@@ -33,13 +33,20 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
 
       if (existingClient) {
         const updateData = {}; const addedFields = []; let contactsToAdd = []
-        const { data: contactsData } = await supabase.from('client_contacts').select('*').eq('client_id', existingClient.id)
+        // 지운 표시가 붙은 사람을 되살리지 않는다
+        const { data: contactsData } = await supabase.from('client_contacts')
+          .select('*').eq('client_id', existingClient.id).is('deleted_at', null)
         const existingContacts = contactsData || []
 
         if (info.contact_person && !existingContacts.some(c => c.name === info.contact_person)) {
           contactsToAdd.push({
             name: info.contact_person, department_role: info.position || '',
-            phone: info.phone || '', email: info.email || '', is_primary: true,
+            phone: info.phone || '', email: info.email || '',
+            /* **이미 대표가 있으면 대표로 세우지 않는다.** 거래처당 대표는
+               하나라는 유니크 제약이 있어, 대표를 둘 담아 보내면 저장이
+               통째로 실패한다. `replaceClientContacts`는 지우고 넣는 방식이라
+               그 실패가 곧 **그 거래처 담당자 전멸**이었다. */
+            is_primary: !existingContacts.some(c => c.is_primary),
           })
         }
 
@@ -49,7 +56,9 @@ const BusinessCardScannerModal = ({ isOpen, onClose, onSuccess }) => {
         })
 
         if (contactsToAdd.length > 0) {
-          await replaceClientContacts(existingClient.id, [...existingContacts, ...contactsToAdd])
+          const r = await replaceClientContacts(existingClient.id, [...existingContacts, ...contactsToAdd])
+          // 저장이 안 됐는데 '담당자 추가됨'이라고 적으면 사라진 것을 아무도 모른다
+          if (!r?.success) throw (r?.error || new Error('담당자를 저장하지 못했습니다.'))
           addedFields.push('담당자')
         }
 
