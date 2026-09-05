@@ -59,7 +59,7 @@ const Calendar = () => {
     }, [activities])
 
     return (
-        <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary min-h-screen">
+        <div className="p-6 bg-oem-bg-app font-['Noto_Sans_KR',sans-serif] text-oem-text-primary">
             <div className="max-w-[1600px] mx-auto bg-white rounded-lg shadow-sm border border-oem-border p-6">
                 <div className="flex items-center gap-2 mb-6">
                     <CalendarIcon className="w-6 h-6 text-oem-blue" />

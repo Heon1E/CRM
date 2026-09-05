@@ -317,12 +317,21 @@ const ScheduleCalendar = () => {
                             return (
                                 <button
                                     key={key}
-                                    onClick={() => setSelected(key)}
                                     /* **고르고 나서 또 찾아 눌러야 했다.** 날짜를 고르면 오른쪽
                                        패널로 눈을 옮겨 '추가'를 다시 눌러야 넣을 수 있었다.
-                                       두 번 누르면 그 날짜로 바로 입력칸이 열린다. */
+                                       두 번 누르면 그 날짜로 바로 입력칸이 열린다.
+
+                                       **`onDoubleClick`만 두면 폰에서는 못 쓴다.** 터치에는
+                                       더블클릭이 없다(브라우저가 확대로 가져간다). 이미 고른
+                                       날을 다시 누르는 것을 같은 뜻으로 받는다 — 마우스로도
+                                       그대로 되고, 처음 누르는 날은 고르기만 하므로 실수로
+                                       입력칸이 열리지 않는다. */
+                                    onClick={() => {
+                                        if (key === selected) setAdding(true)
+                                        else { setSelected(key); setAdding(false) }
+                                    }}
                                     onDoubleClick={() => { setSelected(key); setAdding(true) }}
-                                    title="두 번 누르면 이 날짜에 일정을 넣습니다"
+                                    title="한 번 더 누르면 이 날짜에 일정을 넣습니다"
                                     className="cal-day"
                                     style={{
                                         minHeight: 52, padding: '3px 4px', textAlign: 'left',

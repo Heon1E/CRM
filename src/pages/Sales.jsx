@@ -246,7 +246,7 @@ const Sales = () => {
   const rawCount = localSales.reduce((n, s) => n + (s.items?.length || 1), 0)
 
   return (
-    <div className="min-h-screen bg-oem-bg-app p-2 md:p-4 mt-[56px]">
+    <div className="bg-oem-bg-app p-2 md:p-4">
       <div className="max-w-[1600px] mx-auto">
         <div className="win flex flex-col">
 

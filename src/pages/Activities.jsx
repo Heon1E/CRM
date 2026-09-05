@@ -201,7 +201,7 @@ const Activities = () => {
     }
 
     return (
-        <div className="p-3 md:p-6 min-h-screen">
+        <div className="p-3 md:p-6">
             {/* 읽는 화면이므로 폭을 줄인다 — 한 줄이 너무 길면 눈이 되돌아올 자리를 잃는다 */}
             <div className="max-w-[1100px] mx-auto space-y-4">
 

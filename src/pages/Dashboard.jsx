@@ -187,7 +187,7 @@ const Dashboard = () => {
    */
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="dashboard-light min-h-screen p-3 md:p-4 mt-[56px]" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
+    <div className="dashboard-light p-3 md:p-4" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       <div className="max-w-[1600px] mx-auto space-y-3">
 
         {/* 제목 줄 */}
