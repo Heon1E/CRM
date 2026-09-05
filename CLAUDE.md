@@ -2034,6 +2034,28 @@ VITE_DEV_AUTOLOGIN_PW=<비밀번호>
 거래처는 회사명으로 묶어 보여주므로(`groupedClients`) 매출·활동도 **회사 단위로
 합산**해서 순위를 매긴다. 같은 회사가 여러 행으로 나뉘어 있어도 한 덩어리로 선다.
 
+### 없는 칸을 읽어 조용히 빈 값이 나오는 결함
+
+**같은 종류가 네 번 나왔다.** 오류가 안 나고 `undefined`가 될 뿐이라 화면이
+그럴듯하게 비어 보인다:
+
+| 자리 | 읽던 칸 | 증상 |
+|---|---|---|
+| `/calendar` | `activity.summary` | 227건이 전부 `미팅 - No Title` |
+| 대시보드 최근 활동 | `act.title` | 거래처명이 두 줄로 되풀이, 내용은 안 보임 |
+| 거래처 상태 | `CLIENT_STATUS_SET`에 '활성' 없음 | 736곳이 '신규'로 표시 |
+| **거래처 목록 '누적매출'** | `client.last_year_revenue` | **1,150곳 전부 `-`** |
+
+마지막 것은 `client_sales_summary` 뷰의 칸 이름이 `last_year`인데
+`last_year_revenue`로 읽고 있었다. `clients` 표에도 그런 칸이 없다.
+지금은 `DataContext`가 이미 들고 있는 매출에서 센다 — **다시 조회하지 않는다.**
+뷰 값과 상위 6곳이 원 단위까지 일치하는 것을 확인했고, 매출이 있는
+**687곳**이 `-`에서 실제 금액으로 바뀌었다.
+
+**찾는 법** — DB에서 실제 칸 목록을 받아 코드의 속성 접근과 맞춰 본다.
+`clients`/`sales`/`activities`/`deals`/`quotes` 다섯 표로 훑으면 몇 분이면 된다.
+파생 필드(`clientName`·`totalAmount` 등 `DataContext`가 붙이는 것)는 빼고 볼 것.
+
 ### 거래처 거르기 · 저장된 보기
 
 `src/utils/clientFilters.js` + `tests/clientFilters.test.mjs`(14건).

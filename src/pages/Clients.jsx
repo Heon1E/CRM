@@ -156,9 +156,29 @@ const Clients = () => {
     return dates.length > 0 ? dates[0] : null
   }
 
-  const getLastYearRevenueAmount = (client) => {
-    return Number(client.last_year_revenue || 0)
-  }
+  /*
+   * 누적매출 — **이미 들고 있는 매출에서 센다.**
+   *
+   * 예전에는 `client.last_year_revenue`를 읽었는데 **그런 칸이 없다.**
+   * `clients` 표에도 없고, 매출 요약 뷰(`client_sales_summary`)의 이름은
+   * `last_year`다. 그래서 이 값이 **늘 0**이었고 거래처 목록의 '누적매출'
+   * 열이 1,150곳 전부 `-`로 떴다 — `activities.summary`·`act.title`과 같은,
+   * 없는 칸을 읽어 조용히 빈 값이 나오던 종류다.
+   *
+   * 다시 조회하지 않는다. 매출은 `DataContext`가 이미 들고 있다
+   * (같은 파일의 `getLastOrderDate`도 그렇게 한다).
+   */
+  const revenueByClient = useMemo(() => {
+    const m = new Map()
+    ;(sales || []).forEach((s) => {
+      const id = s.clientId || s.client_id
+      if (!id) return
+      m.set(id, (m.get(id) || 0) + (Number(s.total_amount ?? s.totalAmount) || 0))
+    })
+    return m
+  }, [sales])
+
+  const getLastYearRevenueAmount = (client) => revenueByClient.get(client.id) || 0
 
   const getCompanyStats = (companyClients) => {
     const allOrderDates = companyClients
