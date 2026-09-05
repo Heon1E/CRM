@@ -1949,11 +1949,40 @@ export const DataProvider = ({ children }) => {
   }, [clients, activities])
 
   // 활동 내역 삭제
+  /**
+   * 활동 지우기 — **표시만 한다.**
+   *
+   * 예전에는 `.delete()`로 진짜 지웠다. 거래처는 이미 `deleted_at`으로 바꿔
+   * 뒀는데 활동만 남아 있었다. 지금은 활동 하나에 통화 녹음에서 뽑은
+   * 400~800자가 들어 있고 **녹음 자체는 어디에도 저장하지 않으므로,
+   * 잘못 지우면 다시 만들 수 없다.** 단가·수량·다음 할 일이 통째로 사라진다.
+   *
+   * 되살리기는 설정 > 휴지통.
+   */
   const deleteActivity = useCallback(async (id) => {
-    const { error } = await supabase.from('activities').delete().eq('id', id)
-    if (error) throw error
+    const uid = await getValidUserId(user)
+    const { error } = await supabase.from('activities')
+      .update({ deleted_at: new Date().toISOString(), deleted_by: uid }).eq('id', id)
+
+    if (error) {
+      // 마이그레이션 전이면 그 칸이 없다. 그때는 예전처럼 지운다 —
+      // 지우기가 아예 안 되는 것이 더 나쁘다.
+      const noColumn = error.code === '42703' || /column .* does not exist/i.test(error.message || '')
+      if (!noColumn) throw error
+      console.warn('activities에 deleted_at이 없어 하드 삭제로 떨어집니다 — soft_delete_and_audit.sql을 실행하세요.')
+      const { error: hardError } = await supabase.from('activities').delete().eq('id', id)
+      if (hardError) throw hardError
+    }
 
     setActivities(prev => prev.filter(item => item.id !== id))
+  }, [user])
+
+  /** 휴지통에서 활동 되살리기 */
+  const restoreActivity = useCallback(async (id) => {
+    const { error } = await supabase.from('activities')
+      .update({ deleted_at: null, deleted_by: null }).eq('id', id)
+    if (error) throw error
+    return { success: true }
   }, [])
 
   // 이슈 추가
@@ -2240,7 +2269,7 @@ export const DataProvider = ({ children }) => {
     fetchClientContacts, deleteClient, restoreClient, addClientsBulk, addProductsBulk,
     registerMissingClients, // 매출 업로드 시 신규 거래처 자동 등록
     applySalesReconciliation, // 대사 결과 반영 (삭제/수정/등록)
-    addActivity, updateActivity, deleteActivity, addIssue, updateIssue, deleteIssue,
+    addActivity, updateActivity, deleteActivity, restoreActivity, addIssue, updateIssue, deleteIssue,
     registerModal, // 모달 상태 등록 함수
     processGroupedSales, // 그룹화 로직 노출
     registerMissingProductsFromSales, // 미등록 품목 일괄 등록 함수

@@ -496,29 +496,79 @@ Supabase > Project Settings > API > service_role.
 되살리려면 이력에 있다. **다만 되살릴 때는 하드 삭제가 아니라 `deleted_at`으로
 바꿀 것.**
 
+## 지금 앱에는 백업 기능이 없다 — 있던 것은 15,530건 중 1,000건만 담았다
+
+'데이터 백업'(전 표를 JSON으로 내려받기) 단추는 `components/Navbar.jsx`에 있는데
+**그 파일은 어디에서도 import되지 않는다**(살아 있는 상단바는 `TopNavbar.jsx`).
+그래서 화면 어디에도 백업 단추가 없다.
+
+그 코드에는 별개의 결함이 있었다. 주석에 *"1000-row limit 제거"* 라고 적고
+`.range(0, 99999)`를 쓰고 있었는데 **그렇게는 안 풀린다** — 한 번에 돌려주는
+행 수는 서버(`max-rows`)가 정한다. 실측:
+
+| | 백업이 담은 것 | 실제 |
+|---|---|---|
+| 매출 | **1,000** | 15,530 |
+| 거래처 | **1,000** | 1,167 |
+
+오류도 경고도 없이 *"총 N건 백업 완료"* 라고 말한다. **못 하는 것보다 다 한 줄
+알고 넘어가는 것이 나쁘다** — 그 파일로 되살리면 3년치 매출의 94%가 없다.
+1,000행씩 끊어 받도록 고쳐 두었다(정렬은 `id`로 — 유일하지 않으면 쪽 경계에서
+행이 겹치거나 빠진다).
+
+**되살릴지는 사람이 정할 일이다.** 살리려면 `TopNavbar`에 단추를 잇거나
+설정 화면으로 옮기면 된다.
+
 ## 어디에서도 쓰이지 않는 파일
 
 `import`하는 곳이 없어 빌드 산출물에도 들어가지 않는다. 지우지 않고 적어 두는
 것은, 되살릴지가 사람이 정할 일이기 때문이다. **새 코드를 여기에 이어 붙이기
 전에 이 목록을 볼 것** — 화면에 안 나오는 파일을 고치고 있을 수 있다.
 
+2026-09 실측 — `src/` 145개 중 **21개**가 어디에서도 import되지 않는다.
+
 | 파일 | 줄 | 메모 |
 |---|---|---|
 | `components/SalesCalendar.jsx` | 762 | 한글 깨짐(U+FFFD 277). 아래 '알려진 손상 파일' 참고 |
+| **`components/Navbar.jsx`** | 418 | **살아 있는 것은 `TopNavbar.jsx`다.** 이름이 비슷해 헷갈린다. **앱의 유일한 '데이터 백업' 단추가 여기 있어서, 지금 앱에는 백업 기능이 없다** (아래 참고) |
 | `pages/ForgotPassword.jsx` | 278 | 아이디가 `@idibc.local`이라 메일을 못 보낸다 |
+| `services/aiSalesCoach.js` (+ 그것이 부르는 `services/geminiService.js`) | 252 | 규칙 기반 `SalesCoach.jsx`가 대신한다. **이 둘만 `VITE_GEMINI_API_KEY`를 쓰는데, 산 파일에서 닿지 않아 번들에 안 들어가고 키가 새지 않는다** — 되살리려면 서버 경유로 고쳐야 한다 |
+| `utils/koreanJosa.js` | 222 | 조사(은/는·이/가) 붙이기 |
 | `components/SwipeableListItem.jsx` | 221 | 폰에서도 표를 쓰기로 하면서 쓰지 않게 됐다 |
+| `utils/saveCardExample.jsx` | 148 | 이름 그대로 예제다 |
+| `components/ActionCenter.jsx` | 139 | |
+| **`utils/salesAggregates.js` · `services/salesAggregateService.js`** | 134 / 79 | **뷰는 DB에 있는데 부르는 곳이 없다.** 위 '매출 집계는 서버가 한다'의 경고 참고 |
+| `components/IssueTracker.jsx` | 123 | |
 | `components/StatusBar.jsx` | 103 | |
 | `components/AIInsightModal.jsx` + `insights/*` | 102+ | 대시보드 개편 때 뺀 화면 |
 | `components/MetricCard.jsx` | 81 | |
+| `utils/wakeLock.js` | 60 | 화면 꺼짐 막기 |
 | `components/ProtectedRoute.jsx` | 56 | **App.jsx의 `ProtectedRoutes`(복수)와 다른 파일이다.** 이름이 비슷해 헷갈린다 |
 | `components/common/OracleInput.jsx` | 55 | |
 | `components/MobileFAB.jsx` | 42 | |
 | `components/Toast.jsx` | 31 | `react-hot-toast`가 대신한다 |
+| `hooks/useDebounce.js` | 25 | |
 | `pages/AdminApprovals.jsx` | 19 | 승인은 `UserAdmin`이 맡는다 |
-| `services/aiSalesCoach.js` + `services/geminiService.js` | 131+ | 규칙 기반 `SalesCoach.jsx`가 대신한다. **이 둘만 `VITE_GEMINI_API_KEY`를 쓰는데, import하는 곳이 없어 번들에 들어가지 않아 키가 새지 않는다** — 되살리려면 서버 경유로 고쳐야 한다 |
 
-찾는 법 — 파일 이름(대문자로 시작하는 컴포넌트)이 다른 파일에서 한 번도
-언급되지 않으면 죽은 파일이다.
+### 죽은 파일을 찾는 법 — 이름 검색으로는 안 된다
+
+예전에 적어 둔 방법("파일 이름이 다른 파일에서 한 번도 언급되지 않으면")은
+**주석에 이름이 스치기만 해도 산 파일로 센다.** `Navbar.jsx`가 그래서 몇 달을
+목록 밖에 있었다 — `Layout.jsx` 주석에 "Navbar 높이만큼"이라고 적혀 있다.
+
+실제 `import` 문만 봐야 하고, **세 가지를 다 잡아야 한다. 하나라도 놓치면
+살아 있는 파일을 죽었다고 말한다:**
+
+1. `lazy(() => import('./pages/Clients'))` — `import(` 가 줄 앞에 없다
+2. 여러 줄에 걸친 `import {\n  a, b,\n} from '...'` — 줄바꿈을 넘어야 한다
+3. `export * from '...'`
+
+2번을 빼먹었더니 `clientFilters.js`·`dealStages.js`가 죽었다고 나왔다 —
+**둘 다 멀쩡히 쓰이는 파일이다.** 하마터면 산 기능을 지울 뻔했다.
+(1번을 빼먹으면 화면 파일 20여 개가 통째로 죽은 것으로 나온다.)
+
+`services/geminiService.js`처럼 **죽은 파일만 부르는 파일**은 이 방법으로는
+안 잡힌다. 직접 세는 것이므로 한 단계 더 따라가 볼 것.
 
 ## 알려진 손상 파일
 
@@ -702,6 +752,18 @@ node execution/repair_orphan_sales.mjs <엑셀파일...> --apply  # 실제 반�
 계산은 `src/utils/salesAggregates.js`(순수 함수) + `tests/salesAggregates.test.mjs`.
 조회는 `src/services/salesAggregateService.js`가 맡고, **뷰가 없으면 `null`을
 돌려줘 예전 경로로 떨어진다** — 마이그레이션을 잊어도 화면이 죽지 않는다.
+
+> **⚠️ 지금 이 경로는 이어져 있지 않다 (2026-09 실측).**
+> 뷰 셋은 DB에 **실제로 있다** — `client_sales_summary` 1,167행 ·
+> `client_month_sales` 4,460행 · `monthly_sales` 45행. 그런데
+> `salesAggregateService.js`·`salesAggregates.js`를 **import하는 곳이 하나도 없다.**
+> 만든 커밋(`8007640e`)부터 그랬다 — 파일과 뷰와 테스트만 만들고 화면에
+> 연결하지 않았다. 즉 **집계는 여전히 브라우저가 매출 15,530행을 받아서 한다.**
+>
+> 숫자는 맞다(브라우저 경로가 정답이다). 손해는 성능뿐이다. 이어 붙일지는
+> 사람이 정할 일이라 그대로 두었다 — 집계 경로를 바꾸면 대시보드 숫자가
+> 함께 움직이므로, 붙인다면 **양쪽 값을 화면에서 대조한 뒤**여야 한다
+> (2026-08-15 정렬 사고가 그렇게 드러났다).
 
 특히 `ytdLastYear`는 **같은 달수만** 비교한다. 올해 8월까지와 작년 12월까지를
 비교하면 매년 실적이 줄어든 것처럼 나온다. 테스트가 이 규칙을 고정한다.
@@ -1714,6 +1776,27 @@ Faster`** 로 남아 있었다. 주소를 카카오톡·슬랙에 붙이면 그�
   실측: `issues` 조회가 첫 화면마다 죽어 **콘솔 오류 995건**이 쌓이고 이슈
   목록이 통째로 비어 있었다(실제로는 2건이 들어 있었다).
 - 되살리기는 설정 > **휴지통 · 변경 이력**에서. 관리자만 누를 수 있다.
+
+### 활동도 표시만 한다 (2026-09)
+
+거래처는 `deleted_at`으로 바꿔 뒀는데 **활동만 `.delete()`로 진짜 지우고
+있었다.** 지금은 활동 하나에 통화 녹음에서 뽑은 400~800자가 들어 있고
+**녹음 자체는 어디에도 저장하지 않으므로 다시 만들 수 없다** — 단가·수량·
+다음 할 일이 통째로 사라진다.
+
+- `deleteActivity`가 `deleted_at`만 채운다. 그 칸이 없으면(마이그레이션 전)
+  예전처럼 지운다 — **지우기가 아예 안 되는 것이 더 나쁘다.**
+- 휴지통에 거래처와 활동이 함께 선다. `restoreActivity`로 되살린다.
+- **거래처를 지워서 딸려 온 활동은 휴지통에 따로 세우지 않는다.** 거래처를
+  되살리면 함께 돌아오고, 안 그러면 그 회사 활동 수십 건이 목록을 덮어
+  정작 손으로 지운 한 건이 묻힌다.
+
+실측 — 활동 하나를 표시했더니 265 → 264, 휴지통에 `활동 · 현대드럼산업(주) ·
+미팅` 로 떴고, 되살리니 265로 돌아왔다.
+
+**매출·견적서·발주서·일정은 아직 하드 삭제다.** 매출은 대사(reconcile)가
+승인받아 수천 행을 한 번에 지우는 경로가 있어서, 표시로 바꾸면 휴지통이
+그 수천 건으로 덮인다 — 함께 풀어야 할 문제라 남겨 두었다.
 
 **변경 이력은 DB 트리거가 쓴다.** 앱을 거치지 않은 변경(스크립트·SQL 편집기)도
 남기려면 트리거여야 한다. 바뀐 칸만 저장한다 — 통째로 넣으면 이력 표가 원본만큼

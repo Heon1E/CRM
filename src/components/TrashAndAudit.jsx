@@ -35,8 +35,17 @@ const when = (t) => {
     return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}`
 }
 
+/** 활동 내용에서 한 줄 뽑기 — 봇이 심은 머리글([통화 3회] 등)은 건너뛴다 */
+const activityGist = (text) => {
+    const line = String(text || '')
+        .split('\n')
+        .map((s) => s.trim())
+        .find((s) => s && !/^[[■]/.test(s))
+    return line ? (line.length > 60 ? `${line.slice(0, 60)}…` : line) : '(내용 없음)'
+}
+
 const TrashAndAudit = () => {
-    const { restoreClient, refreshData } = useData()
+    const { restoreClient, restoreActivity, refreshData } = useData()
     const { isAdmin } = useAuth()
     const [tab, setTab] = useState('trash')
     const [trash, setTrash] = useState([])
@@ -48,9 +57,19 @@ const TrashAndAudit = () => {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const [t, l] = await Promise.all([
+            const [t, a, l] = await Promise.all([
                 supabase.from('clients')
                     .select('id,company,sales_rep,deleted_at')
+                    .not('deleted_at', 'is', null)
+                    .order('deleted_at', { ascending: false }).limit(200),
+                /* **활동도 휴지통에 온다.** 활동 하나에 통화 녹음에서 뽑은
+                   400~800자가 들어 있고 녹음은 어디에도 남기지 않으므로,
+                   되살릴 길이 없으면 잘못 지운 순간 끝이다.
+                   단, 거래처를 지워서 딸려 온 것은 여기 따로 세우지 않는다 —
+                   거래처를 되살리면 함께 돌아오고, 안 그러면 그 회사 활동
+                   수십 건이 목록을 덮어 정작 손으로 지운 것이 묻힌다. */
+                supabase.from('activities')
+                    .select('id,client_name,type,activity_date,description,deleted_at,client_id')
                     .not('deleted_at', 'is', null)
                     .order('deleted_at', { ascending: false }).limit(200),
                 supabase.from('audit_log')
@@ -61,7 +80,14 @@ const TrashAndAudit = () => {
                 || /does not exist|could not find the table/i.test(e.message || ''))
             if (missing(t.error) || missing(l.error)) { setNotReady(true); return }
             setNotReady(false)
-            setTrash(t.data || [])
+
+            const deadClients = new Set((t.data || []).map((c) => c.id))
+            setTrash([
+                ...(t.data || []).map((r) => ({ ...r, kind: 'client' })),
+                ...(a.data || [])
+                    .filter((r) => !deadClients.has(r.client_id))
+                    .map((r) => ({ ...r, kind: 'activity' })),
+            ].sort((x, y) => String(y.deleted_at).localeCompare(String(x.deleted_at))))
             setLogs(l.data || [])
         } catch (e) {
             await showError(e.message)
@@ -73,11 +99,17 @@ const TrashAndAudit = () => {
     useEffect(() => { load() }, [load])
 
     const restore = async (row) => {
-        if (!(await showConfirm(`'${row.company}'와 딸린 매출·활동을 되살립니다.`, '되살리기', '되살리기'))) return
+        const isClient = row.kind === 'client'
+        const name = isClient ? row.company : (row.client_name || '거래처 없음')
+        const ask = isClient
+            ? `'${name}'와 딸린 매출·활동을 되살립니다.`
+            : `${row.activity_date || ''} ${name} ${row.type || ''} 기록을 되살립니다.`
+        if (!(await showConfirm(ask, '되살리기', '되살리기'))) return
         setBusy(row.id)
         try {
-            await restoreClient(row.id)
-            await showSuccess(`'${row.company}'를 되살렸습니다.`)
+            if (isClient) await restoreClient(row.id)
+            else await restoreActivity(row.id)
+            await showSuccess(`'${name}'를 되살렸습니다.`)
             await load()
             await refreshData()
         } catch (e) {
@@ -124,17 +156,27 @@ const TrashAndAudit = () => {
                     <table className="dgrid">
                         <thead>
                             <tr>
-                                <th style={{ minWidth: 200 }}>거래처</th>
-                                <th style={{ minWidth: 90 }}>담당</th>
+                                <th style={{ minWidth: 64 }}>구분</th>
+                                <th style={{ minWidth: 200 }}>대상</th>
+                                <th style={{ minWidth: 90 }}>내용 · 담당</th>
                                 <th style={{ minWidth: 110 }}>지운 때</th>
                                 <th style={{ width: 110 }}></th>
                             </tr>
                         </thead>
                         <tbody>
                             {trash.map((r) => (
-                                <tr key={r.id}>
-                                    <td>{r.company}</td>
-                                    <td>{r.sales_rep || '-'}</td>
+                                <tr key={`${r.kind}-${r.id}`}>
+                                    <td>
+                                        <span className="badge-status" data-tone={r.kind === 'client' ? 'off' : 'lead'}>
+                                            {r.kind === 'client' ? '거래처' : '활동'}
+                                        </span>
+                                    </td>
+                                    <td>{r.kind === 'client'
+                                        ? r.company
+                                        : `${r.client_name || '거래처 없음'} · ${r.type || ''}`}</td>
+                                    <td style={{ color: 'var(--text-secondary)' }}>{r.kind === 'client'
+                                        ? (r.sales_rep || '-')
+                                        : `${r.activity_date || ''} ${activityGist(r.description)}`}</td>
                                     <td className="dt">{when(r.deleted_at)}</td>
                                     <td>
                                         <button className="tb-btn" disabled={busy === r.id || !isAdmin}
@@ -146,7 +188,7 @@ const TrashAndAudit = () => {
                                 </tr>
                             ))}
                             {trash.length === 0 && !loading && (
-                                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+                                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
                                     휴지통이 비어 있습니다.
                                 </td></tr>
                             )}
@@ -197,7 +239,8 @@ const TrashAndAudit = () => {
             )}
 
             <p style={{ padding: '10px 12px', margin: 0, fontSize: 11.5, lineHeight: 1.7, color: 'var(--text-secondary)' }}>
-                ※ 거래처를 지우면 딸린 <b>매출·활동·담당자도 함께</b> 휴지통으로 갑니다. 되살리면 같이 돌아옵니다.<br />
+                ※ 거래처를 지우면 딸린 <b>매출·활동·담당자도 함께</b> 휴지통으로 갑니다. 되살리면 같이 돌아옵니다
+                (그래서 그 활동들은 여기 따로 세우지 않습니다).<br />
                 ※ 변경 이력은 <b>읽기만</b> 됩니다. 고치거나 지울 수 있으면 이력이 아닙니다.<br />
                 ※ 매출·활동은 일괄등록으로 수천 건이 오가므로 <b>삭제만</b> 기록합니다.
             </p>

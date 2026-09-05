@@ -134,14 +134,40 @@ const Navbar = () => {
       // 알림: 백업 시작
       alert('데이터 백업을 시작합니다...')
 
-      // Supabase에서 모든 테이블 데이터 가져오기 (1000-row limit 제거)
+      /*
+       * **`.range(0, 99999)`로는 1,000행 제한이 풀리지 않는다.**
+       * 예전 주석에 '1000-row limit 제거'라고 적혀 있었지만, 한 번에 돌려주는
+       * 행 수는 서버(`max-rows`)가 정하므로 범위를 넓게 잡아도 1,000에서
+       * 끊긴다. 실측 — **매출 15,530건 중 1,000건**, 거래처 1,167곳 중 1,000곳만
+       * 담겼다. 오류도 경고도 없이 "총 N건 백업 완료"라고 말한다.
+       *
+       * 백업은 **못 하는 것보다 다 한 줄 알고 넘어가는 것이 나쁘다.**
+       * 그 파일로 되살리면 3년치 매출의 94%가 없는 상태가 된다.
+       *
+       * 1,000행씩 끊어 받되 **정렬을 `id`로 준다.** 정렬이 유일하지 않으면
+       * 쪽 경계에서 어떤 행은 두 번 오고 어떤 행은 아예 안 온다
+       * (2026-08-15에 실제로 겪은 사고다).
+       */
+      const fetchAll = async (table, tweak) => {
+        const out = []
+        for (let from = 0; ; from += 1000) {
+          let q = supabase.from(table).select('*').order('id').range(from, from + 999)
+          if (tweak) q = tweak(q)
+          const { data, error } = await q
+          if (error) return { data: out, error }
+          out.push(...(data || []))
+          if (!data || data.length < 1000) break
+        }
+        return { data: out, error: null }
+      }
+
       const [productsResult, clientsResult, activitiesResult, salesResult, issuesResult, settingsResult] = await Promise.all([
-        supabase.from('products').select('*').range(0, 99999),
-        supabase.from('clients').select('*').range(0, 99999),
-        supabase.from('activities').select('*').range(0, 99999),
-        supabase.from('sales').select('*').range(0, 99999),
-        supabase.from('issues').select('*').range(0, 99999),
-        supabase.from('settings').select('*').eq('user_id', user.id).range(0, 99999)
+        fetchAll('products'),
+        fetchAll('clients'),
+        fetchAll('activities'),
+        fetchAll('sales'),
+        fetchAll('issues'),
+        fetchAll('settings', (q) => q.eq('user_id', user.id)),
       ])
 
       // 에러 확인
