@@ -14,24 +14,11 @@ import BusinessCardScannerModal from '../components/BusinessCardScannerModal'
 import ClientDetailPanel from '../components/ClientDetailPanel'
 import Pagination from '../components/common/Pagination'
 import { exportClientsToExcel } from '../utils/excelExport'
-import { coerceClientStatus, getClientStatusTone } from '../utils/clientStatus'
+import { getClientStatusTone } from '../utils/clientStatus'
 import { showConfirm, showError, showSuccess, showWarning } from '../utils/alert'
 import { formatKoreanCurrency } from '../utils/formatters'
 
 const PAGE_SIZE = 20
-
-/**
- * 상태를 색의 무게로 나눈다 (DESIGN.md 1장).
- * 실제 분포 - 활성 736 · 매출 335 · 잠재고객 46 · 신규 44 · 거래 종료 4 · 단절 1 · 영업 대기 1
- */
-const statusTone = (status) => {
-  const s = String(status || '').trim()
-  if (s === '매출') return 'live'      // 거래 중 - 초록(결론)
-  if (s === '신규') return 'new'       // 지금 여기 - 노랑
-  if (s === '잠재고객' || s === '영업 대기') return 'lead'
-  if (s === '거래 종료' || s === '단절') return 'off'
-  return 'idle'                        // 활성 등 - 물러난다
-}
 
 const Clients = () => {
   // Common Data & Actions
@@ -614,7 +601,7 @@ const Clients = () => {
                                 * 노랑은 '지금 여기'(신규, 1,150곳 중 44곳이라 한 화면에 한둘이다),
                                 * 나머지는 물러난다.
                                 */}
-                              <span className="badge-status" data-tone={statusTone(primaryContact?.status)}>
+                              <span className="badge-status" data-tone={getClientStatusTone(primaryContact?.status)}>
                                 {primaryContact?.status || '미분류'}
                               </span>
                             </td>

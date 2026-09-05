@@ -13,7 +13,7 @@ import {
     ArrowRight
 } from 'lucide-react'
 import { formatCurrency } from '../utils/formatters'
-import { coerceClientStatus } from '../utils/clientStatus'
+import { coerceClientStatus, getClientStatusTone } from '../utils/clientStatus'
 import { showError } from '../utils/alert'
 
 const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
@@ -54,11 +54,12 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                     .eq('client_id', clientData.id)
                     .order('is_primary', { ascending: false })
 
-                const contacts = contactsData || []
+                const contacts = (contactsData || []).filter((c) => !c.deleted_at)
                 const primary = contacts.find((c) => c.is_primary) || contacts[0]
 
                 setFallbackClient({
                     ...clientData,
+                    contacts,
                     contact_person: primary?.name || '',
                     phone: primary?.phone || '',
                     email: primary?.email || '',
@@ -74,6 +75,39 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
     }, [loading, currentClient, clientId])
 
     const resolvedClient = currentClient || fallbackClient
+
+    /*
+     * 연락처는 **여기서 따로 읽는다.**
+     *
+     * `DataContext`는 대표 담당자 하나만 펴서(`contact_person`/`phone`/`email`)
+     * 내려준다. 목록 화면에는 그것으로 충분하지만 상세는 다르다 — 만나러
+     * 가면서 누구에게 걸지 고르는 자리다. 거래처 하나에 대한 한 번의 조회라
+     * 무겁지 않다.
+     *
+     * **번호가 있는 사람을 앞에 세운다.** (주)아모레퍼시픽은 8명 중 4명만
+     * 번호가 있는데 하필 대표가 그 4명에 없었다. 대표 순서만 따르면 정작
+     * 걸 수 있는 사람이 아래로 밀린다.
+     */
+    const [contactList, setContactList] = useState([])
+    useEffect(() => {
+        if (!clientId) { setContactList([]); return undefined }
+        let alive = true
+        ;(async () => {
+            const { data, error } = await supabase
+                .from('client_contacts')
+                .select('id, name, department_role, phone, email, is_primary, deleted_at')
+                .eq('client_id', clientId)
+            if (!alive) return
+            if (error) { console.warn('연락처 조회 실패:', error.message); setContactList([]); return }
+            const rows = (data || []).filter((c) => !c.deleted_at)
+            rows.sort((a, b) =>
+                (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0)
+                || (b.phone ? 1 : 0) - (a.phone ? 1 : 0)
+                || String(a.name || '').localeCompare(String(b.name || ''), 'ko'))
+            setContactList(rows)
+        })()
+        return () => { alive = false }
+    }, [clientId])
 
     // 같은 회사명을 가진 모든 고객 데이터
     const companyClients = useMemo(() => {
@@ -301,7 +335,9 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                             <ArrowRight className="w-5 h-5" />
                         </Link>
                     )}
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${primaryContact.status === '매출' ? 'bg-green-100 text-[color:var(--success)]' : 'bg-slate-200 text-slate-600'}`}>
+                    {/* 목록과 **같은 함수**를 본다. 한쪽만 고치면 같은 거래처가
+                        화면마다 다른 색으로 뜬다. */}
+                    <span className="badge-status" data-tone={getClientStatusTone(primaryContact.status)}>
                         {coerceClientStatus(primaryContact.status)}
                     </span>
                 </div>
@@ -313,13 +349,13 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                     <TrendingUp className="w-24 h-24 text-oem-blue" />
                 </div>
                 <h3 className="text-xs font-bold text-oem-blue flex items-center gap-1 mb-3">
-                    <span className="bg-oem-blue text-white px-1 rounded">⚡</span> Sales Briefing
+                    <span className="bg-oem-blue text-white px-1 rounded">⚡</span> 한눈에 보기
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
                     {/* Top Products */}
                     <div>
-                        <p className="text-[10px] font-bold text-oem-blue uppercase mb-2">선호 제품 (Top 3)</p>
+                        <p className="text-[10px] font-bold text-oem-blue uppercase mb-2">자주 사는 품목</p>
                         <div className="space-y-2">
                             {topProducts.map((prod, idx) => (
                                 <div key={idx} className="flex justify-between items-center text-xs">
@@ -346,22 +382,54 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                 </div>
             </div>
 
-            {/* Quick Contact */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-white p-3 rounded border border-slate-200 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-green-50 flex items-center justify-center text-[color:var(--success)]"><Phone className="w-4 h-4" /></div>
-                    <div className="overflow-hidden">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Phone</p>
-                        <p className="text-sm font-bold text-slate-700 truncate">{primaryContact.phone || '-'}</p>
-                    </div>
+            {/*
+              * 연락처 — **전부 보여준다.**
+              *
+              * 예전에는 대표 담당자 하나만 펴서 'PHONE / EMAIL' 두 칸에 넣었다.
+              * 그런데 (주)아모레퍼시픽은 **8명이 등록돼 있고 그중 4명이 전화번호를
+              * 가지고 있는데**, 하필 대표로 지정된 이태성 차장에게만 번호가 없어
+              * 화면에는 `-` 두 개만 떴다. 만나러 가면서 누구에게 걸어야 할지
+              * 알 수 없는 화면이었다.
+              *
+              * 번호는 눌러서 바로 건다. 이 화면을 여는 이유가 그것이다.
+              */}
+            <div className="bg-white rounded border border-oem-border mb-6">
+                <div className="px-4 py-2 border-b border-oem-border flex items-center justify-between">
+                    <span className="text-xs font-bold">연락처</span>
+                    <span className="text-[11px] text-[color:var(--text-secondary)]">{contactList.length}명</span>
                 </div>
-                <div className="bg-white p-3 rounded border border-slate-200 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-oem-grey-light flex items-center justify-center text-oem-blue"><Mail className="w-4 h-4" /></div>
-                    <div className="overflow-hidden">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Email</p>
-                        <p className="text-sm font-bold text-slate-700 truncate">{primaryContact.email || '-'}</p>
-                    </div>
-                </div>
+                {contactList.length === 0 ? (
+                    <p className="p-4 text-xs text-[color:var(--text-secondary)]">
+                        등록된 연락처가 없습니다. 설정 &gt; 휴대폰 연락처 가져오기로 채울 수 있습니다.
+                    </p>
+                ) : (
+                    <ul className="divide-y divide-oem-border">
+                        {contactList.map((c, i) => (
+                            <li key={c.id || i} className="px-4 py-2 flex items-center gap-3 flex-wrap">
+                                <span className="font-bold text-sm">{c.name}</span>
+                                {c.department_role && (
+                                    <span className="text-[12px] text-[color:var(--text-secondary)]">{c.department_role}</span>
+                                )}
+                                {c.is_primary && (
+                                    <span className="badge-status" data-tone="new">대표</span>
+                                )}
+                                <span className="flex-1" />
+                                {c.phone && (
+                                    <a href={`tel:${String(c.phone).replace(/[^0-9+]/g, '')}`}
+                                        className="tel-link text-[13px] font-bold text-[color:var(--accent)] hover:underline">
+                                        <Phone className="w-3.5 h-3.5 mr-1" />{c.phone}
+                                    </a>
+                                )}
+                                {c.email && (
+                                    <a href={`mailto:${c.email}`} title={c.email}
+                                        className="tel-link text-[12px] text-[color:var(--text-secondary)] hover:underline max-w-[180px] truncate">
+                                        <Mail className="w-3.5 h-3.5 mr-1 shrink-0" />{c.email}
+                                    </a>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
 
             {/* Stats Row */}
@@ -371,7 +439,7 @@ const ClientDetailPanel = ({ clientId, onClose, isEmbedded = false }) => {
                     <p className="text-lg font-bold text-oem-blue">{formatCurrency(thisMonthSales)}</p>
                 </div>
                 <div className="bg-white p-4 rounded border border-slate-200">
-                    <p className="text-xs text-slate-500 mb-1">올해 누적 (YTD)</p>
+                    <p className="text-xs text-slate-500 mb-1">올해 누적</p>
                     <p className="text-lg font-bold text-slate-700">{formatCurrency(ytdSales)}</p>
                 </div>
             </div>
