@@ -107,7 +107,7 @@ const PurchaseOrders = () => {
         return JSON.stringify(editing) !== openedSnapshot.current
     }
     const cancelEdit = async () => {
-        if (isDirty() && !(await showConfirm('고친 내용이 사라집니다. 그래도 닫을까요?', '편집 취소'))) return
+        if (isDirty() && !(await showConfirm('고친 내용이 사라집니다. 그래도 닫을까요?', '편집 취소', '닫기', '계속 쓰기'))) return
         setEditing(null)
     }
 
@@ -196,7 +196,7 @@ const PurchaseOrders = () => {
     }
 
     const removeOrder = async (o) => {
-        if (!(await showConfirm(`발주서 ${o.po_no}를 지웁니다.`, '삭제'))) return
+        if (!(await showConfirm(`발주서 ${o.po_no}를 지웁니다.`, '삭제', '삭제'))) return
         const { error } = await supabase.from('purchase_orders').delete().eq('id', o.id)
         if (error) { await showError(error.message); return }
         await load()

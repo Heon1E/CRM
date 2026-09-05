@@ -240,7 +240,7 @@ const ScheduleCalendar = () => {
         await load()
     }
     const removeRow = async (row) => {
-        if (!(await showConfirm(`'${row.title}' 일정을 지웁니다.`, '일정 삭제'))) return
+        if (!(await showConfirm(`'${row.title}' 일정을 지웁니다.`, '일정 삭제', '삭제'))) return
         const { error } = await supabase.from('schedules').delete().eq('id', row.id)
         if (error) { await showError(error.message); return }
         await load()

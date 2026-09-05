@@ -280,7 +280,7 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
     }
 
     const restoreRow = async (row) => {
-        const ok = await showConfirm(`${row.client_name}을(를) 다시 채권으로 되돌립니다.`, '제외 해제')
+        const ok = await showConfirm(`${row.client_name}을(를) 다시 채권으로 되돌립니다.`, '제외 해제', '되돌리기')
         if (!ok) return
         const { error } = await supabase.from('receivables')
             .update({ excluded: false, exclusion_reason: null }).eq('id', row.id)

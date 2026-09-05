@@ -403,7 +403,8 @@ const Clients = () => {
     if (selectedIds.size === 0) return
     const confirmed = await showConfirm(
       `거래처 ${selectedIds.size}곳을 지웁니다. 딸린 매출·활동·연락처도 함께 감춰집니다.`,
-      '설정 > 휴지통에서 되살릴 수 있습니다.'
+      '설정 > 휴지통에서 되살릴 수 있습니다.',
+      '휴지통으로', '그만두기'
     )
     if (!confirmed) return
 

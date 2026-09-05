@@ -119,7 +119,7 @@ const PipelineBoard = () => {
     }
 
     const remove = async (d) => {
-        if (!(await showConfirm(`'${d.title}'을(를) 지웁니다.`, '삭제'))) return
+        if (!(await showConfirm(`'${d.title}'을(를) 지웁니다.`, '삭제', '삭제'))) return
         const { error } = await supabase.from('deals')
             .update({ deleted_at: new Date().toISOString() }).eq('id', d.id)
         if (error) { await showError(error.message); return }

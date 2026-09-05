@@ -104,10 +104,21 @@ export const showInfo = (message, title = '알림') => {
  * @param {string} confirmButtonColor - 확인 버튼 색상 (기본: 브랜드 초록)
  * @returns {Promise<boolean>} - 확인 시 true, 취소 시 false
  */
+/*
+ * 확인 창.
+ *
+ * **확인 단추의 기본이 '삭제'였다.** 그래서 지우는 것이 아닌 자리에서도
+ * '삭제'가 떴다 — 채권 '제외 해제'(되돌리는 것)와 견적서·발주서 '편집 취소'
+ * (닫기만 하는 것)가 그랬다. 누르는 사람은 무엇이 지워지는 줄 안다.
+ *
+ * 기본을 중립으로 두고 **지우는 자리에서만 '삭제'를 넘긴다.** 잊어도 틀린
+ * 말이 뜨지는 않는다 — 이 저장소가 늘 쓰는 방식이다(빠뜨릴 수 있는 것은
+ * 기본값이 안전해야 한다).
+ */
 export const showConfirm = async (
   message,
   title = '확인',
-  confirmText = '삭제',
+  confirmText = '확인',
   cancelText = '취소',
   icon = 'warning',
   confirmButtonColor = BRAND
