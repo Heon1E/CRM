@@ -168,6 +168,21 @@ const Clients = () => {
    * 다시 조회하지 않는다. 매출은 `DataContext`가 이미 들고 있다
    * (같은 파일의 `getLastOrderDate`도 그렇게 한다).
    */
+  /* 올해분 — 표 칸이 쓴다. 정렬(`companyRank.ytd`)과 **같은 기준**이어야
+     화면의 숫자와 줄 순서가 어긋나지 않는다. */
+  const ytdByClient = useMemo(() => {
+    const y = String(new Date().getFullYear())
+    const m = new Map()
+    ;(sales || []).forEach((s) => {
+      const id = s.clientId || s.client_id
+      if (!id) return
+      const d = String(s.sale_date || s.date || s.created_at || '')
+      if (d.slice(0, 4) !== y) return
+      m.set(id, (m.get(id) || 0) + (Number(s.total_amount ?? s.totalAmount) || 0))
+    })
+    return m
+  }, [sales])
+
   const revenueByClient = useMemo(() => {
     const m = new Map()
     ;(sales || []).forEach((s) => {
@@ -191,14 +206,14 @@ const Clients = () => {
       .filter((date) => date)
       .sort((a, b) => new Date(b) - new Date(a))
 
-    const totalAmount = companyClients.reduce((sum, client) => {
-      return sum + getLastYearRevenueAmount(client)
-    }, 0)
+    const totalAmount = companyClients.reduce((sum, client) => sum + getLastYearRevenueAmount(client), 0)
+    const ytdAmount = companyClients.reduce((sum, client) => sum + (ytdByClient.get(client.id) || 0), 0)
 
     return {
       lastOrder: allOrderDates.length > 0 ? allOrderDates[0] : null,
       lastContact: allContactDates.length > 0 ? allContactDates[0] : null,
-      totalAmount: totalAmount,
+      totalAmount,
+      ytdAmount,
     }
   }
 
@@ -231,10 +246,16 @@ const Clients = () => {
    * 예전에는 가나다순이라 1,100곳 중 지금 챙길 곳을 찾으려면 검색을 해야 했다.
    */
   const companyRank = useMemo(() => {
+    // 전기간과 올해를 **같은 자리에서** 센다. 두 군데로 나누면 한쪽만 고쳐 어긋난다.
+    const thisYear = String(new Date().getFullYear())
     const revenue = new Map()
+    const revenueYtd = new Map()
     ;(sales || []).forEach((s) => {
       if (!s.client_id) return
-      revenue.set(s.client_id, (revenue.get(s.client_id) || 0) + (Number(s.total_amount ?? s.totalAmount ?? 0) || 0))
+      const amt = Number(s.total_amount ?? s.totalAmount ?? 0) || 0
+      revenue.set(s.client_id, (revenue.get(s.client_id) || 0) + amt)
+      const d = String(s.sale_date || s.date || s.created_at || '')
+      if (d.slice(0, 4) === thisYear) revenueYtd.set(s.client_id, (revenueYtd.get(s.client_id) || 0) + amt)
     })
 
     const actCount = new Map()
@@ -259,9 +280,10 @@ const Clients = () => {
 
     const byCompany = new Map()
     Object.entries(groupedClients).forEach(([company, rows]) => {
-      let rev = 0, acts = 0, last = 0, lastSale = 0, mine = false, hasContact = false
+      let rev = 0, ytd = 0, acts = 0, last = 0, lastSale = 0, mine = false, hasContact = false
       rows.forEach((c) => {
         rev += revenue.get(c.id) || 0
+        ytd += revenueYtd.get(c.id) || 0
         acts += actCount.get(c.id) || 0
         last = Math.max(last, lastAct.get(c.id) || 0)
         lastSale = Math.max(lastSale, lastSaleAt.get(c.id) || 0)
@@ -269,15 +291,47 @@ const Clients = () => {
         if (c.contact_person || c.phone) hasContact = true
       })
       const tier = (mine && rev > 0) ? 0 : (acts > 0 ? 1 : 2)
-      byCompany.set(company, { tier, rev, acts, last, lastSale: lastSale || null, mine, hasContact })
+      byCompany.set(company, { tier, rev, ytd, acts, last, lastSale: lastSale || null, mine, hasContact })
     })
     return byCompany
   }, [groupedClients, sales, activities, myRep])
 
+  /*
+   * 정렬 — **기본은 올해 누적매출 순.**
+   *
+   * 예전 기본은 '챙길 순서'(내 담당+매출 -> 활동 있음 -> 나머지)였는데,
+   * 지금 누가 얼마나 사고 있는지를 먼저 보고 싶다는 요구가 있었다.
+   * 그 순서도 `chase`로 남겨 둔다 — 없애면 되찾을 길이 없다.
+   *
+   * 머리글을 누르면 바뀐다. 같은 것을 다시 누르면 오름/내림이 뒤집힌다.
+   */
+  const [sortBy, setSortBy] = useState('ytd')   // 'ytd' | 'rev' | 'chase'
+  const [sortAsc, setSortAsc] = useState(false)
+
+  const toggleSort = (key) => {
+    if (sortBy === key) { setSortAsc((v) => !v); return }
+    setSortBy(key)
+    setSortAsc(false)   // 금액은 큰 것부터 보는 것이 기본이다
+    setPage(1)
+  }
+
   const sortedCompanies = useMemo(() => {
+    const dir = sortAsc ? -1 : 1
     return Object.keys(groupedClients).sort((a, b) => {
       const x = companyRank.get(a), y = companyRank.get(b)
       if (!x || !y) return a.localeCompare(b, 'ko')
+
+      if (sortBy === 'ytd' || sortBy === 'rev') {
+        const key = sortBy
+        if (y[key] !== x[key]) return (y[key] - x[key]) * dir
+        // 금액이 같으면(대개 둘 다 0) 챙길 순서로 떨어뜨린다 —
+        // 매출 없는 곳 수백 개가 가나다순으로 섞이면 목록이 쓸모없어진다
+        if (x.tier !== y.tier) return x.tier - y.tier
+        if (y.acts !== x.acts) return y.acts - x.acts
+        return a.localeCompare(b, 'ko')
+      }
+
+      // 챙길 순서 (예전 기본)
       if (x.tier !== y.tier) return x.tier - y.tier
       if (x.tier === 1) {
         if (y.acts !== x.acts) return y.acts - x.acts
@@ -287,7 +341,7 @@ const Clients = () => {
       if (y.rev !== x.rev) return y.rev - x.rev
       return a.localeCompare(b, 'ko')
     })
-  }, [groupedClients, companyRank])
+  }, [groupedClients, companyRank, sortBy, sortAsc])
 
   // 조건에 맞는 회사만 남긴다. 정렬(챙길 순서)은 그대로 유지된다.
   const shownCompanies = useMemo(
@@ -552,7 +606,27 @@ const Clients = () => {
                       {!selectedClientId && <th className="py-2 ">담당자</th>}
                       <th className="w-24 py-2 text-center">상태</th>
                       {!selectedClientId && <th className="w-32 py-2 ">최종거래</th>}
-                      <th className="w-32 text-right py-2 pr-4 ">누적매출</th>
+                      {/*
+                        * 누르면 그 기준으로 정렬한다. 같은 것을 다시 누르면 뒤집힌다.
+                        *
+                        * **칸과 같은 조건으로 감싼다.** 예전에는 머리글만 항상 그리고
+                        * 칸은 `!selectedClientId`일 때만 그려서, 오른쪽 상세를 열면
+                        * 머리글이 칸보다 하나 많아 열이 어긋났다.
+                        */}
+                      {!selectedClientId && (
+                        <th className="w-28 text-right py-2 cursor-pointer select-none hover:text-[color:var(--accent)]"
+                          onClick={() => toggleSort('ytd')}
+                          title="올해 누적매출 순으로 정렬">
+                          올해 매출{sortBy === 'ytd' ? (sortAsc ? ' ▲' : ' ▼') : ''}
+                        </th>
+                      )}
+                      {!selectedClientId && (
+                        <th className="w-32 text-right py-2 pr-4 cursor-pointer select-none hover:text-[color:var(--accent)]"
+                          onClick={() => toggleSort('rev')}
+                          title="전기간 누적매출 순으로 정렬">
+                          전기간 누적{sortBy === 'rev' ? (sortAsc ? ' ▲' : ' ▼') : ''}
+                        </th>
+                      )}
                       <th className="w-20 text-center py-2">관리</th>
                     </tr>
                   </thead>
@@ -638,7 +712,15 @@ const Clients = () => {
                               </td>
                             )}
                             {!selectedClientId && (
-                              <td className="text-right font-bold text-oem-text-primary py-3 pr-4 ">
+                              /* 올해가 앞이다 — 지금 누가 사고 있는지가 먼저 보여야 한다.
+                                 올해 실적이 있으면 초록으로 눈에 띄게 한다. */
+                              <td className="text-right py-3 font-bold"
+                                style={{ color: stats.ytdAmount > 0 ? 'var(--accent)' : 'var(--text-muted)' }}>
+                                {stats.ytdAmount === 0 ? '-' : formatKoreanCurrency(stats.ytdAmount)}
+                              </td>
+                            )}
+                            {!selectedClientId && (
+                              <td className="text-right text-oem-text-primary py-3 pr-4 ">
                                 {stats.totalAmount === 0 ? '-' : formatKoreanCurrency(stats.totalAmount)}
                               </td>
                             )}
@@ -664,7 +746,8 @@ const Clients = () => {
                        */
                       Array.from({ length: 8 }).map((_, i) => (
                         <tr key={`sk-${i}`}>
-                          {Array.from({ length: 7 }).map((__, c) => (
+                          {/* 열 수는 상세 패널 유무에 따라 달라진다. 뼈대는 넉넉히 그린다. */}
+                          {Array.from({ length: selectedClientId ? 5 : 9 }).map((__, c) => (
                             <td key={c} className="py-2 px-2">
                               <div className="skeleton h-4 rounded"
                                 style={{ width: c === 2 ? '80%' : c === 0 ? '18px' : '55%' }} />
@@ -674,7 +757,7 @@ const Clients = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="7" className="p-12 text-center text-oem-text-secondary">
+                        <td colSpan={selectedClientId ? 5 : 9} className="p-12 text-center text-oem-text-secondary">
                           {searchTerm || activeFilters.length > 0
                             ? '조건에 맞는 거래처가 없습니다.'
                             : '거래처가 없습니다.'}
