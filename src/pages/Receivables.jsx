@@ -453,10 +453,12 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                             <th style={{ minWidth: 130, cursor: 'pointer', textAlign: 'right' }} onClick={() => toggleSort('balance')}>
                                 잔액{sortMark('balance')}
                             </th>
-                            <th style={{ minWidth: 100 }}>최초 미수월</th>
-                            <th style={{ minWidth: 110 }}>대장 메모</th>
-                            <th style={{ minWidth: 80 }}>담당</th>
-                            <th style={{ width: 44 }}></th>
+                            <th style={{ minWidth: 88 }}>최초 미수월</th>
+                            <th style={{ minWidth: 56 }} title="대장에 적힌 메모">메모</th>
+                            <th style={{ minWidth: 64 }}>담당</th>
+                            {/* **행 동작은 오른쪽에 붙박는다.** 표가 1,000px이라 화면 밖으로 밀려
+    제외 단추에 손이 닿지 않았다(실측 803px 지점에서 잘림). */}
+                            <th className="sticky-act"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -497,7 +499,7 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                                             : (r.delay_note || '')}
                                     </td>
                                     <td style={{ fontSize: 12 }}>{repById.get(r.client_id) || ''}</td>
-                                    <td onClick={(e) => e.stopPropagation()}>
+                                    <td className="sticky-act" onClick={(e) => e.stopPropagation()}>
                                         {r.excluded ? (
                                             <button className="rowbtn" onClick={() => restoreRow(r)} title="다시 채권으로 되돌리기">
                                                 <RotateCcw size={13} />

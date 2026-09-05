@@ -810,6 +810,38 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   .tel-link { min-height: 44px; padding-right: 8px; }
 }
 
+/*
+ * 넓은 표의 **행 동작은 오른쪽에 붙박는다.**
+ *
+ * 채권관리 표가 1,000px인데 감싼 상자는 803px이라, 매 행에 있는 '제외' 단추가
+ * 화면 밖에 있었다. 가로로 밀어야만 닿는다 — 기능이 있는데 손이 안 닿으면
+ * 없는 것과 같다(쪽 넘김이 잘려 뒤로 못 가던 것과 같은 결함이다).
+ *
+ * 바탕색을 반드시 채운다. 비워 두면 밑에 있는 칸이 비쳐 글자가 겹친다.
+ */
+.dgrid th.sticky-act,
+.dgrid td.sticky-act {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  width: 56px;
+  min-width: 56px;
+  text-align: center;
+  background: var(--bg-card);
+  box-shadow: -6px 0 6px -6px rgba(0, 0, 0, .18);
+}
+.dgrid thead th.sticky-act { background: var(--ind-panel); z-index: 3; }
+.dgrid tbody tr:hover td.sticky-act { background: var(--bg-panel); }
+/* 고른 행은 노랑 면이므로 붙박은 칸도 같이 물들어야 한 줄로 읽힌다 */
+.dgrid tbody tr.is-selected td.sticky-act { background: var(--sel); }
+
+/* 모바일에서는 표가 카드로 접히므로 붙박을 필요가 없다 */
+@media (max-width: 768px) {
+  .dgrid th.sticky-act, .dgrid td.sticky-act {
+    position: static; width: auto; min-width: 0; box-shadow: none;
+  }
+}
+
 .badge-status {
   display: inline-block;
   font-size: 10px; font-weight: 700;
