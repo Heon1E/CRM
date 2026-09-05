@@ -250,15 +250,34 @@ const Statements = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {rows.map((r) => (
-                                    <tr key={r.key}>
-                                        <td className="dt">{String(r.sale_date).slice(0, 10)}</td>
-                                        <td>{r.item_name || '-'}</td>
-                                        <td className="num">{won(r.quantity)}</td>
-                                        <td className="num">{won(r.unit_price)}</td>
-                                        <td className="num">{won(r.total_amount)}</td>
-                                    </tr>
-                                ))}
+                                {/*
+                                  * **0원 줄에 표시를 단다.**
+                                  *
+                                  * 수량은 있는데 금액이 0인 줄이 매출 15,530행 중 1,285행이다.
+                                  * 실측으로 두 무리로 갈린다 — 월말(마지막 3일) 331행은 71%가
+                                  * 다음 달에 값이 붙어 다시 나오고(결제 이월), 월중 954행은 3%만
+                                  * 재등장하며 품목이 전부 부속품이다(제리캔상부캡 211·가로대 186…)
+                                  * — 샘플 무상공급·불량 교환이다.
+                                  *
+                                  * **어느 쪽인지 줄마다 단정하지 않는다.** 문서에 틀린 이유를
+                                  * 적느니 '0원이 실수가 아니다'만 알린다. 고객은 자기 장부와
+                                  * 맞춰 보다 0원을 보면 우리 실수로 여기고 전화한다.
+                                  */}
+                                {rows.map((r) => {
+                                    const free = Number(r.total_amount) === 0 && Number(r.quantity) > 0
+                                    return (
+                                        <tr key={r.key} style={free ? { color: 'var(--text-secondary)' } : undefined}>
+                                            <td className="dt">{String(r.sale_date).slice(0, 10)}</td>
+                                            <td>
+                                                {r.item_name || '-'}
+                                                {free && <span style={{ marginLeft: 6, fontSize: 11 }}>(무상·이월)</span>}
+                                            </td>
+                                            <td className="num">{won(r.quantity)}</td>
+                                            <td className="num">{won(r.unit_price)}</td>
+                                            <td className="num">{won(r.total_amount)}</td>
+                                        </tr>
+                                    )
+                                })}
                                 {rows.length === 0 && (
                                     <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
                                         그 기간에 거래가 없습니다. 기간을 바꿔 보세요.
