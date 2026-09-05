@@ -253,6 +253,18 @@ const MotionLab = import.meta.env.DEV ? lazy(() => import('./pages/MotionLab')) 
 React가 숫자를 `font-size: 11px`로 직렬화하므로 `[style*="font-size: 11px"]`로
 걸린다. 모바일에서만 12px로 올린다.
 
+**그래도 두 갈래가 샌다 — 클래스 이름도 인라인 px도 아닌 것들이다.**
+386px 전 화면 훑기에서 이렇게 남아 있었다:
+
+| 자리 | 왜 안 걸렸나 |
+|---|---|
+| `/calendar`의 '+3 개' (`.fc-daygrid-more-link`) | FullCalendar가 자기 크기를 **`em`**으로 준다 |
+| `/quotes`의 문서번호 (`.rowbtn.doc-no-btn`) | 클래스에 크기가 들어 있어 목록에 없었다 |
+
+둘 다 **눌러야 뭔가 열리는 자리**다 — 가려진 일정을 펴고, 견적서를 연다.
+목록에 `.rowbtn`과 FullCalendar 규칙을 더했다. 화면을 추가하면 386px에서
+`fontSize < 12`를 다시 훑어 볼 것 — 눈으로는 11px과 12px이 구별되지 않는다.
+
 ### 쪽 넘김은 좁은 화면에서 잘려 손이 닿지 않았다
 
 `Pagination`이 번호를 5개 보여줘서 `‹ 1 … 10 11 12 13 14 … 58 ›`가 500px을

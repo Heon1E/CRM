@@ -1216,6 +1216,9 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   .meta,
   .card-label,
   .statusbar,
+  /* 표 안의 행 단추 — 견적서 목록의 문서번호(`Q-20260815-01`)가 11px이었다.
+     문서를 여는 유일한 손잡이라 작아서는 안 된다. */
+  .rowbtn,
   [class*="text-[9px]"],
   [class*="text-[10px]"],
   [class*="text-[11px]"] {
@@ -1235,6 +1238,20 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   [style*="font-size: 11px"],
   [style*="font-size: 11.5px"] {
     font-size: 12px !important;
+  }
+
+  /*
+   * **FullCalendar는 자기 글꼴 크기를 `em`으로 준다.** 위의 두 규칙은
+   * 클래스 이름과 인라인 `px`를 보므로 여기에 걸리지 않는다 — `/calendar`의
+   * '+3 개'(가려진 일정을 펴는 링크)가 386px에서 11.05px로 남아 있었다.
+   * 하필 **눌러야 나머지 일정이 보이는 자리**다. 누르는 자리도 함께 넓힌다.
+   */
+  .fc .fc-daygrid-more-link {
+    font-size: 12px !important;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 4px;
   }
 
   /*
