@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
     num, monthKey, normalizeClient, findBaseMonth, verifyReport, summarizeClients,
+    suggestFix, closestNames, checkNames,
 } from '../src/utils/collectionReport.js'
 
 /*
@@ -143,4 +144,80 @@ test('한글 칸 이름으로 와도 읽는다', () => {
     }, Y)
     assert.equal(c.months[k(7)].sales, 1111000)
     assert.equal(c.months[k(7)].collected, 1111000)
+})
+
+/* ── 틀린 칸 되찾기 ─────────────────────────────────────────────── */
+
+test('잔액을 매출로 잘못 읽으면 표의 계산이 원래 값을 가리킨다', () => {
+    // 실제 오독: (주)이한산업 8월 잔액 53,512,800 을 그 달 매출 21,546,800 으로 집었다
+    const c = normalizeClient({
+        clientName: '(주)이한산업',
+        months: {
+            7: { carried: 31966000, sales: 18824300, collected: 0, balance: 50790300 },
+            8: { carried: 50790300, sales: 21546800, collected: 18824300, balance: 21546800 },
+            9: { carried: 53512800, sales: 0, collected: 0, balance: 53512800 },
+        },
+    }, Y)
+    const [top] = suggestFix({ client: c, month: k(8), year: Y })
+    assert.equal(top.field, 'balance')
+    assert.equal(top.value, 53512800)
+    assert.equal(top.confidence, 'high', '항등식과 9월 이월이 같은 값을 가리키므로 확실하다')
+})
+
+test('고친 값을 넣으면 검산을 통과한다', () => {
+    const c = normalizeClient({
+        clientName: '(주)이한산업',
+        months: {
+            7: { carried: 31966000, sales: 18824300, collected: 0, balance: 50790300 },
+            8: { carried: 50790300, sales: 21546800, collected: 18824300, balance: 21546800 },
+        },
+    }, Y)
+    assert.equal(verifyReport({ clients: [c], year: Y }).ok, false)
+    c.months[k(8)].balance = 53512800
+    assert.equal(verifyReport({ clients: [c], year: Y }).ok, true)
+})
+
+test('이월을 잘못 읽으면 전달 잔액을 후보로 준다', () => {
+    const c = normalizeClient({
+        clientName: 'ㄱ상사',
+        months: {
+            3: { carried: 0, sales: 1000, collected: 0, balance: 1000 },
+            4: { carried: 100, sales: 500, collected: 0, balance: 1500 },   // 이월이 1000이어야 한다
+        },
+    }, Y)
+    const s = suggestFix({ client: c, month: k(4), year: Y })
+    const carried = s.find((x) => x.field === 'carried')
+    assert.ok(carried)
+    assert.equal(carried.value, 1000)
+    assert.equal(carried.confidence, 'high', '넣으면 항등식까지 맞으므로 확실하다')
+})
+
+test('성한 달에는 고칠 것을 내놓지 않는다', () => {
+    assert.deepEqual(suggestFix({ client: 중부산업, month: k(8), year: Y }), [])
+})
+
+/* ── 이름 오독 ─────────────────────────────────────────────────── */
+
+test('한두 글자 어긋난 이름의 원래 거래처를 찾아 준다', () => {
+    const all = ['주식회사 수산머티리얼즈', '현대드럼산업(주)', '강원드림상사', '(주)이한산업']
+    assert.ok(closestNames('수산아타리얼즈', all).includes('주식회사 수산머티리얼즈'))
+    assert.ok(closestNames('창원드럼산업', all).includes('현대드럼산업(주)'))
+    assert.ok(closestNames('강원드럼상사', all).includes('강원드림상사'))
+})
+
+test('전혀 다른 이름에는 아무것도 권하지 않는다', () => {
+    assert.deepEqual(closestNames('평화산업개발', ['주식회사 수산머티리얼즈', '현대드럼산업(주)']), [])
+})
+
+test('CRM에 없는 이름만 골라 낸다 — 검산으로는 못 잡는 오독이다', () => {
+    const all = ['현대드럼산업(주)', '(주)이한산업']
+    const clients = [
+        normalizeClient({ clientName: '(주)이한산업', months: {} }, Y),
+        normalizeClient({ clientName: '창원드럼산업', months: {} }, Y),
+    ]
+    const lookup = (n) => all.find((x) => x === n)
+    const un = checkNames({ clients, lookup, allNames: all })
+    assert.equal(un.length, 1)
+    assert.equal(un[0].clientName, '창원드럼산업')
+    assert.ok(un[0].suggestions.includes('현대드럼산업(주)'))
 })

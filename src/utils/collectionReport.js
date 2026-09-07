@@ -154,6 +154,122 @@ export const verifyReport = ({ clients, year, repTotal = null, tolerance = 0 }) 
 }
 
 /**
+ * 틀린 칸을 **표의 계산으로 되찾는다.**
+ *
+ * 이 표는 같은 값이 여러 자리에 겹쳐 적혀 있다. 그래서 한 칸을 잘못 읽어도
+ * 나머지가 그 값을 가리킨다 — 지어내는 것이 아니라 **표가 이미 갖고 있는
+ * 답을 꺼내는 것**이다.
+ *
+ * 실제로 있었던 오독이 이 경우다 — (주)이한산업 8월 잔액 53,512,800 을
+ * 그 달 매출 21,546,800 으로 집어 왔다. 항등식(이월+매출−수금)도,
+ * 9월 이월도 똑같이 53,512,800 을 가리킨다.
+ *
+ * **자동으로 고치지 않는다.** 후보만 돌려주고 사람이 누른다 — 이 숫자로
+ * 수금 독촉 전화를 걸기 때문이다.
+ *
+ * @returns {Array<{field, value, basis, confidence}>} 확신이 큰 것부터
+ */
+export const suggestFix = ({ client, month, year }) => {
+    const keys = monthKeys(year)
+    const i = keys.indexOf(month)
+    if (i < 0) return []
+    const cur = client.months[month]
+    if (!cur) return []
+
+    const prev = i > 0 ? client.months[keys[i - 1]] : null
+    const next = i < 11 ? client.months[keys[i + 1]] : null
+    const byIdentity = cur.carried + cur.sales - cur.collected
+    const out = []
+
+    // 잔액이 틀린 경우 — 항등식과 '다음 달 이월'이 **같은 값**을 가리키면 확실하다
+    if (byIdentity !== cur.balance) {
+        const nextAgrees = next && next.carried === byIdentity
+        out.push({
+            field: 'balance', value: byIdentity,
+            basis: nextAgrees
+                ? `이월+매출−수금 과 다음 달 이월이 모두 ${byIdentity.toLocaleString()} 을 가리킵니다`
+                : `이월 ${cur.carried.toLocaleString()} + 매출 ${cur.sales.toLocaleString()} − 수금 ${cur.collected.toLocaleString()}`,
+            confidence: nextAgrees ? 'high' : 'medium',
+        })
+    }
+
+    // 이월이 틀린 경우 — 전달 잔액이 답이다
+    if (prev && prev.carried + prev.sales - prev.collected === prev.balance && cur.carried !== prev.balance) {
+        const fixesIdentity = prev.balance + cur.sales - cur.collected === cur.balance
+        out.push({
+            field: 'carried', value: prev.balance,
+            basis: fixesIdentity
+                ? `전달 잔액 ${prev.balance.toLocaleString()} 을 넣으면 이 달 항등식도 맞습니다`
+                : `전달 잔액이 ${prev.balance.toLocaleString()} 입니다`,
+            confidence: fixesIdentity ? 'high' : 'medium',
+        })
+    }
+
+    // 수금이 틀린 경우 — 이월·매출·잔액이 성하면 수금이 하나로 정해진다
+    const bySubtract = cur.carried + cur.sales - cur.balance
+    if (byIdentity !== cur.balance && bySubtract !== cur.collected && bySubtract >= 0) {
+        out.push({
+            field: 'collected', value: bySubtract,
+            basis: `이월+매출−잔액 = ${bySubtract.toLocaleString()}`,
+            confidence: 'low',
+        })
+    }
+
+    const rank = { high: 0, medium: 1, low: 2 }
+    return out.sort((a, b) => rank[a.confidence] - rank[b.confidence])
+}
+
+/**
+ * 판독된 거래처명이 CRM에 있는 곳인지 본다.
+ *
+ * **검산으로는 이름 오독을 못 잡는다** — 숫자가 맞으면 항등식은 통과한다.
+ * 실제로 넷이 틀렸다(`수산머티리얼즈`→`수산아타리얼즈` 등). 이름이 틀리면
+ * 다른 회사의 채권으로 저장되거나 새 거래처가 만들어진다.
+ *
+ * @param {(name:string)=>object|undefined} lookup 이름으로 거래처를 찾는 함수
+ * @param {string[]} allNames 대조용 거래처명 전체
+ */
+export const checkNames = ({ clients, lookup, allNames = [] }) => {
+    const unmatched = []
+    clients.forEach((c) => {
+        if (!c.clientName) return
+        if (lookup(c.clientName)) return
+        unmatched.push({ clientName: c.clientName, suggestions: closestNames(c.clientName, allNames) })
+    })
+    return unmatched
+}
+
+/**
+ * 글자가 얼마나 겹치는지로 비슷한 이름을 고른다 (오독은 한두 글자만 어긋난다).
+ *
+ * **회사를 가리키는 말을 먼저 걷어낸다.** `주식회사 수산머티리얼즈` 와
+ * `수산아타리얼즈` 는 실제로 같은 곳인데, '주식회사'를 그대로 두면 겹치는
+ * 비율이 0.3까지 떨어져 후보에서 빠진다.
+ */
+const corpStripped = (s) => String(s)
+    .replace(/주식회사|유한회사|합자회사|합명회사|\(주\)|\(유\)|㈜/g, '')
+    .replace(/[\s()[\]{}\-_.·]/g, '')
+
+export const closestNames = (name, allNames, limit = 3) => {
+    const a = corpStripped(name)
+    if (a.length < 2) return []
+    const bigrams = (s) => { const out = []; for (let i = 0; i < s.length - 1; i++) out.push(s.slice(i, i + 2)); return out }
+    const A = bigrams(a)
+    if (!A.length) return []
+    return allNames
+        .map((n) => {
+            const b = corpStripped(n)
+            const B = new Set(bigrams(b))
+            const hit = A.filter((g) => B.has(g)).length
+            return { name: n, score: hit / Math.max(A.length, B.size || 1) }
+        })
+        .filter((x) => x.score >= 0.4)
+        .sort((x, y) => y.score - x.score)
+        .slice(0, limit)
+        .map((x) => x.name)
+}
+
+/**
  * 경과월·연체금액을 낸다. **계산은 `receivablesLedger.agingOf` 그대로 쓴다.**
  *
  * 그쪽이 엑셀의 납작한 행을 받으므로, 여기서 같은 모양(`cells` + `monthCols`)을

@@ -6,7 +6,7 @@ import { useData } from '../contexts/DataContext'
 import { setKpiManualInput } from '../utils/kpiCategories'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../utils/clientAliases'
 import { showSuccess, showError, showWarning } from '../utils/alert'
-import { verifyReport, summarizeClients } from '../utils/collectionReport'
+import { verifyReport, summarizeClients, suggestFix, checkNames } from '../utils/collectionReport'
 import { supabase } from '../lib/supabase'
 
 /**
@@ -38,6 +38,9 @@ const DOC_LABEL = {
 }
 
 const won = (v) => Number(v || 0).toLocaleString('ko-KR')
+
+/** 매출/수금 실적표의 네 줄 */
+const FIELD_LABEL = { carried: '이월', sales: '매출', collected: '수금', balance: '잔액' }
 
 const ErpScreenshotImport = ({ onRefresh }) => {
     const { clients, activities, addActivity } = useData()
@@ -209,6 +212,21 @@ const ErpScreenshotImport = ({ onRefresh }) => {
             `채권관리 화면의 '대장 올리기'로 엑셀을 올려 주세요.`
         )
         clearAll()
+    }
+
+    /**
+     * 실적표의 한 칸을 고친다. **표가 이미 갖고 있는 답을 넣는 것**이므로
+     * 지어내는 것이 아니지만, 누르는 것은 사람이다.
+     */
+    const applyReportFix = (clientIndex, month, field, value) => {
+        setResult((prev) => {
+            if (!prev) return prev
+            const rows = prev.rows.map((c, i) => {
+                if (i !== clientIndex) return c
+                return { ...c, months: { ...c.months, [month]: { ...c.months[month], [field]: value } } }
+            })
+            return { ...prev, rows }
+        })
     }
 
     /**
@@ -506,21 +524,71 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                                 <b style={{ color: 'var(--danger)' }}>
                                     <AlertTriangle size={13} style={{ verticalAlign: -2 }} /> 표와 맞지 않는 곳 {v.problems.length}군데
                                 </b>
-                                <div style={{ marginTop: 4, maxHeight: 150, overflowY: 'auto' }}>
-                                    {v.problems.slice(0, 12).map((p, i) => (
-                                        <div key={i} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                                            · <b>{p.clientName || '합계'}</b> {p.month} — {p.message}
-                                        </div>
-                                    ))}
-                                    {v.problems.length > 12 && (
-                                        <div style={{ fontSize: 12 }}>… 외 {v.problems.length - 12}군데</div>
+                                <div style={{ marginTop: 6, maxHeight: 260, overflowY: 'auto' }}>
+                                    {v.problems.slice(0, 20).map((p, i) => {
+                                        const ci = result.rows.findIndex((c) => c.clientName === p.clientName)
+                                        const fixes = ci >= 0 && p.kind !== 'total'
+                                            ? suggestFix({ client: result.rows[ci], month: p.month, year })
+                                            : []
+                                        return (
+                                            <div key={i} style={{ padding: '4px 0', borderTop: i ? '1px solid var(--border)' : 'none' }}>
+                                                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                                    · <b>{p.clientName || '합계'}</b> {p.month} — {p.message}
+                                                </div>
+                                                {/* **표가 이미 답을 갖고 있다.** 지어내는 것이 아니라 꺼내 오는 것이라
+                                                    한 번 눌러 고칠 수 있게 한다. 다만 누르는 것은 사람이다. */}
+                                                {fixes.slice(0, 2).map((f, j) => (
+                                                    <button
+                                                        key={j}
+                                                        className="tb-btn"
+                                                        style={{ margin: '2px 6px 2px 12px' }}
+                                                        onClick={() => applyReportFix(ci, p.month, f.field, f.value)}
+                                                        title={f.basis}
+                                                    >
+                                                        {FIELD_LABEL[f.field]}을 {won(f.value)} 으로
+                                                        {f.confidence === 'high' ? ' (확실)' : ''}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )
+                                    })}
+                                    {v.problems.length > 20 && (
+                                        <div style={{ fontSize: 12 }}>… 외 {v.problems.length - 20}군데</div>
                                     )}
                                 </div>
                                 <div style={{ marginTop: 4, fontSize: 12 }}>
-                                    표에서 그 칸을 확인해 아래에서 고친 뒤 반영해 주세요. <b>고치기 전에는 저장되지 않습니다.</b>
+                                    표를 보고 맞는지 확인한 뒤 누르세요. <b>고치기 전에는 저장되지 않습니다.</b>
                                 </div>
                             </>
                         )}
+                        {/* 검산은 이름 오독을 못 잡는다 — 숫자가 맞으면 그대로 통과한다 */}
+                        {(() => {
+                            const un = checkNames({
+                                clients: result.rows,
+                                lookup: findClient,
+                                allNames: clients.map((c) => c.company),
+                            })
+                            if (!un.length) return null
+                            return (
+                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 12 }}>
+                                    <b>CRM에 없는 거래처명 {un.length}곳</b> — 이름을 잘못 읽었을 수 있습니다
+                                    (검산으로는 안 잡힙니다).
+                                    {un.slice(0, 8).map((u, i) => (
+                                        <div key={i} style={{ color: 'var(--text-secondary)' }}>
+                                            · {u.clientName}
+                                            {u.suggestions.length > 0 && (
+                                                <> → {u.suggestions.map((s, j) => (
+                                                    <button key={j} className="tb-btn" style={{ margin: '2px 4px' }}
+                                                        onClick={() => editCell(result.rows.findIndex((c) => c.clientName === u.clientName), 'clientName', s)}>
+                                                        {s}
+                                                    </button>
+                                                ))}</>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        })()}
                     </div>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="dgrid">
