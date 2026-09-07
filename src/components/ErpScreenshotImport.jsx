@@ -414,6 +414,18 @@ const ErpScreenshotImport = ({ onRefresh }) => {
         if (t === 'receivables') {
             const total = result.rows.reduce((a, r) => a + toNumber(r.amount), 0)
             const overdue = result.rows.filter((r) => Number(r.overdueDays) > 0).length
+            /* 화면에 없던 칸은 통째로 숨긴다 — 빈 열만 늘어놓으면 표가 읽기 나빠진다.
+               반대로 **값이 있는데 안 보여주면** 무엇이 판독됐는지 확인할 수 없다. */
+            const has = (k) => result.rows.some((r) => r[k] != null && r[k] !== '')
+            const cols = [
+                { k: 'carriedOver', label: '전월이월', w: 110, num: true },
+                { k: 'monthSales', label: '당월매출', w: 110, num: true },
+                { k: 'collected', label: '당월수금', w: 110, num: true },
+                { k: 'agingMonths', label: '경과월', w: 80, num: true },
+                { k: 'overdueDays', label: '연체일', w: 80, num: true },
+                { k: 'dueDate', label: '기일', w: 110, num: false },
+                { k: 'note', label: '비고', w: 120, num: false },
+            ].filter((c) => has(c.k))
             return (
                 <>
                     <div style={{ overflowX: 'auto' }}>
@@ -422,9 +434,8 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                                 <tr>
                                     <th style={{ width: 34 }}></th>
                                     <th style={{ minWidth: 160 }}>거래처</th>
-                                    <th style={{ minWidth: 120 }}>미수금</th>
-                                    <th style={{ minWidth: 90 }}>연체일</th>
-                                    <th style={{ minWidth: 110 }}>기일</th>
+                                    <th style={{ minWidth: 120 }}>미수금(잔액)</th>
+                                    {cols.map((c) => <th key={c.k} style={{ minWidth: c.w }}>{c.label}</th>)}
                                 </tr>
                             </thead>
                             <tbody>
@@ -437,8 +448,15 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                                         </td>
                                         <td><input value={r.clientName || ''} onChange={(e) => editCell(i, 'clientName', e.target.value)} /></td>
                                         <td><input value={r.amount ?? ''} onChange={(e) => editCell(i, 'amount', e.target.value)} style={{ textAlign: 'right' }} /></td>
-                                        <td><input value={r.overdueDays ?? ''} onChange={(e) => editCell(i, 'overdueDays', e.target.value)} style={{ textAlign: 'right' }} /></td>
-                                        <td><input value={r.dueDate || ''} onChange={(e) => editCell(i, 'dueDate', e.target.value)} /></td>
+                                        {cols.map((c) => (
+                                            <td key={c.k}>
+                                                <input
+                                                    value={r[c.k] ?? ''}
+                                                    onChange={(e) => editCell(i, c.k, e.target.value)}
+                                                    style={c.num ? { textAlign: 'right' } : undefined}
+                                                />
+                                            </td>
+                                        ))}
                                     </tr>
                                 ))}
                             </tbody>
@@ -447,7 +465,8 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                     <div className="statusbar">
                         <span>{result.rows.length}개 거래처</span>
                         <span>총 미수금 {won(total)}원</span>
-                        <span>연체 {overdue}건</span>
+                        {overdue > 0 && <span>연체 {overdue}건</span>}
+                        <span>{result.baseMonth ? `기준 ${result.baseMonth}` : '기준월 표시 없음'}</span>
                     </div>
                     <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <label htmlFor="erp-receivable-count" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>

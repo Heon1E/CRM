@@ -118,7 +118,11 @@ export async function analyzeErpScreenshots(files, { docType = 'auto', defaultYe
     const warnings = [...(payload.warnings || [])]
     const rows = normalizeRows(payload.docType, payload.rows || [], defaultYear, warnings)
 
-    return { docType: payload.docType || 'unknown', rows, summary: payload.summary || '', warnings }
+    // 기준월은 **화면에 적혀 있을 때만** 온다. 오늘 날짜로 짐작하지 않는다 —
+    // 채권 대장은 월 스냅샷이라 어느 달 것인지가 값 자체만큼 중요하다.
+    const baseMonth = /^\d{4}-\d{2}$/.test(String(payload.baseMonth || '')) ? payload.baseMonth : null
+
+    return { docType: payload.docType || 'unknown', rows, baseMonth, summary: payload.summary || '', warnings }
 }
 
 /** 판독 결과를 앱이 쓰는 형태로 맞춘다. 이상한 행은 warnings에 남긴다. */
@@ -149,11 +153,26 @@ function normalizeRows(docType, rows, defaultYear, warnings) {
     }
 
     if (docType === 'receivables') {
+        /*
+         * **화면에 있는 칸을 다 가져온다.** 예전에는 `clientName/amount/
+         * overdueDays/dueDate` 넷만 뽑아서, 화면에 당월매출·수금·경과월이
+         * 있어도 담을 자리가 없어 버렸다. 그래서 판독 결과만 보고는
+         * "화면에 잔액밖에 없다"고 잘못 읽게 된다.
+         *
+         * **없는 값은 `null`로 남긴다.** 0으로 바꾸면 '수금 0원'과
+         * '수금 칸이 아예 없음'이 구별되지 않는다.
+         */
+        const num = (v) => (v == null || v === '' ? null : toNumber(v))
         return rows.map((r) => ({
             clientName: String(r.clientName ?? r.client_name ?? '').trim(),
             amount: toNumber(r.amount),
-            overdueDays: r.overdueDays == null ? null : toNumber(r.overdueDays),
-            dueDate: r.dueDate ? normalizeDate(r.dueDate, defaultYear) : null
+            overdueDays: num(r.overdueDays),
+            dueDate: r.dueDate ? normalizeDate(r.dueDate, defaultYear) : null,
+            carriedOver: num(r.carriedOver),
+            monthSales: num(r.monthSales),
+            collected: num(r.collected),
+            agingMonths: num(r.agingMonths),
+            note: String(r.note ?? '').trim(),
         }))
     }
 

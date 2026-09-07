@@ -284,7 +284,16 @@ sales:
   - 합계·소계 행은 제외한다.
 
 receivables:
-  { "clientName": "", "amount": 숫자, "overdueDays": 숫자 또는 null }
+  { "clientName": "", "amount": 숫자, "overdueDays": 숫자 또는 null,
+    "carriedOver": 숫자 또는 null, "monthSales": 숫자 또는 null,
+    "collected": 숫자 또는 null, "agingMonths": 숫자 또는 null, "note": "" }
+  - **amount 는 남은 잔액(미수금)이다.** '잔액'·'미수금'·'미수잔액' 칸의 값을 쓴다.
+  - 화면에 있으면 함께 담고 **없으면 null로 둔다. 지어내지 마라:**
+    carriedOver 전월이월 · monthSales 당월매출 · collected 당월수금/입금 ·
+    agingMonths 경과월 · note 비고 칸 글자 그대로.
+  - 표에 기준 시점이 적혀 있으면(예: '2026년 8월', '26.08 현재') 최상위에
+    "baseMonth": "YYYY-MM" 으로 담는다. **없으면 넣지 마라** — 오늘 날짜로 짐작하지 않는다.
+  - 목록이 잘렸거나 다음 쪽이 있어 보이면 warnings에 적는다. 몇 곳이 전부인지가 중요하다.
 
 question:
   { "ask": "today" | "week" | "other" }
@@ -958,14 +967,24 @@ export default async function handler(req, res) {
             await saveToInbox({
                 chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
                 has_image: !!photos?.length, doc_type: intent,
-                payload: { fp, rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [] },
+                // 기준월은 화면에 적혀 있을 때만 담는다 (오늘 날짜로 짐작하지 않는다)
+                payload: {
+                    fp, rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [],
+                    ...(/^\d{4}-\d{2}$/.test(String(parsed.baseMonth || '')) ? { baseMonth: parsed.baseMonth } : {}),
+                },
                 status: 'pending'
             })
             const label = intent === 'sales' ? '매출' : '채권(미수금)'
             await tgSend(chatId,
                 `📥 <b>${label} ${items.length}건으로 읽었습니다.</b>\n${parsed.reply || ''}` +
                 (warn.length ? `\n\n⚠️ ${warn.join('\n⚠️ ')}` : '') +
-                `\n\n중복 검사를 거쳐야 해서 바로 넣지 않았습니다.\nCRM <b>설정 &gt; 받은 항목</b>에서 확인 후 반영해 주세요.`
+                /* **채권은 아직 대장에 못 넣는다.** '반영'을 눌러도 채권관리 화면은
+                   그대로다. 여기서 미리 말해 두지 않으면 앱까지 가서야 알게 된다. */
+                (intent === 'receivables'
+                    ? `\n\n담아 두었습니다. 다만 <b>채권 대장에는 아직 반영되지 않습니다</b> — ` +
+                      `경과월·연체금액은 월별 매출에서 거꾸로 계산해야 하는데 사진에는 그 이력이 없습니다. ` +
+                      `대장은 채권관리 화면의 '대장 올리기'로 엑셀을 올려 주세요.`
+                    : `\n\n중복 검사를 거쳐야 해서 바로 넣지 않았습니다.\nCRM <b>설정 &gt; 받은 항목</b>에서 확인 후 반영해 주세요.`)
             )
             return ok()
         }

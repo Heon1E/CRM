@@ -28,6 +28,7 @@ const SCHEMA_HINT = `
 {
   "docType": "sales" | "receivables" | "daily_report" | "activity" | "unknown",
   "rows": [ ... ],
+  "baseMonth": "YYYY-MM"   // 화면에 기준 시점이 적혀 있을 때만. 없으면 넣지 마라
   "summary": "한 줄 요약(한국어)",
   "warnings": ["판독이 불확실한 부분(한국어)"]
 }
@@ -42,8 +43,21 @@ docType 별 rows 형식:
 
 2) receivables — 미수금/채권/외상매출금 현황
    { "clientName": "거래처명", "amount": 숫자(원), "overdueDays": 숫자 또는 null,
-     "dueDate": "YYYY-MM-DD" 또는 null }
+     "dueDate": "YYYY-MM-DD" 또는 null,
+     "carriedOver": 숫자 또는 null, "monthSales": 숫자 또는 null,
+     "collected": 숫자 또는 null, "agingMonths": 숫자 또는 null, "note": "" }
    - 연체(기일 초과) 건만이 아니라 표에 보이는 행을 모두 담는다.
+   - **amount 는 남은 잔액(미수금)이다.** 표에 '잔액'·'미수금'·'미수잔액' 칸이
+     있으면 그 값을 쓴다.
+   - 화면에 있으면 함께 담는다. **없으면 null로 두고 지어내지 않는다:**
+     carriedOver 전월이월/이월잔액 · monthSales 당월매출 ·
+     collected 당월수금/입금액 · agingMonths 경과월(개월 수) ·
+     note 비고·메모 칸의 글자 그대로.
+   - 표 위·아래에 기준 시점이 적혀 있으면(예: '2026년 8월', '26.08 현재',
+     '2026-08-31 기준') 최상위에 "baseMonth": "YYYY-MM" 으로 담는다.
+     **화면에 없으면 넣지 않는다** — 오늘 날짜로 짐작하지 마라.
+   - 목록이 잘려 있거나 다음 쪽이 있어 보이면(스크롤 막대, '1/3', '다음' 등)
+     warnings에 그렇게 적는다. **몇 곳이 전부인지가 중요하다.**
 
 3) daily_report — 일일업무보고서 양식 (한 장이 하루)
    { "clientName": "거래처명", "activity_date": "YYYY-MM-DD", "person": "만난 담당자",
