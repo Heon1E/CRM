@@ -22,39 +22,15 @@ import { supabase } from '../lib/supabase'
 import { showError, showWarning, showInfo, showHtmlConfirm } from '../utils/alert'
 import { reconcileSales } from '../utils/salesReconciler'
 import { fetchAllRows } from '../utils/fetchAllRows'
+import { normalizeKey, buildClientKeys } from '../utils/clientKeys.js'
 
-export const normalizeKey = (name, { removeCorp = false, removePunct = false } = {}) => {
-    if (!name) return ''
-    let text = name
-        .toString()
-        .replace(/\u200B|\uFEFF/g, '') // zero-width chars
-        .replace(/\u00A0/g, ' ') // nbsp
-        .replace(/[（]/g, '(')
-        .replace(/[）]/g, ')')
-        .replace(/㈜/g, '(주)')
-        .trim()
-
-    if (removeCorp) {
-        text = text.replace(/주식회사|유한회사|합자회사|합명회사|유한|㈜|\(주\)|\(유\)/g, '')
-    }
-
-    if (removePunct) {
-        text = text.replace(/[\s\(\)\[\]\{\}\-_.·]/g, '')
-    } else {
-        text = text.replace(/\s+/g, '')
-    }
-
-    return text.toLowerCase()
-}
-
-export const buildClientKeys = (name) => {
-    const keys = new Set()
-    keys.add(normalizeKey(name))
-    keys.add(normalizeKey(name, { removeCorp: true }))
-    keys.add(normalizeKey(name, { removePunct: true }))
-    keys.add(normalizeKey(name, { removeCorp: true, removePunct: true }))
-    return Array.from(keys).filter(Boolean)
-}
+/**
+ * 거래처명 키 만들기는 src/utils/clientKeys.js 로 옮겼다 - 이 파일은 React를
+ * import해서 execution/ 스크립트가 못 쓰는데, 그래서 스크립트마다 비슷하지만
+ * 다른 규칙을 다시 짜고 있었다. **규칙이 두 벌이면 반드시 갈린다.**
+ * 여기서 그대로 다시 내보내므로 부르는 쪽은 바뀔 것이 없다.
+ */
+export { normalizeKey, buildClientKeys }
 
 /**
  * 쪽 나눠 받기는 `src/utils/fetchAllRows.js`로 옮겼다 — 이 파일은 React를

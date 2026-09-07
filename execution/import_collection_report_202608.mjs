@@ -23,7 +23,9 @@
  * ```
  */
 import { connect } from './_supabase.mjs'
-import { summarizeClients, normalizeClient, monthKey } from '../src/utils/collectionReport.js'
+import { summarizeClients, normalizeClient } from '../src/utils/collectionReport.js'
+import { nameCandidates } from '../src/utils/clientAliases.js'
+import { buildClientKeys } from '../src/utils/clientKeys.js'
 
 const APPLY = process.argv.includes('--apply')
 const YEAR = 2026
@@ -44,7 +46,10 @@ const DATA = [
     ['진영IBC (최은성)', 10340000, [5023700, 19012400, 8148800, 2464000, 2772000, 2657600, 5766200, 4573800]],
     ['(주)오뚜기', 2079000, [5032500, 5032500, 5032500, 8523900, 2494800, 5197500, 10395000, 2079000]],
     ['신성소재(주)', 13713700, [2618000, 1771000, 4268000, 1680800, 840400, 2731300, 10772300, 2941400]],
-    ['현대산업 주식회사(1)', 26180000, [1485000, 8250000, 27178800, 28798000, 9482000, 9460000, 28534000, 26180000]],
+    // CRM 이름은 `(I)` — 괄호 안이 숫자 1이 아니라 영문 I다. 처음에 1로 옮겨
+    // 적어 거래처가 연결되지 않았다. CRM 2026 매출 129,158,000(공급가액)이
+    // 실적표 139,367,800 ÷ 1.1 = 126,698,000 과 맞아 같은 곳임을 확인했다.
+    ['현대산업 주식회사(I)', 26180000, [1485000, 8250000, 27178800, 28798000, 9482000, 9460000, 28534000, 26180000]],
     ['부평상회', 2772000, [2772000, 0, 2772000, 2772000, 2992000, 0, 0, 0]],
     ['주식회사 윌슨플로켐', 18849600, [0, 6333800, 5740900, 0, 0, 0, 12672000, 6177600]],
     ['신성물산(주)', 1925000, [0, 0, 0, 0, 0, 0, 3465000, 0]],
@@ -119,13 +124,25 @@ const fetchAll = async (build, size = 1000) => {
 
 const allClients = await fetchAll(() => supabase.from('clients').select('id, company').is('deleted_at', null))
 
-/** 앱과 같은 기준으로 이름을 맞춘다 */
-const key = (s) => String(s || '')
-    .replace(/주식회사|유한회사|\(주\)|\(유\)|㈜/g, '')
-    .replace(/[\s()[\]{}\-_.·]/g, '')
-    .toLowerCase()
+/*
+ * **앱과 같은 매칭기를 쓴다.**
+ *
+ * 처음에는 여기서 이름 다듬기를 직접 짰다가 세 곳을 놓쳤다. `clientAliases.js`에
+ * 이미 `신성물산(주) -> 대달인터내셔널(주)` 가 적혀 있는데 그 표를 안 봤기
+ * 때문이다 — 저장소가 경고하는 바로 그 실수다("한쪽을 고치면 다른 쪽도 고칠 것",
+ * "앱과 기준이 갈리면 같은 회사가 새로 만들어진다").
+ */
 const byKey = new Map()
-allClients.forEach((c) => { const k = key(c.company); if (!byKey.has(k)) byKey.set(k, c) })
+allClients.forEach((c) => {
+    buildClientKeys(c.company).forEach((k) => { if (!byKey.has(k)) byKey.set(k, c) })
+})
+const findClient = (raw) => {
+    for (const cand of nameCandidates(raw)) {
+        const hit = buildClientKeys(cand).map((k) => byKey.get(k)).find(Boolean)
+        if (hit) return hit
+    }
+    return null
+}
 
 // 이미 '제외'로 표시해 둔 거래처는 새 달에도 그대로 제외한다
 const prevExcluded = new Map()
@@ -136,7 +153,7 @@ const prevExcluded = new Map()
 }
 
 const payload = rows.map((r) => {
-    const hit = byKey.get(key(r.name))
+    const hit = findClient(r.name)
     return {
         ...(prevExcluded.has(r.name) ? { excluded: true, exclusion_reason: prevExcluded.get(r.name) } : {}),
         client_id: hit ? hit.id : null,
@@ -159,6 +176,24 @@ for (let i = 0; i < payload.length; i += 200) {
     if (error) throw new Error(`반영 실패: ${error.message}`)
 }
 
+/*
+ * 다시 돌릴 때 **이름을 고친 옛 줄이 남는다.** upsert 키가
+ * `(client_name, base_month)`라 이름이 바뀌면 새 줄이 생기고 옛 줄은 그대로다
+ * (`현대산업 주식회사(1)` -> `(I)` 가 그랬다). 이 스크립트가 넣은 줄만 골라
+ * (delay_note 표시) 이번 목록에 없는 것을 지운다 — 엑셀 대장에서 온 줄은
+ * 건드리지 않는다.
+ */
+const MARK = '매출/수금 실적표에서'
+const { data: existing } = await supabase.from('receivables')
+    .select('id, client_name, delay_note').eq('base_month', BASE_MONTH)
+const keep = new Set(payload.map((p) => p.client_name))
+const stale = (existing || []).filter((r) => String(r.delay_note || '').includes(MARK) && !keep.has(r.client_name))
+for (const r of stale) {
+    const { error } = await supabase.from('receivables').delete().eq('id', r.id)
+    if (error) console.log(`  옛 줄 정리 실패: ${r.client_name} — ${error.message}`)
+}
+
 console.log(`\n${BASE_MONTH} 기준 ${payload.length}곳을 반영했습니다.`)
 console.log(`거래처 연결 ${payload.filter((p) => p.client_id).length}곳`)
+if (stale.length) console.log(`이름이 바뀌어 남았던 옛 줄 ${stale.length}건 정리: ${stale.map((r) => r.client_name).join(', ')}`)
 if (unmatched.length) console.log(`거래처를 못 찾은 곳: ${unmatched.join(', ')}`)

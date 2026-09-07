@@ -1312,12 +1312,25 @@ node execution/analyze_receivables.mjs "<외상매출금.xlsx>"
 - 방문시간이 `유선`이면 `전화`, 아니면 `미팅`으로 저장한다. **KPI 정기적방문횟수는 미팅/방문만
   세므로** 이 구분이 곧 KPI 숫자다.
 
-### 거래처명 대응표는 두 군데에 있다
+### 거래처명 대응표는 한 곳이다 — 예전에는 두 군데였다 (2026-09 정리)
 
-`src/utils/clientAliases.js`(앱) 와 `execution/import_daily_report.mjs`의 `ALIASES`(스크립트).
-스크립트는 Node에서 돌아 앱 모듈을 직접 읽지 못한다. **한쪽을 고치면 다른 쪽도 고칠 것.**
-`nameCandidates`가 괄호(`아모레퍼시픽 (오산)` → `(주)아모레퍼시픽`)와 공장 접미사
-(`KCC 전주공장` → `KCC`)까지 훑는다.
+`src/utils/clientAliases.js` **하나**다. `nameCandidates`가 괄호
+(`아모레퍼시픽 (오산)` → `(주)아모레퍼시픽`)와 공장 접미사(`KCC 전주공장` → `KCC`)까지
+훑고, 키 만들기는 `src/utils/clientKeys.js`의 `buildClientKeys`다.
+
+예전에는 `execution/import_daily_report.mjs`가 `ALIASES`·`nameCandidates`·
+`normalizeKey`·`NON_CLIENT`를 통째로 베껴 두고 *"한쪽을 고치면 다른 쪽도 고칠 것"*
+이라고 적어 두었다. **그렇게 두면 언젠가 반드시 갈린다.** 실제로 갈렸다 —
+채권 반영 스크립트에서 별칭표를 안 보는 매칭기를 새로 짰다가 세 곳을 놓쳤고,
+그중 `신성물산(주) → 대달인터내셔널(주)`는 **이미 별칭표에 적혀 있는 것**이었다.
+
+`api/telegram-webhook.js`가 Node에서 이 파일을 그대로 import해 쓰고 있었으므로
+스크립트도 못 할 이유가 없었다. `buildClientKeys`는 React를 import하는
+`useSalesImport.js` 안에 있어서 스크립트가 못 썼던 것이라, 순수 부분만
+`utils/clientKeys.js`로 꺼내고 훅은 그것을 다시 내보낸다(부르는 쪽은 그대로).
+
+**새 스크립트에서 거래처를 찾을 때 규칙을 새로 짜지 말 것.**
+`nameCandidates` + `buildClientKeys` 를 부른다.
 
 ## 채권관리 탭 (`/receivables`)
 

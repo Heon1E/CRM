@@ -52,83 +52,22 @@ const fetchAll = async (build, pageSize = 1000) => {
 }
 
 // ---------------------------------------------------------------------------
-// 거래처명 정규화 (앱의 buildClientKeys와 같은 기준이어야 한다)
+// 거래처명 맞추기 — **앱과 같은 것을 쓴다**
+//
+// 예전에는 여기에 normalizeKey/buildClientKeys/nameCandidates/ALIASES/
+// NON_CLIENT 를 통째로 베껴 두고 "한쪽을 고치면 다른 쪽도 고칠 것"이라고
+// 적어 두었다. 그렇게 두면 언젠가 반드시 갈린다 - 실제로 채권 반영에서
+// 별칭표를 안 보는 매칭기를 새로 짰다가 세 곳을 놓쳤다.
+//
+// api/telegram-webhook.js 가 이미 같은 파일을 Node에서 import해 쓰고 있다.
 // ---------------------------------------------------------------------------
-const normalizeKey = (name, { removeCorp = false, removePunct = false } = {}) => {
-    if (!name) return ''
-    let t = String(name)
-        .replace(/​|﻿/g, '').replace(/ /g, ' ')
-        .replace(/[（]/g, '(').replace(/[）]/g, ')').replace(/㈜/g, '(주)').trim()
-    if (removeCorp) t = t.replace(/주식회사|유한회사|합자회사|합명회사|유한|㈜|\(주\)|\(유\)/g, '')
-    t = removePunct ? t.replace(/[\s()[\]{}\-_.·]/g, '') : t.replace(/\s+/g, '')
-    return t.toLowerCase()
-}
-const buildClientKeys = (name) => [...new Set([
-    normalizeKey(name),
-    normalizeKey(name, { removeCorp: true }),
-    normalizeKey(name, { removePunct: true }),
-    normalizeKey(name, { removeCorp: true, removePunct: true })
-])].filter(Boolean)
+import { buildClientKeys } from '../src/utils/clientKeys.js'
+import {
+    nameCandidates, CLIENT_ALIASES, NON_CLIENT_PATTERN, looksLikeMultiCompany,
+} from '../src/utils/clientAliases.js'
 
-/**
- * 보고서에 적힌 이름은 자유롭게 쓰인다. 매칭 후보를 넓게 만든다.
- *   '아모레퍼시픽 (오산)'   -> '아모레퍼시픽', '오산'
- *   'KCC 전주공장'         -> 'KCC'
- *   '한이물산 (제이비산업)'  -> '한이물산', '제이비산업'
- */
-const nameCandidates = (raw) => {
-    const name = String(raw || '').replace(/\s+/g, ' ').trim()
-    const out = [name]
-
-    const paren = name.match(/^(.+?)\s*[(（](.+?)[)）]\s*$/)
-    if (paren) { out.push(paren[1].trim()); out.push(paren[2].trim()) }
-
-    // 공장/지점/사업장 접미사 제거
-    out.push(name.replace(/\s*(제\d+)?\s*(공장|지점|사업장|본사|센터|연구소|R&D)\s*$/g, '').trim())
-
-    return [...new Set(out.filter((s) => s && s.length >= 2))]
-}
-
-/**
- * 보고서 표기 -> CRM 거래처명 수동 대응표.
- *
- * 자동 정규화로는 이어지지 않는 조합들이다. 이 표가 없으면 같은 회사가
- * 거래처로 새로 하나 더 만들어진다(전에 중복 거래처 9쌍을 병합한 적이 있다).
- * 새 방문처가 '미매칭'으로 뜨는데 실은 CRM에 있는 곳이면 여기에 추가할 것.
- *
- * [주의] 앱에도 같은 표가 `src/utils/clientAliases.js`에 있다. 스크립트는 Node에서
- * 도므로 앱 모듈을 직접 못 읽는다. **한쪽을 고치면 다른 쪽도 함께 고칠 것.**
- */
-const ALIASES = {
-    '현대산업': '현대산업 주식회사(I)',
-    '한국기능성화장품': '(주)한국기능성화장품연구센터',
-    '에이치피앤씨': '(주)에이치피앤씨 오송공장',
-    '폴린트컴포지트': '폴린트컴포지트코리아 주식회사',
-    '안산상사': '안산상사(김현욱)',
-    '리안코스메틱': '(주)리안코스메틱스',
-    '스타코스': '스타코스(STARCOS)',
-    '더가든오브내추럴': '더가든오브내추럴솔루션',
-    '부평상회 인천R&D': '부평상회',
-    'KCC 전주공장': 'KCC',
-    'KP한석유화': '케이피한석유화 주식회사',
-    // 아래는 사용자가 알려준 사실 (2026-08 병합 완료)
-    '윌스플로켐': '주식회사 윌슨플로켐',
-    '윌슨플로켐': '주식회사 윌슨플로켐',
-    '진영IBC': '진영IBC (최은성)',
-    '대달산업': '대달인터내셔널(주)',
-    '신성물산': '대달인터내셔널(주)',
-    '신성물산(주)': '대달인터내셔널(주)',
-    // 주의: '엔켐'은 '아이엔켐텍'과 다른 회사다. 붙이지 말 것.
-}
-
-/** 여러 회사를 한 칸에 몰아 적은 행인지 (예: '성진실업 인지산업 남양화학') */
-const looksLikeMultiCompany = (raw) => {
-    const name = String(raw || '').replace(/[(（].*?[)）]/g, ' ').replace(/\s+/g, ' ').trim()
-    return name.split(' ').filter((w) => w.length >= 3).length >= 3
-}
-
-/** 거래처가 아닌 메모성 항목 */
-const NON_CLIENT = /^(사무실|본사|내근|휴가|출장|교육|회의|기타)$/
+const ALIASES = CLIENT_ALIASES
+const NON_CLIENT = NON_CLIENT_PATTERN
 
 // ---------------------------------------------------------------------------
 // 보고서 파싱
