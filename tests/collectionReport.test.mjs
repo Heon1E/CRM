@@ -221,3 +221,44 @@ test('CRM에 없는 이름만 골라 낸다 — 검산으로는 못 잡는 오�
     assert.equal(un[0].clientName, '창원드럼산업')
     assert.ok(un[0].suggestions.includes('현대드럼산업(주)'))
 })
+
+test('잔액이 옆 달과 이어져 있으면 잔액이 아니라 수금을 고치라고 한다', () => {
+    // 실측: 7월 수금이 빈칸인데 판독이 8월 수금(21,478,600)을 당겨 왔다.
+    // 항등식만 보면 "잔액을 0으로"가 되지만 잔액은 8월 이월과 이어져 맞다.
+    const c = normalizeClient({
+        clientName: '중부산업(주)',
+        months: {
+            6: { carried: 3322000, sales: 14410000, collected: 3322000, balance: 14410000 },
+            7: { carried: 14410000, sales: 7068600, collected: 21478600, balance: 21478600 },
+            8: { carried: 21478600, sales: 10945000, collected: 21478600, balance: 10945000 },
+        },
+    }, Y)
+    const s = suggestFix({ client: c, month: k(7), year: Y })
+    assert.equal(s[0].field, 'collected', '수금을 먼저 권해야 한다')
+    assert.equal(s[0].value, 0, '7월 수금은 0이 맞다')
+    assert.equal(s[0].confidence, 'high')
+    assert.ok(!s.some((x) => x.field === 'balance'), '잔액 고치기는 권하지 않는다')
+})
+
+test('쉼표로 이은 12개 문자열도 읽는다', () => {
+    const c = normalizeClient({
+        clientName: 'ㄱ상사',
+        carried: '0,0,0,0,0,0,0,0,0,0,0,0',
+        sales: '1000,0,0,0,0,0,0,0,0,0,0,0',
+        collected: '0,0,0,0,0,0,0,0,0,0,0,0',
+        balance: '1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000',
+    }, Y)
+    assert.equal(c.months[k(1)].sales, 1000)
+    assert.equal(c.months[k(12)].balance, 1000)
+})
+
+test('아직 오지 않은 달이 기준월로 잡히면 잡아낸다', () => {
+    // 판독이 밀리면 12월에 활동이 생겨 기준월이 미래가 된다.
+    // 그때도 잔액 합계는 맞을 수 있다(잔액은 이월로 계속 딸려오니까).
+    const c = normalizeClient({
+        clientName: 'ㄴ상사',
+        months: { 12: { carried: 0, sales: 500, collected: 0, balance: 500 } },
+    }, Y)
+    const v = verifyReport({ clients: [c], year: Y, now: new Date('2026-09-07T00:00:00Z') })
+    assert.ok(v.problems.some((x) => x.kind === 'future'))
+})

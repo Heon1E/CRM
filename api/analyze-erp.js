@@ -74,14 +74,28 @@ docType 별 rows 형식:
 4) collection_report — 「영업사원 거래처별 매출/수금 실적표」
    거래처 하나가 **네 줄**(이월 / 매출 / 수금 / 잔액)이고, 열은 1월~12월 + 합계다.
    { "clientName": "거래처명", "code": "거래처코드", "phone": "전화번호",
-     "months": { "1": { "carried": 숫자, "sales": 숫자, "collected": 숫자, "balance": 숫자 },
-                 "2": { ... }, ... "12": { ... } } }
+     "carried":   "1월,2월,3월,4월,5월,6월,7월,8월,9월,10월,11월,12월",
+     "sales":     "…12개…",
+     "collected": "…12개…",
+     "balance":   "…12개…" }
+   - 네 값은 **숫자 12개를 쉼표로 이은 문자열**이다. 배열이 아니다.
+     예: "2684000,5368000,2684000,12760000,7876000,3322000,14410000,21478600,10945000,10945000,10945000,10945000"
+   - **반드시 12개다.** 1월부터 12월까지 순서대로.
+   - **빈칸은 0으로 그 자리에 넣어라. 값이 있는 것만 골라 담지 마라.**
+     빈칸을 건너뛰면 뒤의 값이 앞으로 당겨져 **다른 달의 값이 된다.**
+     실제로 그렇게 밀려서 7월 수금 칸에 8월 수금이 들어왔다.
+   - 세로로 이월/매출/수금/잔액 네 줄이다. **줄을 헷갈리지 마라** —
+     맨 위가 이월, 그 다음이 매출, 수금, 맨 아래가 잔액이다.
    - 최상위에 "year": 숫자(표 머리의 '년 도'), "salesRep": "사원명", "page": "5/6" 을 담는다.
    - **'사원별 합계' · '잔액 합계' 행은 rows 에 넣지 마라.** 최상위 "repTotal" 에
      { "carried": 숫자, "sales": 숫자, "collected": 숫자, "balance": 숫자 } 로 담는다.
      그 값은 **기준월(거래가 있는 마지막 달) 칸**의 값을 쓴다.
-   - **합계 열은 months 에 넣지 마라.** 1~12월만 담는다.
-   - 빈칸은 0으로 둔다. 괄호나 앞의 '-'가 붙은 값은 음수다(실제로 나온다).
+   - **합계 열은 넣지 마라.** 1~12월 열만 담는다(합계는 13번째 열이다).
+   - 괄호나 앞의 '-'가 붙은 값은 음수다(실제로 나온다).
+   - **다 읽고 나서 스스로 확인해라.** 달마다 (이월 + 매출 − 수금)이 잔액과
+     같아야 하고, 다음 달 이월이 이번 달 잔액과 같아야 한다. 안 맞으면 그 줄을
+     다시 세어 보고 고쳐라 — 대개 빈칸을 건너뛰어 한 칸씩 밀린 것이다.
+     그래도 안 맞으면 warnings 에 어느 거래처 어느 달인지 적어라.
    - 거래처명은 왼쪽 칸 전체를 그대로 옮긴다. 두 줄로 접혀 있으면 이어 붙인다
      (예: '주식회사 수산 / 머티리얼즈' -> '주식회사 수산머티리얼즈').
      **비슷한 회사 이름으로 고쳐 쓰지 마라.** 보이는 그대로가 중요하다.
@@ -115,6 +129,33 @@ const parseDataUrl = (dataUrl) => {
     const data = parts[1] || parts[0]
     const mimeType = (parts[0].match(/:(.*?);/) || [])[1] || 'image/jpeg'
     return { data, mimeType }
+}
+
+/**
+ * 모델이 낸 JSON을 읽는다. **흔한 흠 두 가지는 고쳐서 읽는다.**
+ *
+ * `responseMimeType: 'application/json'` 을 주어도 완전하지는 않다. 실측 —
+ * 실적표를 읽히니 `Expected double-quoted property name ... line 68` 로 깨졌다.
+ * 답 자체는 끝까지 왔는데(finishReason=STOP) **닫기 괄호 앞에 쉼표**가 남아
+ * 있었다. 판독은 다 해 놓고 쉼표 하나로 통째로 버리는 것은 아깝다.
+ *
+ * 고치는 것은 **두 가지뿐**이다. 그 이상 손대면 잘못된 값을 억지로 읽어
+ * 들이게 된다:
+ *   1. 닫기(`}`·`]`) 앞의 쉼표
+ *   2. 줄 끝 `//` 주석  — 문자열 안의 `//`를 건드릴 수 있어 **맨 나중에** 시도한다
+ */
+export const parseLooseJson = (raw) => {
+    const cleaned = String(raw ?? '').replace(/```json|```/g, '').trim()
+    const m = cleaned.match(/\{[\s\S]*\}/)
+    const body = m ? m[0] : cleaned
+
+    try { return JSON.parse(body) } catch { /* 아래에서 고쳐 본다 */ }
+
+    const noTrailingComma = body.replace(/,(\s*[}\]])/g, '$1')
+    try { return JSON.parse(noTrailingComma) } catch { /* 한 번 더 */ }
+
+    const noComments = noTrailingComma.replace(/^\s*\/\/[^\n\r]*$/gm, '')
+    return JSON.parse(noComments.replace(/,(\s*[}\]])/g, '$1'))
 }
 
 export default async function handler(req, res) {
@@ -181,7 +222,15 @@ export default async function handler(req, res) {
                     generationConfig: {
                         // 표 판독은 창의성이 필요 없다. 낮을수록 숫자를 지어내지 않는다.
                         temperature: 0,
-                        maxOutputTokens: 8192,
+                        /*
+                         * **잘리면 JSON이 통째로 못 쓰게 된다.**
+                         * 8,192로는 매출/수금 실적표가 못 들어간다 — 거래처 하나가
+                         * 숫자 48개(4줄 × 12달)라 열 곳이면 500개가 넘는다. 실측으로
+                         * 세 곳짜리 시험표에서도 중간에 끊겨 `BAD_RESPONSE`가 났다.
+                         * (그 전 형식은 빈칸을 빼먹어서 짧았을 뿐이다 — 그게 곧
+                         *  값이 한 칸씩 밀리는 원인이었다.)
+                         */
+                        maxOutputTokens: 32768,
                         responseMimeType: 'application/json'
                     }
                 })
@@ -198,26 +247,60 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json()
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const cand = data?.candidates?.[0]
+        const text = cand?.content?.parts?.[0]?.text || ''
+        const finish = cand?.finishReason || ''
 
         let parsed
         try {
-            const cleaned = text.replace(/```json|```/g, '').trim()
-            const match = cleaned.match(/\{[\s\S]*\}/)
-            parsed = JSON.parse(match ? match[0] : cleaned)
-        } catch {
-            console.error('[analyze-erp] non-JSON response:', text.slice(0, 400))
+            parsed = parseLooseJson(text)
+        } catch (parseError) {
+            /*
+             * **왜 실패했는지 구별해서 말한다.**
+             * 예전에는 무조건 "화면을 더 크게 찍어 다시 시도해 주세요"라고 했는데,
+             * 정작 흔한 원인은 **답이 길어서 잘린 것**(finishReason=MAX_TOKENS)이다.
+             * 그때 화면을 더 크게 찍으면 오히려 더 나빠진다. 실적표처럼 숫자가
+             * 많은 표에서 실제로 그랬다.
+             */
+            const cut = finish === 'MAX_TOKENS' || (!text.trimEnd().endsWith('}') && text.length > 100)
+            console.error(`[analyze-erp] 판독 결과를 읽지 못함 · finishReason=${finish} · ${text.length}자 · ${parseError.message}`)
+            // 깨진 자리를 그대로 보여준다 — 앞뒤 300자만 봐서는 원인을 못 찾는다
+            const at = Number((parseError.message.match(/position (\d+)/) || [])[1])
+            if (Number.isFinite(at)) {
+                console.error(`[analyze-erp] 깨진 자리(${at}) 앞뒤:`,
+                    JSON.stringify(text.slice(Math.max(0, at - 120), at + 120)))
+            }
+            console.error('[analyze-erp] 뒷부분:', text.slice(-200))
             return res.status(502).json({
-                error: 'BAD_RESPONSE',
-                message: '판독 결과를 이해하지 못했습니다. 화면을 더 크게 찍어 다시 시도해 주세요.'
+                error: cut ? 'RESPONSE_TRUNCATED' : 'BAD_RESPONSE',
+                finishReason: finish,
+                chars: text.length,
+                message: cut
+                    ? '읽을 내용이 많아 답이 중간에 끊겼습니다. 한 번에 올리는 장수를 줄여 주세요(한두 장씩).'
+                    : '판독 결과를 이해하지 못했습니다. 화면을 더 크게 찍어 다시 시도해 주세요.'
             })
         }
 
+        /*
+         * **모델이 준 최상위 값을 버리지 않는다.**
+         * 여기서 네 칸만 골라 돌려주고 있어서 `year`·`salesRep`·`page`·
+         * `repTotal`·`baseMonth`가 통째로 사라졌다. 매출/수금 실적표는
+         * 그 값들이 **검산의 재료**다 — 특히 `repTotal`(표의 잔액 합계)이
+         * 없으면 "거래처별 합이 표의 합계와 맞는가"를 아예 못 센다.
+         * 실측으로 확인했다: 판독은 정확한데 화면에서는 그 대조를 못 했다.
+         */
+        const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null)
         return res.status(200).json({
             docType: parsed.docType || 'unknown',
             rows: Array.isArray(parsed.rows) ? parsed.rows : [],
             summary: parsed.summary || '',
             warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
+            // 화면에 적혀 있을 때만 온다. 없으면 null — 오늘 날짜로 짐작하지 않는다.
+            baseMonth: /^\d{4}-\d{2}$/.test(String(parsed.baseMonth || '')) ? parsed.baseMonth : null,
+            year: num(parsed.year),
+            salesRep: String(parsed.salesRep || '').trim(),
+            page: String(parsed.page || '').trim(),
+            repTotal: parsed.repTotal && typeof parsed.repTotal === 'object' ? parsed.repTotal : null,
             model: MODEL
         })
     } catch (error) {

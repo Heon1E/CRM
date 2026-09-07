@@ -45,20 +45,40 @@ export const monthKey = (year, m) => `${year}-${String(m).padStart(2, '0')}`
 export const monthKeys = (year) => Array.from({ length: 12 }, (_, i) => monthKey(year, i + 1))
 
 /**
- * 한 거래처를 다듬는다.
- * `months`는 `{ "1": {carried, sales, collected, balance}, ... }` 또는
- * `{ "2026-01": {...} }` 둘 다 받는다 — 모델이 어느 쪽으로 줄지 모른다.
+ * 한 거래처를 다듬는다. 세 가지 모양을 다 받는다:
+ *
+ *   1. `{ carried: "n,n,…12개", sales: "…", collected: "…", balance: "…" }`  ← 지금 쓰는 것
+ *   2. `{ carried: [12], … }`  (배열이어도 받는다)
+ *   3. `{ months: { "1": {carried,…}, … } }` / `{ months: { "2026-01": {…} } }`
+ *
+ * **1번(쉼표로 이은 12개)을 쓰는 이유가 둘 있다.**
+ *
+ * - 달을 키로 받으면 모델이 **빈칸을 통째로 빼먹는다.** 그러면 뒤의 값이
+ *   앞으로 당겨져 다른 달의 값이 된다 — 실측에서 7월 수금 칸에 8월 수금이
+ *   들어왔다(7월이 빈칸이었다). 자리 수가 정해져 있으면 밀리면 드러난다.
+ * - 배열로 받았더니 이번에는 **구조가 깨졌다.** 거래처 하나를 닫는 `}`를
+ *   빠뜨려 `] , {` 가 되면서 JSON 전체를 못 읽었다. 괄호가 적을수록 안전하고,
+ *   출력도 짧아진다(6쪽짜리라 길이도 문제다).
  */
 export const normalizeClient = (raw, year) => {
     const months = {}
     const src = raw?.months || {}
+    const toArr = (v) => {
+        if (Array.isArray(v)) return v
+        if (typeof v === 'string' && v.includes(',')) return v.split(',')
+        return null
+    }
+    const arr = (k, ko) => toArr(raw?.[k]) ?? toArr(raw?.[ko])
+    const A = { carried: arr('carried', '이월'), sales: arr('sales', '매출'), collected: arr('collected', '수금'), balance: arr('balance', '잔액') }
+
     for (let m = 1; m <= 12; m++) {
         const cell = src[String(m)] ?? src[m] ?? src[monthKey(year, m)] ?? {}
+        const pick = (k, ko) => (A[k] ? num(A[k][m - 1]) : num(cell[k] ?? cell[ko]))
         months[monthKey(year, m)] = {
-            carried: num(cell.carried ?? cell['이월']),
-            sales: num(cell.sales ?? cell['매출']),
-            collected: num(cell.collected ?? cell['수금']),
-            balance: num(cell.balance ?? cell['잔액']),
+            carried: pick('carried', '이월'),
+            sales: pick('sales', '매출'),
+            collected: pick('collected', '수금'),
+            balance: pick('balance', '잔액'),
         }
     }
     return {
@@ -91,10 +111,25 @@ export const findBaseMonth = (clients, year) => {
  *
  * @param {number} tolerance 원 단위 허용 오차. 표에 반올림이 없으므로 기본 0이다.
  */
-export const verifyReport = ({ clients, year, repTotal = null, tolerance = 0 }) => {
+export const verifyReport = ({ clients, year, repTotal = null, tolerance = 0, now = new Date() }) => {
     const keys = monthKeys(year)
     const baseMonth = findBaseMonth(clients, year)
     const problems = []
+
+    /*
+     * **아직 오지 않은 달이 기준월로 잡히면 판독이 밀린 것이다.**
+     * 실측에서 그랬다 — 7월 수금이 빈칸이라 8월 값이 당겨지면서 뒤가 줄줄이
+     * 밀렸고 기준월이 2026-12로 잡혔다. 그런데 **잔액 합계 대조는 통과했다**
+     * (잔액은 이월로 계속 딸려오니까). 합계만 믿으면 안 되는 이유다.
+     */
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    if (baseMonth && baseMonth > thisMonth) {
+        problems.push({
+            kind: 'future', clientName: null, month: baseMonth,
+            message: `기준월이 ${baseMonth}로 잡혔습니다 — 아직 오지 않은 달입니다.`
+                + ` 빈칸을 건너뛰어 값이 한 칸씩 밀렸을 수 있습니다.`,
+        })
+    }
 
     clients.forEach((c) => {
         keys.forEach((k, i) => {
@@ -181,8 +216,15 @@ export const suggestFix = ({ client, month, year }) => {
     const byIdentity = cur.carried + cur.sales - cur.collected
     const out = []
 
-    // 잔액이 틀린 경우 — 항등식과 '다음 달 이월'이 **같은 값**을 가리키면 확실하다
-    if (byIdentity !== cur.balance) {
+    /*
+     * **잔액이 옆 달과 이어져 있으면 잔액은 맞다.** 그때 틀린 것은 수금(또는
+     * 매출)이다. 실측에서 그랬다 — 7월 수금이 빈칸인데 모델이 8월 수금을
+     * 당겨 와서, 항등식만 보면 "잔액을 0으로 고쳐라"가 되지만 그건 정반대다.
+     * 다음 달 이월이 이번 달 잔액과 같으면 잔액 고치기를 **권하지 않는다.**
+     */
+    const balanceCorroborated = next && next.carried === cur.balance && cur.balance !== 0
+
+    if (byIdentity !== cur.balance && !balanceCorroborated) {
         const nextAgrees = next && next.carried === byIdentity
         out.push({
             field: 'balance', value: byIdentity,
@@ -205,13 +247,23 @@ export const suggestFix = ({ client, month, year }) => {
         })
     }
 
-    // 수금이 틀린 경우 — 이월·매출·잔액이 성하면 수금이 하나로 정해진다
+    /*
+     * 수금이 틀린 경우 — 이월·매출·잔액이 성하면 수금이 하나로 정해진다.
+     *
+     * **잔액이 다음 달 이월과 이어져 있고 이월도 전달 잔액과 맞으면**, 남은
+     * 후보는 매출 아니면 수금뿐이다. 이 표에서 빈칸을 건너뛰어 밀리는 것은
+     * 거의 수금 줄이므로(실측) 그때는 확실한 쪽으로 올린다.
+     */
     const bySubtract = cur.carried + cur.sales - cur.balance
     if (byIdentity !== cur.balance && bySubtract !== cur.collected && bySubtract >= 0) {
+        const carriedCorroborated = !prev || prev.balance === cur.carried
+        const strong = balanceCorroborated && carriedCorroborated
         out.push({
             field: 'collected', value: bySubtract,
-            basis: `이월+매출−잔액 = ${bySubtract.toLocaleString()}`,
-            confidence: 'low',
+            basis: strong
+                ? `잔액과 이월이 옆 달과 이어지므로 수금만 남습니다 — 이월+매출−잔액 = ${bySubtract.toLocaleString()}`
+                : `이월+매출−잔액 = ${bySubtract.toLocaleString()}`,
+            confidence: strong ? 'high' : 'low',
         })
     }
 
