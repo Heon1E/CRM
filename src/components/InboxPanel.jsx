@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useSalesImport, buildClientKeys } from '../hooks/useSalesImport'
 import { useData } from '../contexts/DataContext'
 import { normalizeDate, toNumber } from '../services/erpVisionService'
-import { setKpiManualInput } from '../utils/kpiCategories'
 import { showSuccess, showError, showWarning } from '../utils/alert'
 
 /**
@@ -107,13 +106,25 @@ const InboxPanel = ({ onRefresh }) => {
                 await mark(item.id, 'applied', res.message)
                 if (res.message) await showSuccess(res.message)
             } else if (item.doc_type === 'receivables') {
-                const overdue = rows.filter((r) => Number(r.overdueDays) > 0).length
+                /*
+                 * **'반영'이 아무것도 반영하지 않고 있었다.**
+                 * 채권관리 화면(`receivables` 표)에는 한 줄도 넣지 않으면서
+                 * '반영됨'으로 표시하고 "저장했습니다"라고 말했다. 게다가
+                 * 저장하던 값은 **연체 업체 수를 KPI 사고 건수 칸**에 넣는
+                 * 것이라, 누르면 KPI가 부당하게 깎였다 (그 눈금은 0/1/2건인데
+                 * 연체는 2026-05 기준 36곳이다). 채권관리 화면에 있던 같은
+                 * 단추는 바로 그 이유로 이미 뺐다.
+                 *
+                 * 지금은 읽은 내용만 알려주고 **받은 항목을 그대로 남긴다** —
+                 * '반영됨'으로 덮으면 처리된 줄 알고 넘어간다.
+                 */
                 const total = rows.reduce((a, r) => a + toNumber(r.amount), 0)
-                setKpiManualInput('receivables', overdue)
-                window.dispatchEvent(new Event('kpi-manual-updated'))
-                await mark(item.id, 'applied', `채권 ${overdue}건 / 총 ${total}원`)
-                await showSuccess(
-                    `채권관리 KPI에 ${overdue}건을 저장했습니다.\n총 미수금 ${won(total)}원 (${rows.length}개 거래처)`
+                await showWarning(
+                    `읽은 내용: 거래처 ${rows.length}곳 · 잔액 합계 ${won(total)}원\n\n` +
+                    `채권관리 대장에는 반영하지 않았습니다. 대장은 월 스냅샷이라 ` +
+                    `경과월·연체금액을 월별 매출에서 거꾸로 계산해야 하는데, 사진 한 장에는 ` +
+                    `그 이력이 없습니다.\n` +
+                    `채권관리 화면의 '대장 올리기'로 엑셀을 올려 주세요.`
                 )
             } else if (item.doc_type === 'activity') {
                 const clientMap = new Map()

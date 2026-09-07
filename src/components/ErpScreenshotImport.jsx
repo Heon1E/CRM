@@ -107,10 +107,9 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                 defaultYear: new Date().getFullYear(),
             })
             setResult(r)
-            if (r.docType === 'receivables') {
-                const overdue = r.rows.filter((x) => Number(x.overdueDays) > 0).length
-                setReceivableCount(String(overdue))
-            }
+            /* **연체 건수를 KPI 칸에 미리 채우지 않는다.** 채권관리 KPI는
+               대손·법적 조치 '사고 건수'라 눈금이 0/1/2건이다. 연체 업체 수를
+               넣으면(2026-05 기준 36곳) 언제나 '미흡'이 된다. 비워 둔다. */
             if (r.rows.length === 0) {
                 await showWarning(
                     r.summary || '표를 찾지 못했습니다. 화면을 더 크게 찍거나, 종류를 직접 지정해 다시 시도해 주세요.'
@@ -165,20 +164,47 @@ const ErpScreenshotImport = ({ onRefresh }) => {
         }
     }
 
+    /**
+     * 채권(미수금) 판독 결과.
+     *
+     * **예전에는 "저장했습니다"라고 말하면서 채권관리에는 아무것도 넣지
+     * 않았다.** 하는 일은 localStorage에 KPI 건수 하나를 쓰는 것뿐이라
+     * `/receivables` 화면도 거래명세서의 잔액도 그대로였다 — 사용자는
+     * 반영된 줄 알고 넘어간다.
+     *
+     * 게다가 그 건수의 기본값이 **연체 거래처 수**였다. 채권관리 KPI는
+     * 연체 업체 수가 아니라 **대손·법적 조치 같은 사고 건수**이고
+     * (0건 양호 / 1건 보통 / 2건 미흡), 연체는 2026-05 기준 36곳이라
+     * 그대로 넣으면 **언제나 '미흡'** 이 된다. 채권관리 화면에 같은 단추가
+     * 있었는데 바로 그 이유로 뺐다 — 여기만 남아 있었다.
+     *
+     * 지금은 **적은 것만** 저장하고, 채권 대장에는 반영되지 않았다고 그대로
+     * 말한다. 없는 기록보다 틀린 기록이 나쁘고, 안 된 것을 됐다고 하는 것이
+     * 가장 나쁘다.
+     */
     const applyReceivables = async () => {
-        const n = Number(receivableCount)
-        if (!Number.isFinite(n) || n < 0) {
-            await showWarning('채권 문제 건수를 숫자로 입력해 주세요.')
-            return
+        const total = result.rows.reduce((a, r) => a + toNumber(r.amount), 0)
+        const typed = String(receivableCount).trim()
+
+        if (typed !== '') {
+            const n = Number(typed)
+            if (!Number.isFinite(n) || n < 0) {
+                await showWarning('사고 건수를 숫자로 입력해 주세요.')
+                return
+            }
+            setKpiManualInput('receivables', n)
+            window.dispatchEvent(new Event('kpi-manual-updated'))
         }
-        setKpiManualInput('receivables', n)
-        await showSuccess(
-            `채권관리 KPI에 ${n}건을 저장했습니다.\n` +
-            `총 미수금 ${won(result.rows.reduce((a, r) => a + toNumber(r.amount), 0))}원 (${result.rows.length}개 거래처)`
+
+        await showWarning(
+            `읽은 내용: 거래처 ${result.rows.length}곳 · 잔액 합계 ${won(total)}원\n` +
+            (typed !== '' ? `채권관리 KPI 사고 건수에 ${typed}건을 저장했습니다.\n` : '') +
+            `\n다만 이 값은 채권관리 화면(대장)에는 반영되지 않습니다. ` +
+            `대장은 월 스냅샷이라 경과월·연체금액을 월별 매출에서 거꾸로 계산해야 하는데, ` +
+            `화면 사진 한 장에는 그 이력이 없습니다.\n` +
+            `채권관리 화면의 '대장 올리기'로 엑셀을 올려 주세요.`
         )
         clearAll()
-        // 대시보드 KPI 카드가 값을 다시 읽도록 알린다
-        window.dispatchEvent(new Event('kpi-manual-updated'))
     }
 
     /**
@@ -425,7 +451,7 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                     </div>
                     <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <label htmlFor="erp-receivable-count" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                            채권관리 KPI에 기록할 <b>문제 발생 건수</b>
+                            채권관리 KPI <b>사고 건수</b> (선택)
                         </label>
                         <input
                             id="erp-receivable-count"
@@ -433,10 +459,12 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                             min="0"
                             value={receivableCount}
                             onChange={(e) => setReceivableCount(e.target.value)}
-                            style={{ width: 90, textAlign: 'right' }}
+                            placeholder="비워도 됨"
+                            style={{ width: 110, textAlign: 'right' }}
                         />
                         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                            연체 건수({overdue}건)를 기본으로 넣었습니다. 실제 문제 건수로 고쳐도 됩니다.
+                            <b>대손·법적 조치</b> 건수입니다 — 연체 업체 수({overdue}곳)와 다릅니다.
+                            눈금이 0건 양호 / 1건 보통 / 2건 미흡이라 연체 수를 넣으면 언제나 미흡이 됩니다.
                         </span>
                     </div>
                 </>
