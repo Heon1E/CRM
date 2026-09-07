@@ -6,6 +6,8 @@ import { useData } from '../contexts/DataContext'
 import { setKpiManualInput } from '../utils/kpiCategories'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../utils/clientAliases'
 import { showSuccess, showError, showWarning } from '../utils/alert'
+import { verifyReport, summarizeClients } from '../utils/collectionReport'
+import { supabase } from '../lib/supabase'
 
 /**
  * ERP 화면 스크린샷으로 데이터 입력하기.
@@ -20,6 +22,7 @@ import { showSuccess, showError, showWarning } from '../utils/alert'
 const DOC_TYPES = [
     { value: 'auto', label: '자동 판별' },
     { value: 'sales', label: '매출' },
+    { value: 'collection_report', label: '매출/수금 실적표' },
     { value: 'receivables', label: '채권(미수금)' },
     { value: 'daily_report', label: '일일업무보고서' },
     { value: 'activity', label: '일정·활동' },
@@ -27,6 +30,7 @@ const DOC_TYPES = [
 
 const DOC_LABEL = {
     sales: '매출',
+    collection_report: '매출/수금 실적표',
     receivables: '채권(미수금)',
     daily_report: '일일업무보고서',
     activity: '일정·활동',
@@ -208,6 +212,75 @@ const ErpScreenshotImport = ({ onRefresh }) => {
     }
 
     /**
+     * 「영업사원 거래처별 매출/수금 실적표」를 채권 대장으로 반영한다.
+     *
+     * **검산을 통과하지 못하면 저장하지 않는다.** 이 숫자로 수금 독촉 전화를
+     * 걸기 때문이다. 표가 스스로 갖고 있는 관계 셋으로 검산한다 —
+     * 달마다 `이월+매출−수금=잔액`, 달 사이 `다음달 이월=이번달 잔액`,
+     * 맨 아래 `잔액 합계`. 어긋난 거래처와 달을 그대로 보여준다.
+     *
+     * 경과월·연체금액은 **엑셀 대장과 같은 함수**(`agingOf`)로 낸다.
+     * 계산이 둘로 갈리면 어느 쪽을 믿어야 할지 알 수 없다.
+     */
+    const applyCollectionReport = async () => {
+        const year = result.year || new Date().getFullYear()
+        const v = verifyReport({ clients: result.rows, year, repTotal: result.repTotal })
+
+        if (!v.baseMonth) {
+            await showWarning('매출·수금이 있는 달을 찾지 못했습니다. 표가 잘리지 않았는지 확인해 주세요.')
+            return
+        }
+        if (!v.ok) {
+            await showError(
+                `판독이 표와 맞지 않아 저장하지 않았습니다 (${v.problems.length}곳).\n\n` +
+                v.problems.slice(0, 6).map((p) => `· ${p.clientName || '합계'} ${p.month}\n  ${p.message}`).join('\n') +
+                (v.problems.length > 6 ? `\n\n… 외 ${v.problems.length - 6}곳` : '') +
+                `\n\n표에서 그 칸을 확인해 직접 고친 뒤 다시 반영해 주세요.`
+            )
+            return
+        }
+
+        const summarized = summarizeClients({ clients: result.rows, year, baseMonth: v.baseMonth })
+
+        // 이미 '제외'로 표시해 둔 거래처는 새 달에도 그대로 제외한다 (대장 업로드와 같은 규칙)
+        const prevExcluded = new Map()
+        const { data: ex, error: exErr } = await supabase.from('receivables')
+            .select('client_name, exclusion_reason').eq('excluded', true)
+        if (!exErr) (ex || []).forEach((r) => { if (!prevExcluded.has(r.client_name)) prevExcluded.set(r.client_name, r.exclusion_reason) })
+
+        const payload = summarized.map((x) => {
+            const hit = buildClientKeys(x.name).map((k) => clientMap.get(k)).find(Boolean)
+            return {
+                ...(prevExcluded.has(x.name) ? { excluded: true, exclusion_reason: prevExcluded.get(x.name) } : {}),
+                client_id: hit ? hit.id : null,
+                client_name: x.name,
+                base_month: v.baseMonth,
+                balance: Math.round(x.balance),
+                overdue_amount: Math.round(x.overdue),
+                aging_months: x.aging,
+                oldest_unpaid_month: x.oldest,
+                updated_at: new Date().toISOString(),
+            }
+        })
+
+        for (let i = 0; i < payload.length; i += 200) {
+            const { error } = await supabase.from('receivables')
+                .upsert(payload.slice(i, i + 200), { onConflict: 'client_name,base_month' })
+            if (error) throw error
+        }
+
+        const overdue = payload.filter((p) => p.overdue_amount > 0).length
+        await showSuccess(
+            `${v.baseMonth} 기준 ${payload.length}곳을 채권관리에 반영했습니다.\n` +
+            `잔액 합계 ${won(v.totals.balanceSum)}원 · 연체 ${overdue}곳\n` +
+            `거래처 연결 ${payload.filter((p) => p.client_id).length}건\n\n` +
+            (result.salesRep ? `※ ${result.salesRep} 담당분만 들어 있습니다 — 전사 채권이 아닙니다.` : '')
+        )
+        clearAll()
+        if (onRefresh) await onRefresh()
+    }
+
+    /**
      * 적힌 이름으로 거래처를 찾는다.
      * 대응표(ALIASES)와 '(오산)' 같은 괄호·공장 접미사까지 훑어야
      * 이미 있는 회사를 못 찾고 새로 만드는 일이 없다.
@@ -353,6 +426,7 @@ const ErpScreenshotImport = ({ onRefresh }) => {
         if (!result || result.rows.length === 0) return
         try {
             if (result.docType === 'sales') await applySales()
+            else if (result.docType === 'collection_report') await applyCollectionReport()
             else if (result.docType === 'receivables') await applyReceivables()
             else if (result.docType === 'daily_report') await applyDailyReport()
             else if (result.docType === 'activity') await applyActivities()
@@ -406,6 +480,94 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                     <div className="statusbar">
                         <span>{result.rows.length}건</span>
                         <span>합계 {won(total)}원</span>
+                    </div>
+                </>
+            )
+        }
+
+        if (t === 'collection_report') {
+            const year = result.year || new Date().getFullYear()
+            const v = verifyReport({ clients: result.rows, year, repTotal: result.repTotal })
+            const summarized = v.baseMonth
+                ? summarizeClients({ clients: result.rows, year, baseMonth: v.baseMonth })
+                : []
+            return (
+                <>
+                    {/* 검산 결과를 맨 위에 둔다 — 이 숫자로 수금 전화를 걸기 때문이다 */}
+                    <div style={{
+                        padding: '10px 12px', borderBottom: '1px solid var(--border)',
+                        background: v.ok ? 'var(--bg-subtle)' : 'rgba(220,38,38,0.06)',
+                        fontSize: 13, lineHeight: 1.7,
+                    }}>
+                        {v.ok ? (
+                            <span><b>검산 통과</b> — 표의 이월·매출·수금·잔액이 서로 맞습니다.</span>
+                        ) : (
+                            <>
+                                <b style={{ color: 'var(--danger)' }}>
+                                    <AlertTriangle size={13} style={{ verticalAlign: -2 }} /> 표와 맞지 않는 곳 {v.problems.length}군데
+                                </b>
+                                <div style={{ marginTop: 4, maxHeight: 150, overflowY: 'auto' }}>
+                                    {v.problems.slice(0, 12).map((p, i) => (
+                                        <div key={i} style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                                            · <b>{p.clientName || '합계'}</b> {p.month} — {p.message}
+                                        </div>
+                                    ))}
+                                    {v.problems.length > 12 && (
+                                        <div style={{ fontSize: 12 }}>… 외 {v.problems.length - 12}군데</div>
+                                    )}
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 12 }}>
+                                    표에서 그 칸을 확인해 아래에서 고친 뒤 반영해 주세요. <b>고치기 전에는 저장되지 않습니다.</b>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table className="dgrid">
+                            <thead>
+                                <tr>
+                                    <th style={{ width: 34 }}></th>
+                                    <th style={{ minWidth: 180 }}>거래처</th>
+                                    <th style={{ minWidth: 120 }}>{v.baseMonth || '기준월'} 잔액</th>
+                                    <th style={{ minWidth: 120 }}>연체금액</th>
+                                    <th style={{ minWidth: 80 }}>경과월</th>
+                                    <th style={{ minWidth: 110 }}>최초 미수월</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {summarized.map((r, i) => (
+                                    <tr key={i}>
+                                        <td>
+                                            <button className="rowbtn" onClick={() => removeRow(i)} title="이 행 빼기">
+                                                <X size={13} />
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <input
+                                                value={result.rows[i]?.clientName || ''}
+                                                onChange={(e) => editCell(i, 'clientName', e.target.value)}
+                                            />
+                                        </td>
+                                        <td className="num">{won(r.balance)}</td>
+                                        <td className="num" style={r.overdue > 0 ? { color: 'var(--danger)', fontWeight: 600 } : undefined}>
+                                            {won(r.overdue)}
+                                        </td>
+                                        <td className="num">{r.aging}</td>
+                                        <td>{r.oldest || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="statusbar">
+                        <span>{result.rows.length}개 거래처</span>
+                        <span>기준 {v.baseMonth || '?'}</span>
+                        <span>잔액 합계 {won(v.totals?.balanceSum || 0)}원</span>
+                        {result.repTotal && v.totals?.reported != null && (
+                            <span>표의 합계 {won(v.totals.reported)}원</span>
+                        )}
+                        {result.salesRep && <span>{result.salesRep} 담당분</span>}
+                        {result.page && <span>{result.page} 쪽</span>}
                     </div>
                 </>
             )

@@ -9,6 +9,9 @@
  * 판독 결과는 사람이 확인하기 전에는 저장하지 않는다.
  */
 
+// `.js` 를 반드시 붙인다 — Vite는 없어도 찾아 주지만 Node(테스트)는 못 찾는다.
+import { normalizeClient as normalizeReportClient } from '../utils/collectionReport.js'
+
 const ENDPOINT = '/api/analyze-erp'
 
 /** 판독 정확도와 용량의 절충. 표 글씨가 뭉개지지 않을 만큼은 남긴다. */
@@ -122,7 +125,18 @@ export async function analyzeErpScreenshots(files, { docType = 'auto', defaultYe
     // 채권 대장은 월 스냅샷이라 어느 달 것인지가 값 자체만큼 중요하다.
     const baseMonth = /^\d{4}-\d{2}$/.test(String(payload.baseMonth || '')) ? payload.baseMonth : null
 
-    return { docType: payload.docType || 'unknown', rows, baseMonth, summary: payload.summary || '', warnings }
+    return {
+        docType: payload.docType || 'unknown',
+        rows,
+        baseMonth,
+        summary: payload.summary || '',
+        warnings,
+        // 매출/수금 실적표에만 있는 것들 (검산에 쓴다)
+        year: Number(payload.year) || null,
+        salesRep: String(payload.salesRep || '').trim(),
+        page: String(payload.page || '').trim(),
+        repTotal: payload.repTotal || null,
+    }
 }
 
 /** 판독 결과를 앱이 쓰는 형태로 맞춘다. 이상한 행은 warnings에 남긴다. */
@@ -174,6 +188,12 @@ function normalizeRows(docType, rows, defaultYear, warnings) {
             agingMonths: num(r.agingMonths),
             note: String(r.note ?? '').trim(),
         }))
+    }
+
+    if (docType === 'collection_report') {
+        // 다듬기는 collectionReport.js 가 맡는다 — 검산과 같은 곳에 두어야
+        // 읽는 규칙과 검산하는 규칙이 갈리지 않는다.
+        return rows.map((r) => normalizeReportClient(r, defaultYear))
     }
 
     if (docType === 'daily_report') {

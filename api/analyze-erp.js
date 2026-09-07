@@ -26,7 +26,7 @@ const MAX_IMAGES = 6
 const SCHEMA_HINT = `
 반환 형식(JSON only):
 {
-  "docType": "sales" | "receivables" | "daily_report" | "activity" | "unknown",
+  "docType": "sales" | "receivables" | "collection_report" | "daily_report" | "activity" | "unknown",
   "rows": [ ... ],
   "baseMonth": "YYYY-MM"   // 화면에 기준 시점이 적혀 있을 때만. 없으면 넣지 마라
   "summary": "한 줄 요약(한국어)",
@@ -71,7 +71,23 @@ docType 별 rows 형식:
      실제로 다녀오면 다음 날 일지에 방문기록으로 다시 나온다. 넣으면 이중 계상된다.
    - 방문 및 미팅 내용은 요약하지 말고 보이는 대로 옮긴다.
 
-4) activity — 일정/방문/미팅/메모
+4) collection_report — 「영업사원 거래처별 매출/수금 실적표」
+   거래처 하나가 **네 줄**(이월 / 매출 / 수금 / 잔액)이고, 열은 1월~12월 + 합계다.
+   { "clientName": "거래처명", "code": "거래처코드", "phone": "전화번호",
+     "months": { "1": { "carried": 숫자, "sales": 숫자, "collected": 숫자, "balance": 숫자 },
+                 "2": { ... }, ... "12": { ... } } }
+   - 최상위에 "year": 숫자(표 머리의 '년 도'), "salesRep": "사원명", "page": "5/6" 을 담는다.
+   - **'사원별 합계' · '잔액 합계' 행은 rows 에 넣지 마라.** 최상위 "repTotal" 에
+     { "carried": 숫자, "sales": 숫자, "collected": 숫자, "balance": 숫자 } 로 담는다.
+     그 값은 **기준월(거래가 있는 마지막 달) 칸**의 값을 쓴다.
+   - **합계 열은 months 에 넣지 마라.** 1~12월만 담는다.
+   - 빈칸은 0으로 둔다. 괄호나 앞의 '-'가 붙은 값은 음수다(실제로 나온다).
+   - 거래처명은 왼쪽 칸 전체를 그대로 옮긴다. 두 줄로 접혀 있으면 이어 붙인다
+     (예: '주식회사 수산 / 머티리얼즈' -> '주식회사 수산머티리얼즈').
+     **비슷한 회사 이름으로 고쳐 쓰지 마라.** 보이는 그대로가 중요하다.
+   - 한 쪽에 열 곳 남짓 있다. **한 곳도 빠뜨리지 마라** — 빠지면 잔액 합계가 안 맞는다.
+
+5) activity — 일정/방문/미팅/메모
    { "clientName": "거래처명 또는 빈 문자열", "activity_date": "YYYY-MM-DD",
      "type": "방문"|"미팅"|"전화"|"이메일"|"기타", "description": "내용",
      "next_action_date": "YYYY-MM-DD" 또는 null, "next_action_detail": "" }
@@ -88,9 +104,10 @@ docType 별 rows 형식:
 const TYPE_HINT = {
     sales: '이 이미지는 매출/판매 자료다. docType은 "sales"로 한다.',
     receivables: '이 이미지는 미수금/채권 자료다. docType은 "receivables"로 한다.',
+    collection_report: '이 이미지는 「영업사원 거래처별 매출/수금 실적표」다. docType은 "collection_report"로 한다. 거래처마다 이월/매출/수금/잔액 네 줄이 있고 열이 1~12월이다.',
     activity: '이 이미지는 일정/활동 자료다. docType은 "activity"로 한다.',
     daily_report: '이 이미지는 일일업무보고서다. docType은 "daily_report"로 한다.',
-    auto: '이미지를 보고 매출(sales) / 채권(receivables) / 일일업무보고서(daily_report) / 일정(activity) 중 무엇인지 스스로 판단한다. 상단에 "일일 업무 보고서"라고 적혀 있거나 [거래처명/담당자/방문목적/방문 및 미팅 내용] 표가 보이면 daily_report다.'
+    auto: '이미지를 보고 매출(sales) / 채권(receivables) / 매출수금실적표(collection_report) / 일일업무보고서(daily_report) / 일정(activity) 중 무엇인지 스스로 판단한다. 상단에 "일일 업무 보고서"라고 적혀 있거나 [거래처명/담당자/방문목적/방문 및 미팅 내용] 표가 보이면 daily_report다. 상단에 "영업사원 거래처별 매출/수금 실적표"라고 적혀 있거나 거래처마다 [이월/매출/수금/잔액] 네 줄이 1~12월 열에 걸쳐 있으면 collection_report다.'
 }
 
 const parseDataUrl = (dataUrl) => {
