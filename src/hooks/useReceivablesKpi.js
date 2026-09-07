@@ -60,9 +60,9 @@ export const useReceivablesKpi = () => {
                  * `await` 해도 요청이 나가지 않는다(DataContext에서 겪은 것).
                  */
                 const pick = (cols) => supabase.from('receivables').select(cols).eq('base_month', month)
-                let { data: rows, error: e2 } = await pick('balance, overdue_amount, aging_months, excluded')
+                let { data: rows, error: e2 } = await pick('balance, overdue_amount, aging_months, excluded, delay_note')
                 if (e2 && (e2.code === '42703' || /excluded/.test(e2.message || ''))) {
-                    ;({ data: rows, error: e2 } = await pick('balance, overdue_amount, aging_months'))
+                    ;({ data: rows, error: e2 } = await pick('balance, overdue_amount, aging_months, delay_note'))
                 }
                 if (e2) return warnOnce('대장을 읽지 못했습니다', e2)
                 if (!rows) return
@@ -73,8 +73,21 @@ export const useReceivablesKpi = () => {
                  * 새로 밀린 곳은 아예 안 보인다. 그런 숫자를 '참고'라며 보여주면
                  * 그걸 근거로 전화를 걸게 된다. 대신 갱신을 요청한다.
                  */
+                /*
+                 * **전사 대장인지 담당분인지 함께 알린다.**
+                 * 영업사원 '매출/수금 실적표'로 채운 달은 그 사원 담당 거래처만
+                 * 들어 있다. 그 달의 총액을 KPI 카드에 그냥 '총 미수금'으로
+                 * 보여주면 전사 수치로 읽힌다 — 실측으로 전사 18.89억(108곳)
+                 * 다음 달이 담당분 3.07억(19곳)이라 급감한 것처럼 보인다.
+                 */
+                const marked = rows.filter((r) => String(r.delay_note || '').includes('매출/수금 실적표'))
+                const repScoped = rows.length > 0 && marked.length === rows.length
+                const salesRep = repScoped
+                    ? (String(marked[0].delay_note).match(/^(.+?)\s*담당/) || [])[1] || ''
+                    : ''
+
                 const age = ledgerAge(month)
-                if (alive) setState({ month, ...age, ...summarizeReceivables(rows) })
+                if (alive) setState({ month, repScoped, salesRep, ...age, ...summarizeReceivables(rows) })
             } catch (e) {
                 /* 채권 자료를 못 읽어도 KPI 나머지는 그대로 보여야 한다.
                    다만 **조용히 삼키지는 않는다** — 왜 '대장 없음'으로 보이는지

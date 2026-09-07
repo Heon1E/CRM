@@ -130,6 +130,21 @@ const Receivables = () => {
      */
     const age = useMemo(() => ledgerAge(months[0]), [months])
 
+    /**
+     * 지금 보는 달이 **영업사원 담당분만**인지 본다.
+     *
+     * 실적표로 넣은 줄에는 `delay_note`에 '매출/수금 실적표에서'가 적힌다.
+     * 그 줄이 이 달의 전부라면 전사 대장이 아니다 — 총액을 다른 달과 그대로
+     * 견주면 안 된다.
+     */
+    const repScoped = useMemo(() => {
+        if (!rows.length) return null
+        const marked = rows.filter((r) => String(r.delay_note || '').includes('매출/수금 실적표'))
+        if (marked.length !== rows.length) return null   // 섞여 있으면 전사 대장으로 본다
+        const rep = (String(marked[0].delay_note).match(/^(.+?)\s*담당/) || [])[1] || ''
+        return { rep, count: rows.length }
+    }, [rows])
+
     const view = useMemo(() => {
         const b = BUCKETS.find((x) => x.key === bucket) || BUCKETS[0]
         const q = query.trim().toLowerCase()
@@ -384,6 +399,28 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                     </div>
                 ))}
             </div>
+
+            {/*
+              * **이 달이 전사인지 담당분인지 말해 준다.**
+              *
+              * 실적표(영업사원별)로 채운 달은 그 사원 담당 거래처만 들어 있다.
+              * 그런데 화면은 그냥 '총 미수금'이라고 적으므로, 전사 대장으로
+              * 채운 달과 나란히 놓이면 **미수금이 급감한 것처럼 읽힌다** —
+              * 실제로 2026-05는 108곳 18.89억(전사), 2026-08은 19곳 3.07억
+              * (이헌일 담당)이라 84% 줄어든 것처럼 보인다.
+              * 숫자를 감추지는 않는다. **무엇을 세고 있는지 적어 준다.**
+              */}
+            {repScoped && (
+                <div style={{
+                    margin: '10px 0', padding: '10px 14px', borderRadius: 'var(--radius)',
+                    background: 'var(--bg-subtle)', border: '1px solid var(--border)',
+                    fontSize: 13, lineHeight: 1.7,
+                }}>
+                    <b>{baseMonth} 은 {repScoped.rep ? `${repScoped.rep} 담당분` : '영업사원 담당분'}입니다</b>
+                    {' '}— 매출/수금 실적표에서 넣은 {repScoped.count}곳이라 <b>전사 채권이 아닙니다.</b>
+                    {' '}전사 대장(엑셀)로 채운 달과 <b>총액을 그대로 견주지 마세요.</b>
+                </div>
+            )}
 
             {age.stale && months.length > 0 && (
                 <div style={{

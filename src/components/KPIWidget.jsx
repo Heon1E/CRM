@@ -582,7 +582,12 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                             : autoReceivables.stale
                                 ? `⚠ 채권 대장이 ${autoReceivables.month} 기준으로 ${autoReceivables.monthsBehind}개월 전 것입니다.`
                                     + ' 채권관리 화면에서 최신 대장을 올려 주세요 — 지금 숫자는 현재를 말하지 못합니다.'
-                                : `참고 — ${autoReceivables.month} 대장 기준:`
+                                /* 담당분만 들어 있는 달을 '전사 총 미수금'으로 읽으면
+                                   급감한 것처럼 보인다. 무엇을 센 숫자인지 적는다. */
+                                : `참고 — ${autoReceivables.month} `
+                                    + (autoReceivables.repScoped
+                                        ? `${autoReceivables.salesRep || '영업사원'} 담당분 기준(전사 아님):`
+                                        : '대장 기준:')
                                     + ` 잔액이 밀린 곳 ${autoReceivables.overdueCount}곳`
                                     + ` · 연체금액 ${(autoReceivables.overdueAmount / 1e8).toFixed(2)}억`
                                     + ` · 3개월 이상 ${autoReceivables.m3}곳`,
