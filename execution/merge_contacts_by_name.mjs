@@ -94,7 +94,51 @@ const main = async () => {
     const plans = []     // 합칠 것
     const kept = []      // 일부러 두는 것 (양쪽에 번호가 있다)
 
+    /*
+     * ## 이름이 **똑같은** 두 줄
+     *
+     * 아래 짝짓기는 짧은 이름이 긴 이름 안에 들어 있는 경우만 본다. 그래서
+     * **글자까지 똑같은 중복은 통째로 건너뛰고 있었다** — `strip(a) === strip(b)`
+     * 이면 `continue` 했다.
+     *
+     * 그런데 그 경우가 실제로 생긴다. **거래처를 합치면** 양쪽에 있던 같은
+     * 사람이 한 거래처 밑에 두 줄로 남는다 — 엔에스티바이오를 합쳤더니
+     * `김태희 책임`(010-7256-7377)과 `김태희 책임`(번호없음)이 나란히 섰다.
+     * 이건 두 사람이 아니다.
+     *
+     * 규칙은 아래와 같다: **양쪽에 번호가 있으면 손대지 않는다**(사무실과
+     * 휴대폰일 수 있다). 한쪽이 비어 있을 때만 합친다.
+     */
     for (const [clientId, list] of byClient) {
+        const sameName = new Map()
+        list.forEach((c) => {
+            const k = strip(c.name)
+            if (k.length < 2) return
+            if (!sameName.has(k)) sameName.set(k, [])
+            sameName.get(k).push(c)
+        })
+        for (const [, group] of sameName) {
+            if (group.length < 2) continue
+            const withPhone = group.filter((c) => c.phone)
+            const label = `${companyOf.get(clientId) || '?'} : "${group[0].name}" ${group.length}줄 (${group.map((c) => c.phone || '번호없음').join(' / ')})`
+            // 번호가 둘 이상 서로 다르면 다른 사람일 수 있다 — 그대로 둔다
+            if (new Set(withPhone.map((c) => strip(c.phone))).size > 1) { kept.push(label); continue }
+            const winner = withPhone[0] || group.find((c) => c.email) || group[0]
+            for (const loser of group) {
+                if (loser.id === winner.id) continue
+                plans.push({
+                    clientId, label, winner, loser,
+                    patch: {
+                        name: winner.name,
+                        department_role: winner.department_role || loser.department_role || null,
+                        phone: winner.phone || loser.phone || null,
+                        email: winner.email || loser.email || null,
+                    },
+                    becomePrimary: Boolean(winner.is_primary || loser.is_primary),
+                })
+            }
+        }
+
         for (const long of list) {
             for (const short of list) {
                 if (long.id === short.id) continue
