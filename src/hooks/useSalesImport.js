@@ -21,6 +21,7 @@ import { useData } from '../contexts/DataContext'
 import { supabase } from '../lib/supabase'
 import { showError, showWarning, showInfo, showHtmlConfirm } from '../utils/alert'
 import { reconcileSales } from '../utils/salesReconciler'
+import { fetchAllRows } from '../utils/fetchAllRows'
 
 export const normalizeKey = (name, { removeCorp = false, removePunct = false } = {}) => {
     if (!name) return ''
@@ -55,20 +56,13 @@ export const buildClientKeys = (name) => {
     return Array.from(keys).filter(Boolean)
 }
 
-export const fetchAllRows = async (buildQuery, pageSize = 1000) => {
-    let from = 0
-    let results = []
-
-    for (;;) {
-        const { data, error } = await buildQuery().range(from, from + pageSize - 1)
-        if (error) throw error
-        results = results.concat(data || [])
-        if (!data || data.length < pageSize) break
-        from += pageSize
-    }
-
-    return results
-}
+/**
+ * 쪽 나눠 받기는 `src/utils/fetchAllRows.js`로 옮겼다 — 이 파일은 React를
+ * import해서 `node --test`로 못 도는데, **정렬이 유일해야 한다**는 규칙은
+ * 테스트로 고정해 두어야 하는 종류의 것이기 때문이다.
+ * (`tests/fetchAllRows.test.mjs`)
+ */
+export { fetchAllRows }
 
 const won = (v) => Number(v || 0).toLocaleString('ko-KR') + '원'
 

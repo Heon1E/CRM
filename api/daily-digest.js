@@ -20,6 +20,7 @@
  */
 
 import { deriveSecret } from './telegram-webhook.js'
+import { fetchAllPages } from '../src/utils/restPaging.js'
 
 export const config = { maxDuration: 60 }
 
@@ -46,6 +47,12 @@ const sb = async (path) => {
     if (!res.ok) throw new Error(`${path} ${res.status}: ${(await res.text()).slice(0, 160)}`)
     return res.json()
 }
+
+/**
+ * 1,000행을 넘겨 받아야 할 때. **`limit=5000`으로는 안 된다** —
+ * 규칙과 실측은 `src/utils/restPaging.js`에 적어 두었다.
+ */
+const sbAll = (pathBase) => fetchAllPages(sb, pathBase)
 
 const tgSend = async (chatId, text) => {
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -120,10 +127,12 @@ export async function buildDigest() {
             .catch(() => [])
 
         const [clients, activities, schedules] = await Promise.all([
-            sb('clients?select=id,company,sales_rep&limit=5000'),
+            // 거래처는 1,167곳이라 한 번에 다 오지 않는다 — 끊어 받는다
+            sbAll('clients?select=id,company,sales_rep'),
             // 후속조치 판정에 과거 접촉 이력이 필요하다. 1년치면 충분하다.
-            sb(`activities?select=id,client_id,activity_date,next_action_date,next_action_detail` +
-                `&activity_date=gte.${new Date(Date.now() - 400 * DAY).toISOString().slice(0, 10)}&limit=5000`),
+            // 통화 녹음이 들어오면서 활동이 계속 늘고 있으므로 여기도 끊어 받는다.
+            sbAll(`activities?select=id,client_id,activity_date,next_action_date,next_action_detail` +
+                `&activity_date=gte.${new Date(Date.now() - 400 * DAY).toISOString().slice(0, 10)}`),
             sb(`schedules?select=title,client_name,starts_at,all_day,location,kind,status` +
                 `&starts_at=gte.${encodeURIComponent(`${today}T00:00:00+09:00`)}` +
                 `&starts_at=lt.${encodeURIComponent(`${today}T23:59:59+09:00`)}` +

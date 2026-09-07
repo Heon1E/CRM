@@ -29,6 +29,7 @@ import crypto from 'crypto'
 import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../src/utils/clientAliases.js'
 import { nextBusinessDay } from '../src/utils/businessDay.js'
 import { mergeActivityDescription } from '../src/utils/activityMerge.js'
+import { fetchAllPages } from '../src/utils/restPaging.js'
 
 /**
  * 웹훅 비밀 토큰을 봇 토큰에서 만들어 낸다.
@@ -347,9 +348,23 @@ const fmtDate = (d) => {
     return `${d.slice(5).replace('-', '/')}(${WEEKDAY[dt.getUTCDay()]})`
 }
 
+/**
+ * 1,000행을 넘겨 받아야 할 때. **`limit=5000`으로는 안 된다** —
+ * 규칙과 실측은 `src/utils/restPaging.js`에 적어 두었다.
+ */
+const sbAll = (pathBase) => fetchAllPages(sb, pathBase)
+
 async function loadClients() {
+    /*
+     * **여기가 잘리면 같은 거래처가 새로 만들어진다.**
+     * 거래처가 1,169곳인데 `limit=5000`으로 한 번에 받아 1,000곳만 들어왔다.
+     * 빠진 169곳은 통화 녹음에서 이름이 나와도 `findClient`가 못 찾고,
+     * 그러면 '새 거래처'로 등록된다 — 매출은 원래 행에, 활동은 새 행에 갈려
+     * 영업 코치가 같은 회사를 '매출 0인 신규'와 '거래 중인 기존'으로 따로 센다.
+     * 게다가 `order`가 없어 **어느 167곳이 빠지는지 그때그때 달랐다.**
+     */
     // `sales_rep`도 받는다 — 담당이 비어 있는 곳만 채우려면 현재 값을 알아야 한다
-    const rows = await sb('clients?select=id,company,sales_rep&limit=5000')
+    const rows = await sbAll('clients?select=id,company,sales_rep')
     const map = new Map()
     rows.forEach((c) => keysOf(c.company).forEach((k) => { if (!map.has(k)) map.set(k, c) }))
     return map
