@@ -132,14 +132,36 @@ async function tgSend(chatId, text) {
     }
 }
 
+/** file_id 하나를 내려받아 base64로 */
+async function fetchFileBase64(fileId, mimeType) {
+    const info = await fetch(TG(`getFile?file_id=${fileId}`)).then((r) => r.json())
+    if (!info.ok) throw new Error('파일을 가져오지 못했습니다.')
+    const url = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${info.result.file_path}`
+    const buf = Buffer.from(await fetch(url).then((r) => r.arrayBuffer()))
+    return { data: buf.toString('base64'), mimeType: mimeType || 'image/jpeg' }
+}
+
 async function fetchPhotoBase64(photoSizes) {
     // 가장 큰 것을 쓴다. 표 글씨는 작아서 축소본으로는 못 읽는다.
     const best = photoSizes[photoSizes.length - 1]
-    const info = await fetch(TG(`getFile?file_id=${best.file_id}`)).then((r) => r.json())
-    if (!info.ok) throw new Error('사진을 가져오지 못했습니다.')
-    const url = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${info.result.file_path}`
-    const buf = Buffer.from(await fetch(url).then((r) => r.arrayBuffer()))
-    return { data: buf.toString('base64'), mimeType: 'image/jpeg' }
+    return fetchFileBase64(best.file_id, 'image/jpeg')
+}
+
+/**
+ * **'사진'으로 보내면 텔레그램이 눌러 버린다.**
+ *
+ * `msg.photo`는 텔레그램이 다시 압축해 화질을 떨어뜨린 것이다. 표처럼 글씨가
+ * 작은 자료는 그 압축에서 숫자가 뭉개진다 — 실제로 거래처명 넷과 금액 하나를
+ * 잘못 읽었다. **파일(document)로 보내면 원본이 그대로 온다.**
+ *
+ * 그래서 이미지 document 도 받는다. 받는 쪽이 한 줄이면 보내는 쪽이 편해진다.
+ */
+const IMAGE_DOC = /^image\/(jpeg|png|webp|heic|heif)$/i
+function imageDocumentOf(msg) {
+    const d = msg.document
+    if (!d) return null
+    if (!IMAGE_DOC.test(String(d.mime_type || ''))) return null
+    return d
 }
 
 /*
@@ -231,7 +253,7 @@ clientName에 넣지 마라. 우리 영업사원(이헌일·박민철·송원기
 **clientName·person은 언제나 상대편(고객사와 그 직원)이다.**
 
 {
-  "intent": "schedule" | "activity" | "sales" | "receivables" | "question" | "memo",
+  "intent": "schedule" | "activity" | "sales" | "collection_report" | "receivables" | "question" | "memo",
   "items": [ ... ],
   "reply": "사용자에게 보여줄 한국어 한 줄 요약",
   "warnings": ["불확실한 부분"]
@@ -241,7 +263,9 @@ intent 고르는 법:
 - 앞으로 할 일 / 약속 / 방문 예정 / "내일", "다음주", "몇시에"  -> schedule
 - 이미 다녀온 방문·미팅·통화 기록, 일일업무보고서 사진          -> activity
 - 거래처·품목·수량·금액이 있는 매출표 사진                     -> sales
-- 미수금/채권/외상 잔액표 사진                                 -> receivables
+- **"영업사원 거래처별 매출/수금 실적표"** 사진, 또는 거래처마다
+  [이월/매출/수금/잔액] 네 줄이 1~12월 열에 걸쳐 있는 표        -> collection_report
+- 그 밖의 미수금/채권/외상 잔액표 사진                          -> receivables
 - "오늘 일정 뭐야", "이번주 뭐 있어" 같은 물음                  -> question
 - 위 어디에도 안 맞는 메모                                     -> memo
 
@@ -282,6 +306,21 @@ sales:
   { "clientName": "", "date": "YYYY-MM-DD", "itemName": "", "quantity": 숫자, "unitPrice": 숫자 }
   - 단가는 부가세 제외. 합계만 있으면 합계÷수량.
   - 합계·소계 행은 제외한다.
+
+collection_report:
+  { "clientName": "", "code": "", "phone": "",
+    "months": { "1": {"carried":숫자,"sales":숫자,"collected":숫자,"balance":숫자}, ... "12": {...} } }
+  - 거래처 하나가 **네 줄**(이월/매출/수금/잔액)이고 열이 1~12월 + 합계다.
+  - 최상위에 "year": 숫자, "salesRep": "사원명", "page": "5/6" 을 담는다.
+  - '사원별 합계'·'잔액 합계' 행은 items 에 넣지 말고 최상위 "repTotal" 에
+    { "carried":숫자, "sales":숫자, "collected":숫자, "balance":숫자 } 로 담는다.
+    기준월(거래가 있는 마지막 달) 칸의 값을 쓴다.
+  - **합계 열은 months 에 넣지 마라.** 1~12월만 담는다. 빈칸은 0.
+  - **읽은 뒤 스스로 확인해라: 달마다 (이월 + 매출 − 수금)이 잔액과 같아야 하고,
+    다음 달 이월이 이번 달 잔액과 같아야 한다.** 안 맞으면 그 칸을 다시 보고
+    고쳐라. 그래도 안 맞으면 warnings 에 어느 거래처 어느 달인지 적어라.
+  - 거래처명은 왼쪽 칸 글자를 **그대로** 옮긴다. 비슷한 회사로 고쳐 쓰지 마라.
+  - 한 쪽에 열 곳 남짓이다. 한 곳도 빠뜨리지 마라.
 
 receivables:
   { "clientName": "", "amount": 숫자, "overdueDays": 숫자 또는 null,
@@ -757,6 +796,8 @@ export default async function handler(req, res) {
 
     const text = (msg.text || msg.caption || '').trim()
     const photos = msg.photo
+    // 파일로 보낸 이미지도 받는다 — 압축되지 않아 표 글씨가 살아 있다
+    const imageDoc = imageDocumentOf(msg)
     // '누르고 말하기'(voice)와 파일로 붙인 오디오(audio) 둘 다 받는다.
     const audio = msg.voice || msg.audio || null
 
@@ -837,7 +878,7 @@ export default async function handler(req, res) {
             return ok()
         }
     }
-    if (!text && !photos && !audio) {
+    if (!text && !photos && !audio && !imageDoc) {
         await tgSend(chatId, '사진·녹음·글로 보내주세요. 사용법은 /help')
         return ok()
     }
@@ -852,6 +893,11 @@ export default async function handler(req, res) {
         if (text) parts.push({ text: `\n사용자 메시지:\n${text}` })
         if (photos?.length) {
             const img = await fetchPhotoBase64(photos)
+            blobs.push(img.data)
+            parts.push({ inlineData: { data: img.data, mimeType: img.mimeType } })
+        }
+        if (imageDoc) {
+            const img = await fetchFileBase64(imageDoc.file_id, imageDoc.mime_type)
             blobs.push(img.data)
             parts.push({ inlineData: { data: img.data, mimeType: img.mimeType } })
         }
@@ -893,7 +939,7 @@ export default async function handler(req, res) {
         }
 
         const parsed = await callGemini(parts)
-        const intent = ['schedule', 'activity', 'sales', 'receivables', 'question', 'memo'].includes(parsed.intent)
+        const intent = ['schedule', 'activity', 'sales', 'collection_report', 'receivables', 'question', 'memo'].includes(parsed.intent)
             ? parsed.intent : 'memo'
         const items = Array.isArray(parsed.items) ? parsed.items : []
         const warn = (parsed.warnings || []).slice(0, 3)
@@ -962,19 +1008,27 @@ export default async function handler(req, res) {
             return ok()
         }
 
-        // ---- 매출·채권: 담아두기 (대사를 거쳐야 한다) ----
-        if (intent === 'sales' || intent === 'receivables') {
+        // ---- 매출·채권·실적표: 담아두기 (대사·검산을 거쳐야 한다) ----
+        if (intent === 'sales' || intent === 'receivables' || intent === 'collection_report') {
             await saveToInbox({
                 chat_id: chatId, from_name: fromName, raw_text: text || (audio ? '[녹음]' : null),
-                has_image: !!photos?.length, doc_type: intent,
+                has_image: !!(photos?.length || imageDoc), doc_type: intent,
                 // 기준월은 화면에 적혀 있을 때만 담는다 (오늘 날짜로 짐작하지 않는다)
                 payload: {
                     fp, rows: items, summary: parsed.reply || '', warnings: parsed.warnings || [],
                     ...(/^\d{4}-\d{2}$/.test(String(parsed.baseMonth || '')) ? { baseMonth: parsed.baseMonth } : {}),
+                    // 실적표는 검산에 이 셋이 필요하다
+                    ...(intent === 'collection_report' ? {
+                        year: Number(parsed.year) || null,
+                        salesRep: String(parsed.salesRep || '').trim(),
+                        page: String(parsed.page || '').trim(),
+                        repTotal: parsed.repTotal || null,
+                    } : {}),
                 },
                 status: 'pending'
             })
-            const label = intent === 'sales' ? '매출' : '채권(미수금)'
+            const label = intent === 'sales' ? '매출'
+                : intent === 'collection_report' ? '매출/수금 실적표' : '채권(미수금)'
             await tgSend(chatId,
                 `📥 <b>${label} ${items.length}건으로 읽었습니다.</b>\n${parsed.reply || ''}` +
                 (warn.length ? `\n\n⚠️ ${warn.join('\n⚠️ ')}` : '') +
@@ -983,8 +1037,12 @@ export default async function handler(req, res) {
                 (intent === 'receivables'
                     ? `\n\n담아 두었습니다. 다만 <b>채권 대장에는 아직 반영되지 않습니다</b> — ` +
                       `경과월·연체금액은 월별 매출에서 거꾸로 계산해야 하는데 사진에는 그 이력이 없습니다. ` +
-                      `대장은 채권관리 화면의 '대장 올리기'로 엑셀을 올려 주세요.`
-                    : `\n\n중복 검사를 거쳐야 해서 바로 넣지 않았습니다.\nCRM <b>설정 &gt; 받은 항목</b>에서 확인 후 반영해 주세요.`)
+                      `월별 [이월/매출/수금/잔액]이 다 보이는 <b>매출/수금 실적표</b>를 보내시면 대장까지 들어갑니다.`
+                    : intent === 'collection_report'
+                        ? `\n\n<b>설정 &gt; 받은 항목</b>에서 검산을 확인하고 반영해 주세요.` +
+                          `\n표의 '이월+매출−수금=잔액'이 맞는지 앱이 한 번 더 셉니다.` +
+                          `\n<i>사진 대신 <b>파일로</b> 보내시면 압축이 안 돼 글씨를 더 잘 읽습니다.</i>`
+                        : `\n\n중복 검사를 거쳐야 해서 바로 넣지 않았습니다.\nCRM <b>설정 &gt; 받은 항목</b>에서 확인 후 반영해 주세요.`)
             )
             return ok()
         }

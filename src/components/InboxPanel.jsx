@@ -5,6 +5,9 @@ import { useSalesImport, buildClientKeys } from '../hooks/useSalesImport'
 import { useData } from '../contexts/DataContext'
 import { normalizeDate, toNumber } from '../services/erpVisionService'
 import { showSuccess, showError, showWarning } from '../utils/alert'
+import {
+    normalizeClient as normalizeReportClient, verifyReport, summarizeClients,
+} from '../utils/collectionReport'
 
 /**
  * 텔레그램으로 받은 항목 처리함.
@@ -15,6 +18,7 @@ import { showSuccess, showError, showWarning } from '../utils/alert'
 
 const LABEL = {
     sales: '매출',
+    collection_report: '매출/수금 실적표',
     receivables: '채권(미수금)',
     activity: '일정·활동',
     memo: '메모',
@@ -105,6 +109,77 @@ const InboxPanel = ({ onRefresh }) => {
                 if (!res.ok) return
                 await mark(item.id, 'applied', res.message)
                 if (res.message) await showSuccess(res.message)
+            } else if (item.doc_type === 'collection_report') {
+                /*
+                 * 「영업사원 거래처별 매출/수금 실적표」 — 월별 이월/매출/수금/잔액이
+                 * 다 있으므로 **엑셀 대장과 같은 계산**으로 채권 대장에 넣는다.
+                 *
+                 * **검산을 통과해야만 저장한다.** 이 숫자로 수금 독촉 전화를 건다.
+                 * 표는 스스로를 검산한다 — 달마다 `이월+매출−수금=잔액`,
+                 * 달 사이 `다음 달 이월=이번 달 잔액`, 맨 아래 `잔액 합계`.
+                 *
+                 * 쪽마다 따로 오므로(6쪽짜리다) **한 쪽씩 반영해도 쌓인다** —
+                 * `(client_name, base_month)`로 upsert 하기 때문이다. 잔액 합계는
+                 * 마지막 쪽에만 있으므로 그 쪽에서만 대조된다.
+                 */
+                const p = item.payload || {}
+                const reportYear = Number(p.year) || year
+                const clients0 = rows.map((r) => normalizeReportClient(r, reportYear))
+                const v = verifyReport({ clients: clients0, year: reportYear, repTotal: p.repTotal })
+
+                if (!v.baseMonth) {
+                    await showWarning('매출·수금이 있는 달을 찾지 못했습니다. 표가 잘리지 않았는지 확인해 주세요.')
+                    return
+                }
+                if (!v.ok) {
+                    await showError(
+                        `판독이 표와 맞지 않아 저장하지 않았습니다 (${v.problems.length}곳).\n\n` +
+                        v.problems.slice(0, 6).map((x) => `· ${x.clientName || '합계'} ${x.month}\n  ${x.message}`).join('\n') +
+                        (v.problems.length > 6 ? `\n\n… 외 ${v.problems.length - 6}곳` : '') +
+                        `\n\n설정 > ERP 스크린샷에서 같은 사진을 올리면 틀린 칸을 한 번에 고칠 수 있습니다.`
+                    )
+                    return
+                }
+
+                const summarized = summarizeClients({ clients: clients0, year: reportYear, baseMonth: v.baseMonth })
+                const map = new Map()
+                clients.forEach((c) => buildClientKeys(c.company).forEach((kk) => { if (!map.has(kk)) map.set(kk, c) }))
+
+                const prevExcluded = new Map()
+                const { data: ex, error: exErr } = await supabase.from('receivables')
+                    .select('client_name, exclusion_reason').eq('excluded', true)
+                if (!exErr) (ex || []).forEach((r) => { if (!prevExcluded.has(r.client_name)) prevExcluded.set(r.client_name, r.exclusion_reason) })
+
+                const payload = summarized.map((x) => {
+                    const hit = buildClientKeys(x.name).map((kk) => map.get(kk)).find(Boolean)
+                    return {
+                        ...(prevExcluded.has(x.name) ? { excluded: true, exclusion_reason: prevExcluded.get(x.name) } : {}),
+                        client_id: hit ? hit.id : null,
+                        client_name: x.name,
+                        base_month: v.baseMonth,
+                        balance: Math.round(x.balance),
+                        overdue_amount: Math.round(x.overdue),
+                        aging_months: x.aging,
+                        oldest_unpaid_month: x.oldest,
+                        delay_note: p.salesRep ? `${p.salesRep} 담당 · 매출/수금 실적표에서` : '매출/수금 실적표에서',
+                        updated_at: new Date().toISOString(),
+                    }
+                })
+
+                for (let i = 0; i < payload.length; i += 200) {
+                    const { error } = await supabase.from('receivables')
+                        .upsert(payload.slice(i, i + 200), { onConflict: 'client_name,base_month' })
+                    if (error) throw error
+                }
+
+                const overdue = payload.filter((x) => x.overdue_amount > 0).length
+                await mark(item.id, 'applied', `${v.baseMonth} 채권 ${payload.length}곳`)
+                await showSuccess(
+                    `${v.baseMonth} 기준 ${payload.length}곳을 채권관리에 반영했습니다.\n` +
+                    `잔액 합계 ${won(v.totals.balanceSum)}원 · 연체 ${overdue}곳\n` +
+                    `거래처 연결 ${payload.filter((x) => x.client_id).length}곳` +
+                    (p.salesRep ? `\n\n※ ${p.salesRep} 담당분입니다 — 전사 채권이 아닙니다.` : '')
+                )
             } else if (item.doc_type === 'receivables') {
                 /*
                  * **'반영'이 아무것도 반영하지 않고 있었다.**
