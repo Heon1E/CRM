@@ -248,9 +248,9 @@ const ErpScreenshotImport = ({ onRefresh }) => {
             await showWarning('매출·수금이 있는 달을 찾지 못했습니다. 표가 잘리지 않았는지 확인해 주세요.')
             return
         }
-        if (!v.ok) {
+        if (!v.okToSave) {
             await showError(
-                `판독이 표와 맞지 않아 저장하지 않았습니다 (${v.problems.length}곳).\n\n` +
+                `판독이 표와 맞지 않아 저장하지 않았습니다 (${v.blocking.length}곳).\n\n` +
                 v.problems.slice(0, 6).map((p) => `· ${p.clientName || '합계'} ${p.month}\n  ${p.message}`).join('\n') +
                 (v.problems.length > 6 ? `\n\n… 외 ${v.problems.length - 6}곳` : '') +
                 `\n\n표에서 그 칸을 확인해 직접 고친 뒤 다시 반영해 주세요.`
@@ -514,15 +514,22 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                     {/* 검산 결과를 맨 위에 둔다 — 이 숫자로 수금 전화를 걸기 때문이다 */}
                     <div style={{
                         padding: '10px 12px', borderBottom: '1px solid var(--border)',
-                        background: v.ok ? 'var(--bg-subtle)' : 'rgba(220,38,38,0.06)',
+                        background: v.okToSave ? 'var(--bg-subtle)' : 'rgba(220,38,38,0.06)',
                         fontSize: 13, lineHeight: 1.7,
                     }}>
-                        {v.ok ? (
-                            <span><b>검산 통과</b> — 표의 이월·매출·수금·잔액이 서로 맞습니다.</span>
+                        {v.okToSave ? (
+                            <span>
+                                <b>저장해도 됩니다</b> — 매출·잔액이 표의 합계와 맞습니다.
+                                {v.problems.length > 0 && (
+                                    <span style={{ color: 'var(--text-secondary)' }}>
+                                        {' '}(수금 줄만 {v.problems.length}군데 어긋나는데, 수금은 대장에 저장하지 않습니다)
+                                    </span>
+                                )}
+                            </span>
                         ) : (
                             <>
                                 <b style={{ color: 'var(--danger)' }}>
-                                    <AlertTriangle size={13} style={{ verticalAlign: -2 }} /> 표와 맞지 않는 곳 {v.problems.length}군데
+                                    <AlertTriangle size={13} style={{ verticalAlign: -2 }} /> 고쳐야 저장됩니다 — {v.blocking.length}군데
                                 </b>
                                 <div style={{ marginTop: 6, maxHeight: 260, overflowY: 'auto' }}>
                                     {v.problems.slice(0, 20).map((p, i) => {

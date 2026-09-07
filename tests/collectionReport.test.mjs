@@ -262,3 +262,104 @@ test('아직 오지 않은 달이 기준월로 잡히면 잡아낸다', () => {
     const v = verifyReport({ clients: [c], year: Y, now: new Date('2026-09-07T00:00:00Z') })
     assert.ok(v.problems.some((x) => x.kind === 'future'))
 })
+
+/* ── 달을 붙여 적으면 빈칸이 있어도 밀리지 않는다 ────────────────── */
+
+test('"달:금액" 으로 오면 빈 달을 건너뛰어도 제자리에 들어간다', () => {
+    // 중부산업 수금 줄 — 7월이 빈칸이라 7이 아예 없다
+    const c = normalizeClient({
+        clientName: '중부산업(주)',
+        carried: '1:2684000,2:5368000,3:2684000,4:12760000,5:7876000,6:3322000,7:14410000,8:21478600',
+        sales: '1:5368000,2:2684000,3:12760000,4:7876000,5:3322000,6:14410000,7:7068600,8:10945000',
+        collected: '1:2684000,2:5368000,3:2684000,4:12760000,5:7876000,6:3322000,8:21478600',
+        balance: '1:5368000,2:2684000,3:12760000,4:7876000,5:3322000,6:14410000,7:21478600,8:10945000',
+    }, Y)
+    assert.equal(c.months[k(7)].collected, 0, '7월 수금은 빈칸이므로 0')
+    assert.equal(c.months[k(8)].collected, 21478600, '8월 수금이 7월로 당겨지지 않는다')
+    assert.equal(verifyReport({ clients: [c], year: Y }).ok, true)
+})
+
+test('자리로만 적은 옛 형식도 그대로 읽는다', () => {
+    const c = normalizeClient({
+        clientName: 'ㄱ', sales: '1000,0,0,0,0,0,0,0,0,0,0,0',
+        balance: '1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000',
+        carried: '0,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000',
+        collected: '0,0,0,0,0,0,0,0,0,0,0,0',
+    }, Y)
+    assert.equal(c.months[k(1)].sales, 1000)
+    assert.equal(c.months[k(12)].balance, 1000)
+})
+
+test('합계 열이 안 맞으면 어느 줄이 틀렸는지 짚는다', () => {
+    // 수금 줄에서 한 칸을 놓친 경우 — 항등식만으로는 무엇이 틀렸는지 모른다
+    const c = normalizeClient({
+        clientName: 'ㄴ상사',
+        carried: '1:0,2:1000',
+        sales: '1:1000,2:2000',
+        collected: '2:500',
+        balance: '1:1000,2:2500',
+        totals: '0,3000,1500,2500',      // 수금 합계가 1,500 인데 읽힌 것은 500뿐
+    }, Y)
+    const v = verifyReport({ clients: [c], year: Y })
+    const p = v.problems.find((x) => x.kind === 'rowTotal')
+    assert.ok(p, '합계 열 대조가 잡아야 한다')
+    assert.equal(p.field, 'collected')
+    assert.match(p.message, /수금 줄을 다시 보세요/)
+})
+
+test('합계 열이 맞으면 그 줄은 문제 삼지 않는다', () => {
+    const c = normalizeClient({
+        clientName: 'ㄷ상사',
+        carried: '1:0', sales: '1:1000', collected: '1:1000', balance: '1:0',
+        totals: '0,1000,1000,0',
+    }, Y)
+    const v = verifyReport({ clients: [c], year: Y })
+    assert.ok(!v.problems.some((x) => x.kind === 'rowTotal'))
+})
+
+/* ── 막을 것과 알리기만 할 것 ────────────────────────────────────── */
+
+test('수금 줄만 어긋난 것은 저장을 막지 않는다 (수금은 저장하지 않는다)', () => {
+    // 실측: (주)이한산업 수금이 밀렸는데 잔액·연체·경과월은 정확했다.
+    const c = normalizeClient({
+        clientName: '(주)이한산업',
+        carried: '1:5280000,2:13860000,3:15840000,4:28600000,5:56012000,6:39688000,7:31966000,8:50790300,9:53512800',
+        sales: '1:13860000,2:15840000,3:12760000,4:27412000,5:11088000,6:31966000,7:18824300,8:21546800',
+        collected: '1:5280000,2:13860000,4:27412000,5:27412000,6:39688000,7:18824300,8:10824300',   // 밀림
+        balance: '1:13860000,2:15840000,3:28600000,4:56012000,5:39688000,6:31966000,7:50790300,8:53512800,9:53512800',
+        totals: '5280000,153297100,105064300,53512800',
+    }, Y)
+    const v = verifyReport({ clients: [c], year: Y })
+    assert.equal(v.ok, false, '문제는 있다')
+    assert.equal(v.okToSave, true, '그래도 저장할 값은 검증됐다')
+    assert.ok(v.problems.some((p) => p.kind === 'rowTotal' && p.field === 'collected'))
+
+    // 저장되는 값이 손으로 낸 것과 같아야 한다
+    const [row] = summarizeClients({ clients: [c], year: Y, baseMonth: k(8) })
+    assert.equal(row.balance, 53512800)
+    assert.equal(row.overdue, 31966000)
+    assert.equal(row.aging, 2)
+})
+
+test('매출 합계가 안 맞으면 막는다 — 저장 값이 흔들린다', () => {
+    const c = normalizeClient({
+        clientName: 'ㄹ상사',
+        carried: '1:0,2:1000', sales: '1:1000,2:5000', collected: '2:4000',
+        balance: '1:1000,2:2000',
+        totals: '0,3000,4000,2000',   // 매출 합계가 3,000 인데 읽힌 것은 6,000
+    }, Y)
+    const v = verifyReport({ clients: [c], year: Y })
+    assert.equal(v.okToSave, false)
+    assert.ok(v.blocking.some((p) => p.kind === 'rowTotal' && p.field === 'sales'))
+})
+
+test('잔액이 옆 달과 안 이어지면 막는다', () => {
+    const c = normalizeClient({
+        clientName: 'ㅁ상사',
+        carried: '1:0,2:9999', sales: '1:1000,2:0', collected: '',
+        balance: '1:1000,2:9999',
+        totals: '0,1000,0,9999',
+    }, Y)
+    const v = verifyReport({ clients: [c], year: Y })
+    assert.equal(v.okToSave, false)
+})

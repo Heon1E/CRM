@@ -47,33 +47,59 @@ export const monthKeys = (year) => Array.from({ length: 12 }, (_, i) => monthKey
 /**
  * 한 거래처를 다듬는다. 세 가지 모양을 다 받는다:
  *
- *   1. `{ carried: "n,n,…12개", sales: "…", collected: "…", balance: "…" }`  ← 지금 쓰는 것
- *   2. `{ carried: [12], … }`  (배열이어도 받는다)
- *   3. `{ months: { "1": {carried,…}, … } }` / `{ months: { "2026-01": {…} } }`
+ *   1. `{ carried: "1:2684000,2:5368000,…", … }`   ← 지금 쓰는 것 (달:금액)
+ *   2. `{ carried: "n,n,…12개", … }`               (자리로만 적은 것)
+ *   3. `{ carried: [12], … }`
+ *   4. `{ months: { "1": {carried,…}, … } }` / `{ months: { "2026-01": {…} } }`
  *
- * **1번(쉼표로 이은 12개)을 쓰는 이유가 둘 있다.**
+ * **1번(달을 함께 적는 것)이 핵심이다.** 표에는 값이 전부 제대로 적혀 있으므로
+ * 밀릴 이유가 없다 — 밀린 것은 **자리로만 달을 정하게 시켰기 때문**이다.
+ * 빈칸을 하나 건너뛰면 그 뒤가 전부 어긋난다(실측: 7월 수금 칸에 8월 수금이
+ * 들어왔다). 값마다 달을 붙이면 빈칸을 빼도 아무 일이 없다.
  *
- * - 달을 키로 받으면 모델이 **빈칸을 통째로 빼먹는다.** 그러면 뒤의 값이
- *   앞으로 당겨져 다른 달의 값이 된다 — 실측에서 7월 수금 칸에 8월 수금이
- *   들어왔다(7월이 빈칸이었다). 자리 수가 정해져 있으면 밀리면 드러난다.
- * - 배열로 받았더니 이번에는 **구조가 깨졌다.** 거래처 하나를 닫는 `}`를
- *   빠뜨려 `] , {` 가 되면서 JSON 전체를 못 읽었다. 괄호가 적을수록 안전하고,
- *   출력도 짧아진다(6쪽짜리라 길이도 문제다).
+ * 2·3번을 거쳐 온 이유도 적어 둔다. 자리로 12개를 요구했더니 모델이 빈칸을
+ * 빼먹어 밀렸고, 배열로 바꿨더니 거래처를 닫는 `}`를 빠뜨려 JSON이 통째로
+ * 깨졌다(`] , {`). 괄호가 적고 뜻이 분명한 쪽이 안전하다.
  */
 export const normalizeClient = (raw, year) => {
     const months = {}
     const src = raw?.months || {}
-    const toArr = (v) => {
-        if (Array.isArray(v)) return v
-        if (typeof v === 'string' && v.includes(',')) return v.split(',')
-        return null
+
+    /**
+     * 한 줄을 달별 값으로 편다.
+     * `"1:2684000,3:12760000"` (달을 붙인 것) 과 `"n,n,…"`(자리로만 적은 것),
+     * 배열을 모두 받는다. **달이 붙어 있으면 그것을 믿는다** — 빈칸을 건너뛰어도
+     * 어긋나지 않는 것이 이 형식의 요점이다.
+     */
+    const spread = (v) => {
+        const out = {}
+        if (v == null) return null
+        const list = Array.isArray(v) ? v : String(v).split(',')
+        let positional = 0
+        for (const raw1 of list) {
+            const s = String(raw1).trim()
+            if (!s) { positional++; continue }
+            const pair = s.match(/^(\d{1,2})\s*[:：]\s*(-?[\d,]+)$/)
+            if (pair) {
+                const m = Number(pair[1])
+                if (m >= 1 && m <= 12) out[m] = num(pair[2])
+                continue
+            }
+            positional++
+            if (positional <= 12) out[positional] = num(s)
+        }
+        return out
     }
-    const arr = (k, ko) => toArr(raw?.[k]) ?? toArr(raw?.[ko])
-    const A = { carried: arr('carried', '이월'), sales: arr('sales', '매출'), collected: arr('collected', '수금'), balance: arr('balance', '잔액') }
+
+    const line = (k, ko) => spread(raw?.[k] ?? raw?.[ko])
+    const A = {
+        carried: line('carried', '이월'), sales: line('sales', '매출'),
+        collected: line('collected', '수금'), balance: line('balance', '잔액'),
+    }
 
     for (let m = 1; m <= 12; m++) {
         const cell = src[String(m)] ?? src[m] ?? src[monthKey(year, m)] ?? {}
-        const pick = (k, ko) => (A[k] ? num(A[k][m - 1]) : num(cell[k] ?? cell[ko]))
+        const pick = (k, ko) => (A[k] ? num(A[k][m] ?? 0) : num(cell[k] ?? cell[ko]))
         months[monthKey(year, m)] = {
             carried: pick('carried', '이월'),
             sales: pick('sales', '매출'),
@@ -81,7 +107,15 @@ export const normalizeClient = (raw, year) => {
             balance: pick('balance', '잔액'),
         }
     }
+
+    // 맨 오른쪽 '합 계' 열 — 있으면 검산에 쓴다
+    const t = raw?.totals ?? raw?.['합계']
+    const tv = t == null ? null : (Array.isArray(t) ? t : String(t).split(',')).map(num)
+    const totals = tv && tv.length >= 4
+        ? { carried: tv[0], sales: tv[1], collected: tv[2], balance: tv[3] }
+        : null
     return {
+        totals,
         clientName: String(raw?.clientName ?? raw?.name ?? '').trim(),
         code: String(raw?.code ?? '').trim(),
         phone: String(raw?.phone ?? '').trim(),
@@ -130,6 +164,29 @@ export const verifyReport = ({ clients, year, repTotal = null, tolerance = 0, no
                 + ` 빈칸을 건너뛰어 값이 한 칸씩 밀렸을 수 있습니다.`,
         })
     }
+
+    /*
+     * **줄마다 합계 열이 있다.** 매출 칸을 다 더하면 그 줄의 '합 계'와 같아야
+     * 한다. 이것으로 **어느 줄이 틀렸는지**를 가릴 수 있다 — 항등식만으로는
+     * "이 달이 안 맞는다"까지만 알고 넷 중 무엇이 틀렸는지는 모른다.
+     * (이월·잔액의 합계 열은 연간 합이 아니라 첫/끝 값이라 세지 않는다.)
+     */
+    clients.forEach((c) => {
+        if (!c.totals) return
+        for (const [field, ko] of [['sales', '매출'], ['collected', '수금']]) {
+            const reported = c.totals[field]
+            if (!reported) continue
+            const sum = keys.reduce((a, k) => a + (c.months[k]?.[field] || 0), 0)
+            if (Math.abs(sum - reported) > tolerance) {
+                problems.push({
+                    kind: 'rowTotal', clientName: c.clientName, month: null, field,
+                    message: `${ko} 칸을 다 더하면 ${sum.toLocaleString()} 인데`
+                        + ` 합계 열은 ${reported.toLocaleString()} 입니다`
+                        + ` (${(sum - reported).toLocaleString()} 차이) — ${ko} 줄을 다시 보세요.`,
+                })
+            }
+        }
+    })
 
     clients.forEach((c) => {
         keys.forEach((k, i) => {
@@ -185,7 +242,54 @@ export const verifyReport = ({ clients, year, repTotal = null, tolerance = 0, no
         }
     }
 
-    return { baseMonth, problems, totals, ok: problems.length === 0 }
+    /*
+     * **막을 것과 알리기만 할 것을 가른다.**
+     *
+     * 대장에 저장되는 것은 **잔액·연체금액·경과월**이고, 그 셋은 `매출`과
+     * `잔액`만으로 난다 — **수금은 저장하지 않는다.** 그러니 매출·잔액이
+     * 표의 합계와 맞는데 수금 줄만 어긋난 것이라면, 저장할 값은 이미 검증된
+     * 것이고 수금 오독은 결과를 바꾸지 못한다.
+     *
+     * 실측에서 그랬다 — (주)이한산업은 수금 줄이 밀렸는데도 잔액 53,512,800 ·
+     * 연체 31,966,000 · 경과 2가 손으로 낸 값과 정확히 같았다. 그걸 막으면
+     * 사용자는 **저장에 쓰이지도 않는 칸**을 고치느라 붙들린다.
+     *
+     * 다만 판단 근거가 있을 때만 그렇게 본다:
+     *   - 그 거래처의 **매출 합계**가 표의 합계 열과 맞고
+     *   - 그 달의 **잔액이 다음 달 이월과 이어지고**, 이월이 전달 잔액과 이어진다
+     * 이 둘이 서면 남는 것은 수금뿐이다.
+     */
+    const sum = (c, field) => keys.reduce((a, k) => a + (c.months[k]?.[field] || 0), 0)
+    const salesTrusted = new Map(clients.map((c) => [
+        c.clientName,
+        c.totals?.sales ? Math.abs(sum(c, 'sales') - c.totals.sales) <= tolerance : false,
+    ]))
+
+    problems.forEach((p) => {
+        if (p.kind === 'rowTotal') { p.blocking = p.field !== 'collected'; return }
+        if (p.kind !== 'identity') { p.blocking = true; return }
+
+        const c = clients.find((x) => x.clientName === p.clientName)
+        const i = keys.indexOf(p.month)
+        if (!c || i < 0 || !salesTrusted.get(p.clientName)) { p.blocking = true; return }
+
+        const cur = c.months[p.month]
+        const prev = i > 0 ? c.months[keys[i - 1]] : null
+        const next = i < 11 ? c.months[keys[i + 1]] : null
+        const balanceLinked = next && next.carried === cur.balance
+        const carriedLinked = !prev || prev.balance === cur.carried
+        // 매출이 합계와 맞고 잔액·이월이 옆 달과 이어지면 남는 것은 수금뿐이다
+        p.blocking = !(balanceLinked && carriedLinked)
+    })
+
+    const blocking = problems.filter((p) => p.blocking)
+    return {
+        baseMonth, problems, totals,
+        ok: problems.length === 0,
+        /** 저장해도 되는가 — 수금 줄만 어긋난 것은 막지 않는다 */
+        okToSave: blocking.length === 0,
+        blocking,
+    }
 }
 
 /**

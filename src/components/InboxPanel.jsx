@@ -131,9 +131,9 @@ const InboxPanel = ({ onRefresh }) => {
                     await showWarning('매출·수금이 있는 달을 찾지 못했습니다. 표가 잘리지 않았는지 확인해 주세요.')
                     return
                 }
-                if (!v.ok) {
+                if (!v.okToSave) {
                     await showError(
-                        `판독이 표와 맞지 않아 저장하지 않았습니다 (${v.problems.length}곳).\n\n` +
+                        `판독이 표와 맞지 않아 저장하지 않았습니다 (${v.blocking.length}곳).\n\n` +
                         v.problems.slice(0, 6).map((x) => `· ${x.clientName || '합계'} ${x.month}\n  ${x.message}`).join('\n') +
                         (v.problems.length > 6 ? `\n\n… 외 ${v.problems.length - 6}곳` : '') +
                         `\n\n설정 > ERP 스크린샷에서 같은 사진을 올리면 틀린 칸을 한 번에 고칠 수 있습니다.`
