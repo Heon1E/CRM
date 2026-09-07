@@ -80,10 +80,17 @@ const fetchAll = async (build, pageSize = 1000) => {
 const won = (v) => Math.round((Number(v) || 0) / 10000).toLocaleString('ko-KR') + '만원'
 
 // ---------- 1. 조회 ----------
-const clients = await fetchAll(() => supabase.from('clients').select('id, company, created_at, sales_rep').order('id'))
-const sales = await fetchAll(() => supabase.from('sales').select('id, client_id, total_amount').order('id'))
-const activities = await fetchAll(() => supabase.from('activities').select('id, client_id').order('id'))
-const contacts = await fetchAll(() => supabase.from('client_contacts').select('id, client_id').order('id'))
+/*
+ * **휴지통에 든 것은 빼고 본다.** 예전에는 `deleted_at` 조건이 없어서
+ * 이미 지운 거래처가 중복 후보로 다시 올라왔다. 아래에서 진 쪽을 지운 표시로
+ * 바꾸므로, 거르지 않으면 **한 번 합친 짝이 다음 실행에서 또 올라온다.**
+ * 매출·활동·담당자도 같이 걸러야 화면에 찍히는 건수가 맞는다.
+ */
+const alive = (q) => q.is('deleted_at', null)
+const clients = await fetchAll(() => alive(supabase.from('clients').select('id, company, created_at, sales_rep')).order('id'))
+const sales = await fetchAll(() => alive(supabase.from('sales').select('id, client_id, total_amount')).order('id'))
+const activities = await fetchAll(() => alive(supabase.from('activities').select('id, client_id')).order('id'))
+const contacts = await fetchAll(() => alive(supabase.from('client_contacts').select('id, client_id')).order('id'))
 
 const stats = {}
 sales.forEach(s => {
@@ -193,8 +200,18 @@ for (const { keeper, losers } of duplicates) {
                 if (count > 0) throw new Error(`${table}에 ${count}건이 남아 있어 삭제를 중단합니다 (이관 실패)`)
             }
 
-            const { error: delErr } = await supabase.from('clients').delete().eq('id', loser.id)
-            if (delErr) throw new Error(`거래처 삭제 실패: ${delErr.message}`)
+            /*
+             * **지우기는 '표시'다** (저장소 규칙). 예전에는 `.delete()`로 진짜
+             * 지웠다. 딸린 자료는 위에서 전부 이긴 쪽으로 옮겼으므로 잃을 것은
+             * 없지만, 합치기를 잘못 판단했을 때 되돌릴 길이 사라진다.
+             * `deleted_at`만 채우면 설정 > 휴지통에서 되살릴 수 있다.
+             *
+             * 위에서 조회할 때 지운 표시를 거르므로 다음 실행에서 다시
+             * 중복으로 올라오지 않는다.
+             */
+            const { error: delErr } = await supabase.from('clients')
+                .update({ deleted_at: new Date().toISOString() }).eq('id', loser.id)
+            if (delErr) throw new Error(`거래처 지움 표시 실패: ${delErr.message}`)
 
             record.status = 'ok'
             ok++
