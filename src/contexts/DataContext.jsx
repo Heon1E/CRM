@@ -188,7 +188,7 @@ export const DataProvider = ({ children }) => {
         .slice(0, 5)
 
       // 6. 빠르게 크는 거래처 — 같은 날수끼리 비교, 늘어난 곳만 (src/utils/growthClients.js)
-      const calculatedGrowthClients = computeGrowthClients({ sales: rawSalesData, clients, now, limit: 8 })
+      const calculatedGrowthClients = computeGrowthClients({ sales: rawSalesData, clients, now, limit: 8, reserveNew: 1 })
 
       // 4. Sales Intelligence Metrics for AI Insight
       // Dormant clients: had sales 3-12 months ago, but not in last 3 months

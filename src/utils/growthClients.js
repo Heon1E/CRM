@@ -48,8 +48,11 @@ export const growthWindows = (now) => {
  * @param {Array} clients id·company
  * @returns {Array<{id, name, amount, prevAmount, growthRate: number|null, kind: 'growth'|'new'}>}
  *   늘어난 곳(성장률 순) → 첫 거래(금액 순). 목록 이름이 '빠르게 크는'이라 성장이 먼저다.
+ * @param {number} reserveNew 끝에서 첫 거래 몫으로 남겨 둘 칸 수. 성장한 곳만으로 칸이
+ *   다 차서 첫 거래가 아예 안 보였다(사용자 결정 2026-10-20: 마지막 한 칸). 첫 거래가
+ *   모자라면 그 칸은 성장한 곳이 채우고, 성장한 곳이 모자라면 첫 거래가 채운다 — 빈칸을 두지 않는다.
  */
-export const computeGrowthClients = ({ sales, clients, now = new Date(), limit = 4 }) => {
+export const computeGrowthClients = ({ sales, clients, now = new Date(), limit = 4, reserveNew = 0 }) => {
     const { target, comparison } = growthWindows(now)
     const nameOf = new Map((clients || []).map((c) => [c.id, c.company || c.name || '알 수 없음']))
     const stats = new Map()
@@ -70,8 +73,7 @@ export const computeGrowthClients = ({ sales, clients, now = new Date(), limit =
         if (d < target[0]) st.before += amount
     }
 
-    const rank = { growth: 0, new: 1 }
-    return [...stats.values()]
+    const picked = [...stats.values()]
         .filter((c) => c.amount > 0)
         .map((c) => {
             const kind = c.prevAmount > 0 ? 'growth' : (c.before > 0 ? 'returning' : 'new')
@@ -79,10 +81,14 @@ export const computeGrowthClients = ({ sales, clients, now = new Date(), limit =
             return { id: c.id, name: nameOf.get(c.id) || '알 수 없음', amount: c.amount, prevAmount: c.prevAmount, growthRate, kind }
         })
         .filter((c) => c.kind === 'new' || (c.kind === 'growth' && c.growthRate > 0))
-        .sort((a, b) =>
-            rank[a.kind] - rank[b.kind]
-            || (a.kind === 'growth' ? b.growthRate - a.growthRate : b.amount - a.amount))
-        .slice(0, limit)
+
+    const growth = picked.filter((c) => c.kind === 'growth').sort((a, b) => b.growthRate - a.growthRate)
+    const fresh = picked.filter((c) => c.kind === 'new').sort((a, b) => b.amount - a.amount)
+    const newSlots = Math.min(reserveNew, fresh.length)
+    const head = growth.slice(0, limit - newSlots)
+    // 성장한 곳이 모자라 남은 칸은 첫 거래로 채운다
+    const tail = fresh.slice(0, limit - head.length)
+    return [...head, ...tail]
 }
 
 /** 화면 표시 — 성장률은 부호를 숫자에서 가져온다(`+`를 박아 두지 않는다) */

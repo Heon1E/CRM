@@ -76,3 +76,26 @@ test('거래처가 없는 매출과 날짜가 깨진 매출은 건너뛴다', ()
     })
     assert.deepEqual(out, [])
 })
+
+// 마지막 칸은 첫 거래 몫 (사용자 결정 2026-10-20) — 성장한 곳만으로 칸이 다 차서 첫 거래가 안 보였다
+const many = () => [
+    ...['a', 'b', 'c'].flatMap((id, i) => [S(id, '2026-09-02', 100), S(id, '2026-10-02', 200 + i * 100)]), // +100 +200 +300%
+    S('n1', '2026-10-03', 50), S('n2', '2026-10-03', 900),                                                  // 첫 거래 둘
+]
+const CL2 = ['a', 'b', 'c', 'n1', 'n2'].map((id) => ({ id, company: id }))
+
+test('reserveNew: 마지막 칸은 금액이 큰 첫 거래', () => {
+    const out = computeGrowthClients({ now: new Date(2026, 9, 20), clients: CL2, sales: many(), limit: 3, reserveNew: 1 })
+    assert.deepEqual(out.map((c) => c.name), ['c', 'b', 'n2'])
+})
+
+test('reserveNew: 첫 거래가 없으면 그 칸도 성장한 곳이 채운다', () => {
+    const sales = many().filter((s) => !s.client_id.startsWith('n'))
+    const out = computeGrowthClients({ now: new Date(2026, 9, 20), clients: CL2, sales, limit: 3, reserveNew: 1 })
+    assert.deepEqual(out.map((c) => c.name), ['c', 'b', 'a'])
+})
+
+test('reserveNew: 성장한 곳이 모자라면 남은 칸은 첫 거래로 채운다 — 빈칸을 두지 않는다', () => {
+    const out = computeGrowthClients({ now: new Date(2026, 9, 20), clients: CL2, sales: many(), limit: 8, reserveNew: 1 })
+    assert.deepEqual(out.map((c) => c.name), ['c', 'b', 'a', 'n2', 'n1'])
+})
