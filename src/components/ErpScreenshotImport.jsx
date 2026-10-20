@@ -266,8 +266,18 @@ const ErpScreenshotImport = ({ onRefresh }) => {
             .select('client_name, exclusion_reason').eq('excluded', true)
         if (!exErr) (ex || []).forEach((r) => { if (!prevExcluded.has(r.client_name)) prevExcluded.set(r.client_name, r.exclusion_reason) })
 
+        /*
+         * 실적표로 넣은 줄이라는 표시. 채권관리 화면이 이것을 보고 "○○ 담당분입니다 —
+         * 전사 채권이 아닙니다" 띠를 띄운다. 텔레그램(InboxPanel)·스크립트와 같은 문구여야
+         * `Receivables.jsx`가 알아본다 — 빠뜨리면 담당분이 전사 총액처럼 보인다.
+         */
+        const delayNote = result.salesRep
+            ? `${result.salesRep} 담당 · 매출/수금 실적표에서`
+            : '매출/수금 실적표에서'
+
         const payload = summarized.map((x) => {
-            const hit = buildClientKeys(x.name).map((k) => clientMap.get(k)).find(Boolean)
+            // 미리보기의 이름 검사(checkNames)와 같은 findClient — 별칭표까지 본다
+            const hit = findClient(x.name)
             return {
                 ...(prevExcluded.has(x.name) ? { excluded: true, exclusion_reason: prevExcluded.get(x.name) } : {}),
                 client_id: hit ? hit.id : null,
@@ -277,6 +287,7 @@ const ErpScreenshotImport = ({ onRefresh }) => {
                 overdue_amount: Math.round(x.overdue),
                 aging_months: x.aging,
                 oldest_unpaid_month: x.oldest,
+                delay_note: delayNote,
                 updated_at: new Date().toISOString(),
             }
         })
