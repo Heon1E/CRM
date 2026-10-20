@@ -516,7 +516,7 @@ const Sales = () => {
           {/* 데이터 그리드 — 폰에서도 같은 화면을 쓰고, 좁으면 가로로 민다 */}
           {!isItemSearch && (
           <div className="grid-scroll flex-1" style={{ minHeight: '320px' }}>
-            <table className="dgrid">
+            <table className="dgrid sales-grid">
               <thead>
                 <tr>
                   <th style={{ width: '48px' }}>번호</th>
@@ -562,7 +562,7 @@ const Sales = () => {
                             </button>
                           ) : (sale.date ? sale.date.split('T')[0] : '-')}
                         </td>
-                        <td style={{ fontWeight: 600 }}>{sale.clientName}</td>
+                        <td className="client-cell" style={{ fontWeight: 600 }}>{sale.clientName}</td>
                         <td style={{ maxWidth: '340px', overflow: 'hidden', textOverflow: 'ellipsis' }}
                           title={sale.displayItemName || ''}>
                           {sale.displayItemName || '품목 미지정'}

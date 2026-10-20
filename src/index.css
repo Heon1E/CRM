@@ -1147,6 +1147,26 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
     padding-bottom: 4px;
   }
 
+  /*
+   * 매출 카드의 제목은 **거래처**다. 공통 규칙은 첫 칸을 제목으로 키우는데 매출 표의
+   * 첫 칸이 순번(1, 2, 3…)이라 카드마다 숫자만 크게 떠 있었다. 폰에서는 조회용이라
+   * "어느 거래처인가"가 먼저 보여야 한다. 데스크톱 표의 칸 순서는 그대로 둔다.
+   */
+  table.dgrid.sales-grid tbody tr.row-expandable {
+    display: flex;
+    flex-direction: column;
+  }
+  table.dgrid.sales-grid td.seq { display: none; }
+  table.dgrid.sales-grid td.client-cell {
+    order: -1;
+    justify-content: flex-start;
+    text-align: left;
+    font-size: 15px;
+    font-weight: 700;
+    min-height: 44px;
+  }
+  table.dgrid.sales-grid td.client-cell::before { content: none; }
+
   /* 펼친 품목은 바로 위 카드에 붙인다 — 따로 떨어진 카드로 보이면 어느 줄 것인지 모른다 */
   table.dgrid tbody tr.row-expandable.is-open {
     margin-bottom: 0;
