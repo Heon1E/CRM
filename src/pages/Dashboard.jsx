@@ -29,6 +29,7 @@ import KPIWidget from '../components/KPIWidget'
 import { SALES_REP_OPTIONS, setStoredRep } from '../utils/salesRep'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 import PullToRefresh from '../components/PullToRefresh'
+import { growthLabel } from '../utils/growthClients'
 
 
 const Dashboard = () => {
@@ -283,7 +284,9 @@ const Dashboard = () => {
           <div className="win">
             <div className="win-title">
               <span>빠르게 크는 거래처</span>
-              <span className="meta">성장률 상위</span>
+              <span className="meta">
+                {new Date().getDate() <= 5 ? '지난달 · 그 전달 대비' : `이번 달 1~${new Date().getDate()}일 · 지난달 같은 날짜까지 대비`}
+              </span>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="dgrid">
@@ -301,8 +304,12 @@ const Dashboard = () => {
                       <td className="seq">{idx + 1}</td>
                       <td>{client.name}</td>
                       <td className="num">{formatKoreanCurrency(client.amount)}</td>
-                      <td className="num" style={{ color: '#1C6B3C', fontWeight: 600 }}>
-                        +{client.growthRate?.toFixed(0)}%
+                      {/* 부호는 숫자에서 가져온다 — 예전에는 '+'를 박아 두어 '+-60%'가 떴다 */}
+                      <td className="num" style={{
+                        color: client.kind === 'new' ? 'var(--text-primary)' : 'var(--success)',
+                        fontWeight: 600,
+                      }}>
+                        {growthLabel(client)}
                       </td>
                     </tr>
                   ))}

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { makeClientFinder } from '../utils/clientKeys'
+import { computeGrowthClients } from '../utils/growthClients'
 import {
   getAllData as getOfflineData,
   saveToStore,
@@ -186,82 +187,8 @@ export const DataProvider = ({ children }) => {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5)
 
-      // 6. Fastest Growing Clients (Safe Mode: Use Last Month if early in current month)
-      const topGrowthClients = []
-      const currentDay = now.getDate()
-
-      // If within first 5 days of month, analyze Last Month vs Prior Month
-      // Otherwise, analyze Current Month vs Last Month
-      const useLastMonthAsBasis = currentDay <= 5
-
-      const targetMonthStart = useLastMonthAsBasis
-        ? new Date(now.getFullYear(), now.getMonth() - 1, 1) // Jan 1 if Now is Feb 1
-        : new Date(now.getFullYear(), now.getMonth(), 1)
-
-      const targetMonthEnd = useLastMonthAsBasis
-        ? new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999) // Jan 31
-        : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-
-      const comparisonMonthStart = useLastMonthAsBasis
-        ? new Date(now.getFullYear(), now.getMonth() - 2, 1) // Dec 1
-        : new Date(now.getFullYear(), now.getMonth() - 1, 1)
-
-      const comparisonMonthEnd = useLastMonthAsBasis
-        ? new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59, 999) // Dec 31
-        : new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
-
-      const growthStats = {}
-
-      rawSalesData.forEach(sale => {
-        const clientId = sale.client_id || sale.clientId
-        if (!clientId) return
-        const d = new Date(sale.sale_date || sale.date || sale.created_at)
-        const amount = Number(sale.total_amount ?? sale.totalAmount ?? 0) || 0
-
-        if (!growthStats[clientId]) {
-          const clientObj = clients.find(c => c.id === clientId)
-          growthStats[clientId] = {
-            id: clientId,
-            name: clientObj?.company || clientObj?.name || 'Unknown',
-            role: clientObj?.industry || clientObj?.type || '',
-            targetMonthAmt: 0,
-            comparisonMonthAmt: 0,
-            historicalBeforeTarget: 0,
-          }
-        }
-
-        if (d >= targetMonthStart && d <= targetMonthEnd) {
-          growthStats[clientId].targetMonthAmt += amount
-        } else if (d >= comparisonMonthStart && d <= comparisonMonthEnd) {
-          growthStats[clientId].comparisonMonthAmt += amount
-        } else if (d < targetMonthStart) {
-          // Count total historical revenue to determine "True New"
-          growthStats[clientId].historicalBeforeTarget += amount
-        }
-      })
-
-      const calculatedGrowthClients = Object.values(growthStats)
-        .filter(c => c.targetMonthAmt > 0)
-        .map(c => {
-          const isTrueNew = c.historicalBeforeTarget === 0
-          let growthRate = 0
-          if (c.comparisonMonthAmt > 0) {
-            growthRate = ((c.targetMonthAmt - c.comparisonMonthAmt) / c.comparisonMonthAmt) * 100
-          } else if (c.targetMonthAmt > 0) {
-            growthRate = 100 // Infinite/New growth
-          }
-
-          return { ...c, isTrueNew, growthRate, amount: c.targetMonthAmt }
-        })
-        .sort((a, b) => {
-          if (a.isTrueNew && !b.isTrueNew) return -1
-          if (!a.isTrueNew && b.isTrueNew) return 1
-          // if both new, sort by amounts
-          if (a.isTrueNew && b.isTrueNew) return b.amount - a.amount
-          // otherwise sort by growth rate
-          return b.growthRate - a.growthRate
-        })
-        .slice(0, 4)
+      // 6. 빠르게 크는 거래처 — 같은 날수끼리 비교, 늘어난 곳만 (src/utils/growthClients.js)
+      const calculatedGrowthClients = computeGrowthClients({ sales: rawSalesData, clients, now, limit: 8 })
 
       // 4. Sales Intelligence Metrics for AI Insight
       // Dormant clients: had sales 3-12 months ago, but not in last 3 months
