@@ -47,7 +47,7 @@ test('줄어든 곳은 목록에 넣지 않는다 (예전 +-60%)', () => {
     assert.deepEqual(out.map((c) => c.name), ['나'])
 })
 
-test('처음 산 곳은 맨 앞에 "첫 거래", 다시 산 곳(주기)은 빼고, 나머지는 성장률 순', () => {
+test('성장률 높은 곳이 먼저, "첫 거래"는 그 뒤, 다시 산 곳(주기)은 뺀다', () => {
     const out = computeGrowthClients({
         now: new Date(2026, 9, 20),
         clients: CLIENTS,
@@ -58,7 +58,7 @@ test('처음 산 곳은 맨 앞에 "첫 거래", 다시 산 곳(주기)은 빼�
             S('d', '2026-09-02', 100), S('d', '2026-10-02', 400),   // +300%
         ],
     })
-    assert.deepEqual(out.map((c) => [c.name, growthLabel(c)]), [['가', '첫 거래'], ['라', '+300%'], ['다', '+100%']])
+    assert.deepEqual(out.map((c) => [c.name, growthLabel(c)]), [['라', '+300%'], ['다', '+100%'], ['가', '첫 거래']])
 })
 
 test('표시는 부호를 숫자에서 가져온다 — "+" 를 박아 두지 않는다', () => {

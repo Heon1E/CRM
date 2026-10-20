@@ -10,7 +10,7 @@
  * 2. **줄어든 곳도 목록에 들어갔다.** 매출이 있는 곳을 성장률 순으로 4곳 잘랐을 뿐이라
  *    크는 곳이 모자라면 줄어든 곳이 채웠다. '빠르게 크는' 목록이므로 늘어난 곳만 남긴다.
  * 3. **화면이 언제나 `+`를 붙였다** → `+-60%`. 비교할 매출이 없으면 성장률을
- *    100%로 지어냈다. 처음 산 곳은 '첫 거래'로 따로 보이고(맨 앞), 두세 달 간격으로
+ *    100%로 지어냈다. 처음 산 곳은 '첫 거래'로 따로 보이고(성장한 곳 뒤 — 사용자 결정 2026-10-20), 두세 달 간격으로
  *    사는 곳이 다시 산 것(`returning`)은 성장이 아니라 주기라 목록에서 뺀다 — 넣으면
  *    정기 주문처가 목록을 덮는다.
  *
@@ -47,7 +47,7 @@ export const growthWindows = (now) => {
  * @param {Array} sales  client_id·sale_date·total_amount (camelCase도 받는다)
  * @param {Array} clients id·company
  * @returns {Array<{id, name, amount, prevAmount, growthRate: number|null, kind: 'growth'|'new'}>}
- *   첫 거래(금액 순) → 늘어난 곳(성장률 순).
+ *   늘어난 곳(성장률 순) → 첫 거래(금액 순). 목록 이름이 '빠르게 크는'이라 성장이 먼저다.
  */
 export const computeGrowthClients = ({ sales, clients, now = new Date(), limit = 4 }) => {
     const { target, comparison } = growthWindows(now)
@@ -70,7 +70,7 @@ export const computeGrowthClients = ({ sales, clients, now = new Date(), limit =
         if (d < target[0]) st.before += amount
     }
 
-    const rank = { new: 0, growth: 1 }
+    const rank = { growth: 0, new: 1 }
     return [...stats.values()]
         .filter((c) => c.amount > 0)
         .map((c) => {
