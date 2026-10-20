@@ -2,6 +2,16 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import { reloadOnceForNewVersion } from './utils/staleChunk'
+
+/*
+ * 배포 직후, 열어 둔 옛 화면이 사라진 조각 파일을 부르면 Vite가 이 이벤트를 쏜다.
+ * 새 버전으로 한 번 새로고침한다(`staleChunk.js`). 방금 했는데 또 나면 막지 않고
+ * 오류를 그대로 흘려 ErrorBoundary가 보여주게 한다 — 끝없이 새로고침하지 않게.
+ */
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadOnceForNewVersion()) event.preventDefault()
+})
 
 // 서비스 워커 등록 (PWA 지원)
 if ('serviceWorker' in navigator) {

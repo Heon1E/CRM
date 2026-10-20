@@ -1,5 +1,6 @@
 import React from 'react';
 import { RefreshCw, TriangleAlert } from 'lucide-react';
+import { isStaleChunkError, reloadOnceForNewVersion } from '../utils/staleChunk';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -8,14 +9,20 @@ class ErrorBoundary extends React.Component {
     }
 
     static getDerivedStateFromError(error) {
-        // 다음 렌더링에서 폴백 UI가 보이도록 상태를 업데이트 합니다.
-        return { hasError: true };
+        /*
+         * **배포 직후 옛 조각 파일 오류는 고장이 아니다.** 새 버전을 받으면 끝난다.
+         * 'SYSTEM ERROR'로 덮지 않고 한 번 새로고침한다(`staleChunk.js`).
+         * 방금 새로고침했는데 또 나면 그때는 진짜 오류 화면을 보여준다.
+         */
+        return { hasError: true, updating: isStaleChunkError(error) };
     }
 
     componentDidCatch(error, errorInfo) {
         // 에러 리포팅 서비스에 에러를 기록할 수도 있습니다.
         console.error("Uncaught error:", error, errorInfo);
-        this.setState({ error, errorInfo });
+        // 새로고침은 여기서 한다(렌더 단계는 부작용이 없어야 한다). 방금 했으면 오류 화면으로.
+        const updating = isStaleChunkError(error) && reloadOnceForNewVersion();
+        this.setState({ error, errorInfo, updating });
     }
 
     handleReload = () => {
@@ -23,6 +30,13 @@ class ErrorBoundary extends React.Component {
     };
 
     render() {
+        if (this.state.updating) {
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-oem-bg-app">
+                    <p style={{ color: 'var(--text-secondary)' }}>새 버전으로 바꾸는 중입니다…</p>
+                </div>
+            );
+        }
         if (this.state.hasError) {
             // 폴백 UI
             return (

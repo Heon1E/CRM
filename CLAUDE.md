@@ -878,6 +878,22 @@ node execution/repair_orphan_sales.mjs <엑셀파일...> --apply  # 실제 반�
 **합계·거래처·날짜는 그대로**라 대시보드 숫자가 바뀌지 않는다. 건수가 중요한
 매출 목록 화면은 상세를 받으므로 영향이 없다.
 
+## 배포 직후 'SYSTEM ERROR' — 옛 화면이 사라진 조각을 부른다 (2026-10-20)
+
+폰에서 `TypeError: Failed to fetch dynamically imported module: …/RevenueForecastPanel-D-BVvlwW.js`
+로 화면 전체가 오류로 덮였다. 조각 파일 이름에는 해시가 붙어 배포마다 바뀐다.
+**배포 전에 열어 둔 화면**이나 배포 도중의 요청은 없는 이름을 찾는다.
+
+세 겹으로 막는다:
+1. **한 번 새로고침해서 새 버전을 받는다** — `src/utils/staleChunk.js`.
+   `main.jsx`의 `vite:preloadError`와 `ErrorBoundary`가 같은 함수를 부른다.
+   15초 안에 또 나면 멈추고 진짜 오류 화면을 보여준다(끝없이 돌지 않게,
+   `tests/staleChunk.test.mjs`).
+2. **`vercel.json` 재작성에서 `assets/`를 뺐다.** 예전에는 없는 JS 파일을 찾아도
+   `index.html`을 **200으로** 돌려줬다 — 오류가 아니라 HTML이 와서 원인이 가려진다.
+3. **서비스 워커가 JS 자리에 온 HTML을 담지 않는다**(캐시 이름 v3로 한 번 비움).
+   담아 두면 폰이 잠깐 끊겼을 때 그 HTML을 꺼내 같은 오류로 죽는다.
+
 ## 화면은 열 때 받는다 (코드 분할)
 
 예전에는 전부 한 덩어리(2,315KB)라 대시보드만 보려 해도 견적서·지도·요금표까지

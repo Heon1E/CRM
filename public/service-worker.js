@@ -1,7 +1,8 @@
 // Xavian CRM - Service Worker
 // 오프라인 지원 및 캐싱을 위한 기본 서비스 워커
 
-const CACHE_NAME = 'xavian-crm-v2'
+// v3: 화면(HTML)을 JS 파일 이름으로 담아 둔 캐시가 남아 있을 수 있어 한 번 비운다 (2026-10-20)
+const CACHE_NAME = 'xavian-crm-v3'
 const urlsToCache = [
   '/',
   '/index.html'
@@ -59,6 +60,19 @@ self.addEventListener('fetch', (event) => {
       .then((response) => {
         // 응답이 유효한지 확인
         if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response
+        }
+
+        /*
+         * **스크립트·스타일 자리에 HTML이 오면 담지 않는다.** 배포 중에 조각 파일을
+         * 못 찾으면 서버가 index.html을 200으로 돌려준 적이 있다(vercel.json 재작성 —
+         * 지금은 assets/를 뺐다). 그걸 JS 이름으로 담아 두면, 폰이 잠깐 끊겼을 때
+         * 캐시에서 HTML을 꺼내 'Failed to fetch dynamically imported module'로 죽는다.
+         */
+        const type = response.headers.get('content-type') || ''
+        const wantsCode = event.request.destination === 'script' || event.request.destination === 'style'
+          || /\/assets\//.test(new URL(event.request.url).pathname)
+        if (wantsCode && type.includes('text/html')) {
           return response
         }
 
