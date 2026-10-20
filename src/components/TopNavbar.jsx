@@ -74,12 +74,14 @@ const TopNavbar = () => {
             배경은 투명하게 따 두었다. 흰 네모가 붙어 있으면 상단바 회색과
             부딪힌다.
           */}
+          {/* 400px 미만에서는 글자를 숨기고 마크만 둔다 — 375px 폰에서 '아이앤디 CRM'이
+              두 줄로 꺾이거나(줄바꿈 허용 시) 알림 종과 겹쳤다(막았을 때, 실측 2px). */}
           <img
             src="/brand-mark.png"
             alt=""
             style={{ height: 22, width: 'auto', objectFit: 'contain' }}
           />
-          <span className="font-bold text-base sm:text-lg tracking-tight transition-colors"
+          <span className="hidden min-[400px]:inline font-bold text-sm sm:text-lg tracking-tight transition-colors whitespace-nowrap"
             style={{ color: 'var(--text-primary)' }}
           >아이앤디 CRM</span>
         </Link>

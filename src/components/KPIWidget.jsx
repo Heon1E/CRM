@@ -776,7 +776,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
     const overallGrade = getGradeInfo(overallScore)
 
     return (
-        <div className="rounded-xl overflow-hidden mb-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+        <div className="win">
             {/* Header */}
             {/*
               **좁은 화면에서는 줄을 바꾼다.** 예전에는 한 줄에 밀어 넣어서
@@ -786,7 +786,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
             */}
             <div className="px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-y-2" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-3">
-                    <h2 className="text-base font-black" style={{ color: 'var(--text-primary)' }}>KPI Performance</h2>
+                    <h2 className="font-extrabold" style={{ fontSize: 15, color: 'var(--ind-ink)' }}>KPI 평가</h2>
                     <span className="text-[10px] font-bold px-2 py-0.5" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-header)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontFamily: 'var(--font-data)' }}>
                         {currentWeek}주차 / {totalWeeks}
                     </span>
@@ -820,7 +820,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                             <div
                                 key={item.id}
                                 onClick={() => setExpandedKPI(isExpanded ? null : item.id)}
-                                className={`relative group cursor-pointer rounded-lg p-3 transition-all duration-200 border-t-4 ${isExpanded ? 'shadow-lg' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
+                                className={`relative group cursor-pointer rounded-lg p-3 transition-all duration-200 border-t-4 ${isExpanded ? 'shadow-md' : 'hover:shadow-md'}`}
                                 style={{
                                     backgroundColor: 'var(--bg-card)',
                                     border: '1px solid var(--border)',
@@ -834,7 +834,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                         <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                                             {item.category}
                                         </span>
-                                        <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>Weight: {item.weight}</span>
+                                        <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>가중치 {item.weight}</span>
                                     </div>
 
                                     {/* Name & Icon */}

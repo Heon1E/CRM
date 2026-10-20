@@ -459,57 +459,41 @@ const Clients = () => {
         </div>
       )}
 
-      <div className="max-w-[1600px] mx-auto space-y-6">
+      <div className="max-w-[1600px] mx-auto space-y-3">
 
-        {/* 타이틀바 */}
-        <div className="win-title" style={{ border: '1px solid var(--border)', borderBottom: 0 }}>
-          <span className="flex items-baseline gap-3">
-            거래처 관리
-            <span className="meta">거래처 {sortedCompanies.length.toLocaleString()}곳</span>
-          </span>
-        </div>
+        {/* 머리 — 예전에는 제목 · '신규' 단추 하나 · 검색 · 조건 · 목록이 상자 다섯 개로
+            세로로 쌓여 있었다. 한 패널로 묶고, 신규와 검색을 한 줄에 둔다. */}
+        <div className="win">
+          <div className="win-title">
+            <span className="flex items-baseline gap-3">
+              거래처 관리
+              <span className="meta">전체 {sortedCompanies.length.toLocaleString()}곳</span>
+            </span>
+            <span className="meta" style={{ display: 'inline-flex', gap: 14 }}>
+              <span>거래 중 <b style={{ color: 'var(--accent)', fontWeight: 800 }}>{(contextClients?.filter(c => c.status === '매출' || c.status === '활성').length || 0).toLocaleString()}</b>곳</span>
+              <span>지금 보이는 곳 <b style={{ color: 'var(--ind-ink)', fontWeight: 800 }}>{shownCompanies.length.toLocaleString()}</b>곳</span>
+            </span>
+          </div>
 
-        {/* 툴바 */}
-        <div className="toolbar" style={{ border: '1px solid var(--border)', borderTop: 0 }}>
-          <button onClick={() => setIsAddModalOpen(true)} className="tb-btn primary">
-            <Plus className="w-3.5 h-3.5" /> 신규 <kbd>F2</kbd>
-          </button>
-        </div>
-
-        {/* Search & Statistics Ribbon */}
-        <div className="oem-panel shadow-sm" style={{ borderLeft: '4px solid var(--accent)' }}>
-          <div className="p-4 flex flex-col lg:flex-row gap-4 lg:items-center">
-            <div className="flex-1 flex items-center gap-3">
-              <label className="text-[11px] font-bold text-oem-text-secondary whitespace-nowrap">거래처 찾기</label>
-              <div className="relative flex-1 group">
-                <input
-                  type="text"
-                  placeholder="회사명으로 찾기"
-                  value={searchInput}
-                  onChange={handleSearchChange}
-                  onKeyDown={handleSearchKeyDown}
-                  className="w-full bg-oem-bg-panel border border-oem-border px-4 py-2 rounded-oem text-[13px] outline-none focus:border-oem-blue focus:bg-white transition-all"
-                />
-                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-oem-text-secondary w-4 h-4 group-focus-within:text-oem-blue" />
-              </div>
-            </div>
-            <div className="flex items-center gap-6 px-4 lg:border-l border-oem-border text-[11px] font-medium text-oem-text-secondary uppercase">
-              <div className="flex flex-col">
-                <span>거래 중인 거래처</span>
-                <span className="text-oem-blue font-bold text-sm tracking-tighter">
-                  {contextClients?.filter(c => c.status === '매출' || c.status === '활성').length || 0}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span>지금 보이는 곳</span>
-                <span className="text-oem-text-primary font-bold text-sm tracking-tighter">{shownCompanies.length}곳</span>
-              </div>
+          <div className="toolbar" style={{ gap: 8 }}>
+            <button onClick={() => setIsAddModalOpen(true)} className="tb-btn primary" title="새 거래처 (F2)">
+              <Plus className="w-4 h-4" /> 새 거래처 <kbd>F2</kbd>
+            </button>
+            <div className="relative flex-1" style={{ minWidth: 220 }}>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="search"
+                enterKeyHint="search"
+                aria-label="거래처 찾기"
+                placeholder="회사명으로 찾기"
+                value={searchInput}
+                onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
+                className="w-full pl-9"
+              />
             </div>
           </div>
-        </div>
 
-        {/* 조건 거르기 + 저장된 보기 */}
-        <div className="win" style={{ marginTop: 8 }}>
           <div className="toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
             {FILTERS.map((f) => {
               const on = activeFilters.includes(f.key)
@@ -533,7 +517,7 @@ const Clients = () => {
             </span>
           </div>
 
-          <div className="toolbar" style={{ flexWrap: 'wrap', gap: 6, borderTop: 0 }}>
+          <div className="toolbar" style={{ flexWrap: 'wrap', gap: 6, borderBottom: 0 }}>
             <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>저장한 보기</span>
             {views.length === 0 && (
               <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
@@ -568,8 +552,6 @@ const Clients = () => {
             <span>거래처 목록</span>
             <div className="flex items-center gap-4 text-[10px] font-medium text-oem-text-secondary">
               <span>{page} / {Math.max(1, Math.ceil(shownCompanies.length / PAGE_SIZE))} 쪽</span>
-              <span className="w-px h-3 bg-oem-border"></span>
-              <span className="text-oem-blue font-bold">준비됨</span>
             </div>
           </div>
 
@@ -588,7 +570,7 @@ const Clients = () => {
             {/* Left List Pane */}
             <div className={`${selectedClientId ? 'w-1/2' : 'w-full'} transition-all duration-300 flex flex-col`}>
               <div className="flex-1 overflow-y-auto border border-oem-border rounded-lg bg-white">
-                <table className="dgrid min-w-full relative">
+                <table className="dgrid clients-grid min-w-full relative">
                   <thead className="sticky top-0 z-10 bg-oem-bg-header shadow-sm">
                     <tr>
                       <th className="w-8 py-2 text-center">
@@ -652,7 +634,7 @@ const Clients = () => {
                             className={`group cursor-pointer transition-colors border-l-4 ${isSelected ? 'bg-[color:var(--sel)] border-l-[color:var(--sel-border)]' : 'hover:bg-slate-50 border-l-transparent'}`}
                             onClick={() => setSelectedClientId(primaryContact.id)}
                           >
-                            <td className="text-center py-3" onClick={(e) => e.stopPropagation()}>
+                            <td className="pick-cell text-center py-3" onClick={(e) => e.stopPropagation()}>
                               <label className="tap-box" aria-label={`${company} 고르기`}>
                                 <input
                                   type="checkbox"
@@ -662,8 +644,8 @@ const Clients = () => {
                                 />
                               </label>
                             </td>
-                            <td className="text-center font-bold text-oem-text-secondary py-3">{index}</td>
-                            <td className="py-3">
+                            <td className="row-no text-center font-bold text-oem-text-secondary py-3">{index}</td>
+                            <td className="client-cell py-3">
                               <span className={`font-bold ${isSelected ? 'text-oem-blue' : 'text-oem-text-primary'}`}>
                                 {company}
                               </span>

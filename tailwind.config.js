@@ -9,8 +9,8 @@ export default {
       fontFamily: {
         // 회사 e카탈로그와 같은 서체 (DESIGN.md). public/fonts/에 직접 담아 쓴다.
         sans: ['NanumSquareNeo', '"Segoe UI"', '"Malgun Gothic"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        // 표의 숫자는 고정폭을 유지한다 — 자릿수가 어긋나면 금액을 눈으로 못 맞춘다.
-        data: ['Consolas', '"Cascadia Mono"', '"D2Coding"', 'monospace'],
+        // 숫자 — 브랜드 서체 + 자릿수 고정(tabular-nums). index.css의 --font-data와 같다.
+        data: ['Montserrat', 'NanumSquareNeo', '"Malgun Gothic"', 'sans-serif'],
         brand: ['Montserrat', 'NanumSquareNeo', 'sans-serif'],
       },
       colors: {
@@ -19,11 +19,11 @@ export default {
         // 색은 회사 e카탈로그 기준 (DESIGN.md) — 초록 #007538.
         oem: {
           bg: {
-            app: '#eceef1',
+            app: '#f4f5f5',
             panel: '#ffffff',
-            header: '#e4e7eb',
+            header: '#f2f3f3',
           },
-          border: '#b9bec7',
+          border: '#dcdddd',
           text: {
             primary: '#16191d',
             secondary: '#5b626c',
@@ -43,9 +43,17 @@ export default {
            */
           'blue-light': '#45b97a',
           grey: {
-            light: '#f7f8fa',
-            medium: '#d6dae0',
+            light: '#fafbfb',
+            medium: '#ebecec',
           }
+        },
+        /*
+         * Tailwind 기본 회색 500(#6b7280)이 16개 파일에 글씨색으로 박혀 있다. 흰 바탕에선
+         * 4.83:1로 통과하지만 페이지 바탕(#f4f5f5) 위에선 4.43:1로 떨어진다(2026-10 실측).
+         * 하나씩 고치면 또 빠지므로 값을 브랜드 보조 글씨색으로 올린다.
+         */
+        gray: {
+          500: '#5b626c',
         },
         brand: {
           DEFAULT: '#007538',
@@ -61,7 +69,7 @@ export default {
         }
       },
       borderRadius: {
-        'oem': '2px', // 데스크톱 프로그램 느낌
+        'oem': '6px', // 단추·입력칸 (index.css --radius). 예전 2px은 'PC 프로그램' 방향이었다
       },
       keyframes: {
         // Toast(`animate-slide-in`) 와 설정 탭(`animate-fade-in`)이 쓰는데

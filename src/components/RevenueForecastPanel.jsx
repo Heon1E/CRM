@@ -64,32 +64,29 @@ const RevenueForecastPanel = () => {
 
     // --- Empty State (No Data) ---
     if (!data) {
+        /* 단추 하나를 위해 320px짜리 빈 상자를 차지하고 있었다 — 한 줄로 접는다.
+           누르기 전에는 설명과 단추만 있으면 된다. */
         return (
-            <div className="oem-panel h-[320px] flex flex-col items-center justify-center p-6 relative"
-                style={{ backgroundColor: 'var(--bg-card)' }}>
-                <div className="absolute top-3 right-3">
-                    <span className="badge-accent">시험 기능</span>
+            <div className="win">
+                <div className="flex flex-wrap items-center gap-4 px-4 py-4">
+                    <BrainCircuit className="w-8 h-8 shrink-0" style={{ color: 'var(--ind-ink-faint)' }} />
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-extrabold" style={{ fontSize: 15, color: 'var(--ind-ink)' }}>연말 매출 추정</h3>
+                            <span className="badge-accent">시험 기능</span>
+                        </div>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
+                            최근 4년 실적으로 올해 연말 매출을 내다봅니다. 계산에 시간이 조금 걸립니다.
+                        </p>
+                    </div>
+                    <button onClick={handleAnalyze} className="tb-btn primary">
+                        <TrendingUp className="w-4 h-4" />
+                        추정치 계산하기
+                    </button>
                 </div>
-                <BrainCircuit className="w-12 h-12 mb-4 opacity-30" style={{ color: 'var(--text-secondary)' }} />
-                <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>연말 매출 추정</h3>
-                <p className="text-sm text-center max-w-xs mb-6" style={{ color: 'var(--text-secondary)' }}>
-                    최근 4년 실적으로 올해 연말 매출을 내다봅니다. 계산에 시간이 조금 걸립니다.
-                </p>
-                <button
-                    onClick={handleAnalyze}
-                    className="font-bold py-2.5 px-6 rounded-lg transition-all hover:scale-105 flex items-center gap-2 shadow-lg"
-                    style={{
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px var(--accent-glow)'
-                    }}
-                >
-                    <TrendingUp className="w-4 h-4" />
-                    올해 매출 추정치 분석
-                </button>
                 {error && (
-                    <div className="mt-4 flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-lg"
-                        style={{ color: 'var(--danger)', backgroundColor: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                    <div className="mx-4 mb-4 flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-lg"
+                        style={{ color: 'var(--danger)', backgroundColor: 'var(--danger-subtle)', border: '1px solid var(--danger)' }}>
                         <AlertCircle className="w-3 h-3" />
                         {error}
                     </div>

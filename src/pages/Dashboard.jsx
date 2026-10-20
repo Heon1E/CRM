@@ -229,14 +229,14 @@ const Dashboard = () => {
             borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)'
           }}>
             {summaryCards.map((c) => (
-              <div key={c.label} style={{ background: 'var(--bg-card)', padding: '10px 14px' }}>
+              <div key={c.label} style={{ background: 'var(--bg-card)', padding: '14px 18px' }}>
                 {/* 인라인 `fontSize`는 전역 모바일 규칙(12px)을 이긴다. 매일 보는
                     카드의 라벨이 폰에서 11px로 남아 있었다 — 클래스로 넘긴다. */}
                 <div className="card-label" style={{ color: 'var(--text-secondary)' }}>{c.label}</div>
                 {/* 불러오는 중에는 '—' 대신 자리를 그린다. '—'는 '값이 없다'는
                     뜻으로 읽혀서(매출 0원인 상태와 구별되지 않는다), 기다리는
                     중임을 알리지 못한다. 틀린 숫자를 안 보여주는 원칙은 그대로다. */}
-                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
+                <div className="stat-value">
                   {dataReady ? c.value : <span className="skeleton" style={{ display: 'block', height: 22, width: '70%', borderRadius: 4 }} />}
                 </div>
                 <div className="card-label" style={{ color: 'var(--text-secondary)' }}>
@@ -273,13 +273,14 @@ const Dashboard = () => {
 
         <div>
           {/* 오는 동안 자리를 지킨다 — 갑자기 아래 내용이 밀려 올라가지 않게 */}
-          <Suspense fallback={<div className="skeleton" style={{ height: 260, borderRadius: 6 }} />}>
+          <Suspense fallback={<div className="skeleton" style={{ height: 76, borderRadius: 8 }} />}>
             <RevenueForecastPanel />
           </Suspense>
         </div>
 
-        {/* Lower Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* 아래 두 칸 — 크는 거래처와 최근 활동을 나란히. 예전에는 크는 거래처 표가
+            반쪽만 쓰고 오른쪽 절반이 비어 있었고, 최근 활동은 그 아래 따로 한 줄을 차지했다. */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pb-20 items-start">
           {/* 빠르게 크는 거래처 */}
           <div className="win">
             <div className="win-title">
@@ -322,10 +323,8 @@ const Dashboard = () => {
               </table>
             </div>
           </div>
-        </div>
 
-        {/* 최근 활동 */}
-        <div className="grid grid-cols-1 gap-3 pb-20">
+          {/* 최근 활동 */}
           <div className="win">
             <div className="win-title">
               <span>최근 활동</span>

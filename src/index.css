@@ -1,10 +1,13 @@
 /* =========================================
-   아이앤디 CRM — 데스크톱 업무화면 디자인 시스템
+   아이앤디 CRM — 업무화면 디자인 시스템
 
-   방향: 브라우저에서 돌지만 '설치된 PC 업무 프로그램'처럼 보이고 동작해야 한다.
-   - 조밀한 표(행 26px), 칸마다 실선
-   - 숫자는 오른쪽 정렬 + 고정폭
-   - 모바일도 같은 밀도. 좁으면 가로 스크롤로 처리한다 (카드로 바꾸지 않는다)
+   방향(2026-10 바꿈): **깔끔하고 읽기 쉬운 최신 업무 화면.**
+   예전 방향은 '설치된 PC 업무 프로그램'(행 26px, 칸마다 실선, 2px 모서리, 고정폭
+   Consolas 숫자, 타이틀바·툴바·상태줄)이었다. 사용자가 깔끔한 최신 스타일과
+   사용자 친화성을 원해 바꿨다 — 색·글꼴(브랜드)은 그대로, 밀도·선·모서리·위계를 고쳤다.
+   - 표는 가로줄만, 행 38px, 숫자는 오른쪽 정렬 + 자릿수 고정(tabular-nums)
+   - 카드 8px · 단추 6px (DESIGN.md의 카드 반경 8px에 맞춤)
+   - 모바일은 표를 카드로 접는다 (아래 '모바일' 절)
 
    색과 글꼴은 **회사 e카탈로그가 기준이다** (`DESIGN.md`).
    예전엔 Oracle 계열 붉은색에 윈도우 기본 글꼴이었는데, 견적서·명함·카탈로그와
@@ -93,7 +96,7 @@
   --font-brand-en: "Montserrat", "NanumSquareNeo", sans-serif;
 
   /* --- Surfaces --- */
-  --bg-app: #eceef1;
+  --bg-app: #f4f5f5;           /* 브랜드 패널 회색 계열 — 예전 #eceef1(푸른 회색)은 카탈로그에 없다 */
   --bg-card: #ffffff;
   /*
    * 옅은 판·호버 — **중립 회색이다.**
@@ -102,13 +105,15 @@
    * 노랑으로 바꾸자 상관없는 판까지 전부 물들었다.
    * 고른 것은 `--sel`(진짜 노랑), 옅은 판은 여기(회색)로 나눈다.
    */
-  --bg-card-hover: #f2f3f5;
-  --bg-header: #e4e7eb;
-  --bg-subtle: #f7f8fa;
+  --bg-card-hover: #f5f6f6;
+  --bg-header: #f2f3f3;        /* = --ind-panel. 표 머리·옅은 판 */
+  --bg-subtle: #fafbfb;        /* 카탈로그 표 줄무늬 */
 
-  --border: #b9bec7;
-  --border-light: #d6dae0;
-  --border-strong: #a7adb7;
+  /* 선은 카탈로그의 헤어라인(#dcdddd) 계열로 연하게. 입력칸만 --border-strong(눌러야
+     하는 자리라 경계가 보여야 한다). */
+  --border: #dcdddd;
+  --border-light: #ebecec;
+  --border-strong: #b5b8bc;
 
   /* --- Text --- */
   --text-primary: #16191d;
@@ -141,25 +146,26 @@
      초록과 가장 잘 맞고, 무엇을 골랐는지가 한눈에 보인다. */
   --sel: var(--ind-yellow);
   --sel-border: #d6c700;
-  --focus: #2b6cb0;
+  --focus: var(--accent);      /* 예전 파랑 — 파랑을 걷어낸 화면에서 혼자 남아 있었다 */
 
   /* --- Shape --- */
-  --radius: 2px;
-  --radius-sm: 2px;
-  --radius-lg: 3px;
+  --radius: 6px;               /* 단추·입력칸 */
+  --radius-sm: 4px;
+  --radius-lg: 8px;            /* 카드·패널 — DESIGN.md 카드 반경 */
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .07);
-  --shadow: 0 1px 3px rgba(0, 0, 0, .10);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, .13);
-  --shadow-lg: 0 6px 20px rgba(0, 0, 0, .18);
+  --shadow-sm: 0 1px 2px rgba(62, 58, 57, .05);
+  --shadow: 0 1px 3px rgba(62, 58, 57, .08);
+  --shadow-md: 0 4px 12px rgba(62, 58, 57, .10);
+  --shadow-lg: 0 12px 32px rgba(62, 58, 57, .16);
 
-  --row-h: 26px;
+  --row-h: 38px;
 
   --font-ui: "NanumSquareNeo", "Segoe UI", "Malgun Gothic", -apple-system, BlinkMacSystemFont, sans-serif;
-  /* 표의 숫자는 고정폭을 유지한다. 자릿수가 어긋나면 금액을 눈으로 못 맞춘다.
-     카탈로그는 Montserrat를 쓰지만 조밀한 데이터 표가 없어 이 요구가 없었다.
-     문서(.doc-*)에서는 --font-brand-en(Montserrat)을 쓴다. */
-  --font-data: "Consolas", "Cascadia Mono", "D2Coding", "Malgun Gothic", monospace;
+  /* 숫자는 브랜드 서체 Montserrat + **자릿수 고정(tabular-nums)**.
+     예전에는 고정폭 Consolas였다 — 자릿수는 맞지만 코딩 화면처럼 보였다. 자릿수를
+     맞추는 데 필요한 것은 고정폭 글꼴이 아니라 '숫자 폭이 같은 것'이다(tnum).
+     Montserrat는 라틴 글자만 담아(unicode-range) 한글은 네오가 받는다. */
+  --font-data: "Montserrat", "NanumSquareNeo", "Malgun Gothic", sans-serif;
 
   /* Legacy OEM aliases */
   --oem-bg-app: var(--bg-app);
@@ -177,26 +183,8 @@
   --oem-grey-medium: var(--border-light);
 }
 
-/* 대시보드도 같은 토큰을 쓴다 */
-.dashboard-light {
-  --bg-app: #eceef1;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f2f3f5;
-  --bg-header: #e4e7eb;
-  --border: #b9bec7;
-  --border-light: #d6dae0;
-  --text-primary: #16191d;
-  --text-secondary: #5b626c;
-  --text-muted: #5f6773;
-  --accent: #007538;
-  --accent-dark: #005c2b;
-  /* 밝은 배경 위 '글씨'로 쓰인다(내비 활성, 패널 제목). 초록 중에 이보다 밝으면서
-     4.5:1을 넘는 값이 없어 --accent와 같은 값으로 둔다. 더 옅은 '면'이 필요하면
-     --accent-subtle을 쓸 것. */
-  --accent-light: #007538;
-  --accent-glow: rgba(0, 117, 56, 0.18);
-  --accent-subtle: #e6f2ea;
-}
+/* 대시보드도 같은 토큰을 쓴다 — 예전엔 :root 값을 여기 통째로 베껴 두어 한쪽만 바뀌었다 */
+.dashboard-light {}
 
 @tailwind base;
 @tailwind components;
@@ -219,8 +207,8 @@ body {
   padding: 0;
   height: 100%;
   font-family: var(--font-ui);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 14px;            /* 예전 13px — 읽기 편하게 한 단계 */
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -262,7 +250,7 @@ a:hover {
 .win {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -278,44 +266,72 @@ a:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 5px 10px 5px 12px;
-  background: var(--bg-header);
-  border-bottom: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 12px 16px 11px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ind-ink);
+  position: relative;
+}
+/* 초록 막대는 남긴다(어디가 패널의 시작인지) — 모서리가 둥글어져 테두리 대신
+   제목 앞의 짧은 막대로. 회색 타이틀바는 걷었다: 제목이 화면에서 가장 작은 글씨였다. */
+.win-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
 }
 
 /* 상단 요약 카드의 라벨·부연. 데스크톱은 밀도가 중요해 11px을 쓰지만
    모바일에서는 아래 미디어쿼리가 12px로 올린다. 인라인 `style`로 주면
    그 규칙을 이겨 버리므로 반드시 클래스로 둔다. */
 .card-label {
-    font-size: 11px;
+    font-size: 12px;
+    color: var(--ind-ink-mute);
 }
 
+/* 요약 카드의 큰 숫자 — 화면에서 가장 먼저 읽히는 자리 */
+.stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 4px 0 2px;
+  color: var(--ind-ink);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+/* 폰은 두 칸씩이라 24px이면 '6억 7,917 / 만원'처럼 꺾인다 — 한 줄에 들어가게 */
+@media (max-width: 768px) { .stat-value { font-size: 19px; } }
+
 .win-title .meta {
-  font-family: var(--font-data);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding: 4px 8px;
+  padding: 10px 16px;
   background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .tb-btn {
   font: inherit;
-  font-size: 12px;
-  padding: 3px 10px;
-  min-height: 26px;
-  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  min-height: 34px;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--bg-card);
   color: var(--text-primary);
@@ -327,7 +343,8 @@ a:hover {
 }
 
 .tb-btn:hover:not(:disabled) {
-  background: var(--bg-header);
+  background: var(--bg-card-hover);
+  border-color: var(--ind-ink-faint);
 }
 
 .tb-btn:disabled {
@@ -350,30 +367,14 @@ a:hover {
   color: var(--danger);
 }
 
-.tb-btn kbd {
-  font-family: var(--font-data);
-  font-size: 10px;
-  /* `--text-muted`(#5f6773)는 `--bg-app` 위에서 4.47:1로 4.5에 미치지 못한다
-     (실측). 한 단계 진한 값으로 둔다. */
-  color: var(--text-secondary);
-  border: 1px solid var(--border-light);
-  border-radius: 2px;
-  padding: 0 3px;
-  background: var(--bg-app);
-}
-
-.tb-btn.primary kbd {
-  /* 예전 Oracle 레드 테마의 분홍 잔재였다. 초록 단추 위에서는 흰색 계열이 맞다. */
-  color: rgba(255, 255, 255, .85);
-  border-color: rgba(255, 255, 255, .35);
-  background: rgba(0, 0, 0, .15);
-}
-
+/* 단추 안의 단축키 표시(F2·F4…)는 감춘다. 단축키는 그대로 동작하고 title에 남는다.
+   모든 단추에 키 이름이 붙어 있으면 정작 단추 이름이 묻힌다. */
+.tb-btn kbd { display: none; }
 .tb-sep {
   width: 1px;
   align-self: stretch;
   background: var(--border-light);
-  margin: 2px 4px;
+  margin: 4px 4px;
 }
 
 .filterbar {
@@ -381,24 +382,27 @@ a:hover {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding: 5px 8px;
+  padding: 10px 16px;
   background: var(--bg-subtle);
-  border-bottom: 1px solid var(--border);
-  font-size: 12px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
+/* 상태줄 — PC 프로그램의 흉내('준비됨'·단축키 안내)는 걷고 건수만 조용히 남긴다 */
 .statusbar {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  padding: 3px 9px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--bg-header);
-  border-top: 1px solid var(--border);
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-light);
+  font-variant-numeric: tabular-nums;
 }
+.statusbar .hint { display: none; }
 
 .statusbar .dot {
   width: 7px;
@@ -419,7 +423,8 @@ a:hover {
 table.dgrid {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -428,15 +433,17 @@ table.dgrid {
  * 물러나고, 초록은 실선 하나로만 브랜드를 붙든다.
  * 화면과 종이가 같은 모양이어야 한 회사가 만든 것처럼 보인다.
  */
+/* 칸마다 세로선을 두르지 않는다 — 가로줄만. 머리는 브랜드 규칙 그대로
+   (밝은 회색 + 먹색 + 초록 2px 실선). */
 table.dgrid th {
   background: var(--bg-header);
-  border: 1px solid var(--border-light);
-  border-top: 0;
+  border: 0;
   border-bottom: 2px solid var(--accent);
-  padding: 4px 7px;
+  padding: 9px 12px;
   text-align: left;
+  font-size: 12.5px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--ind-ink-mute);
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -444,18 +451,21 @@ table.dgrid th {
 }
 
 table.dgrid td {
-  border: 1px solid var(--border-light);
-  padding: 3px 7px;
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  padding: 7px 12px;
   white-space: nowrap;
   height: var(--row-h);
 }
 
 table.dgrid tbody tr:nth-child(even) {
-  background: var(--bg-subtle);
+  background: transparent;
 }
 
+/* 마우스를 올린 줄은 옅은 회색. **노랑은 '고른 줄'만** — 예전에는 지나가는 줄마다
+   노랗게 칠해져 '여기를 보라'가 의미를 잃었다 (노랑은 한 화면에 한둘). */
 table.dgrid tbody tr:hover {
-  background: var(--sel);
+  background: var(--bg-card-hover);
 }
 
 table.dgrid tbody tr.is-selected {
@@ -517,9 +527,10 @@ table.dgrid tbody tr.row-detail td {
 
 .rowbtn {
   font: inherit;
-  font-size: 11px;
-  padding: 1px 6px;
-  min-height: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  min-height: 28px;
   cursor: pointer;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -528,8 +539,9 @@ table.dgrid tbody tr.row-detail td {
 }
 
 .rowbtn:hover {
-  background: var(--bg-header);
+  background: var(--bg-card-hover);
   color: var(--text-primary);
+  border-color: var(--ind-ink-faint);
 }
 
 .rowbtn.danger:hover {
@@ -539,7 +551,7 @@ table.dgrid tbody tr.row-detail td {
 }
 
 .rowbtn+.rowbtn {
-  margin-left: 3px;
+  margin-left: 4px;
 }
 
 /* =========================================
@@ -557,24 +569,24 @@ table.dgrid tbody tr.row-detail td {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 4px 9px;
+  padding: 10px 16px;
   background: var(--accent-subtle);
   border-bottom: 1px solid var(--border-light);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .editor-head .rec {
-  font-family: var(--font-data);
   font-weight: 400;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
 .fields {
-  padding: 8px 9px;
+  padding: 14px 16px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 22px;
+  gap: 10px 28px;
 }
 
 .fields.one {
@@ -583,13 +595,13 @@ table.dgrid tbody tr.row-detail td {
 
 .f {
   display: grid;
-  grid-template-columns: 78px 1fr;
+  grid-template-columns: 88px 1fr;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .f>label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
   text-align: right;
 }
@@ -599,19 +611,20 @@ table.dgrid tbody tr.row-detail td {
 }
 
 .lines {
-  margin: 4px 9px 0;
+  margin: 4px 16px 0;
 }
 
 .lines table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .lines th {
   background: var(--bg-header);
   border: 1px solid var(--border-light);
-  padding: 3px 7px;
+  padding: 7px 10px;
   text-align: left;
   font-weight: 600;
   color: var(--text-secondary);
@@ -625,13 +638,14 @@ table.dgrid tbody tr.row-detail td {
 
 .lines td>input {
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   border: 0 !important;
   background: transparent !important;
   color: var(--text-primary) !important;
-  padding: 3px 7px;
+  padding: 6px 10px;
   width: 100%;
-  min-height: 24px;
+  min-height: 34px;
+  border-radius: 0;
 }
 
 .lines td.num>input {
@@ -642,22 +656,22 @@ table.dgrid tbody tr.row-detail td {
 
 .lines tfoot td {
   background: var(--bg-header);
-  font-weight: 600;
-  padding: 3px 7px;
+  font-weight: 700;
+  padding: 7px 10px;
 }
 
 .editor-foot {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 7px 9px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border-light);
   background: var(--bg-subtle);
 }
 
 .hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -677,7 +691,7 @@ input,
 select,
 textarea {
   background-color: var(--bg-card) !important;
-  border-color: var(--border) !important;
+  border-color: var(--border-strong) !important;
   color: var(--text-primary) !important;
   border-radius: var(--radius);
   font-family: inherit;
@@ -694,14 +708,15 @@ textarea {
    체크박스·라디오만 아래에서 되돌린다. */
 input,
 select {
-  min-height: 26px;
-  padding: 2px 6px;
-  font-size: 12px;
+  min-height: 34px;
+  padding: 5px 10px;
+  font-size: 13px;
 }
 
 textarea {
-  padding: 3px 6px;
-  font-size: 12px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 /* 체크박스·라디오는 위 규칙을 되돌린다 (속성 선택자라 요소 선택자를 이긴다) */
@@ -720,9 +735,8 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--focus) !important;
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-  box-shadow: none;
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 /* =========================================
@@ -893,24 +907,34 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
 /* 10px은 손에 들고 보기엔 작다. 데스크톱 밀도는 그대로 두고 폰에서만 올린다. */
 @media (max-width: 768px) { .badge-status { font-size: 12px; padding: 3px 7px; } }
 
+/* 패널 머리 — .win-title 과 같은 모양(흰 바탕 · 굵은 제목 · 초록 짧은 막대).
+   두 이름이 따로 놀아 화면마다 머리가 달라 보였다. */
 .oem-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 16px;
-  background: var(--ind-panel);
+  padding: 12px 16px 11px;
+  background: var(--bg-card);
   color: var(--ind-ink);
-  font-size: 12px;
-  font-weight: 700;
-  border-bottom: 2px solid var(--ind-green);
+  font-size: 15px;
+  font-weight: 800;
+  border-bottom: 1px solid var(--border-light);
+  position: relative;
+}
+.oem-panel-header::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 12px; bottom: 12px; width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
 }
 
 .oem-panel,
 .card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
 
@@ -921,8 +945,8 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   color: #fff;
   border: 1px solid var(--accent-dark);
   border-radius: var(--radius);
-  min-height: 28px;
-  font-size: 12px;
+  min-height: 34px;
+  font-size: 13px;
 }
 
 .oem-btn-primary:hover,
@@ -937,8 +961,8 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   border: 1px solid var(--border);
   color: var(--text-primary);
   border-radius: var(--radius);
-  min-height: 28px;
-  font-size: 12px;
+  min-height: 34px;
+  font-size: 13px;
 }
 
 .oem-btn-secondary:hover,
@@ -952,8 +976,8 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
   color: var(--danger);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  min-height: 28px;
-  font-size: 12px;
+  min-height: 34px;
+  font-size: 13px;
 }
 
 .btn-danger:hover {
@@ -1152,12 +1176,18 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
    * 첫 칸이 순번(1, 2, 3…)이라 카드마다 숫자만 크게 떠 있었다. 폰에서는 조회용이라
    * "어느 거래처인가"가 먼저 보여야 한다. 데스크톱 표의 칸 순서는 그대로 둔다.
    */
-  table.dgrid.sales-grid tbody tr.row-expandable {
+  /* 거래처 목록도 같다(2026-10) — 첫 칸이 고르기 체크박스라 카드마다 체크박스만 있는
+     빈 줄이 맨 위에 있었다. 체크박스는 카드 오른쪽 위로 옮긴다. */
+  table.dgrid.sales-grid tbody tr:not(.row-detail),
+  table.dgrid.clients-grid tbody tr {
     display: flex;
     flex-direction: column;
+    position: relative;
   }
-  table.dgrid.sales-grid td.seq { display: none; }
-  table.dgrid.sales-grid td.client-cell {
+  table.dgrid.sales-grid td.seq,
+  table.dgrid.clients-grid td.row-no { display: none; }
+  table.dgrid.sales-grid td.client-cell,
+  table.dgrid.clients-grid td.client-cell {
     order: -1;
     justify-content: flex-start;
     text-align: left;
@@ -1165,7 +1195,24 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
     font-weight: 700;
     min-height: 44px;
   }
-  table.dgrid.sales-grid td.client-cell::before { content: none; }
+  table.dgrid.clients-grid td.client-cell { padding-right: 56px; }
+  table.dgrid.sales-grid td.client-cell::before,
+  table.dgrid.clients-grid td.client-cell::before { content: none; }
+  table.dgrid.clients-grid td.pick-cell {
+    position: absolute;
+    top: 0;
+    right: 0;
+    border: 0;
+    padding: 0;
+    width: auto;
+    min-height: 0;
+    z-index: 1;
+  }
+  table.dgrid.clients-grid td.pick-cell::before { content: none; }
+
+  /* 패널 제목 옆 숫자가 몰리면 제목이 '거래처 / 관리'로 꺾인다 — 숫자를 아래 줄로 */
+  .win-title { flex-wrap: wrap; row-gap: 2px; }
+  .win-title > :first-child { white-space: nowrap; }
 
   /* 펼친 품목은 바로 위 카드에 붙인다 — 따로 떨어진 카드로 보이면 어느 줄 것인지 모른다 */
   table.dgrid tbody tr.row-expandable.is-open {

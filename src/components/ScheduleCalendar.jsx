@@ -335,7 +335,8 @@ const ScheduleCalendar = () => {
                                     className="cal-day"
                                     style={{
                                         minHeight: 52, padding: '3px 4px', textAlign: 'left',
-                                        border: isSel ? '2px solid var(--accent)' : '1px solid var(--border)',
+                                        /* 칸마다 테두리를 두르면 42칸이 전부 상자라 시끄럽다 — 고른 날만 테두리 */
+                                        border: isSel ? '2px solid var(--accent)' : '1px solid transparent',
                                         borderRadius: 'var(--radius)',
                                         /* 오늘 — 달력에서 한 칸뿐이므로 진짜 노랑으로 찍는다 */
                                         background: isToday ? 'var(--sel)' : 'transparent',
@@ -344,7 +345,7 @@ const ScheduleCalendar = () => {
                                     }}
                                 >
                                     <span style={{
-                                        fontSize: 12, fontWeight: isToday ? 800 : 500,
+                                        fontSize: 13, fontWeight: isToday ? 800 : 500,
                                         // 공휴일은 일요일과 같은 빨간색으로 (한국 달력 관례)
                                         color: (holiday || d.getDay() === 0) ? '#B91C1C'
                                             : d.getDay() === 6 ? '#1D4ED8' : 'var(--text-primary)'

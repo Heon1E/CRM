@@ -449,7 +449,7 @@ Supabase에서 execution/sql/receivables_exclusions.sql 을 실행해 주세요.
                     </button>
                 ))}
                 <span className="tb-sep" />
-                <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13 }}>
+                <label className="tap-box" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
                     <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
                     내 담당만
                 </label>
