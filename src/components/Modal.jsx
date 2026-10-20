@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 
 /**
@@ -37,6 +37,21 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', docked = false, 
         }
     }, [isOpen, docked, onClose])
 
+    /*
+     * **붙박이 편집 영역은 열릴 때 화면으로 끌어온다.** 매출 화면에서는 표 맨
+     * 아래에 붙어서, 폰에서 '수정'을 누르면 아무 일도 안 일어난 것처럼 보이고
+     * 한참 내려가야 창이 있었다. 폰은 머리가 위에 오게(`start`), 데스크톱은
+     * 이미 보이면 움직이지 않게(`nearest`). 상단바에 가리지 않는 여백은
+     * `.editor { scroll-margin-top }`이 맡는다.
+     */
+    const dockRef = useRef(null)
+    useEffect(() => {
+        if (!isOpen || !docked || !dockRef.current) return
+        const phone = window.matchMedia?.('(max-width: 768px)').matches
+        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        dockRef.current.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: phone ? 'start' : 'nearest' })
+    }, [isOpen, docked])
+
     if (!isOpen) return null
 
     const sizeClasses = {
@@ -48,7 +63,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md', docked = false, 
 
     if (docked) {
         return (
-            <div className="editor animate-in fade-in duration-150">
+            <div ref={dockRef} className="editor animate-in fade-in duration-150">
                 <div className="editor-head">
                     <span>{title}</span>
                     <span className="flex items-center gap-3">

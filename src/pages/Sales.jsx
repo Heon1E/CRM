@@ -7,6 +7,7 @@ import EditSaleModal from '../components/EditSaleModal'
 import { exportSalesToExcel } from '../utils/excelExport'
 import { showError, showConfirm, showSuccess } from '../utils/alert'
 import { formatKoreanCurrency } from '../utils/formatters'
+import { itemSearchPatterns, summarizeItemPrices } from '../utils/itemSearch'
 
 /** 검색 모드에서 한 번에 가져올 최대 건수 */
 const SEARCH_LIMIT = 300
@@ -23,6 +24,113 @@ const shiftDate = (iso, days) => {
   return toISO(d)
 }
 const weekdayOf = (iso) => ['일', '월', '화', '수', '목', '금', '토'][new Date(iso + 'T00:00:00').getDay()]
+const won = (v) => `${(Number(v) || 0).toLocaleString('ko-KR')}원`
+
+/**
+ * 펼친 줄의 품목 — 품목 · 수량 × 단가 = 금액.
+ * 표(`dgrid`)를 안에 또 두지 않는다. 모바일 카드 규칙이 안쪽 표에도 걸려
+ * 이름표가 겹친다.
+ */
+const SaleItemsDetail = ({ sale }) => {
+  const items = sale.items || []
+  if (items.length === 0) return <div className="sale-items-empty">품목 정보가 없습니다</div>
+  return (
+    <div className="sale-items">
+      {items.map((it, i) => (
+        <div key={it.id || i} className="sale-item">
+          <div className="sale-item-name">{it.item_name || '품목 미지정'}</div>
+          <div className="sale-item-calc">
+            {(Number(it.quantity) || 0).toLocaleString()} × {won(it.unit_price)}
+            <b>{won(it.total_amount)}</b>
+          </div>
+          {it.notes && it.notes !== sale.notes && <div className="sale-item-note">{it.notes}</div>}
+        </div>
+      ))}
+      {sale.notes && <div className="sale-item-note">메모 · {sale.notes}</div>}
+    </div>
+  )
+}
+
+/**
+ * 품목 검색 결과.
+ *
+ * **맨 위가 답이다** — 거래처별 마지막 단가. 밖에서 "이거 얼마였죠?"에 답하는
+ * 화면이라 이력 전체를 훑게 하면 안 된다. 단가는 0원이 아닌 마지막 값이다
+ * (0원 줄은 이월·부품·교환이라 가격이 아니다 — `summarizeItemPrices`).
+ */
+const ItemSearchResults = ({ loading, term, summary, rows, onPickDate }) => {
+  if (loading) {
+    return <div className="grid-scroll" style={{ padding: '24px', color: 'var(--text-muted)' }}>불러오는 중...</div>
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="grid-scroll" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)' }}>
+        <FileText className="w-6 h-6 mx-auto mb-1" style={{ opacity: .4 }} />
+        ‘{term}’ 이(가) 들어간 품목의 매출이 없습니다 — 낱말을 줄여 보세요 (예: BF-50, 150 캡)
+      </div>
+    )
+  }
+  return (
+    <div className="grid-scroll flex-1" style={{ minHeight: '320px' }}>
+      <div className="item-search-head">거래처별 마지막 단가 <span>{summary.length}가지</span></div>
+      <table className="dgrid">
+        <thead>
+          <tr>
+            <th style={{ width: '190px' }}>거래처</th>
+            <th>품목</th>
+            <th style={{ width: '112px' }}>마지막 단가</th>
+            <th style={{ width: '96px' }}>단가 날짜</th>
+            <th style={{ width: '96px' }}>최근 거래</th>
+            <th style={{ width: '56px' }}>건수</th>
+          </tr>
+        </thead>
+        <tbody>
+          {summary.map((g) => (
+            <tr key={g.key}>
+              <td style={{ fontWeight: 600 }}>{g.clientName}</td>
+              <td>{g.itemName}</td>
+              <td className="num"><b>{g.price ? won(g.price) : '0원'}</b></td>
+              <td className="dt">{g.priceDate || '-'}</td>
+              <td className="dt">{g.lastDate}</td>
+              <td className="num">{g.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="item-search-head">이력 <span>최근 순 {rows.length}건</span></div>
+      <table className="dgrid">
+        <thead>
+          <tr>
+            <th style={{ width: '190px' }}>거래처</th>
+            <th style={{ width: '104px' }}>날짜</th>
+            <th>품목</th>
+            <th style={{ width: '60px' }}>수량</th>
+            <th style={{ width: '104px' }}>단가</th>
+            <th style={{ width: '112px' }}>금액</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td style={{ fontWeight: 600 }}>{r.clientName}</td>
+              <td className="dt">
+                <button className="rowbtn" style={{ fontFamily: 'var(--font-data)', padding: '0 4px' }}
+                  onClick={() => onPickDate(r.sale_date)} title="이 날짜의 매출 보기">
+                  {r.sale_date}
+                </button>
+              </td>
+              <td>{r.item_name}{r.notes && <span style={{ color: 'var(--text-muted)' }}> · {r.notes}</span>}</td>
+              <td className="num">{(Number(r.quantity) || 0).toLocaleString()}</td>
+              <td className="num">{(Number(r.unit_price) || 0).toLocaleString()}</td>
+              <td className="num">{(Number(r.total_amount) || 0).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 const Sales = () => {
   const {
@@ -56,10 +164,24 @@ const Sales = () => {
   const [totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  /*
+   * 무엇으로 찾나 — 거래처 / 품목.
+   * 품목 검색은 밖에서 "이거 얼마였죠?"에 답하려고 있다. 그래서 결과를 묶지 않고
+   * 한 줄씩(단가가 보이게) 받고, 거래처별 마지막 단가를 맨 위에 둔다.
+   */
+  const [searchField, setSearchField] = useState('client')
+  const [itemRows, setItemRows] = useState([])
+  /*
+   * 펼친 줄. **품목을 보려고 '수정'을 누르지 않아도 된다.** 예전에는 내역을
+   * 보려면 수정을 눌러야 했고, 그 편집 창이 표 맨 아래에 붙어 폰에서는 한참
+   * 내려가야 보였다. 폰은 입력보다 조회에 쓰는 화면이다.
+   */
+  const [expandedId, setExpandedId] = useState(null)
   // 하단 스트립: viewDate 앞뒤로 5일치 건수/합계
   const [strip, setStrip] = useState([])
 
   const isSearchMode = Boolean(searchTerm)
+  const isItemSearch = isSearchMode && searchField === 'item'
 
   // 전체 건수 (상태줄 표시용)
   useEffect(() => {
@@ -122,6 +244,41 @@ const Sales = () => {
     }
   }, [mapRows])
 
+  /*
+   * 품목으로 찾기 — 전 기간, 한 줄씩. 거래처별로 묶지 않는다(단가가 줄마다 다르다).
+   * 낱말마다 따로 건다: `150 캡`이 `150캡`을, `BF 50`이 `BF-50V1H`를 찾는다.
+   * 휴지통에 든 매출(지운 거래처에 딸린 것)은 뺀다 — 가격을 물을 때 답이 아니다.
+   */
+  const fetchItemSearch = useCallback(async (term) => {
+    const patterns = itemSearchPatterns(term)
+    if (patterns.length === 0) { setItemRows([]); setLocalLoading(false); return }
+    try {
+      setLocalLoading(true)
+      let q = supabase
+        .from('sales')
+        .select('id, sale_date, client_id, item_name, quantity, unit_price, total_amount, notes, clients(company)')
+      patterns.forEach((p) => { q = q.ilike('item_name', p) })
+      const { data, error } = await q
+        .is('deleted_at', null)
+        .order('sale_date', { ascending: false })
+        .order('id', { ascending: true })
+        .limit(SEARCH_LIMIT)
+
+      if (error) throw error
+      setItemRows((data || []).map((r) => ({
+        ...r,
+        clientName: r.clients?.company
+          || clients.find((c) => c.id === r.client_id)?.company
+          || '알 수 없음',
+      })))
+    } catch (error) {
+      console.error('품목 검색 오류:', error)
+      showError('검색 중 오류가 발생했습니다.')
+    } finally {
+      setLocalLoading(false)
+    }
+  }, [clients])
+
   // 하단 5일 스트립 (viewDate 기준 앞뒤 2일)
   const fetchStrip = useCallback(async (center) => {
     const days = [-2, -1, 0, 1, 2].map(n => shiftDate(center, n))
@@ -141,9 +298,10 @@ const Sales = () => {
   }, [])
 
   const fetchData = useCallback(() => {
-    if (isSearchMode) fetchSearch(searchTerm)
+    if (isItemSearch) fetchItemSearch(searchTerm)
+    else if (isSearchMode) fetchSearch(searchTerm)
     else { fetchDay(viewDate); fetchStrip(viewDate) }
-  }, [isSearchMode, searchTerm, viewDate, fetchSearch, fetchDay, fetchStrip])
+  }, [isItemSearch, isSearchMode, searchTerm, viewDate, fetchItemSearch, fetchSearch, fetchDay, fetchStrip])
 
   /**
    * 매출이 있는 이전/다음 날로 이동한다.
@@ -196,7 +354,13 @@ const Sales = () => {
 
   /* 날짜나 검색이 바뀌면 고른 줄을 푼다 — 다른 날의 줄이 골라진 채로 남으면
      '수정'이 화면에 없는 줄을 연다. */
-  useEffect(() => { setPickedId(null) }, [viewDate, searchTerm])
+  useEffect(() => { setPickedId(null); setExpandedId(null) }, [viewDate, searchTerm, searchField])
+
+  /* 줄을 누르면 고르고, 품목을 펼친다(다시 누르면 접는다). */
+  const handleRowClick = (id) => {
+    setPickedId(id)
+    setExpandedId((cur) => (cur === id ? null : id))
+  }
 
   const handleSearchChange = (e) => {
     setSearchInput(e.target.value)
@@ -241,7 +405,10 @@ const Sales = () => {
 
   // 선택된 행 (키보드 이동용)
   const selectedId = editingSale?.id || pickedId || null
-  const pageSum = localSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
+  const pageSum = isItemSearch
+    ? itemRows.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
+    : localSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0)
+  const priceSummary = useMemo(() => (isItemSearch ? summarizeItemPrices(itemRows) : []), [isItemSearch, itemRows])
   // 한 행은 '같은 거래처·같은 날짜'의 매출을 묶은 것이라, 행 수와 원본 건수가 다르다.
   const rawCount = localSales.reduce((n, s) => n + (s.items?.length || 1), 0)
 
@@ -300,11 +467,20 @@ const Sales = () => {
               </>
             )}
 
-            <label htmlFor="sales-q">거래처</label>
+            <select
+              value={searchField}
+              onChange={(e) => setSearchField(e.target.value)}
+              aria-label="검색 기준"
+              style={{ width: '88px' }}
+            >
+              <option value="client">거래처</option>
+              <option value="item">품목</option>
+            </select>
             <input
               id="sales-q"
-              type="text"
-              placeholder="전 기간에서 검색"
+              type="search"
+              enterKeyHint="search"
+              placeholder={searchField === 'item' ? '품목명 (예: BF-50, 150 캡)' : '거래처명 — 전 기간'}
               value={searchInput}
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
@@ -319,14 +495,26 @@ const Sales = () => {
 
             <span className="flex-1" />
             <span>
-              {isSearchMode ? '검색 합계' : '이 날 합계'}{' '}
+              {isItemSearch ? '찾은 매출 합계' : isSearchMode ? '검색 합계' : '이 날 합계'}{' '}
               <b style={{ fontFamily: 'var(--font-data)', fontSize: '14px', color: 'var(--text-primary)' }}>
                 {formatKoreanCurrency(pageSum)}
               </b>
             </span>
           </div>
 
+          {/* 품목 검색 — 거래처별 마지막 단가가 먼저, 줄별 이력은 그 아래 */}
+          {isItemSearch && (
+            <ItemSearchResults
+              loading={localLoading}
+              term={searchTerm}
+              summary={priceSummary}
+              rows={itemRows}
+              onPickDate={(d) => { clearSearch(); setSearchField('client'); setViewDate(d) }}
+            />
+          )}
+
           {/* 데이터 그리드 — 폰에서도 같은 화면을 쓰고, 좁으면 가로로 민다 */}
+          {!isItemSearch && (
           <div className="grid-scroll flex-1" style={{ minHeight: '320px' }}>
             <table className="dgrid">
               <thead>
@@ -352,12 +540,14 @@ const Sales = () => {
                 ) : localSales.length > 0 ? (
                   localSales.map((sale, index) => {
                     const qty = sale.items?.reduce((sum, it) => sum + (Number(it.quantity) || 0), 0) || 0
+                    const open = expandedId === sale.id
                     return (
+                      <React.Fragment key={sale.id}>
                       <tr
-                        key={sale.id}
-                        className={selectedId === sale.id ? 'is-selected' : ''}
-                        onClick={() => setPickedId(sale.id)}
+                        className={`row-expandable ${selectedId === sale.id ? 'is-selected' : ''} ${open ? 'is-open' : ''}`}
+                        onClick={() => handleRowClick(sale.id)}
                         onDoubleClick={() => handleEdit(sale)}
+                        aria-expanded={open}
                       >
                         <td className="seq">{index + 1}</td>
                         <td className="dt">
@@ -381,10 +571,18 @@ const Sales = () => {
                         <td className="num">{qty.toLocaleString()}</td>
                         <td className="num">{(sale.totalAmount || 0).toLocaleString()}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <button className="rowbtn" onClick={() => handleEdit(sale)}>수정</button>
-                          <button className="rowbtn danger" onClick={() => handleDelete(sale)}>삭제</button>
+                          <button className="rowbtn" onClick={(e) => { e.stopPropagation(); handleEdit(sale) }}>수정</button>
+                          <button className="rowbtn danger" onClick={(e) => { e.stopPropagation(); handleDelete(sale) }}>삭제</button>
                         </td>
                       </tr>
+                      {open && (
+                        <tr className="row-detail">
+                          <td colSpan="7">
+                            <SaleItemsDetail sale={sale} />
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     )
                   })
                 ) : (
@@ -400,6 +598,7 @@ const Sales = () => {
               </tbody>
             </table>
           </div>
+          )}
 
           {/* 편집 영역 — 목록을 가리지 않고 화면에 붙는다 */}
           <AddSaleModal
@@ -451,7 +650,9 @@ const Sales = () => {
             <span><span className="dot" style={{ background: localLoading ? 'var(--warning)' : 'var(--success)' }} />
               {localLoading ? '조회 중' : '준비됨'}</span>
             <span>
-              {isSearchMode
+              {isItemSearch
+                ? `품목 검색 ${itemRows.length}건 · 거래처·품목 ${priceSummary.length}가지 (최대 ${SEARCH_LIMIT}건)`
+                : isSearchMode
                 ? `검색 결과 ${localSales.length}행 (매출 ${rawCount}건, 최대 ${SEARCH_LIMIT}건)`
                 : `${viewDate} — 표시 ${localSales.length}행 (매출 ${rawCount}건)`}
               {' / '}전체 {totalCount.toLocaleString()}건
@@ -459,7 +660,7 @@ const Sales = () => {
             {searchTerm && <span>필터: {searchTerm}</span>}
             <span className="flex-1" />
             <span className="hint">
-              <kbd>←</kbd><kbd>→</kbd> 날짜 이동 · <kbd>F2</kbd> 신규 · <kbd>F5</kbd> 새로고침 · <kbd>Esc</kbd> 닫기 · 행 더블클릭으로 수정
+              <kbd>←</kbd><kbd>→</kbd> 날짜 이동 · <kbd>F2</kbd> 신규 · <kbd>F5</kbd> 새로고침 · <kbd>Esc</kbd> 닫기 · 행을 누르면 품목 펼침 · 더블클릭으로 수정
             </span>
           </div>
         </div>

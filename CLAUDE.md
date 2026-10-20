@@ -24,6 +24,24 @@ npm run test:e2e:headed
 > rm -rf node_modules/@esbuild/win32-x64 && npm install @esbuild/win32-x64@0.21.5 --no-save --force
 > ```
 
+### 작업 도구 (플러그인·연결) — 2026-10 정리
+
+| 도구 | 상태 | 언제 쓰나 |
+|---|---|---|
+| `frontend-design` (Anthropic 공식 플러그인) | 설치됨 — 사용자 범위, `claude plugin install frontend-design --marketplace anthropics/claude-plugins-official` | 화면을 새로 만들거나 크게 고칠 때 |
+| `audit-suite` (성능·디자인·접근성 점검 10종, 지침 파일만 — 훅·외부 연결 없음) | 설치됨 — `claude plugin install audit-suite@anthropic-plugin-directory` (앱의 카드 설치는 실패했다. 디렉터리 이름이 UUID가 아니라 `audit-suite`다) | 화면을 고친 뒤 점검(`audit-as-perf-eng`·`audit-as-design-eng`·`audit-as-a11y-eng`), 성능 개선 전 진단 |
+| DB 조회 | `execution/_supabase.mjs`의 `connect()` (서비스 롤 키) | 읽기는 자유, 쓰기는 미리보기 → 승인 → `--apply` |
+| 화면 확인 | 앱 안 브라우저(`crm-dev`) · 사용자 크롬(배포본, 로그인돼 있음) | 고친 화면은 반드시 눌러 보고 수치로 잰다 |
+
+**`frontend-design`은 '독특하고 과감한' 디자인을 권한다. 이 저장소에서는 브랜드 규칙이
+이긴다** — 색·글꼴·표 모양은 `DESIGN.md`와 `src/index.css`의 `--ind-*` 토큰을 따르고,
+새 글꼴·새 강조색·장식 모션을 들이지 않는다(아래 '브랜드'·'모션' 절). 이 도구는
+배치·위계·빈 상태·모바일 흐름을 다듬는 데 쓴다.
+
+Supabase·Vercel **연결(MCP)은 붙어 있지 않다.** 서비스는 쓰고 있지만 Claude가 그 화면을
+직접 보는 연결은 없다 — 그래서 Vercel 배포·크론 기록은 사용자에게 물어야 한다
+(`directives/USER_TODO.md` 6·8번). 붙이면 이 표를 고칠 것.
+
 업로드 UI는 **Settings 페이지의 BULK DATA OPERATIONS 패널**에 있다 (`/sales`가 아니다).
 브라우저 확인용 dev 서버 설정은 `.claude/launch.json`(`crm-dev`, 포트 5173).
 
@@ -710,6 +728,32 @@ offset 끊어 받기  ->   1,169     (고유 id 1,169개)
 
 훅에 넘기는 행 형식: `{ clientName, sale_date, item_name, quantity, unitPrice, notes }`.
 `totalAmount`는 훅이 `quantity × unitPrice`로 다시 계산한다(판독이 합계 칸을 잘못 읽어도 대사가 어긋나지 않게).
+
+## 매출 화면 (`/sales`) — 폰에서는 입력보다 조회다 (2026-10)
+
+영업사원은 밖에서 폰으로 **"이 거래처에 뭘 얼마에 줬지?"** 를 찾는다. 두 가지가
+막고 있었다:
+
+1. **품목을 보려면 '수정'을 눌러야 했다.** 그 편집 창이 표 **맨 아래**에 붙어
+   있어서 폰에서는 한참 내려가야 보였고, 누른 직후에는 아무 일도 안 일어난 것처럼
+   보였다. → 줄을 **누르면 그 줄 바로 밑에 품목이 펼쳐진다**(품목 · 수량 × 단가 =
+   금액). 모바일에서는 펼친 내용이 그 카드에 붙는다(`tr.row-detail`).
+   '수정'을 누르면 편집 창을 화면으로 끌어온다(`Modal` docked의 `scrollIntoView` +
+   `.editor { scroll-margin-top }`).
+2. **품목으로 찾을 수 없었다.** → 검색칸 앞의 `거래처 / 품목`. 품목 검색은
+   `src/utils/itemSearch.js`(+ `tests/itemSearch.test.mjs` 7건):
+   - **낱말마다 따로 건다(AND).** `150 캡`이 `상부캡(150)`을, `BF 50`이
+     `BF-50V1H`를 찾는다.
+   - **맨 위는 거래처별 마지막 단가** — 거래처가 가격을 물을 때 답이 바로 보이게.
+     **0원이 아닌 마지막 단가**를 쓴다(0원은 이월·부품·교환이라 가격이 아니다).
+     0원밖에 없으면 0을 그대로 둔다. 그 아래가 줄별 이력이고, 날짜를 누르면 그날로 간다.
+   - 결과를 거래처·날짜로 묶지 않는다 — 줄마다 단가가 다르다.
+
+실측(386px 폰 크기): 가로 넘침 0 · 터치 44px 미달 0 · 12px 미만 0. `150 캡` →
+55건 / 35가지(거래처×품목).
+
+**모바일 카드의 제목이 순번(1, 2, 3…)이다.** `dgrid` 규칙이 첫 칸을 제목으로 키우는데
+매출 표의 첫 칸이 번호라서 그렇다. 조회용으로는 거래처가 제목이어야 한다 — 남은 숙제.
 
 ## 엑셀 일괄등록 (매출)
 

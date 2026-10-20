@@ -463,6 +463,41 @@ table.dgrid tbody tr.is-selected {
   box-shadow: inset 0 0 0 1px var(--sel-border);
 }
 
+/*
+ * 눌러서 펼치는 줄 (매출 화면). **내역을 보려고 '수정'을 누르지 않게 한다** —
+ * 예전에는 품목이 편집 창에만 있었고, 그 창이 표 맨 아래에 붙어 폰에서는
+ * 한참 내려가야 보였다. 펼친 품목은 그 줄 바로 밑에 붙는다.
+ */
+table.dgrid tbody tr.row-expandable { cursor: pointer; }
+table.dgrid tbody tr.row-detail,
+table.dgrid tbody tr.row-detail:hover { background: var(--bg-subtle); }
+table.dgrid tbody tr.row-detail td {
+  height: auto;
+  padding: 6px 12px 10px 56px;
+  white-space: normal;
+}
+.sale-items { display: flex; flex-direction: column; gap: 4px; max-width: 760px; }
+.sale-item {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: 2px 16px; padding: 4px 0; border-bottom: 1px dashed var(--border-light);
+}
+.sale-item:last-of-type { border-bottom: 0; }
+.sale-item-name { font-weight: 600; color: var(--text-primary); }
+.sale-item-calc {
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
+  color: var(--text-secondary); display: flex; gap: 12px; align-items: baseline;
+}
+.sale-item-calc b { color: var(--text-primary); }
+.sale-item-note, .sale-items-empty { color: var(--text-muted); font-size: 12px; }
+
+/* 품목 검색 — 표 두 개(마지막 단가 / 이력)의 머리 */
+.item-search-head {
+  padding: 8px 10px 6px; font-weight: 700; color: var(--text-primary);
+  border-top: 1px solid var(--border);
+}
+.item-search-head:first-child { border-top: 0; }
+.item-search-head span { font-weight: 400; color: var(--text-muted); margin-left: 6px; font-size: 12px; }
+
 .num {
   text-align: right;
   font-family: var(--font-data);
@@ -513,6 +548,8 @@ table.dgrid tbody tr.is-selected {
 .editor {
   border-top: 2px solid var(--accent);
   background: var(--bg-card);
+  /* 열릴 때 화면으로 끌어온다(Modal docked). 고정 상단바(56px)에 머리가 가리지 않게 */
+  scroll-margin-top: 64px;
 }
 
 .editor-head {
@@ -1108,6 +1145,30 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
     gap: 6px;
     padding-top: 4px;
     padding-bottom: 4px;
+  }
+
+  /* 펼친 품목은 바로 위 카드에 붙인다 — 따로 떨어진 카드로 보이면 어느 줄 것인지 모른다 */
+  table.dgrid tbody tr.row-expandable.is-open {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  table.dgrid tbody tr.row-detail {
+    margin-top: 0;
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    box-shadow: var(--shadow-sm);
+    padding: 2px 0;
+  }
+  table.dgrid tbody tr.row-detail td,
+  table.dgrid tbody tr.row-detail td:first-child {
+    display: block;
+    padding: 6px 12px 8px;
+    min-height: 0;
+    text-align: left;
+    font-size: inherit;
+    font-weight: 400;
   }
 
   /* 손가락으로 누를 수 있는 크기 */
