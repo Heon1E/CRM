@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Image as ImageIcon, Loader2, Trash2, ScanLine, Check, AlertTriangle, X } from 'lucide-react'
 import { analyzeErpScreenshots, toNumber } from '../services/erpVisionService'
-import { useSalesImport, buildClientKeys } from '../hooks/useSalesImport'
+import { useSalesImport } from '../hooks/useSalesImport'
 import { useData } from '../contexts/DataContext'
 import { setKpiManualInput } from '../utils/kpiCategories'
-import { nameCandidates, NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../utils/clientAliases'
+import { NON_CLIENT_PATTERN, looksLikeMultiCompany } from '../utils/clientAliases'
+import { makeClientFinder } from '../utils/clientKeys'
 import { showSuccess, showError, showWarning } from '../utils/alert'
 import { verifyReport, summarizeClients, suggestFix, checkNames } from '../utils/collectionReport'
 import { supabase } from '../lib/supabase'
@@ -313,22 +314,9 @@ const ErpScreenshotImport = ({ onRefresh }) => {
      * 적힌 이름으로 거래처를 찾는다.
      * 대응표(ALIASES)와 '(오산)' 같은 괄호·공장 접미사까지 훑어야
      * 이미 있는 회사를 못 찾고 새로 만드는 일이 없다.
+     * 규칙은 `makeClientFinder` 하나다 — 매출 업로드·받은 항목과 같은 함수를 쓴다.
      */
-    const clientMap = useMemo(() => {
-        const m = new Map()
-        clients.forEach((c) => {
-            buildClientKeys(c.company).forEach((k) => { if (!m.has(k)) m.set(k, c) })
-        })
-        return m
-    }, [clients])
-
-    const findClient = (raw) => {
-        for (const cand of nameCandidates(raw)) {
-            const hit = buildClientKeys(cand).map((k) => clientMap.get(k)).find(Boolean)
-            if (hit) return hit
-        }
-        return null
-    }
+    const findClient = useMemo(() => makeClientFinder(clients), [clients])
 
     /**
      * 이미 등록된 활동인지. 같은 거래처를 같은 날 두 번 등록하지 않는다.

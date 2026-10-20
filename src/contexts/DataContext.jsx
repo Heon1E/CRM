@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { makeClientFinder } from '../utils/clientKeys'
 import {
   getAllData as getOfflineData,
   saveToStore,
@@ -1249,9 +1250,11 @@ export const DataProvider = ({ children }) => {
     const newClientsMap = {}
     if (missingClientNames.length > 0) {
       console.log('[addSale] 신규 거래처 자동 등록 중:', missingClientNames)
+      // 이미 있는지 다시 확인 (중복 등록 방지). 글자 그대로 비교하면 '(주)한국'과
+      // '한국'이 다른 회사가 되고 병합해 둔 옛 이름도 못 찾는다 — 입력 경로 공통 규칙을 쓴다.
+      const findClient = makeClientFinder(clients)
       for (const name of missingClientNames) {
-        // 이미 로컬에 있는지 다시 확인 (중복 등록 방지)
-        const existing = clients.find(c => c.company.trim() === name)
+        const existing = findClient(name)
         if (existing) {
           newClientsMap[name] = existing.id
           continue
@@ -1263,6 +1266,7 @@ export const DataProvider = ({ children }) => {
           continue
         }
         newClientsMap[name] = data.id
+        findClient.add(data) // 같은 묶음 안의 '(주)한국' / '한국'이 둘 다 만들어지지 않게
         setClients(prev => [...prev, { ...data, lastOrder: null, orderAmount: 0, contact_person: '', phone: '', email: '' }])
       }
     }

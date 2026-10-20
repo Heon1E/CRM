@@ -51,7 +51,12 @@ const fetchAll = async (build, ps = 1000) => {
     return out
 }
 
-const clients = await fetchAll(() => supabase.from('clients').select('*').order('company'))
+/*
+ * **휴지통에 든 것은 빼고, `id`로 정렬한다.** (`merge_duplicate_clients.mjs`와 같은 규칙)
+ * - 지운 거래처를 넣으면 이름이 같은 지운 행을 '남길 쪽'으로 집을 수 있다.
+ * - `company`는 유일하지 않아 1,000행 경계에서 한 곳이 빠지거나 겹친다.
+ */
+const clients = await fetchAll(() => supabase.from('clients').select('*').is('deleted_at', null).order('id'))
 const byName = new Map(clients.map((c) => [c.company.trim(), c]))
 
 console.log('거래처 병합\n')
@@ -118,10 +123,17 @@ for (const p of plans) {
         continue
     }
 
-    const { error } = await supabase.from('clients').delete().eq('id', p.remove.id)
-    if (error) { console.error(`  삭제 실패: ${error.message}`); continue }
-    console.log(`  '${p.remove.company}' 삭제 완료`)
+    /*
+     * **지우기는 '표시'다** (저장소 규칙). 예전에는 `.delete()`로 진짜 지웠다 —
+     * `merge_duplicate_clients.mjs`는 2026-09에 고쳤는데 이 파일만 남아 있었다.
+     * 딸린 자료는 위에서 다 옮겼으므로 잃을 것은 없지만, 합치기를 잘못 판단했을 때
+     * 설정 > 휴지통에서 되살릴 길이 남는다.
+     */
+    const { error } = await supabase.from('clients')
+        .update({ deleted_at: new Date().toISOString() }).eq('id', p.remove.id)
+    if (error) { console.error(`  지움 표시 실패: ${error.message}`); continue }
+    console.log(`  '${p.remove.company}' 지움 표시 완료 (휴지통)`)
 }
 
-const after = await fetchAll(() => supabase.from('clients').select('id').order('id'))
+const after = await fetchAll(() => supabase.from('clients').select('id').is('deleted_at', null).order('id'))
 console.log(`\n완료. 거래처 ${clients.length} -> ${after.length}곳`)

@@ -1334,6 +1334,35 @@ node execution/analyze_receivables.mjs "<외상매출금.xlsx>"
 **새 스크립트에서 거래처를 찾을 때 규칙을 새로 짜지 말 것.**
 `nameCandidates` + `buildClientKeys` 를 부른다.
 
+### 앱에서는 `makeClientFinder` 하나를 쓴다 (2026-10)
+
+`src/utils/clientKeys.js`. 위 두 함수를 묶은 것이다 — 별칭이 맨 앞, 그다음 적힌
+이름, 괄호 안팎, 공장 접미사. `find.add(c)`로 방금 만든 거래처를 끼워 넣는다.
+`tests/clientFinder.test.mjs`(8건).
+
+**합쳐 둔 거래처가 매출 업로드로 되살아났다.** 2026-08에 `신성물산(주)`를
+`대달인터내셔널(주)`로 합쳤는데, 2026-10-01 매출 엑셀에 옛 이름이 적혀 있자
+`useSalesImport`가 그것을 못 찾고 **새 거래처로 만들어 매출 3행을 붙였다.**
+대시보드 '빠르게 크는 거래처' 1위로 떠 있었다. 매출 업로드가 `buildClientKeys`만
+보고 별칭표를 안 봤기 때문이다 — 별칭표에 **이미 적혀 있었는데도.**
+
+같은 결함이 네 군데였다. 전부 `makeClientFinder`로 바꿨다:
+
+| 자리 | 어떻게 틀렸나 |
+|---|---|
+| `useSalesImport` (엑셀·ERP 스크린샷·텔레그램 매출이 모두 거친다) | 별칭 안 봄 → 새 거래처 생성 |
+| `ErpScreenshotImport` 실적표 저장 | 미리보기는 별칭을 보고 저장은 안 봄 → `client_id = null` |
+| `InboxPanel` 실적표·일정·활동 | 별칭 안 봄 → 연결 끊김 / '못 찾음'으로 버림 |
+| `DataContext.addSale` 자동 등록 폴백 | 글자 그대로 비교 (`'(주)한국'` ≠ `'한국'`) |
+
+**매출 업로드는 휴지통에 든 거래처를 빼고 맞춘다.** 넣어 두면 지운(병합하며 표시만
+해 둔) 거래처에 매출이 붙어 **화면 어디에도 안 보이는 매출**이 된다. 옛 이름은
+별칭표가 남은 쪽으로 잇는다.
+
+**병합하면 별칭표에 옛 이름을 꼭 넣을 것.** 그래야 다음 업로드가 되살리지 않는다.
+2026-10 조회로 별칭표의 왼쪽 이름이 살아 있는 거래처로 남은 것은 `신성물산(주)`
+하나뿐이었다.
+
 ## 채권관리 탭 (`/receivables`)
 
 `src/pages/Receivables.jsx`. 결제가 밀린 순서로 거래처를 세운다.
@@ -1590,7 +1619,7 @@ upsert라 **한 쪽씩 반영해도 쌓인다.** 잔액 합계는 마지막 쪽�
    그런데 미리보기의 `checkNames`는 별칭을 보는 `findClient`를 쓴다. 그래서
    `신성물산(주)`는 **미리보기에서 '있는 거래처'로 통과하고 저장은 `client_id = null`**
    이었다 — 스크립트(`7363e0a7`)에서 고친 바로 그 실수다.
-   **둘 다 `findClient`(= `nameCandidates` + `buildClientKeys`)로 바꿨다.**
+   **둘 다 `findClient`(= `makeClientFinder`, 별칭표까지 본다)로 바꿨다.**
    `InboxPanel`의 일정·활동 갈래도 같은 결함이라(별칭 거래처를 '못 찾음'으로 버렸다)
    함께 고쳤다 — 이제 그 파일은 `findClient` 하나만 쓴다.
 2. **설정 화면 업로드가 담당분 표시를 안 남겼다.** payload에 `delay_note`가 없어서
@@ -2310,8 +2339,18 @@ VITE_DEV_AUTOLOGIN_PW=<비밀번호>
 
 매출은 한쪽에, 활동은 다른 쪽에 갈려 있으면 코치가 같은 회사를 '매출 0인 신규'와
 '거래 중인 기존'으로 따로 세어 판단이 어긋난다.
-합친 뒤 `clientAliases.js`와 `import_daily_report.mjs`의 `ALIASES` **양쪽에** 별칭을 넣어야
-다음 업로드에서 다시 만들어지지 않는다.
+합친 뒤 `clientAliases.js`에 옛 이름을 별칭으로 넣어야 다음 업로드에서 다시
+만들어지지 않는다. (예전 문서는 `import_daily_report.mjs`의 `ALIASES`에도 넣으라고
+했는데, 그 사본은 2026-09에 없앴다 — 이제 `clientAliases.js` 하나다.)
+
+**별칭을 넣어도 찾는 쪽이 그 표를 안 보면 소용없다.** `신성물산(주)`는 별칭표에
+있었는데도 2026-10-01 매출 업로드로 되살아났다(위 '앱에서는 `makeClientFinder`
+하나를 쓴다').
+
+**이 스크립트도 진 쪽을 진짜로 지우고 있었다(2026-10 고침).** 같은 결함을
+`merge_duplicate_clients.mjs`에서는 2026-09에 고쳤는데 이 파일만 남아 있었다.
+지금은 `deleted_at`만 채우고(휴지통에서 되살릴 수 있다), 휴지통에 든 거래처는
+읽지 않으며, `company`가 아니라 `id`로 정렬해 받는다.
 
 ## 거래처 브리핑 (`ClientBriefing.jsx` + `api/client-briefing.js`)
 

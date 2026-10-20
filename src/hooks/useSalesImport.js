@@ -22,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { showError, showWarning, showInfo, showHtmlConfirm } from '../utils/alert'
 import { reconcileSales } from '../utils/salesReconciler'
 import { fetchAllRows } from '../utils/fetchAllRows'
-import { normalizeKey, buildClientKeys } from '../utils/clientKeys.js'
+import { normalizeKey, buildClientKeys, makeClientFinder } from '../utils/clientKeys.js'
 
 /**
  * 거래처명 키 만들기는 src/utils/clientKeys.js 로 옮겼다 - 이 파일은 React를
@@ -75,16 +75,17 @@ export function useSalesImport() {
             // ---- 1. 거래처 매칭 ----
             setProgress({ current: 0, total: 0, stage: '거래처 목록 불러오는 중' })
 
+            /*
+             * **휴지통에 든 거래처는 빼고 맞춘다.** 넣어 두면 지운(또는 병합하며 표시만
+             * 해 둔) 거래처에 매출이 붙어 **화면 어디에도 안 보이는 매출**이 된다.
+             * 병합된 옛 이름은 별칭표(`makeClientFinder`)가 남은 쪽으로 이어 준다.
+             */
             const fetchedClients = await fetchAllRows(() =>
-                supabase.from('clients').select('id, company').order('company')
+                supabase.from('clients').select('id, company').is('deleted_at', null).order('company')
             )
 
-            const clientMap = new Map()
-            ;(fetchedClients || []).forEach((c) => {
-                buildClientKeys(c.company).forEach((key) => {
-                    if (!clientMap.has(key)) clientMap.set(key, c)
-                })
-            })
+            // 별칭표까지 보는 찾기 — 키만 맞추면 합쳐 둔 거래처가 새로 만들어진다
+            const findClient = makeClientFinder(fetchedClients)
 
             setProgress({ current: 0, total: rows.length, stage: '거래처 매칭 중' })
 
@@ -92,7 +93,7 @@ export function useSalesImport() {
             rows.forEach((sale) => {
                 if (!sale.clientName || String(sale.clientName).trim() === '') return
 
-                const client = buildClientKeys(sale.clientName).map((k) => clientMap.get(k)).find(Boolean)
+                const client = findClient(sale.clientName)
                 const quantity = Number(sale.quantity) || 0
                 const unitPrice = Number(sale.unitPrice) || 0
 
@@ -137,9 +138,7 @@ export function useSalesImport() {
                     const created = await registerMissingClients(Array.from(newNameByKey.values()))
                     created.forEach((c) => {
                         createdClientNames.push(c.company)
-                        buildClientKeys(c.company).forEach((key) => {
-                            if (!clientMap.has(key)) clientMap.set(key, c)
-                        })
+                        findClient.add(c)
                     })
                 } catch (clientError) {
                     console.error('신규 거래처 자동 등록 실패:', clientError)
@@ -147,7 +146,7 @@ export function useSalesImport() {
 
                 validatedSales.forEach((s) => {
                     if (s.clientId) return
-                    const match = buildClientKeys(s.clientName).map((k) => clientMap.get(k)).find(Boolean)
+                    const match = findClient(s.clientName)
                     if (match) s.clientId = match.id
                 })
             }

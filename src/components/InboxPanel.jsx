@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Inbox, Loader2, Check, X, RefreshCw, MessageSquare, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useSalesImport, buildClientKeys } from '../hooks/useSalesImport'
+import { useSalesImport } from '../hooks/useSalesImport'
 import { useData } from '../contexts/DataContext'
 import { normalizeDate, toNumber } from '../services/erpVisionService'
 import { showSuccess, showError, showWarning } from '../utils/alert'
-import { nameCandidates } from '../utils/clientAliases'
+import { makeClientFinder } from '../utils/clientKeys'
 import {
     normalizeClient as normalizeReportClient, verifyReport, summarizeClients,
 } from '../utils/collectionReport'
@@ -33,21 +33,10 @@ const InboxPanel = ({ onRefresh }) => {
 
     /**
      * 적힌 이름으로 거래처를 찾는다 — **별칭표·괄호·공장 접미사까지 훑는다**
-     * (`ErpScreenshotImport.findClient`와 같은 규칙). 키만 맞춰 보면
+     * (`makeClientFinder` — 매출 업로드·ERP 스크린샷과 같은 함수). 키만 맞춰 보면
      * `신성물산(주)` 같은 별칭 거래처를 못 찾아 연결이 끊긴 채 저장된다.
      */
-    const clientMap = useMemo(() => {
-        const m = new Map()
-        clients.forEach((c) => buildClientKeys(c.company).forEach((k) => { if (!m.has(k)) m.set(k, c) }))
-        return m
-    }, [clients])
-    const findClient = (raw) => {
-        for (const cand of nameCandidates(raw)) {
-            const hit = buildClientKeys(cand).map((k) => clientMap.get(k)).find(Boolean)
-            if (hit) return hit
-        }
-        return null
-    }
+    const findClient = useMemo(() => makeClientFinder(clients), [clients])
     const { importSalesRows, isImporting } = useSalesImport()
 
     const [items, setItems] = useState([])
