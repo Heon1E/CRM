@@ -90,11 +90,11 @@ const ClientMonthSalesModal = ({ isOpen, onClose, client, salesData, currentMont
                     {/* Summary Cards */}
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <div className="bg-white border border-oem-border rounded-lg p-4 shadow-sm">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">총 매출액</p>
+                            <p className="text-xs font-bold text-gray-500 mb-1">총 매출액</p>
                             <p className="text-2xl font-bold text-oem-blue">{formatKoreanCurrency(totalSalesAmount)}</p>
                         </div>
                         <div className="bg-white border border-oem-border rounded-lg p-4 shadow-sm">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">총 판매 수량</p>
+                            <p className="text-xs font-bold text-gray-500 mb-1">총 판매 수량</p>
                             <p className="text-2xl font-bold text-gray-800">{formatNumber(totalQuantity)} 개</p>
                         </div>
                     </div>

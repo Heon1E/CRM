@@ -357,11 +357,11 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
     : []
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`CLIENT_DETAILS: ${client?.company || 'NEW_RECORD'}`} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={client?.company ? `거래처 수정 · ${client.company}` : '새 거래처'} size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="font-bold text-black uppercase tracking-tight">
+            <label className="font-bold text-[color:var(--ind-ink)]">
               COMPANY_NAME:
             </label>
             <input
@@ -373,7 +373,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="font-bold text-black uppercase tracking-tight">
+            <label className="font-bold text-[color:var(--ind-ink)]">
               SALES_REP_ID:
             </label>
             <select
@@ -392,7 +392,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
 
           {/* 주소 입력 섹션 */}
           <div className="col-span-1 md:col-span-2 oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-            <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">주소</label>
+            <label className="font-bold text-[color:var(--ind-ink)] block border-b border-gray-400 pb-1 mb-2">주소</label>
             <div className="flex gap-2 items-center">
               <label className="w-20">우편번호</label>
               <input
@@ -433,7 +433,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
         {/* 담당자 관리 섹션 */}
         <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
           <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
-            <label className="font-bold text-black uppercase tracking-tight">담당자</label>
+            <label className="font-bold text-[color:var(--ind-ink)]">담당자</label>
             <button
               type="button"
               onClick={handleAddContact}
@@ -515,7 +515,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="font-bold text-black uppercase tracking-tight">CLIENT_STATUS:</label>
+          <label className="font-bold text-[color:var(--ind-ink)]">상태</label>
           <select
             value={formData.status || '신규'}
             onChange={(e) => setFormData({ ...formData, status: e.target.value || '신규' })}
@@ -529,7 +529,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
 
         {/* 계약 단가 관리 섹션 */}
         <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-          <label className="font-bold text-black uppercase tracking-tight block border-b border-gray-400 pb-1 mb-2">계약 단가</label>
+          <label className="font-bold text-[color:var(--ind-ink)] block border-b border-gray-400 pb-1 mb-2">계약 단가</label>
 
           <div className="bg-white p-2 oracle-sunken space-y-2">
             <div className="flex gap-2 items-end">

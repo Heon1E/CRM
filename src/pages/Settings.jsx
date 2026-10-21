@@ -29,7 +29,7 @@ const Panel = ({ title, children, className = "" }) => (
     <div className="oem-panel-header">
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-oem-text-secondary">▼</span>
-        <span className="uppercase tracking-tight">{title}</span>
+        <span>{title}</span>
       </div>
     </div>
     <div className="oem-panel-content p-4">
@@ -302,13 +302,13 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-oem-bg-app">
-        <div className="text-oem-text-secondary text-sm">LOADING_SETTINGS_MODULE...</div>
+        <div className="text-oem-text-secondary text-sm">설정을 불러오는 중…</div>
       </div>
     )
   }
 
   return (
-    <div className="bg-oem-bg-app p-6 font-['Noto_Sans_KR',sans-serif] text-oem-text-primary">
+    <div className="bg-oem-bg-app p-6 text-oem-text-primary">
       <div className="max-w-[1200px] mx-auto space-y-6">
 
         {/* Page Header */}

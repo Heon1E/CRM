@@ -369,7 +369,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="font-bold text-black uppercase tracking-tight">
+            <label className="font-bold text-[color:var(--ind-ink)]">
               CLIENT_ID: <span className="text-[color:var(--danger)]">*</span>
             </label>
             <ClientCombobox
@@ -382,7 +382,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="font-bold text-black uppercase tracking-tight">
+            <label className="font-bold text-[color:var(--ind-ink)]">
               TRANS_DATE: <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
@@ -398,7 +398,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
         {/* 품목 리스트 */}
         <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
           <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
-            <label className="font-bold text-black uppercase tracking-tight">품목</label>
+            <label className="font-bold text-[color:var(--ind-ink)]">품목</label>
             <button
               type="button"
               onClick={addItem}
@@ -486,7 +486,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label className="font-bold text-black uppercase tracking-tight">비고</label>
+          <label className="font-bold text-[color:var(--ind-ink)]">비고</label>
           <textarea
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}

@@ -40,40 +40,43 @@ class ErrorBoundary extends React.Component {
         if (this.state.hasError) {
             // 폴백 UI
             return (
-                <div className="min-h-screen flex items-center justify-center bg-oem-bg-app font-['Noto_Sans_KR',sans-serif]">
-                    <div className="max-w-md w-full bg-white border border-red-200 shadow-lg rounded-sm p-8 text-center">
-                        <div className="flex justify-center mb-6">
-                            <div className="bg-red-50 p-4 rounded-full">
-                                <TriangleAlert className="w-12 h-12 text-[color:var(--danger)]" />
+                /* 예전엔 'SYSTEM ERROR DETECTED' · 'RELOAD APPLICATION' · 'Error Code:
+                   RENDER_EXCEPTION_0x1' 처럼 영어·개발자 말로 떠서, 폰에서 본 사용자가
+                   무엇을 해야 할지 알 수 없었다. 할 일(다시 불러오기)을 먼저, 기술 내용은
+                   관리자에게 보여 줄 용도로 아래에 작게. */
+                <div className="min-h-screen flex items-center justify-center bg-oem-bg-app px-4">
+                    <div className="win max-w-md w-full p-8 text-center">
+                        <div className="flex justify-center mb-5">
+                            <div className="p-4 rounded-full" style={{ background: 'var(--danger-subtle)' }}>
+                                <TriangleAlert className="w-10 h-10 text-[color:var(--danger)]" />
                             </div>
                         </div>
 
-                        <h1 className="text-xl font-bold text-gray-900 mb-2 tracking-tight uppercase">
-                            System Error Detected
+                        <h1 className="text-xl font-extrabold mb-2" style={{ color: 'var(--ind-ink)' }}>
+                            화면을 여는 중에 문제가 생겼습니다
                         </h1>
 
-                        <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                            어플리케이션 실행 중 예기치 않은 오류가 발생했습니다.<br />
-                            문제가 지속되면 관리자에게 문의해 주세요.
+                        <p className="text-sm mb-6 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            아래 단추로 다시 불러오면 대부분 해결됩니다.<br />
+                            계속 같은 화면이 뜨면 관리자에게 알려 주세요.
                         </p>
 
-                        <div className="bg-gray-50 p-3 rounded text-left mb-6 overflow-auto max-h-32 border border-gray-200">
-                            <p className="text-[11px] font-mono text-gray-500 break-all">
-                                {this.state.error && this.state.error.toString()}
-                            </p>
-                        </div>
-
-                        <button
-                            onClick={this.handleReload}
-                            className="w-full bg-oem-blue hover:bg-oem-blue-dark text-white font-bold py-3 px-4 rounded-sm transition-colors flex items-center justify-center gap-2 uppercase text-sm tracking-wide"
-                        >
+                        <button onClick={this.handleReload} className="tb-btn primary w-full justify-center" style={{ minHeight: 44 }}>
                             <RefreshCw className="w-4 h-4" />
-                            Reload Application
+                            다시 불러오기
                         </button>
 
-                        <p className="mt-4 text-[10px] text-gray-500">
-                            Error Code: RENDER_EXCEPTION_0x1
-                        </p>
+                        {this.state.error && (
+                            <details className="mt-5 text-left">
+                                <summary className="text-xs cursor-pointer" style={{ color: 'var(--text-muted)' }}>
+                                    관리자에게 보낼 내용
+                                </summary>
+                                <p className="mt-2 p-3 rounded text-xs break-all overflow-auto max-h-32"
+                                    style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>
+                                    {this.state.error.toString()}
+                                </p>
+                            </details>
+                        )}
                     </div>
                 </div>
             );

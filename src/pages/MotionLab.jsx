@@ -3,6 +3,7 @@ import Modal from '../components/Modal'
 import PageLoading from '../components/PageLoading'
 import PullToRefresh from '../components/PullToRefresh'
 import RouteTransition from '../components/RouteTransition'
+import toast from 'react-hot-toast'
 
 /**
  * 모션 확인 화면 — **개발 중에만 존재한다** (`/__motion`)
@@ -70,6 +71,13 @@ const MotionLab = () => {
                             ${saving === 'done' ? '' : 'bg-oem-blue'} disabled:opacity-80`}>
                         {saving === 'saving' ? '저장 중…' : saving === 'done' ? '저장됨 ✓' : '저장'}
                     </button>
+                </Swatch>
+
+                <Swatch label="알림(토스트)" hint="저장할 때마다 위에 뜨는 것 — 모양은 App.jsx의 Toaster">
+                    <div className="flex gap-2">
+                        <button className="tb-btn" onClick={() => toast.success('저장했습니다 — 매출 3건')}>성공 알림</button>
+                        <button className="tb-btn" onClick={() => toast.error('저장하지 못했습니다 — 다시 시도해 주세요')}>실패 알림</button>
+                    </div>
                 </Swatch>
 
                 <Swatch label="스켈레톤" hint="빈 화면 대신 형태를 먼저 보여준다">

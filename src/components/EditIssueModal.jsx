@@ -182,7 +182,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="이슈 수정" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
-          <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+          <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
             TITLE <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
@@ -197,7 +197,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+          <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
             내용
           </label>
           <textarea
@@ -215,7 +215,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+            <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
               목표일
             </label>
             <input
@@ -227,7 +227,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-oem-text-secondary uppercase tracking-tight mb-1">
+            <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
               STATUS <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select

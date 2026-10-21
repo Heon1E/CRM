@@ -831,7 +831,7 @@ const KPIWidget = ({ rawSalesData = [], clients = [], activities = [], myAccount
                                 <div className="relative z-10">
                                     {/* Category Badge */}
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                                        <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>
                                             {item.category}
                                         </span>
                                         <span className="text-[11px] font-bold" style={{ color: 'var(--text-muted)' }}>가중치 {item.weight}</span>

@@ -168,35 +168,38 @@ function App() {
               position="top-center"
               toastOptions={{
                 duration: 4000,
+                /* 저장할 때마다 뜨는 알림 — 예전엔 Oracle 파랑 막대 · 2px 모서리 ·
+                   Noto Sans KR(담아 두지 않은 글꼴) · Tailwind 초록/빨강이었다.
+                   앱 토큰(index.css)을 그대로 쓴다. */
                 style: {
-                  background: '#ffffff',
-                  color: '#333333',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-                  borderRadius: '2px', // Oracle-style slight rounding
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  fontFamily: '"Noto Sans KR", sans-serif',
+                  background: 'var(--bg-card)',
+                  color: 'var(--ind-ink)',
+                  boxShadow: 'var(--shadow-md)',
+                  borderRadius: 'var(--radius-lg)',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-ui)',
                   padding: '10px 16px',
-                  border: '1px solid #d9d9d9',
-                  borderLeft: '4px solid #0076ce', // Oracle Blue
+                  border: '1px solid var(--border)',
+                  borderLeft: '4px solid var(--accent)',
                   maxWidth: '450px'
                 },
                 success: {
                   iconTheme: {
-                    primary: '#10b981',
+                    primary: 'var(--success)',
                     secondary: '#ffffff',
                   },
                   style: {
-                    borderLeft: '4px solid #10b981',
+                    borderLeft: '4px solid var(--success)',
                   },
                 },
                 error: {
                   iconTheme: {
-                    primary: '#ef4444',
+                    primary: 'var(--danger)',
                     secondary: '#ffffff',
                   },
                   style: {
-                    borderLeft: '4px solid #ef4444',
+                    borderLeft: '4px solid var(--danger)',
                   },
                 },
               }}

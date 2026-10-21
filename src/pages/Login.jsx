@@ -123,7 +123,7 @@ const Login = () => {
             <form onSubmit={handleEmailAuth} className="space-y-5">
               {/* Email Field */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="email">아이디</label>
+                <label className="text-xs font-bold text-slate-700" htmlFor="email">아이디</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
                   <input
@@ -141,7 +141,7 @@ const Login = () => {
               {/* Password Field */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider" htmlFor="password">비밀번호</label>
+                  <label className="text-xs font-bold text-slate-700" htmlFor="password">비밀번호</label>
                   {/* 예전에 href="#" 인 '비밀번호 찾기'가 있었다. 눌러도 아무 일이
                       일어나지 않는다. 아이디가 회사 내부용(@idibc.local)이라 메일로
                       보낼 수도 없다. 관리자에게 요청하는 것이 실제 절차다. */}
@@ -183,7 +183,7 @@ const Login = () => {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-200"></div>
               </div>
-              <div className="relative flex justify-center text-xs uppercase tracking-widest">
+              <div className="relative flex justify-center text-xs">
                 <span className="bg-white px-4 text-slate-500 font-medium">또는</span>
               </div>
             </div>
