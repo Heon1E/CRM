@@ -506,14 +506,14 @@ const AddActivityModal = ({ isOpen, onClose, initialDate = null }) => {
             이슈로도 등록
           </label>
           <span className="text-xs text-oem-text-secondary ml-1">
-            (Automatically adds this activity to the Issue Tracker)
+            (이슈 화면에도 같은 내용으로 올라갑니다)
           </span>
         </div>
 
         {registerAsIssue && (
           <div className="p-3 bg-oem-grey-light border border-oem-border rounded-sm">
             <p className="text-xs text-oem-blue font-medium">
-              💡 This activity will be copied to the Issue Tracker with the same title and description.
+              이 활동의 제목과 내용이 그대로 이슈로 복사됩니다.
             </p>
           </div>
         )}

@@ -357,7 +357,7 @@ const Settings = () => {
               <Panel title="회사 정보">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
                   <div>
-                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">회사명</label>
+                    <label className="block text-[13px] font-bold text-oem-text-secondary mb-1.5 uppercase">회사명</label>
                     <input
                       type="text"
                       value={settings.company_name}
@@ -367,7 +367,7 @@ const Settings = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-oem-text-secondary mb-1.5 uppercase">대표 이메일</label>
+                    <label className="block text-[13px] font-bold text-oem-text-secondary mb-1.5 uppercase">대표 이메일</label>
                     <input
                       type="email"
                       value={settings.email}
@@ -650,14 +650,14 @@ const Settings = () => {
                                 <button
                                   onClick={() => setEditingProductId(product.id)}
                                   className="p-1 hover:bg-gray-100 rounded text-oem-blue transition-colors"
-                                  title="Edit"
+                                  title="수정" aria-label="품목 수정"
                                 >
                                   <Edit className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(product.id)}
                                   className="p-1 hover:bg-gray-100 rounded text-[color:var(--danger)] transition-colors"
-                                  title="Delete"
+                                  title="삭제" aria-label="품목 삭제"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -667,8 +667,8 @@ const Settings = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="4" className="py-8 text-center text-xs text-oem-text-secondary italic">
-                            NO_PRODUCT_RECORDS_FOUND
+                          <td colSpan="4" className="py-8 text-center text-sm text-oem-text-secondary">
+                            등록된 품목이 없습니다
                           </td>
                         </tr>
                       )}

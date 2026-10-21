@@ -76,7 +76,7 @@ const ActivityTimeline = ({ maxItems = 5 }) => {
                                         style={{ color: 'var(--text-primary)' }}>
                                         {act.clientName || '거래처 없음'}
                                     </p>
-                                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                                    <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                                         {String(act.activity_date || act.date || '').slice(5).replace('-', '/')}
                                     </span>
                                 </div>

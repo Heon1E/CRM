@@ -182,8 +182,8 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="이슈 수정" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
-          <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
-            TITLE <span className="text-[color:var(--danger)]">*</span>
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
+            제목 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="text"
@@ -197,7 +197,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
             내용
           </label>
           <textarea
@@ -208,14 +208,14 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
             placeholder="자세한 내용을 적습니다"
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-[10px] text-gray-500 font-mono">
+          <div className="mt-1 text-right text-[10px] text-gray-500">
             {charCount}/1000
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
+            <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
               목표일
             </label>
             <input
@@ -227,8 +227,8 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
-              STATUS <span className="text-[color:var(--danger)]">*</span>
+            <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
+              상태 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
               value={formData.status}
@@ -236,9 +236,9 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
               className="oem-input w-full"
               required
             >
-              <option value="등록">Registered</option>
-              <option value="진행">In Progress</option>
-              <option value="완료">Completed</option>
+              <option value="등록">등록</option>
+              <option value="진행">진행</option>
+              <option value="완료">완료</option>
             </select>
           </div>
         </div>
@@ -247,9 +247,9 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2 bg-red-50 text-[color:var(--danger)] border border-red-200 rounded hover:bg-red-100 transition-colors text-[11px] font-bold uppercase"
+            className="px-4 py-2 bg-red-50 text-[color:var(--danger)] border border-red-200 rounded hover:bg-red-100 transition-colors text-[13px] font-bold"
           >
-            DELETE_ISSUE
+            이슈 삭제
           </button>
           <div className="space-x-2">
             <button
@@ -263,7 +263,7 @@ const EditIssueModal = ({ isOpen, onClose, issueId, onDelete }) => {
               type="submit"
               className="oem-btn-primary px-4 py-2"
             >
-              UPDATE
+              저장
             </button>
           </div>
         </div>

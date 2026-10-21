@@ -444,11 +444,11 @@ const Clients = () => {
       {/* Bulk Action Bar (Floating Bottom) */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 animate-in slide-in-from-bottom-10 fade-in duration-300">
-          <span className="font-bold">{selectedIds.size} selected</span>
+          <span className="font-bold">{selectedIds.size}곳 선택</span>
           <div className="h-4 w-px bg-slate-700"></div>
           <button
             onClick={handleBulkDelete}
-            className="flex items-center gap-2 text-red-400 hover:text-red-300 font-bold text-sm transition-colors"
+            className="flex items-center gap-2 text-red-300 hover:text-red-200 font-bold text-sm transition-colors"
           >
             <Trash2 className="w-4 h-4" /> 선택 삭제
           </button>

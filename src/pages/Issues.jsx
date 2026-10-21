@@ -94,7 +94,7 @@ const Issues = () => {
             이슈 관리
           </span>
           <span className="meta">
-            ISSUE · {filteredIssues.length}건
+            {filteredIssues.length}건
             {statusFilter !== 'all' && ` (전체 ${issues.length}건 중)`}
           </span>
         </span>
@@ -199,7 +199,7 @@ const Issues = () => {
                   </button>
                   <button
                     onClick={() => handleDelete(issue.id)}
-                    className="text-red-300 hover:text-red-200 font-medium flex items-center space-x-1 transition-colors"
+                    className="text-[color:var(--danger)] hover:opacity-80 font-medium flex items-center space-x-1 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                     <span className="text-sm">삭제</span>

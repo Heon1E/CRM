@@ -256,21 +256,21 @@ const ShareProcessing = () => {
 
         {status === 'success' && (
           <>
-            <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-emerald-300" />
+            <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-[color:var(--success)]" />
             <h2 className="text-xl font-semibold text-[color:var(--text-primary)] mb-2">처리 완료</h2>
             <p className="text-[color:var(--text-secondary)] mb-4">{message}</p>
             {analysisResult && (
               <div className="mt-4 p-4 bg-[color:var(--bg-card)] rounded-lg text-left border border-[color:var(--border)]">
-                <p className="text-sm text-emerald-300">
+                <p className="text-sm text-[color:var(--success)]">
                   <strong>거래처:</strong> {analysisResult.clientName || '없음'}
                 </p>
-                <p className="text-sm text-emerald-300">
+                <p className="text-sm text-[color:var(--success)]">
                   <strong>날짜:</strong> {analysisResult.date}
                 </p>
-                <p className="text-sm text-emerald-300">
+                <p className="text-sm text-[color:var(--success)]">
                   <strong>유형:</strong> {analysisResult.type}
                 </p>
-                <p className="text-sm text-emerald-300 mt-2">
+                <p className="text-sm text-[color:var(--success)] mt-2">
                   <strong>요약:</strong> {analysisResult.summary}
                 </p>
               </div>

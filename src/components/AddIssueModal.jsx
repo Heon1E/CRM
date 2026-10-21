@@ -102,7 +102,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="이슈 추가" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 px-1">
         <div>
-          <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
             제목 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
@@ -117,7 +117,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
             내용
           </label>
           <textarea
@@ -128,14 +128,14 @@ const AddIssueModal = ({ isOpen, onClose }) => {
             placeholder="자세한 내용"
             maxLength={1000}
           />
-          <div className="mt-1 text-right text-[10px] text-gray-500 font-mono">
+          <div className="mt-1 text-right text-[10px] text-gray-500">
             {charCount}/1000
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
+            <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
               목표일
             </label>
             <input
@@ -147,7 +147,7 @@ const AddIssueModal = ({ isOpen, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
+            <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
               상태 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
@@ -156,9 +156,9 @@ const AddIssueModal = ({ isOpen, onClose }) => {
               className="oem-input w-full"
               required
             >
-              <option value="등록">Registered</option>
-              <option value="진행">In Progress</option>
-              <option value="완료">Completed</option>
+              <option value="등록">등록</option>
+              <option value="진행">진행</option>
+              <option value="완료">완료</option>
             </select>
           </div>
         </div>

@@ -55,7 +55,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            품목명 <span className="text-red-400">*</span>
+            품목명 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
             type="text"
@@ -69,7 +69,7 @@ const AddProductModal = ({ isOpen, onClose }) => {
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            품목 종류 <span className="text-red-400">*</span>
+            품목 종류 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <select
             value={formData.type}

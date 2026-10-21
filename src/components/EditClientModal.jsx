@@ -10,6 +10,28 @@ import { showWarning, showSuccess, showError, showConfirm } from '../utils/alert
 import { formatKoreanPhone } from '../utils/phoneFormatter'
 import { CLIENT_STATUS_OPTIONS } from '../utils/clientStatus'
 
+/*
+ * 예전에는 회색 돋움 테두리(oracle-raised · #d0d0d0 · #808080) + 9~11px 글씨 +
+ * `BROWSE...`·`EXIT`·`Add`·`DELETE_RECORD`·`KM` 같은 영어 단추였다 — 'PC 업무
+ * 프로그램' 방향의 잔재다. 담당자 표는 10px 글씨에 테두리 없는 칸이라 어디에
+ * 적는지조차 안 보였다. 앱의 다른 입력 창과 같은 모양으로 맞춘다.
+ */
+// 컴포넌트 바깥에 둔다 — 안에 두면 그릴 때마다 새 타입이 되어 입력칸이 포커스를 잃는다.
+const Label = ({ children, htmlFor }) => (
+  <label htmlFor={htmlFor} className="block text-[13px] font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+    {children}
+  </label>
+)
+const Section = ({ title, action, children }) => (
+  <section className="rounded-lg border border-oem-border p-4 space-y-3">
+    <div className="flex items-center justify-between gap-2">
+      <h3 className="text-sm font-extrabold" style={{ color: 'var(--ind-ink)' }}>{title}</h3>
+      {action}
+    </div>
+    {children}
+  </section>
+)
+
 const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDelete }) => {
   // 모든 Hook 선언을 최상단에 배치 (React Hooks 규칙 준수)
   const { clients, updateClient, deleteClient, products, fetchClientContacts } = useData()
@@ -358,30 +380,28 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={client?.company ? `거래처 수정 · ${client.company}` : '새 거래처'} size="lg">
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-[color:var(--ind-ink)]">
-              회사명
-            </label>
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-5 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="ec-company">회사명</Label>
             <input
+              id="ec-company"
               type="text"
               value={formData.company || ''}
               onChange={(e) => setFormData({ ...formData, company: e.target.value || '' })}
-              className="oracle-sunken px-2 py-0.5"
+              className="w-full"
               required
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-[color:var(--ind-ink)]">
-              담당 영업사원
-            </label>
+          <div>
+            <Label htmlFor="ec-rep">담당 영업사원</Label>
             <select
+              id="ec-rep"
               value={formData.sales_rep || ''}
               onChange={(e) => setFormData({ ...formData, sales_rep: e.target.value })}
-              className="oracle-sunken px-2 py-0.5"
+              className="w-full"
             >
-              <option value="">(None)</option>
+              <option value="">지정 안 함</option>
               {SALES_REP_OPTIONS.map((rep) => (
                 <option key={rep} value={rep}>
                   {rep}
@@ -389,228 +409,199 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
               ))}
             </select>
           </div>
-
-          {/* 주소 입력 섹션 */}
-          <div className="col-span-1 md:col-span-2 oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-            <label className="font-bold text-[color:var(--ind-ink)] block border-b border-gray-400 pb-1 mb-2">주소</label>
-            <div className="flex gap-2 items-center">
-              <label className="w-20">우편번호</label>
-              <input
-                type="text"
-                value={formData.postal_code}
-                className="oracle-sunken w-24 bg-gray-100"
-                readOnly
-              />
-              <button
-                type="button"
-                onClick={handleAddressSearch}
-                className="oracle-raised bg-gray-200 px-3 py-0.5 hover:bg-gray-100"
-              >
-                BROWSE...
-              </button>
-            </div>
-            <div className="flex gap-2 items-center">
-              <label className="w-20">주소</label>
-              <input
-                type="text"
-                value={formData.address}
-                className="oracle-sunken flex-1 bg-gray-100"
-                readOnly
-              />
-            </div>
-            <div className="flex gap-2 items-center">
-              <label className="w-20">상세주소</label>
-              <input
-                type="text"
-                value={formData.address_detail}
-                onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })}
-                className="oracle-sunken flex-1"
-              />
-            </div>
+          <div>
+            <Label htmlFor="ec-status">상태</Label>
+            <select
+              id="ec-status"
+              value={formData.status || '신규'}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value || '신규' })}
+              className="w-full"
+            >
+              {CLIENT_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* 담당자 관리 섹션 */}
-        <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-          <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
-            <label className="font-bold text-[color:var(--ind-ink)]">담당자</label>
-            <button
-              type="button"
-              onClick={handleAddContact}
-              className="oracle-raised bg-gray-200 px-2 py-0.5 flex items-center gap-1"
-            >
-              <Plus className="w-3 h-3" />
-              <span>담당자 추가</span>
+        <Section title="주소">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={formData.postal_code || ''}
+              placeholder="우편번호"
+              aria-label="우편번호"
+              className="w-28"
+              style={{ background: 'var(--bg-subtle)' }}
+              readOnly
+            />
+            <button type="button" onClick={handleAddressSearch} className="oem-btn-secondary">
+              주소 찾기
+            </button>
+          </div>
+          <input
+            type="text"
+            value={formData.address || ''}
+            placeholder="'주소 찾기'로 고르면 채워집니다"
+            aria-label="주소"
+            className="w-full"
+            style={{ background: 'var(--bg-subtle)' }}
+            readOnly
+          />
+          <input
+            type="text"
+            value={formData.address_detail || ''}
+            onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })}
+            placeholder="상세주소 (동·호수 등)"
+            aria-label="상세주소"
+            className="w-full"
+          />
+        </Section>
+
+        <Section
+          title={`담당자 ${contacts.length}명`}
+          action={
+            <button type="button" onClick={handleAddContact} className="oem-btn-secondary inline-flex items-center gap-1">
+              <Plus className="w-4 h-4" />
+              담당자 추가
+            </button>
+          }
+        >
+          <div className="space-y-2">
+            {contacts.map((contact, index) => (
+              <div key={index} className="rounded-md p-3 grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_1.4fr_auto] gap-2 items-center"
+                style={{ background: contact.is_primary ? 'var(--bg-header)' : 'transparent', border: '1px solid var(--border-light)' }}>
+                <input
+                  type="text"
+                  value={contact.name || ''}
+                  onChange={(e) => handleContactChange(index, 'name', e.target.value)}
+                  placeholder="이름"
+                  aria-label="이름"
+                  className="w-full"
+                />
+                <input
+                  type="text"
+                  value={contact.department_role || ''}
+                  onChange={(e) => handleContactChange(index, 'department_role', e.target.value)}
+                  placeholder="직급"
+                  aria-label="직급"
+                  className="w-full"
+                />
+                <input
+                  type="tel"
+                  value={contact.phone || ''}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d-]/g, '')
+                    handleContactChange(index, 'phone', value)
+                  }}
+                  onBlur={() => handleContactPhoneBlur(index)}
+                  placeholder="전화"
+                  aria-label="전화"
+                  className="w-full"
+                />
+                <input
+                  type="email"
+                  value={contact.email || ''}
+                  onChange={(e) => handleContactChange(index, 'email', e.target.value)}
+                  placeholder="이메일"
+                  aria-label="이메일"
+                  className="w-full"
+                />
+                <div className="flex items-center justify-end gap-1">
+                  <label className="tap-box inline-flex items-center gap-1.5 text-[13px] whitespace-nowrap cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={contact.is_primary || false}
+                      onChange={(e) => handleContactChange(index, 'is_primary', e.target.checked)}
+                    />
+                    대표
+                  </label>
+                  {contacts.length > 1 && (
+                    <button type="button" onClick={() => handleRemoveContact(index)}
+                      className="icon-btn icon-btn-danger" aria-label={`담당자 ${index + 1} 빼기`} title="빼기">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="계약 단가">
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="flex-1 min-w-[180px]">
+              <Label htmlFor="ec-cp-product">품목</Label>
+              <select
+                id="ec-cp-product"
+                value={newContractPrice.productId || ''}
+                onChange={(e) => setNewContractPrice({ ...newContractPrice, productId: e.target.value || '' })}
+                className="w-full"
+              >
+                <option value="">품목을 고르세요</option>
+                {Array.isArray(availableProducts) && availableProducts.map((product) => (
+                  <option key={product?.id} value={product?.id || ''}>
+                    {product?.name || ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="w-32">
+              <Label htmlFor="ec-cp-price">단가 (원)</Label>
+              <input
+                id="ec-cp-price"
+                type="number"
+                value={newContractPrice.price || ''}
+                onChange={(e) => setNewContractPrice({ ...newContractPrice, price: e.target.value || '' })}
+                className="w-full text-right"
+                min="0"
+              />
+            </div>
+            <button type="button" onClick={handleAddContractPrice} className="oem-btn-secondary">
+              추가
             </button>
           </div>
 
-          <div className="space-y-1 max-h-[160px] overflow-auto oracle-sunken bg-white p-1">
-            <table className="w-full text-[10px] border-collapse">
-              <thead className="bg-gray-200 sticky top-0">
-                <tr>
-                  <th className="w-6">KM</th>
-                  <th>이름</th>
-                  <th>직급</th>
-                  <th>전화</th>
-                  <th>이메일</th>
-                  <th className="w-6">삭제</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contacts.map((contact, index) => (
-                  <tr key={index} className="border-b border-gray-100">
-                    <td className="p-1 text-center">
+          {currentPrices.length > 0 ? (
+            <ul className="divide-y" style={{ borderTop: '1px solid var(--border-light)' }}>
+              {currentPrices.filter(cp => cp?.productId).map((cp) => {
+                const product = Array.isArray(products) ? products.find((p) => p?.id === cp?.productId) : null
+                return (
+                  <li key={cp?.productId} className="flex items-center justify-between gap-3 py-2" style={{ borderColor: 'var(--border-light)' }}>
+                    <span className="font-bold truncate">{product?.name || '(지운 품목)'}</span>
+                    <div className="flex items-center gap-1">
                       <input
-                        type="checkbox"
-                        checked={contact.is_primary || false}
-                        onChange={(e) => handleContactChange(index, 'is_primary', e.target.checked)}
+                        type="number"
+                        value={cp?.price || 0}
+                        onChange={(e) => handleUpdateContractPrice(cp?.productId, e.target.value || '0')}
+                        aria-label={`${product?.name || '품목'} 단가`}
+                        className="w-28 text-right num"
                       />
-                    </td>
-                    <td className="p-1">
-                      <input
-                        type="text"
-                        value={contact.name || ''}
-                        onChange={(e) => handleContactChange(index, 'name', e.target.value)}
-                        className="w-full border-none outline-none bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <input
-                        type="text"
-                        value={contact.department_role || ''}
-                        onChange={(e) => handleContactChange(index, 'department_role', e.target.value)}
-                        className="w-full border-none outline-none bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <input
-                        type="tel"
-                        value={contact.phone || ''}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^\d-]/g, '')
-                          handleContactChange(index, 'phone', value)
-                        }}
-                        onBlur={() => handleContactPhoneBlur(index)}
-                        className="w-full border-none outline-none bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1">
-                      <input
-                        type="email"
-                        value={contact.email || ''}
-                        onChange={(e) => handleContactChange(index, 'email', e.target.value)}
-                        className="w-full border-none outline-none bg-transparent"
-                      />
-                    </td>
-                    <td className="p-1 text-center">
-                      {contacts.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveContact(index)} className="text-[color:var(--danger)] font-bold">×</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-bold text-[color:var(--ind-ink)]">상태</label>
-          <select
-            value={formData.status || '신규'}
-            onChange={(e) => setFormData({ ...formData, status: e.target.value || '신규' })}
-            className="oracle-sunken px-2 py-0.5"
-          >
-            {CLIENT_STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* 계약 단가 관리 섹션 */}
-        <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-          <label className="font-bold text-[color:var(--ind-ink)] block border-b border-gray-400 pb-1 mb-2">계약 단가</label>
-
-          <div className="bg-white p-2 oracle-sunken space-y-2">
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="block text-[9px] font-bold">품목 고르기</label>
-                <select
-                  value={newContractPrice.productId || ''}
-                  onChange={(e) => setNewContractPrice({ ...newContractPrice, productId: e.target.value || '' })}
-                  className="w-full border border-gray-300 outline-none h-6 px-1"
-                >
-                  <option value="">-- Choose --</option>
-                  {Array.isArray(availableProducts) && availableProducts.map((product) => (
-                    <option key={product?.id} value={product?.id || ''}>
-                      {product?.name || ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="w-24">
-                <label className="block text-[9px] font-bold">단가</label>
-                <input
-                  type="number"
-                  value={newContractPrice.price || ''}
-                  onChange={(e) => setNewContractPrice({ ...newContractPrice, price: e.target.value || '' })}
-                  className="w-full border border-gray-300 outline-none h-6 px-1"
-                  min="0"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleAddContractPrice}
-                className="oracle-raised bg-gray-200 px-3 h-6 text-[10px] uppercase font-bold"
-              >
-                Add
-              </button>
-            </div>
-
-            {currentPrices.length > 0 && (
-              <div className="mt-2 border-t border-gray-200 pt-2 space-y-1">
-                {currentPrices.filter(cp => cp?.productId).map((cp) => {
-                  const product = Array.isArray(products) ? products.find((p) => p?.id === cp?.productId) : null
-                  return (
-                    <div key={cp?.productId} className="flex items-center justify-between border-b border-gray-100 pb-1">
-                      <span className="font-bold w-40 truncate">{product?.name || 'UNKNOWN'}</span>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          value={cp?.price || 0}
-                          onChange={(e) => handleUpdateContractPrice(cp?.productId, e.target.value || '0')}
-                          className="w-16 border border-gray-300 outline-none px-1 text-right"
-                        />
-                        <button type="button" onClick={() => handleRemoveContractPrice(cp?.productId)} className="text-[color:var(--danger)] font-bold px-1">×</button>
-                      </div>
+                      <button type="button" onClick={() => handleRemoveContractPrice(cp?.productId)}
+                        className="icon-btn icon-btn-danger" aria-label="단가 빼기" title="빼기">
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <p className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+              정해 둔 단가가 없습니다. 품목을 고르고 단가를 적어 추가하세요.
+            </p>
+          )}
+        </Section>
 
-        <div className="flex justify-between pt-2 border-t border-gray-400">
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="oracle-raised bg-[#808080] text-red-100 px-3 py-1 font-bold hover:bg-red-800"
-          >
-            DELETE_RECORD
+        <div className="flex justify-between gap-2 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+          <button type="button" onClick={handleDelete} className="btn-danger">
+            거래처 삭제
           </button>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="oracle-raised bg-gray-200 px-4 py-1 hover:bg-gray-100"
-            >
-              EXIT
+            <button type="button" onClick={onClose} className="oem-btn-secondary">
+              닫기
             </button>
-            <button
-              type="submit"
-              className="oracle-raised bg-oem-blue text-white px-6 py-1 font-bold hover:bg-oem-blue-dark"
-            >
+            <button type="submit" className="oem-btn-primary px-6">
               저장
             </button>
           </div>

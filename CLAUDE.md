@@ -424,6 +424,34 @@ Tailwind 클래스를 쓴 화면만 옛 색으로 남는다(2026-10에 실제로
 실측(2026-10-21): 폰 375px 영업활동·달력·영업기회·지도·견적서 편집 — 가로 넘침 0 ·
 12px 미만 0 · 대비 미달 0 · 44px 미만 0(지도 왼쪽 아래 카카오 로고 링크만 예외 — 우리 것이 아니다).
 
+### 3단계 — 입력 창과 남은 영어 (2026-10-21)
+
+- **상단 메뉴 전체가 `Inter`였다.** `TopNavbar`에 `font-['Inter',sans-serif]`가 박혀 있었는데
+  담아 두지 않은 글꼴이라 PC마다 다른 글꼴로 대체됐다. 브랜드 글꼴(나눔스퀘어 네오)로.
+  찾는 법: 화면 글씨의 `getComputedStyle(e).fontFamily` 첫 이름을 모아 Nanum·Montserrat
+  밖의 것을 본다(`ui-monospace`는 `Ctrl K` 표시뿐이다).
+- **거래처 수정 · 매출 등록 창이 옛 모양 그대로였다** — 회색 돋움 테두리(`oracle-raised`·
+  `#d0d0d0`·`#808080`), 9~11px 글씨, `BROWSE...`·`EXIT`·`Add`·`DELETE_RECORD`·
+  `Grand Total (Commit Amount): … KRW`. 2단계에서 라벨만 한국어로 바꾸고 모양은 남아 있었다.
+  지금은 흰 창 + 구획(테두리 8px) + 13px 라벨 + 앱 단추(`oem-btn-*`·`btn-danger`).
+  담당자는 10px 표 대신 줄마다 칸 넷 + '대표' 고르기(`tap-box`). 매출 품목은 폰에서 품목을
+  위에, 수량·단가·금액을 아래에 두고 **폰에서만 칸 이름을 붙인다**(숫자가 차면 placeholder가
+  사라져 어느 칸이 단가인지 모른다).
+- **창 안에서 쓰는 작은 컴포넌트(`Label`·`Section`)는 컴포넌트 바깥에 둔다.** 안에 두면
+  그릴 때마다 새 타입이 되어 **입력칸이 글자 하나마다 포커스를 잃는다.**
+- 다크 테마 잔재 색 — 이슈 '삭제'가 `text-red-300`(흰 바탕 1.90:1), 품목 '삭제'가
+  `text-red-200`, 필수 표시 `text-red-400`, 공유 처리 결과가 `text-emerald-300`. 전부 토큰으로.
+- 남은 영어 — 이슈 창(`TITLE`·`STATUS`·`Registered/In Progress/Completed`·`UPDATE`·
+  `DELETE_ISSUE`), 활동 수정(`Follow-up Action`·`Target Date`·`ATTENDEES`·`ADD`·`DELETE`),
+  명령 팔레트(`ProTip…`·`Contact:`), 일괄선택 `N selected`, 품목 `NO_PRODUCT_RECORDS_FOUND`.
+  **정규식으로는 코드와 섞여 못 찾는다** — `@babel/parser`로 JSX 글자·`placeholder`·`title`·
+  `aria-label`만 뽑아 한글이 없는 것을 보면 52곳이 나왔고, 남은 것은 파일 경로·`Ctrl K`·
+  예시 주소뿐이다.
+- 창 라벨 `text-[11px]` → 13px(`.oem-label` 포함).
+
+실측(2026-10-21): 전 화면 14곳 데스크톱 — 대비 미달 0 · 테두리 없는 입력칸 0 · 개발자 말 0.
+거래처 수정·매출 등록 창 375px — 가로 넘침 0 · 12px 미만 0 · 44px 미달 0.
+
 지켜야 할 규칙:
 
 - **`html`은 반드시 16px.** Tailwind의 `text-xs`(0.75rem) 등이 전부 rem 기준이라, 여기를 15px로 낮추면

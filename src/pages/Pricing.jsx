@@ -16,7 +16,7 @@ import { Rocket, Phone, Mail, MapPin, ArrowRight } from 'lucide-react'
  * 파는 물건이 되면 이 파일을 다시 요금제 화면으로 만들면 된다.
  */
 const Pricing = () => (
-    <div className="bg-[#F8FAFC] text-slate-900 min-h-screen font-['Inter',sans-serif]">
+    <div className="bg-[#F8FAFC] text-slate-900 min-h-screen">
 
         <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#007538]/10">
             <div className="max-w-5xl mx-auto px-6">

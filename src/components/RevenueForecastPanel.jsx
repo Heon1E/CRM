@@ -131,7 +131,7 @@ const RevenueForecastPanel = () => {
                     </div>
                     <div className="text-[11px] font-bold"
                         style={{ color: Number(data.growth_rate) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        {Number(data.growth_rate) >= 0 ? '▲' : '▼'} {data.growth_rate}% (YoY)
+                        {Number(data.growth_rate) >= 0 ? '▲' : '▼'} {data.growth_rate}% (작년 대비)
                     </div>
                     {isLowConfidence && (
                         <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded"

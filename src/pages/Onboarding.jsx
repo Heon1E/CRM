@@ -267,7 +267,7 @@ const Onboarding = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] flex items-center justify-center p-6 font-['Inter',sans-serif]">
+        <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] flex items-center justify-center p-6">
 
             {/* Background glow */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">

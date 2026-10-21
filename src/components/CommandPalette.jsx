@@ -136,7 +136,7 @@ const CommandPalette = () => {
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <p className={`text-sm font-medium truncate ${idx === selectedIndex ? 'font-bold' : ''}`}>{item.name}</p>
-                                        {item.sub && <p className="text-xs text-slate-500 truncate">Contact: {item.sub}</p>}
+                                        {item.sub && <p className="text-xs text-slate-500 truncate">담당 {item.sub}</p>}
                                     </div>
                                     {idx === selectedIndex && (
                                         <ArrowRight className="w-4 h-4 text-oem-blue" />
@@ -153,9 +153,9 @@ const CommandPalette = () => {
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                    <span>ProTip: Use arrows to navigate, Enter to select</span>
-                    <span>Open Quick Actions with Ctrl+K</span>
+                <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                    <span>↑↓로 고르고 Enter로 엽니다</span>
+                    <span>Ctrl+K로 언제든 엽니다</span>
                 </div>
             </div>
         </div>

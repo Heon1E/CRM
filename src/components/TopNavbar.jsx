@@ -48,7 +48,7 @@ const TopNavbar = () => {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-50 h-[56px] flex items-center px-6 font-['Inter',sans-serif]"
+      className="fixed top-0 left-0 right-0 z-50 h-[56px] flex items-center px-6"
       style={{
         backgroundColor: 'var(--bg-header)',
         borderBottom: '1px solid var(--border)',
@@ -140,7 +140,7 @@ const TopNavbar = () => {
           type="button"
           className="p-2 relative transition-colors"
           style={{ color: 'var(--text-secondary)' }}
-          aria-label="Notifications"
+          aria-label="알림"
         >
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--accent)' }}></span>

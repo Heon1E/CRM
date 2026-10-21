@@ -219,7 +219,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              회사명 <span className="text-red-400">*</span>
+              회사명 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
               type="text"
@@ -308,7 +308,7 @@ const AddClientModal = ({ isOpen, onClose, initialData = null }) => {
                     <button
                       type="button"
                       onClick={() => handleRemoveContact(index)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
+                      className="text-[color:var(--danger)] hover:opacity-80 transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>

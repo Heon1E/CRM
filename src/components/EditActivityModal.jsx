@@ -232,7 +232,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="활동 수정" size="lg">
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-oem-text-primary">
         <div>
-          <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
             거래처 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <ClientCombobox
@@ -250,7 +250,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
+            <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
               활동 유형 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
@@ -269,7 +269,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
+            <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
               상태 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <select
@@ -285,7 +285,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
             날짜 <span className="text-[color:var(--danger)]">*</span>
           </label>
           <input
@@ -299,14 +299,14 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
 
         {/* 다음 일정 */}
         <div className="p-3 bg-oem-bg-app border border-oem-border rounded-sm">
-          <p className="text-[10px] font-bold text-oem-text-secondary uppercase mb-3 flex items-center gap-1">
+          <p className="text-[13px] font-bold text-oem-text-secondary mb-3 flex items-center gap-1">
             <span className="w-1 h-3 bg-oem-blue inline-block"></span>
-            Follow-up Action
+            다음에 할 일
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
-                Target Date
+              <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
+                언제까지
               </label>
               <input
                 type="date"
@@ -316,8 +316,8 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-oem-text-secondary mb-1">
-                Action Detail
+              <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
+                할 일
               </label>
               <input
                 type="text"
@@ -332,8 +332,8 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
 
         {/* 참석자 */}
         <div>
-          <label className="block text-xs font-bold text-oem-text-secondary uppercase mb-1">
-            ATTENDEES
+          <label className="block text-[13px] font-bold text-oem-text-secondary mb-1">
+            참석자 (상대측)
           </label>
           <div className="flex gap-2 mb-2">
             <input
@@ -351,7 +351,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
               className="bg-white border border-oem-border hover:bg-gray-50 text-oem-text-primary px-3 py-2 text-xs font-bold rounded-sm flex items-center gap-1 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              ADD
+              추가
             </button>
           </div>
           {attendees.length > 0 && (
@@ -378,7 +378,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
         {/* 내용 */}
         <div>
           <div className="flex items-center justify-between mb-1 gap-2">
-            <label className="block text-xs font-bold text-oem-text-secondary uppercase">
+            <label className="block text-[13px] font-bold text-oem-text-secondary">
               내용 <span className="text-[color:var(--danger)]">*</span>
             </label>
             {preAIText !== null && !isAILoading && (
@@ -431,7 +431,7 @@ const EditActivityModal = ({ isOpen, onClose, activityId, onDelete }) => {
             onClick={handleDeleteWrap}
             className="px-4 py-2 text-xs font-bold text-[color:var(--danger)] hover:bg-red-50 border border-transparent hover:border-red-200 rounded-sm transition-colors"
           >
-            DELETE
+            삭제
           </button>
           <div className="flex space-x-2">
             <button

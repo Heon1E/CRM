@@ -364,12 +364,17 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
     }
   }
 
+  /*
+   * 예전에는 회색 돋움 테두리(oracle-raised)와 10~11px 표, `Grand Total (Commit Amount):
+   * … KRW` 같은 영어 합계 줄이었다. 앱의 다른 입력 창(거래처 수정)과 같은 모양으로 맞춘다.
+   * 폰에서는 품목 한 줄이 칸 넷을 다 담지 못하므로 품목을 위에, 수량·단가·금액을 아래에 둔다.
+   */
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="매출 등록" size="lg" docked={docked}>
-      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 text-[11px]">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-[color:var(--ind-ink)]">
+      <form ref={formRef} onSubmit={handleSubmit} className={`space-y-5 text-sm ${docked ? 'p-4' : ''}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_12rem] gap-4">
+          <div>
+            <label className="block text-[13px] font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               거래처 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <ClientCombobox
@@ -381,133 +386,131 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="font-bold text-[color:var(--ind-ink)]">
+          <div>
+            <label htmlFor="as-date" className="block text-[13px] font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>
               매출일 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
+              id="as-date"
               type="date"
               value={formData.sale_date}
               onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
-              className="oracle-sunken px-2 py-0.5"
+              className="w-full"
               required
             />
           </div>
         </div>
 
         {/* 품목 리스트 */}
-        <div className="oracle-raised bg-[#d0d0d0] p-2 space-y-2">
-          <div className="flex items-center justify-between border-b border-gray-400 pb-1 mb-2">
-            <label className="font-bold text-[color:var(--ind-ink)]">품목</label>
-            <button
-              type="button"
-              onClick={addItem}
-              className="oracle-raised bg-gray-200 px-2 py-0.5 flex items-center gap-1"
-            >
-              <Plus className="w-3 h-3" />
-              <span>품목 추가</span>
+        <section className="rounded-lg border border-oem-border p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-extrabold" style={{ color: 'var(--ind-ink)' }}>품목 {formData.items.length}줄</h3>
+            <button type="button" onClick={addItem} className="oem-btn-secondary inline-flex items-center gap-1">
+              <Plus className="w-4 h-4" />
+              품목 추가
             </button>
           </div>
 
-          <div className="space-y-1 max-h-[300px] overflow-auto oracle-sunken bg-white p-1">
-            <table className="w-full text-[10px] border-collapse">
-              <thead className="bg-[#c0c0c0] sticky top-0">
-                <tr>
-                  <th className="border-r border-b border-gray-400 w-8">번호</th>
-                  <th className="border-r border-b border-gray-400">품목 (검색)</th>
-                  <th className="border-r border-b border-gray-400 w-16">수량</th>
-                  <th className="border-r border-b border-gray-400 w-24 text-right">단가</th>
-                  <th className="border-r border-b border-gray-400 w-24 text-right">금액</th>
-                  <th className="border-b border-gray-400 w-6">삭제</th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.items.map((item, index) => {
-                  const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-                  return (
-                    <tr key={index} className="border-b border-gray-100">
-                      <td className="text-center bg-gray-50">{index + 1}</td>
-                      <td className="p-1" data-product-index={index}>
-                        <ProductCombobox
-                          products={products || []}
-                          value={item.productId || ''}
-                          onSelect={(productId) => handleProductSelect(index, productId)}
-                          placeholder={formData.clientId ? "품목 고르기" : "거래처를 먼저 고르세요"}
-                          disabled={!formData.clientId}
-                          className="border-none shadow-none"
-                        />
-                      </td>
-                      <td className="p-1">
-                        <input
-                          ref={(el) => { if (el) quantityInputRefs.current[`quantity-${index}`] = el }}
-                          type="number"
-                          value={item.quantity === '' ? '' : item.quantity}
-                          onChange={(e) => handleQuantityChange(index, e.target.value)}
-                          onBlur={() => handleQuantityBlur(index)}
-                          className="w-full border-none outline-none text-center bg-transparent"
-                          min="1"
-                          required
-                        />
-                      </td>
-                      <td className="p-1">
-                        <input
-                          ref={(el) => { if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el }}
-                          type="number"
-                          value={item.unitPrice === '' ? '' : item.unitPrice}
-                          onChange={(e) => handleUnitPriceChange(index, e.target.value)}
-                          onBlur={() => handleUnitPriceBlur(index)}
-                          className="w-full border-none outline-none text-right bg-transparent"
-                          min="0"
-                          required
-                        />
-                      </td>
-                      <td className="p-1 text-right font-bold text-oem-blue">
-                        {itemTotal.toLocaleString()}
-                      </td>
-                      <td className="p-1 text-center">
-                        {formData.items.length > 1 && (
-                          <button type="button" onClick={() => removeItem(index)} className="text-[color:var(--danger)] font-bold">×</button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="hidden sm:grid grid-cols-[1fr_5rem_7rem_7rem_2.75rem] gap-2 px-1 text-[12px] font-bold"
+            style={{ color: 'var(--text-secondary)' }}>
+            <span>품목</span>
+            <span className="text-center">수량</span>
+            <span className="text-right">단가</span>
+            <span className="text-right">금액</span>
+            <span />
           </div>
-        </div>
 
-        {/* 총액 */}
-        <div className="oracle-raised bg-[#808080] p-1 flex justify-between items-center text-white font-bold px-4">
-          <span className="uppercase text-[10px]">Grand Total (Commit Amount):</span>
-          <span className="text-sm">
-            {totalAmount.toLocaleString()} KRW
+          <div className="space-y-2">
+            {formData.items.map((item, index) => {
+              const itemTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
+              return (
+                <div key={index}
+                  className="grid grid-cols-[1fr_1fr_1fr_auto] sm:grid-cols-[1fr_5rem_7rem_7rem_2.75rem] gap-2 items-end sm:items-center rounded-md p-2 sm:p-1"
+                  style={{ border: '1px solid var(--border-light)' }}>
+                  <div className="col-span-4 sm:col-span-1" data-product-index={index}>
+                    <ProductCombobox
+                      products={products || []}
+                      value={item.productId || ''}
+                      onSelect={(productId) => handleProductSelect(index, productId)}
+                      placeholder={formData.clientId ? "품목 고르기" : "거래처를 먼저 고르세요"}
+                      disabled={!formData.clientId}
+                    />
+                  </div>
+                  <label className="block">
+                    <span className="sm:hidden block text-[12px] font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>수량</span>
+                    <input
+                      ref={(el) => { if (el) quantityInputRefs.current[`quantity-${index}`] = el }}
+                      type="number"
+                      value={item.quantity === '' ? '' : item.quantity}
+                      onChange={(e) => handleQuantityChange(index, e.target.value)}
+                      onBlur={() => handleQuantityBlur(index)}
+                      aria-label={`${index + 1}번 수량`}
+                      placeholder="수량"
+                      className="w-full text-center"
+                      min="1"
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="sm:hidden block text-[12px] font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>단가</span>
+                    <input
+                      ref={(el) => { if (el) unitPriceInputRefs.current[`unitPrice-${index}`] = el }}
+                      type="number"
+                      value={item.unitPrice === '' ? '' : item.unitPrice}
+                      onChange={(e) => handleUnitPriceChange(index, e.target.value)}
+                      onBlur={() => handleUnitPriceBlur(index)}
+                      aria-label={`${index + 1}번 단가`}
+                      placeholder="단가"
+                      className="w-full text-right"
+                      min="0"
+                      required
+                    />
+                  </label>
+                  <div className="text-right">
+                    <span className="sm:hidden block text-[12px] font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>금액</span>
+                    <span className="num block py-2.5 sm:py-0 text-right font-bold pr-1" style={{ color: 'var(--ind-ink)' }}>
+                      {itemTotal.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-end">
+                    {formData.items.length > 1 ? (
+                      <button type="button" onClick={() => removeItem(index)}
+                        className="icon-btn icon-btn-danger" aria-label={`${index + 1}번 품목 빼기`} title="빼기">
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : <span className="w-11" />}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* 총액 — 진한 초록은 결론(합계)에만 쓴다 (DESIGN.md) */}
+        <div className="flex justify-between items-baseline px-1">
+          <span className="text-[13px] font-bold" style={{ color: 'var(--text-secondary)' }}>합계 (공급가액)</span>
+          <span className="num text-xl font-extrabold" style={{ color: 'var(--accent)' }}>
+            {totalAmount.toLocaleString()}원
           </span>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="font-bold text-[color:var(--ind-ink)]">비고</label>
+        <div>
+          <label htmlFor="as-notes" className="block text-[13px] font-bold mb-1.5" style={{ color: 'var(--text-secondary)' }}>비고</label>
           <textarea
+            id="as-notes"
             value={formData.notes}
             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             rows={2}
-            className="oracle-sunken px-2 py-1 bg-white resize-none"
+            className="w-full resize-none"
             placeholder="메모 (선택)"
           />
         </div>
 
-        <div className="flex justify-end gap-2 pt-2 border-t border-gray-400">
-          <button
-            type="button"
-            onClick={onClose}
-            className="oracle-raised bg-gray-200 px-6 py-1 font-bold hover:bg-gray-100"
-          >
+        <div className="flex justify-end gap-2 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+          <button type="button" onClick={onClose} className="oem-btn-secondary px-5">
             취소
           </button>
-          <button
-            type="submit"
-            className="oracle-raised bg-oem-blue text-white px-8 py-1 font-bold hover:bg-oem-blue-dark"
-          >
+          <button type="submit" className="oem-btn-primary px-8">
             저장
           </button>
         </div>
