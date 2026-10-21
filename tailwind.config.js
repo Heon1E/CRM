@@ -70,6 +70,9 @@ export default {
       },
       borderRadius: {
         'oem': '6px', // 단추·입력칸 (index.css --radius). 예전 2px은 'PC 프로그램' 방향이었다
+        // Tailwind 기본 rounded-sm(2px)이 47곳에 박혀 있다(배지·작은 단추·입력칸). 하나씩
+        // 고치면 빠지므로 값을 4px로 올린다 — 카드 8px·단추 6px보다 한 단계 작게.
+        'sm': '4px',
       },
       keyframes: {
         // Toast(`animate-slide-in`) 와 설정 탭(`animate-fade-in`)이 쓰는데

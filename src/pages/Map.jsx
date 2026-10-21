@@ -118,10 +118,10 @@ const Map = () => {
         overlaysRef.current.forEach((o) => o.setMap(null))
         overlaysRef.current = []
 
-        const dot = (color, px, ring) => {
+        const dot = (color, px, ring, ringColor = '#fff') => {
             const el = document.createElement('div')
             el.style.cssText = `width:${px}px;height:${px}px;border-radius:50%;background:${color};`
-                + `border:${ring}px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;`
+                + `border:${ring}px solid ${ringColor};box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:pointer;`
             return el
         }
 
@@ -135,12 +135,15 @@ const Map = () => {
         }
 
         if (hqLocation) {
-            const el = dot('#111827', 16, 3)
+            /* 색은 브랜드 규칙을 따른다(2026-10): 거래처는 '누구인가'의 초록, 내 위치는
+               '지금 여기'의 노랑, 본사는 먹색. 예전엔 거래처가 빨강이라 지도의 모든 점이
+               '심각' 단계처럼 읽혔다(빨강은 채권 3개월+ 같은 경고 색이다). */
+            const el = dot('#3e3a39', 16, 3)
             el.title = '본사'
             add(hqLocation, el, 9999)
         }
         if (userLocation) {
-            const el = dot('#007538', 14, 3)
+            const el = dot('#ffed00', 16, 3, '#3e3a39')   // 노랑은 흰 테두리로는 지도에서 안 보인다
             el.title = '내 위치'
             add(userLocation, el, 10000)
         }
@@ -148,7 +151,7 @@ const Map = () => {
         filteredClients.forEach((c) => {
             const rev = Number(c.last_year_revenue || 0)
             const px = rev > 100_000_000 ? 18 : rev > 50_000_000 ? 15 : rev > 10_000_000 ? 12 : 9
-            const el = dot(c.status === '휴면' ? '#9ca3af' : '#d90000', px, 2)
+            const el = dot(c.status === '휴면' ? '#9ca3af' : '#007538', px, 2)
             el.title = c.company
             el.addEventListener('click', () => setSelectedClient(c))
             add({ lat: c.latitude, lng: c.longitude }, el, Math.floor(rev / 10000))
@@ -307,8 +310,8 @@ const Map = () => {
                     <div className="oem-panel-header shrink-0">
                         <span>지도</span>
                         <div className="flex items-center gap-3 text-xs font-bold text-oem-text-secondary">
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-black" /> 본사</span>
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#d90000]" /> 거래처</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#3e3a39]" /> 본사</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#007538]" /> 거래처</span>
                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#9ca3af]" /> 휴면</span>
                         </div>
                     </div>

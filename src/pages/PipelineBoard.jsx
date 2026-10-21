@@ -129,7 +129,7 @@ const PipelineBoard = () => {
     if (notReady) {
         return (
             <div className="win" style={{ margin: 12 }}>
-                <div className="win-title"><span>파이프라인</span></div>
+                <div className="win-title"><span>영업기회</span></div>
                 <p style={{ padding: 16, margin: 0, fontSize: 13, lineHeight: 1.8, color: 'var(--text-secondary)' }}>
                     아직 준비되지 않았습니다. Supabase SQL Editor에서{' '}
                     <code>execution/sql/deals.sql</code> 을 실행하면 나타납니다.
@@ -143,7 +143,7 @@ const PipelineBoard = () => {
             {/* ── 요약 ─────────────────────────────────────────────── */}
             <div className="win">
                 <div className="win-title">
-                    <span>파이프라인</span>
+                    <span>영업기회</span>
                     <span className="meta">진행 중인 영업 기회</span>
                 </div>
                 <div className="toolbar" style={{ flexWrap: 'wrap', gap: 8 }}>
@@ -154,7 +154,7 @@ const PipelineBoard = () => {
                         <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> 새로고침
                     </button>
                     {myRep && (
-                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5 }}>
+                        <label className="tap-box" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
                             <input type="checkbox" checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
                             내 것만
                         </label>

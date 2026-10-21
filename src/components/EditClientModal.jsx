@@ -362,7 +362,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <label className="font-bold text-[color:var(--ind-ink)]">
-              COMPANY_NAME:
+              회사명
             </label>
             <input
               type="text"
@@ -374,7 +374,7 @@ const EditClientModal = ({ isOpen, onClose, clientId, client: clientProp, onDele
           </div>
           <div className="flex flex-col gap-1">
             <label className="font-bold text-[color:var(--ind-ink)]">
-              SALES_REP_ID:
+              담당 영업사원
             </label>
             <select
               value={formData.sales_rep || ''}

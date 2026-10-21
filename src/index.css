@@ -706,17 +706,26 @@ textarea {
      밀려 조밀한 입력칸이 통째로 풀린다(패딩 0, 글자 13px).
    요소 선택자면 리셋보다 뒤에 와서 이기고, 클래스에는 진다 — 둘 다 만족한다.
    체크박스·라디오만 아래에서 되돌린다. */
+/* **테두리 '두께'를 준다.** Tailwind 리셋이 모든 테두리를 0으로 만드는데 위 규칙은
+   색만 정하고 있었다 — Tailwind 'border' 클래스를 안 붙인 입력칸은 테두리가 없었다.
+   흰 판 위에서는 흰 칸이라 어디에 쓰는지 안 보였다(2026-10 실측: 견적서 편집 11칸 전부,
+   거래처·매출 검색칸). 클래스('border-0' 등)는 이 요소 규칙을 이기므로 일부러 뺀
+   자리(표 안 입력 '.lines')는 그대로다. */
 input,
 select {
   min-height: 34px;
   padding: 5px 10px;
   font-size: 13px;
+  border-width: 1px;
+  border-style: solid;
 }
 
 textarea {
   padding: 8px 10px;
   font-size: 13px;
   line-height: 1.55;
+  border-width: 1px;
+  border-style: solid;
 }
 
 /* 체크박스·라디오는 위 규칙을 되돌린다 (속성 선택자라 요소 선택자를 이긴다) */
@@ -1806,3 +1815,59 @@ table.dgrid tbody tr:active { background: var(--bg-panel); }
     0%, 100% { opacity: 1; }
     50% { opacity: 0.35; }
 }
+
+/* =========================================
+   달력(FullCalendar, /calendar) — 브랜드에 맞춘다 (2026-10)
+
+   손대지 않아 라이브러리 기본 모양이 그대로였다:
+   - 단추가 짙은 남색(#2C3E50) — 앱의 강조는 초록 하나다
+   - 오늘이 흐린 노랑 — "흐린 노랑은 노랑이 아니다"(DESIGN.md). 진짜 노랑 '점'으로
+   - 날짜 숫자가 링크라 전역 `a { color: 초록 }`을 받아 **전부 초록**이었다.
+     일요일 빨강 · 토요일 파랑(한국 달력 관례, 대시보드 달력과 같은 값)이 사라졌다.
+   ========================================= */
+.fc {
+  --fc-border-color: var(--border-light);
+  --fc-today-bg-color: transparent;
+  --fc-button-bg-color: var(--bg-card);
+  --fc-button-border-color: var(--border-strong);
+  --fc-button-text-color: var(--ind-ink);
+  --fc-button-hover-bg-color: var(--bg-card-hover);
+  --fc-button-hover-border-color: var(--ind-ink-faint);
+  --fc-button-active-bg-color: var(--accent);
+  --fc-button-active-border-color: var(--accent-dark);
+  --fc-neutral-bg-color: var(--bg-subtle);
+  --fc-page-bg-color: var(--bg-card);
+}
+.fc .fc-button {
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: var(--radius);
+  box-shadow: none !important;
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active { color: #fff; }
+.fc .fc-button:disabled { opacity: .45; }
+.fc .fc-toolbar-title { font-size: 20px; font-weight: 800; color: var(--ind-ink); }
+
+/* 날짜·요일은 링크지만 글씨색은 달력 관례를 따른다 */
+.fc a.fc-daygrid-day-number,
+.fc a.fc-col-header-cell-cushion { color: var(--ind-ink); text-decoration: none; }
+.fc .fc-col-header-cell { background: var(--bg-header); }
+.fc a.fc-col-header-cell-cushion { color: var(--ind-ink-mute); font-weight: 700; font-size: 12.5px; }
+.fc .fc-day-sun a.fc-daygrid-day-number,
+.fc .fc-day-sun a.fc-col-header-cell-cushion { color: #B91C1C; }
+.fc .fc-day-sat a.fc-daygrid-day-number,
+.fc .fc-day-sat a.fc-col-header-cell-cushion { color: #1D4ED8; }
+.fc .fc-day-other a.fc-daygrid-day-number { opacity: .4; }
+
+/* 오늘 — 칸 전체를 물들이지 않고 숫자에만 진짜 노랑 면 (한 화면에 하나) */
+.fc .fc-day-today a.fc-daygrid-day-number {
+  background: var(--ind-yellow);
+  color: var(--ind-ink);
+  font-weight: 800;
+  border-radius: 999px;
+  min-width: 26px;
+  text-align: center;
+  margin: 2px;
+}
+.fc .is-holiday a.fc-daygrid-day-number { color: #B91C1C; }

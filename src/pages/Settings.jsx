@@ -633,7 +633,7 @@ const Settings = () => {
                     <thead>
                       <tr>
                         <th className="pl-4 text-left">품목명</th>
-                        <th className="text-left w-[20%]">TYPE</th>
+                        <th className="text-left w-[20%]">종류</th>
                         <th className="text-left w-[20%]">규격</th>
                         <th className="text-center w-[150px]">관리</th>
                       </tr>

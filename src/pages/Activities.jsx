@@ -240,10 +240,14 @@ const Activities = () => {
                         <span className="text-[11px] font-medium text-[color:var(--text-secondary)]">최신순</span>
                     </div>
 
-                    <div className="overflow-y-auto max-h-[calc(100vh-260px)]">
+                    {/* 예전엔 목록이 자체 스크롤 상자(max-h: 100vh-260px)에 갇혀 페이지와 상자가
+                        따로 굴렀다(실측: 상자 640px 안에 9,652px). 폰에서 상자 안을 밀면 페이지가
+                        안 움직이고, 상자 끝을 목록 끝으로 오해한다. 페이지 하나로 굴린다 —
+                        더 불러오기는 화면 기준(root: null)이라 그대로 동작한다. */}
+                    <div>
                         {visibleGroups.length > 0 ? visibleGroups.map(([date, rows]) => (
                             <div key={date}>
-                                <div className="px-4 py-1.5 flex items-center gap-3 sticky top-0 z-10 border-b"
+                                <div className="px-4 py-1.5 flex items-center gap-3 sticky top-14 z-10 border-b"
                                     style={{ background: 'var(--ind-panel)', borderColor: 'var(--border)' }}>
                                     <span className="font-bold text-[12px] whitespace-nowrap">{fmtDate(date)}</span>
                                     <div className="h-px flex-1" style={{ background: 'var(--border)' }} />

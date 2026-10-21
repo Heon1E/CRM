@@ -370,7 +370,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <label className="font-bold text-[color:var(--ind-ink)]">
-              CLIENT_ID: <span className="text-[color:var(--danger)]">*</span>
+              거래처 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <ClientCombobox
               clients={clients || []}
@@ -383,7 +383,7 @@ const AddSaleModal = ({ isOpen, onClose , docked = false }) => {
 
           <div className="flex flex-col gap-1">
             <label className="font-bold text-[color:var(--ind-ink)]">
-              TRANS_DATE: <span className="text-[color:var(--danger)]">*</span>
+              매출일 <span className="text-[color:var(--danger)]">*</span>
             </label>
             <input
               type="date"

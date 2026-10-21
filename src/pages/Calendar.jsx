@@ -7,6 +7,7 @@ import { Calendar as CalendarIcon, MapPin, Phone } from 'lucide-react'
 import koLocale from '@fullcalendar/core/locales/ko'
 import { useData } from '../contexts/DataContext'
 import { getHolidays } from '../utils/koreanHolidays'
+import { ymd } from '../utils/day'
 
 const Calendar = () => {
     const { activities, loading } = useData()
@@ -58,6 +59,13 @@ const Calendar = () => {
         return [...activityEvents, ...holidayEvents]
     }, [activities])
 
+    /* 공휴일 날짜 숫자도 일요일처럼 빨갛게 — 대시보드 달력과 같은 관례. 예전엔 공휴일이
+       '이벤트 막대'로만 표시되고 숫자는 검정이라 한눈에 쉬는 날인지 안 보였다. */
+    const holidayDates = useMemo(() => {
+        const y = new Date().getFullYear()
+        return new Set([y - 1, y, y + 1].flatMap((yy) => getHolidays(yy).map((h) => h.date)))
+    }, [])
+
     return (
         <div className="p-6 bg-oem-bg-app text-oem-text-primary">
             <div className="max-w-[1600px] mx-auto bg-white rounded-lg shadow-sm border border-oem-border p-6">
@@ -77,6 +85,7 @@ const Calendar = () => {
                             right: 'dayGridMonth,listWeek'
                         }}
                         events={events} // Pass events directly
+                        dayCellClassNames={(arg) => (holidayDates.has(ymd(arg.date)) ? ['is-holiday'] : [])}
                         eventContent={(arg) => {
                             const isHoliday = arg.event.backgroundColor === '#c81e1e'
                             const memo = arg.event.extendedProps?.memo
